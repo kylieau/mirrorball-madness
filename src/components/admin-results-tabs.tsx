@@ -8,6 +8,7 @@ import { ResultsForm } from "@/components/results-form";
 import { AllResultsView } from "@/components/all-results-view";
 import { ScheduleManager } from "@/components/schedule-manager";
 import { JudgesDanceStylesManager } from "@/components/judges-dance-styles-manager";
+import { PageHeader } from "@/components/page-header";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { PlusCircleIcon, ListChecksIcon, CalendarIcon, SettingsIcon } from "lucide-react";
 
@@ -106,7 +107,7 @@ export function AdminResultsTabs({
           </div>
         </div>
 
-        <h1 className="text-2xl font-semibold tracking-tight">Admin</h1>
+        <PageHeader title="Admin" />
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:border-b sm:pb-0">
