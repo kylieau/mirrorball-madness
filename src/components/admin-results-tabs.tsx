@@ -80,7 +80,7 @@ export function AdminResultsTabs({
 
   return (
     <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
-      <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 pt-8">
+      <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-8">
         <div className="flex items-start justify-between gap-4">
           <Link href="/today" className="text-xs font-medium text-muted-foreground">
             🪩 Mirrorball Madness
