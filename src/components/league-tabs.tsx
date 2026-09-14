@@ -48,7 +48,7 @@ export function LeagueTabs({
   return (
     <Tabs value={activeTab} onValueChange={handleValueChange}>
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:border-b sm:pb-0">
-        <TabsList className="h-auto w-full justify-around rounded-none bg-transparent p-1 sm:w-fit sm:justify-start sm:gap-1">
+        <TabsList className="h-auto w-full justify-around rounded-none bg-transparent p-1 group-data-horizontal/tabs:h-auto sm:w-fit sm:justify-start sm:gap-1">
           {LINK_ITEMS.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
