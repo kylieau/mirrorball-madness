@@ -73,21 +73,67 @@ export default async function ThisWeekPage() {
   const coupleDisplayNames = buildCoupleDisplayNames(flatCouples);
 
   // Which of the viewer's own leagues have each couple on their Dance Card
-  // roster right now — this is what makes eliminations/safe calls read as
-  // personally relevant instead of just generic show news.
-  const { data: rosterSlots } = await supabase
-    .from("roster_slots")
-    .select("league_id, couple_id")
-    .eq("manager_id", user.id)
-    .in("league_id", leagueIds)
-    .is("end_week", null);
+  // roster right now, plus which leagues they picked this couple as this
+  // week's elimination/top-scorer call — this is what makes eliminations
+  // and safe calls read as personally relevant instead of just generic
+  // show news. Picks are looked up against the episode being shown here
+  // (the latest completed one), not the upcoming episode Your Picks deals
+  // with — a past call, not a pending one.
+  const [{ data: rosterSlots }, { data: pastPredictions }] = await Promise.all([
+    supabase
+      .from("roster_slots")
+      .select("league_id, couple_id")
+      .eq("manager_id", user.id)
+      .in("league_id", leagueIds)
+      .is("end_week", null),
+    latestEpisodeId
+      ? supabase
+          .from("predictions")
+          .select("league_id, predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
+          .eq("manager_id", user.id)
+          .eq("episode_id", latestEpisodeId)
+          .in("league_id", leagueIds)
+      : Promise.resolve({ data: [] }),
+  ]);
 
-  const leaguesByCouple: Record<string, string[]> = {};
+  const rosterLeaguesByCouple: Record<string, string[]> = {};
   for (const slot of rosterSlots ?? []) {
     if (!slot.couple_id) continue;
     const leagueName = leagueNameById.get(slot.league_id);
     if (!leagueName) continue;
-    (leaguesByCouple[slot.couple_id] ??= []).push(leagueName);
+    (rosterLeaguesByCouple[slot.couple_id] ??= []).push(leagueName);
+  }
+
+  const eliminationPickLeaguesByCouple: Record<string, string[]> = {};
+  const topScorerPickLeaguesByCouple: Record<string, string[]> = {};
+  for (const p of pastPredictions ?? []) {
+    const leagueName = leagueNameById.get(p.league_id);
+    if (!leagueName) continue;
+    if (p.predicted_eliminated_couple_id) {
+      (eliminationPickLeaguesByCouple[p.predicted_eliminated_couple_id] ??= []).push(leagueName);
+    }
+    if (p.predicted_top_scorer_couple_id) {
+      (topScorerPickLeaguesByCouple[p.predicted_top_scorer_couple_id] ??= []).push(leagueName);
+    }
+  }
+
+  const leaguesByCouple: Record<string, string[]> = {};
+  for (const coupleId of new Set([
+    ...Object.keys(rosterLeaguesByCouple),
+    ...Object.keys(eliminationPickLeaguesByCouple),
+    ...Object.keys(topScorerPickLeaguesByCouple),
+  ])) {
+    const lines: string[] = [];
+    if (rosterLeaguesByCouple[coupleId]?.length) {
+      lines.push(`On your roster in ${rosterLeaguesByCouple[coupleId].join(", ")}`);
+    }
+    if (eliminationPickLeaguesByCouple[coupleId]?.length) {
+      lines.push(`Your elimination pick in ${eliminationPickLeaguesByCouple[coupleId].join(", ")}`);
+    }
+    if (topScorerPickLeaguesByCouple[coupleId]?.length) {
+      lines.push(`Your top-scorer pick in ${topScorerPickLeaguesByCouple[coupleId].join(", ")}`);
+    }
+    leaguesByCouple[coupleId] = lines;
   }
 
   return (

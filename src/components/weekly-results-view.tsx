@@ -153,11 +153,11 @@ export function WeeklyResultsView({
                   {r.parts ? <CoupleName {...r.parts} /> : "Unknown"}
                   {r.danceLabel && <span className="block text-xs font-normal text-muted-foreground">{r.danceLabel}</span>}
                 </p>
-                {leaguesByCouple?.[r.couple_id] && leaguesByCouple[r.couple_id].length > 0 && (
-                  <p className="mt-0.5 text-xs text-accent">
-                    On your roster in {leaguesByCouple[r.couple_id].join(", ")}
+                {leaguesByCouple?.[r.couple_id]?.map((line) => (
+                  <p key={line} className="mt-0.5 text-xs text-accent">
+                    {line}
                   </p>
-                )}
+                ))}
               </div>
               <div className="shrink-0 text-right text-xs text-muted-foreground">
                 <span className="block font-heading text-base font-semibold text-foreground">{r.total}</span>
