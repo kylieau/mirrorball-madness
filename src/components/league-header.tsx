@@ -32,6 +32,7 @@ export function LeagueHeader({
   scoringConfigured,
   switcherLeagues,
   members,
+  viewerDisplayName,
 }: ComponentProps<typeof LeagueModulesForm> & {
   leagueName: string;
   inviteCode: string;
@@ -41,6 +42,7 @@ export function LeagueHeader({
   scoringConfigured: boolean;
   switcherLeagues: SwitcherLeague[];
   members: { userId: string; displayName: string; role: string }[];
+  viewerDisplayName: string;
 }) {
   return (
     <Sheet>
@@ -74,6 +76,15 @@ export function LeagueHeader({
           <SheetTrigger render={<Button variant="outline" size="icon-sm" aria-label="League settings" />}>
             <SettingsIcon />
           </SheetTrigger>
+          <Button
+            render={<Link href="/settings" />}
+            nativeButton={false}
+            size="icon-sm"
+            aria-label="Account settings"
+            className="rounded-full font-bold"
+          >
+            {viewerDisplayName.charAt(0).toUpperCase()}
+          </Button>
         </div>
       </div>
 
