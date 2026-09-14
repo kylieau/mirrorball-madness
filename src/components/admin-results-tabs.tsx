@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ResultsForm } from "@/components/results-form";
 import { AllResultsView } from "@/components/all-results-view";
@@ -49,6 +51,7 @@ const TABS = [
 ] as const;
 
 export function AdminResultsTabs({
+  viewerDisplayName,
   activeCouples,
   allCouples,
   activeCoupleDisplayNames,
@@ -60,6 +63,7 @@ export function AdminResultsTabs({
   judgeScores,
   episodeResults,
 }: {
+  viewerDisplayName: string;
   activeCouples: Couple[];
   allCouples: Couple[];
   activeCoupleDisplayNames: Record<string, CoupleNameParts>;
@@ -75,7 +79,33 @@ export function AdminResultsTabs({
 
   return (
     <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
-      <div className="mx-auto max-w-3xl px-4 pt-12">
+      <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 pt-8">
+        <div className="flex items-start justify-between gap-4">
+          <Link href="/today" className="text-xs font-medium text-muted-foreground">
+            🪩 Mirrorball Madness
+          </Link>
+          <div className="flex gap-2">
+            <Button
+              render={<Link href="/settings" />}
+              nativeButton={false}
+              variant="outline"
+              size="icon-sm"
+              aria-label="Settings"
+            >
+              <SettingsIcon />
+            </Button>
+            <Button
+              render={<Link href="/settings" />}
+              nativeButton={false}
+              size="icon-sm"
+              aria-label="Account settings"
+              className="rounded-full font-bold"
+            >
+              {viewerDisplayName.charAt(0).toUpperCase()}
+            </Button>
+          </div>
+        </div>
+
         <h1 className="text-2xl font-semibold tracking-tight">Admin</h1>
       </div>
 

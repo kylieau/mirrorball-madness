@@ -16,7 +16,7 @@ export default async function AdminResultsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_super_admin")
+    .select("is_super_admin, display_name")
     .eq("id", user.id)
     .single();
 
@@ -76,6 +76,7 @@ export default async function AdminResultsPage() {
 
   return (
     <AdminResultsTabs
+      viewerDisplayName={profile?.display_name ?? "?"}
       activeCouples={activeCouples}
       allCouples={allCouples}
       activeCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(activeCouples))}
