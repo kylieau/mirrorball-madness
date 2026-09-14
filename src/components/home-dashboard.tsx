@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { DeadlineStub } from "@/components/deadline-stub";
-import { formatCountdown } from "@/lib/relative-time";
+import { formatCountdown } from "@/lib/format-countdown";
 
 type HomeLeague = {
   id: string;
@@ -38,7 +38,7 @@ export function HomeDashboard({
       {urgentDeadline && (
         <DeadlineStub
           label={`${urgentDeadline.leagueName} · ${urgentDeadline.moduleLabel}`}
-          headline={formatCountdown(urgentDeadline.iso)}
+          headline={`Closes in ${formatCountdown(urgentDeadline.iso)}`}
           ctaLabel="Make picks"
           href={`/leagues/${urgentDeadline.leagueId}?tab=yourpicks`}
         />

@@ -9,7 +9,7 @@ import { getDefaultLandingPath } from "@/lib/default-landing";
 export async function signIn(formData: FormData) {
   const supabase = await createClient();
 
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { error } = await supabase.auth.signInWithPassword({
     email: formData.get("email") as string,
     password: formData.get("password") as string,
   });
@@ -19,7 +19,7 @@ export async function signIn(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  redirect(await getDefaultLandingPath(supabase, data.user.id));
+  redirect(getDefaultLandingPath());
 }
 
 export async function signUp(formData: FormData) {

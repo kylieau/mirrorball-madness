@@ -48,7 +48,7 @@ export function LeagueHeader({
     <Sheet>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <Link href="/leagues" className="text-xs font-medium text-muted-foreground">
+          <Link href="/today" className="text-xs font-medium text-muted-foreground">
             🪩 Mirrorball Madness
           </Link>
           <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} />

@@ -32,11 +32,9 @@ export function NativeAuthListener() {
       }
 
       const supabase = createClient();
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
       window.location.assign(
-        error
-          ? `/login?error=${encodeURIComponent(error.message)}`
-          : await getDefaultLandingPath(supabase, data.user.id)
+        error ? `/login?error=${encodeURIComponent(error.message)}` : getDefaultLandingPath()
       );
     });
 

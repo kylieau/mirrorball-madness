@@ -19,6 +19,7 @@ export async function createLeague(formData: FormData) {
   }
 
   revalidatePath("/leagues", "layout");
+  revalidatePath("/today");
   redirect(`/leagues/${data.id}?justCreated=1`);
 }
 
@@ -34,6 +35,7 @@ export async function joinLeague(formData: FormData) {
   }
 
   revalidatePath("/leagues", "layout");
+  revalidatePath("/today");
   redirect(`/leagues/${data.id}`);
 }
 
@@ -45,5 +47,6 @@ export async function leaveLeague(leagueId: string): Promise<{ error: string | n
 
   revalidatePath("/settings");
   revalidatePath("/leagues", "layout");
+  revalidatePath("/today");
   return { error: null };
 }

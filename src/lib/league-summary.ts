@@ -11,8 +11,9 @@ export type LeagueSummary = {
   rankBadge: string;
 };
 
-// Shared by /today (cross-league dashboard) and /notifications (the same
-// "needs attention" signal, just filtered down to leagues that need it).
+// Used by /notifications for its "needs attention" signal. /today has its
+// own richer per-league computation (src/lib/league-home-summary.ts) since
+// it needs rank/points/module flags this simpler summary doesn't carry.
 export async function computeLeagueSummary(
   supabase: SupabaseClient<Database>,
   userId: string,

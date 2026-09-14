@@ -52,7 +52,7 @@ export function LeagueSwitcher({
             return (
               <Link
                 key={l.id}
-                href={`/leagues/${l.id}`}
+                href={`/leagues/${l.id}?tab=${activeTab}`}
                 className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
               >
                 <div>

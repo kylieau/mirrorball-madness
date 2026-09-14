@@ -11,7 +11,7 @@ import { StandingsModuleBreakdown } from "@/components/standings-module-breakdow
 import { RosterCard } from "@/components/roster-card";
 import { PickEmBox } from "@/components/pick-em-box";
 import { GrandFinaleBox } from "@/components/grand-finale-box";
-import { HomeDashboard } from "@/components/home-dashboard";
+import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { LeagueHeader } from "@/components/league-header";
 import { LeagueTabs } from "@/components/league-tabs";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
@@ -316,16 +316,6 @@ export default async function LeaguePage({
     (curtainCallOn && !!upcomingEpisode && !isLocked && !ownPrediction) ||
     (grandFinaleOn && !grandFinaleLocked && !grandFinaleOrder);
 
-  const deadlineCandidates: { label: string; iso: string }[] = [];
-  if (curtainCallOn && lockAt && new Date(lockAt) > new Date()) {
-    deadlineCandidates.push({ label: "Curtain Call", iso: lockAt });
-  }
-  if (grandFinaleOn && grandFinaleDeadline && new Date(grandFinaleDeadline) > new Date()) {
-    deadlineCandidates.push({ label: "Grand Finale", iso: grandFinaleDeadline });
-  }
-  deadlineCandidates.sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime());
-  const nextDeadline = deadlineCandidates[0] ?? null;
-
   const categoryBreakdown = (
     [
       danceCardOn && {
@@ -365,199 +355,27 @@ export default async function LeaguePage({
     .eq("user_id", user.id);
 
   const RECENT_JOIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-  const joinCutoff = Date.now() - RECENT_JOIN_WINDOW_MS;
+  const joinCutoffMs = Date.now() - RECENT_JOIN_WINDOW_MS;
 
-  // Eliminations are season-global, not league-scoped, so the latest week's
-  // results (already fetched above for This Week) apply the same to every
-  // league — no need to refetch per league, just attribute one activity line
-  // per Dance-Card league the couple's manager happens to be in.
-  const latestEliminatedNames = latestCompletedEpisodeId
-    ? (episodeResults ?? [])
-        .filter((r) => r.episode_id === latestCompletedEpisodeId && r.outcome === "eliminated")
-        .map((r) => allDisplayNames.get(r.couple_id))
-        .filter((parts): parts is NonNullable<typeof parts> => !!parts)
-        .map((parts) => formatCoupleName(parts))
-    : [];
-
-  const currentRecentJoins = (members ?? [])
-    .filter((m) => m.user_id !== user.id && new Date(m.joined_at).getTime() >= joinCutoff)
-    .map((m) => ({ name: m.profiles?.display_name ?? "Someone", joinedAt: m.joined_at }));
-  const currentTookLead = currentRanks.get(user.id) === 1 && (previousRanks?.get(user.id) ?? 1) !== 1;
-
-  const otherLeagues = await Promise.all(
+  const otherLeagueSummaries = await Promise.all(
     (myMemberships ?? [])
       .map((m) => m.leagues!)
       .filter((l) => l.id !== id)
-      .map(async (otherLeague) => {
-        const [{ data: otherScoringSettings }, { data: otherMembers }, { data: otherScores }] = await Promise.all([
-          supabase
-            .from("scoring_settings")
-            .select(
-              "judges_score_category_enabled, eliminations_category_enabled, bonus_picks_category_enabled, bonus_picks_deadline"
-            )
-            .eq("league_id", otherLeague.id)
-            .single(),
-          supabase.from("league_members").select("user_id, joined_at, profiles(display_name)").eq("league_id", otherLeague.id),
-          supabase
-            .from("weekly_manager_scores")
-            .select("episode_id, manager_id, total_points")
-            .eq("league_id", otherLeague.id),
-        ]);
-
-        const otherPointsByManager = new Map<string, number>();
-        const otherPreviousPointsByManager = new Map<string, number>();
-        for (const row of otherScores ?? []) {
-          otherPointsByManager.set(
-            row.manager_id,
-            (otherPointsByManager.get(row.manager_id) ?? 0) + row.total_points
-          );
-          if (row.episode_id !== latestCompletedEpisodeId) {
-            otherPreviousPointsByManager.set(
-              row.manager_id,
-              (otherPreviousPointsByManager.get(row.manager_id) ?? 0) + row.total_points
-            );
-          }
-        }
-        const otherStandings = (otherMembers ?? []).map((m) => ({
-          managerId: m.user_id,
-          points: otherPointsByManager.get(m.user_id) ?? 0,
-          previousPoints: otherPreviousPointsByManager.get(m.user_id) ?? 0,
-        }));
-        const otherRank = Math.max(
-          1,
-          [...otherStandings].sort((a, b) => b.points - a.points).findIndex((s) => s.managerId === user.id) + 1
-        );
-        const otherPreviousRank = latestCompletedEpisodeId
-          ? Math.max(
-              1,
-              [...otherStandings]
-                .sort((a, b) => b.previousPoints - a.previousPoints)
-                .findIndex((s) => s.managerId === user.id) + 1
-            )
-          : null;
-
-        const otherDanceCardOn = otherScoringSettings?.judges_score_category_enabled ?? true;
-        const otherCurtainCallOn = otherScoringSettings?.eliminations_category_enabled ?? true;
-        const otherGrandFinaleOn = otherScoringSettings?.bonus_picks_category_enabled ?? false;
-        const otherGrandFinaleDeadline = otherScoringSettings?.bonus_picks_deadline ?? null;
-        const otherGrandFinaleLocked =
-          !!otherGrandFinaleDeadline && new Date() >= new Date(otherGrandFinaleDeadline);
-
-        let otherLockAt: string | null = null;
-        let otherPicksDue = false;
-        if (otherCurtainCallOn && upcomingEpisode) {
-          const { data } = await supabase.rpc("prediction_lock_at", {
-            p_league_id: otherLeague.id,
-            p_episode_id: upcomingEpisode.id,
-          });
-          otherLockAt = data;
-          const otherIsLocked = !!otherLockAt && new Date() >= new Date(otherLockAt);
-          if (!otherIsLocked) {
-            const { data: otherPrediction } = await supabase
-              .from("predictions")
-              .select("manager_id")
-              .eq("league_id", otherLeague.id)
-              .eq("episode_id", upcomingEpisode.id)
-              .eq("manager_id", user.id)
-              .maybeSingle();
-            otherPicksDue = !otherPrediction;
-          }
-        }
-        let otherGrandFinalePicksDue = false;
-        if (otherGrandFinaleOn && !otherGrandFinaleLocked) {
-          const { data: otherGrandFinalePick } = await supabase
-            .from("grand_finale_predictions")
-            .select("manager_id")
-            .eq("league_id", otherLeague.id)
-            .eq("manager_id", user.id)
-            .limit(1)
-            .maybeSingle();
-          otherGrandFinalePicksDue = !otherGrandFinalePick;
-        }
-
-        const otherDeadlineCandidates: { label: string; iso: string }[] = [];
-        if (otherPicksDue && otherLockAt && new Date(otherLockAt) > new Date()) {
-          otherDeadlineCandidates.push({ label: "Curtain Call", iso: otherLockAt });
-        }
-        if (otherGrandFinalePicksDue && otherGrandFinaleDeadline && new Date(otherGrandFinaleDeadline) > new Date()) {
-          otherDeadlineCandidates.push({ label: "Grand Finale", iso: otherGrandFinaleDeadline });
-        }
-        otherDeadlineCandidates.sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime());
-
-        return {
-          id: otherLeague.id,
-          name: otherLeague.name,
-          rank: otherRank,
-          totalMembers: otherStandings.length,
-          totalPoints: otherPointsByManager.get(user.id) ?? 0,
-          picksDue: otherPicksDue || otherGrandFinalePicksDue,
-          nextDeadline: otherDeadlineCandidates[0] ?? null,
-          danceCardOn: otherDanceCardOn,
-          curtainCallOn: otherCurtainCallOn,
-          grandFinaleOn: otherGrandFinaleOn,
-          recentJoins: (otherMembers ?? [])
-            .filter((m) => m.user_id !== user.id && new Date(m.joined_at).getTime() >= joinCutoff)
-            .map((m) => ({ name: m.profiles?.display_name ?? "Someone", joinedAt: m.joined_at })),
-          tookLead: otherPreviousRank !== null && otherRank === 1 && otherPreviousRank !== 1,
-        };
-      })
+      .map((otherLeague) =>
+        computeLeagueHomeSummary(supabase, user.id, otherLeague, upcomingEpisode ?? null, latestCompletedEpisodeId, joinCutoffMs)
+      )
   );
 
   const switcherLeagues = [
     { id, name: league.name, rank, totalMembers: standings.length, picksDue: picksNeeded },
-    ...otherLeagues.map((l) => ({ id: l.id, name: l.name, rank: l.rank, totalMembers: l.totalMembers, picksDue: l.picksDue })),
-  ];
-
-  const homeLeagues = [
-    {
-      id,
-      name: league.name,
-      rank,
-      totalMembers: standings.length,
-      totalPoints: userPoints,
-      picksDue: picksNeeded,
-      danceCardOn,
-      curtainCallOn,
-      grandFinaleOn,
-    },
-    ...otherLeagues.map((l) => ({
+    ...otherLeagueSummaries.map((l) => ({
       id: l.id,
       name: l.name,
       rank: l.rank,
       totalMembers: l.totalMembers,
-      totalPoints: l.totalPoints,
       picksDue: l.picksDue,
-      danceCardOn: l.danceCardOn,
-      curtainCallOn: l.curtainCallOn,
-      grandFinaleOn: l.grandFinaleOn,
     })),
   ];
-
-  const urgentDeadlineCandidates = [
-    ...(picksNeeded && nextDeadline
-      ? [{ leagueId: id, leagueName: league.name, moduleLabel: nextDeadline.label, iso: nextDeadline.iso }]
-      : []),
-    ...otherLeagues
-      .filter((l) => l.picksDue && l.nextDeadline)
-      .map((l) => ({ leagueId: l.id, leagueName: l.name, moduleLabel: l.nextDeadline!.label, iso: l.nextDeadline!.iso })),
-  ].sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime());
-  const urgentDeadline = urgentDeadlineCandidates[0] ?? null;
-
-  const recentActivity = [
-    ...(danceCardOn ? latestEliminatedNames.map((name) => `${name} eliminated — ${league.name}`) : []),
-    ...otherLeagues.flatMap((l) =>
-      l.danceCardOn ? latestEliminatedNames.map((name) => `${name} eliminated — ${l.name}`) : []
-    ),
-    ...(currentTookLead ? [`${league.name}: you took the points lead`] : []),
-    ...otherLeagues.filter((l) => l.tookLead).map((l) => `${l.name}: you took the points lead`),
-    ...currentRecentJoins
-      .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
-      .map((j) => `${j.name} joined ${league.name}`),
-    ...otherLeagues
-      .flatMap((l) => l.recentJoins.map((j) => ({ ...j, leagueName: l.name })))
-      .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
-      .map((j) => `${j.name} joined ${j.leagueName}`),
-  ].slice(0, 3);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
@@ -586,7 +404,6 @@ export default async function LeaguePage({
       />
 
       <LeagueTabs
-        home={<HomeDashboard leagues={homeLeagues} urgentDeadline={urgentDeadline} recentActivity={recentActivity} />}
         yourPicks={
           <div className="flex flex-col gap-6">
             {curtainCallOn && (
