@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/auth/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronRightIcon } from "lucide-react";
+import { ChevronRightIcon, XIcon } from "lucide-react";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 
 const LINKED_ROWS = [
@@ -45,8 +45,8 @@ export default async function SettingsPage({
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
       <div className="flex flex-col gap-6">
-        <Link href={backHref} className="text-sm font-medium text-muted-foreground">
-          ‹ Back
+        <Link href={backHref} aria-label="Close" className="text-muted-foreground hover:text-foreground">
+          <XIcon className="size-5" />
         </Link>
 
         <div>
