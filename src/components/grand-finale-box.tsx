@@ -56,7 +56,9 @@ export function GrandFinaleBox({
   const [order, setOrder] = useState<string[]>(existingOrder ?? []);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  // Read-only "here's your order" view whenever a saved prediction already
+  // exists — reordering reopens the arrows, saving successfully closes them.
+  const [reviewing, setReviewing] = useState(!!existingOrder);
   const formattedDeadline = useFormattedDeadline(deadline);
 
   const coupleById = new Map(couples.map((c) => [c.id, c]));
@@ -93,11 +95,10 @@ export function GrandFinaleBox({
 
   async function handleSubmit() {
     setError(null);
-    setSaved(false);
     setSubmitting(true);
     const result = await submitGrandFinalePrediction(leagueId, order);
     if (result.error) setError(result.error);
-    else setSaved(true);
+    else setReviewing(true);
     setSubmitting(false);
   }
 
@@ -138,11 +139,15 @@ export function GrandFinaleBox({
         <CardHeader>
           <CardTitle>Grand Finale</CardTitle>
           <CardDescription>
-            Tap couples in the order you think they&apos;ll be eliminated — first tap is who goes home first, last is your predicted winner.
+            Tap couples in the order you think they&apos;ll be eliminated — first tap is who goes home first, last is your predicted winner. Saving needs every couple placed.
             {deadline ? ` Locks at ${formattedDeadline}.` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          <p className="text-sm font-medium text-accent">
+            {order.length} of {couples.length} placed
+          </p>
+
           <div className="flex flex-col gap-1">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {order.length === 0 ? "Tap who's eliminated first" : "Tap who's eliminated next"}
@@ -178,6 +183,42 @@ export function GrandFinaleBox({
               </Button>
             </div>
           )}
+
+          <Button disabled>Save prediction ({order.length}/{couples.length})</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (reviewing) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Grand Finale</CardTitle>
+          <CardDescription>
+            Your predicted order, first eliminated to season winner.
+            {deadline ? ` Locks at ${formattedDeadline}.` : ""}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-sm text-emerald-text">
+            <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald/30 text-[10px]">
+              ✓
+            </span>
+            Order saved
+          </div>
+          <div className="flex flex-col gap-1 text-sm">
+            {order.map((coupleId, i) => (
+              <div key={coupleId} className="flex items-center justify-between border-b border-border py-1 last:border-b-0">
+                <span>
+                  {i + 1}. {nameFor(coupleId)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <Button variant="outline" size="sm" className="self-start" onClick={() => setReviewing(false)}>
+            Edit order
+          </Button>
         </CardContent>
       </Card>
     );
@@ -194,7 +235,6 @@ export function GrandFinaleBox({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {saved && <p className="text-sm text-muted-foreground">Prediction saved.</p>}
 
         <div className="flex flex-col gap-1">
           {order.map((coupleId, i) => (

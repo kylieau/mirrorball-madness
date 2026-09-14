@@ -51,7 +51,12 @@ export function PickEmBox({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  // Starts in read-only "here's what you picked" mode whenever a pick
+  // already exists (a fresh page load with a saved prediction) — editing
+  // reopens the chip pickers, saving successfully closes them again.
+  const [editing, setEditing] = useState(
+    !existingPrediction?.predicted_eliminated_couple_id && !existingPrediction?.predicted_top_scorer_couple_id
+  );
   const formattedLockAt = useFormattedDeadline(lockAt);
 
   function nameFor(coupleId: string) {
@@ -74,7 +79,6 @@ export function PickEmBox({
 
   async function handleSubmit() {
     setError(null);
-    setSaved(false);
     setSubmitting(true);
     const result = await submitPrediction(
       leagueId,
@@ -83,9 +87,11 @@ export function PickEmBox({
       topScorerId || null
     );
     if (result.error) setError(result.error);
-    else setSaved(true);
+    else setEditing(false);
     setSubmitting(false);
   }
+
+  const hasSavedPick = !!eliminatedId || !!topScorerId;
 
   return (
     <Card>
@@ -101,42 +107,72 @@ export function PickEmBox({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {saved && <p className="text-sm text-muted-foreground">Prediction saved.</p>}
 
         {!isLocked ? (
-          <>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Who Gets Eliminated?</label>
-              <div className="flex flex-wrap gap-2">
-                {activeCouples.map((c) => (
-                  <Chip
-                    key={c.id}
-                    selected={eliminatedId === c.id}
-                    onClick={() => setEliminatedId(eliminatedId === c.id ? "" : c.id)}
-                  >
-                    {nameFor(c.id)}
-                  </Chip>
-                ))}
+          editing ? (
+            <>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Who Gets Eliminated?</label>
+                <div className="flex flex-wrap gap-2">
+                  {activeCouples.map((c) => (
+                    <Chip
+                      key={c.id}
+                      selected={eliminatedId === c.id}
+                      onClick={() => setEliminatedId(eliminatedId === c.id ? "" : c.id)}
+                    >
+                      {nameFor(c.id)}
+                    </Chip>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Who Scores Highest?</label>
-              <div className="flex flex-wrap gap-2">
-                {activeCouples.map((c) => (
-                  <Chip
-                    key={c.id}
-                    selected={topScorerId === c.id}
-                    onClick={() => setTopScorerId(topScorerId === c.id ? "" : c.id)}
-                  >
-                    {nameFor(c.id)}
-                  </Chip>
-                ))}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium">Who Scores Highest?</label>
+                <div className="flex flex-wrap gap-2">
+                  {activeCouples.map((c) => (
+                    <Chip
+                      key={c.id}
+                      selected={topScorerId === c.id}
+                      onClick={() => setTopScorerId(topScorerId === c.id ? "" : c.id)}
+                    >
+                      {nameFor(c.id)}
+                    </Chip>
+                  ))}
+                </div>
               </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSubmit} disabled={submitting}>
+                  {submitting ? "Saving..." : "Save prediction"}
+                </Button>
+                {hasSavedPick && (
+                  <Button variant="outline" onClick={() => setEditing(false)} disabled={submitting}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2 text-sm text-emerald-text">
+                <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald/30 text-[10px]">
+                  ✓
+                </span>
+                Picks saved for this week
+              </div>
+              <div className="flex flex-col gap-1.5 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Eliminated</span>
+                  <span className="font-medium">{eliminatedId ? nameFor(eliminatedId) : "No pick"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Top scorer</span>
+                  <span className="font-medium">{topScorerId ? nameFor(topScorerId) : "No pick"}</span>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" className="self-start" onClick={() => setEditing(true)}>
+                Edit picks
+              </Button>
             </div>
-            <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting ? "Saving..." : "Save prediction"}
-            </Button>
-          </>
+          )
         ) : (
           <div className="flex flex-col gap-2 text-sm">
             {revealedPredictions?.map((p, i) => (
