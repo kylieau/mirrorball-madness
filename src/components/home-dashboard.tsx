@@ -53,7 +53,7 @@ export function HomeDashboard({
       </div>
       <div className="flex flex-col gap-2.5">
         {leagues.map((l) => (
-          <Link key={l.id} href={`/leagues/${l.id}`} className="block">
+          <Link key={l.id} href={`/leagues/${l.id}?tab=standings`} className="block">
             <Card>
               <CardContent className="flex items-start justify-between gap-3 py-4">
                 <div>
