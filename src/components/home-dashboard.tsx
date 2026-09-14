@@ -28,8 +28,6 @@ export function HomeDashboard({
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-semibold">Home</h1>
-      <div className="mt-2.5 mb-4 h-0.5 w-9 rounded-full bg-primary" />
       <p className="mb-4 text-sm text-muted-foreground">
         {leagues.length} league{leagues.length === 1 ? "" : "s"}
         {needingPicks > 0 ? ` · ${needingPicks} need${needingPicks === 1 ? "s" : ""} picks` : " · all caught up"}

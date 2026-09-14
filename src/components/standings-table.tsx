@@ -30,9 +30,6 @@ export function StandingsTable({
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-semibold">Standings</h1>
-      <div className="mt-2.5 mb-4 h-0.5 w-9 rounded-full bg-primary" />
-
       <div className="flex items-center gap-3.5">
         <RankBadge rank={viewerRank} />
         <div>

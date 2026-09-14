@@ -2,6 +2,7 @@
 
 import type { ComponentProps } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import { LeagueModulesForm } from "@/components/league-modules-form";
 import { LeagueInfoSection } from "@/components/league-info-section";
 import { LeagueSwitcher, type SwitcherLeague } from "@/components/league-switcher";
 import { LeagueMembersSection } from "@/components/league-members-section";
+import { PageHeader } from "@/components/page-header";
 
 export function LeagueHeader({
   leagueId,
@@ -44,15 +46,16 @@ export function LeagueHeader({
   members: { userId: string; displayName: string; role: string }[];
   viewerDisplayName: string;
 }) {
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") ?? "yourpicks";
+  const title = activeTab === "standings" ? "Standings" : "Your Picks";
+
   return (
     <Sheet>
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <Link href="/today" className="text-xs font-medium text-muted-foreground">
-            🪩 Mirrorball Madness
-          </Link>
-          <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} />
-        </div>
+        <Link href="/today" className="text-xs font-medium text-muted-foreground">
+          🪩 Mirrorball Madness
+        </Link>
         <div className="flex gap-2">
           {danceCardOn && (
             <Button
@@ -87,6 +90,12 @@ export function LeagueHeader({
           </Button>
         </div>
       </div>
+
+      <PageHeader title={title}>
+        {switcherLeagues.length > 1 && (
+          <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
+        )}
+      </PageHeader>
 
       {justCreated && canEdit && (
         <Card className="border-primary">

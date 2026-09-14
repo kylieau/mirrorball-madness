@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { HomeDashboard } from "@/components/home-dashboard";
+import { PageHeader } from "@/components/page-header";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { HomeIcon, ListChecksIcon, PencilLineIcon, SettingsIcon, TrophyIcon } from "lucide-react";
@@ -146,6 +147,7 @@ export default async function TodayPage() {
       </div>
 
       <div className="pb-20 sm:pb-0">
+        <PageHeader title="Home" />
         <HomeDashboard leagues={leagues} urgentDeadline={urgentDeadline} recentActivity={recentActivity} />
       </div>
 
@@ -157,7 +159,7 @@ export default async function TodayPage() {
           </span>
           <Link href="/this-week" className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
             <ListChecksIcon className="size-5 sm:size-4" />
-            <span className="text-[10px] sm:text-sm">This week</span>
+            <span className="text-[10px] sm:text-sm">This Week</span>
           </Link>
           <Link href={`/leagues/${firstLeagueId}?tab=yourpicks`} className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
             <PencilLineIcon className="size-5 sm:size-4" />

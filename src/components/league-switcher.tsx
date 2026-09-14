@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { ChevronDownIcon, CheckIcon } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
@@ -15,30 +14,26 @@ export type SwitcherLeague = {
   picksDue: boolean;
 };
 
+// Lives in the switcher slot under the page title (Your Picks / Standings
+// only — the caller decides whether to render this at all). Nothing to
+// switch to with just one league, so it renders nothing rather than a dead
+// chip.
 export function LeagueSwitcher({
   currentLeagueId,
   leagues,
+  activeTab,
 }: {
   currentLeagueId: string;
   leagues: SwitcherLeague[];
+  activeTab: string;
 }) {
-  const searchParams = useSearchParams();
   const current = leagues.find((l) => l.id === currentLeagueId);
 
-  // The switcher sheet is only interactive on Your Picks and Standings —
-  // Home and This Week show the league name as a plain label, matching the
-  // mockup's split between a static "leaguelabel" and the tappable
-  // "switcher" chip.
-  const activeTab = searchParams.get("tab") ?? "thisweek";
-  const isSwitcherTab = activeTab === "yourpicks" || activeTab === "standings";
-
-  if (!isSwitcherTab || leagues.length <= 1) {
-    return <h1 className="font-heading text-lg font-semibold">{current?.name}</h1>;
-  }
+  if (leagues.length <= 1) return null;
 
   return (
     <Sheet>
-      <SheetTrigger className="flex items-center gap-1.5 font-heading text-lg font-semibold">
+      <SheetTrigger className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
         {current?.name}
         <ChevronDownIcon className="size-3.5 text-accent" aria-hidden />
       </SheetTrigger>

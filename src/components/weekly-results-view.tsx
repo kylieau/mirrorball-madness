@@ -67,8 +67,6 @@ export function WeeklyResultsView({
   if (!episode) {
     return (
       <div>
-        <h1 className="font-heading text-2xl font-semibold">This Week</h1>
-        <div className="mt-2.5 mb-4 h-0.5 w-9 rounded-full bg-primary" />
         <p className="mb-4 text-sm text-muted-foreground">Season hasn&apos;t started yet</p>
         <Card>
           <CardHeader>
@@ -117,8 +115,6 @@ export function WeeklyResultsView({
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-semibold">This Week</h1>
-      <div className="mt-2.5 mb-4 h-0.5 w-9 rounded-full bg-primary" />
       <p className="mb-4 text-sm text-muted-foreground">
         Week {episode.week_number}
         {episode.theme ? ` — ${episode.theme}` : ""}, the actual results

@@ -3,13 +3,20 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
+import { WeekSwitcher } from "@/components/week-switcher";
+import { PageHeader } from "@/components/page-header";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { HomeIcon, ListChecksIcon, PencilLineIcon, SettingsIcon, TrophyIcon } from "lucide-react";
 
 const TAB_ITEM_CLASSES =
   "flex flex-1 flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-sm font-medium sm:flex-row sm:gap-1.5 sm:px-3";
 
-export default async function ThisWeekPage() {
+export default async function ThisWeekPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ week?: string }>;
+}) {
+  const { week: weekParam } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -44,20 +51,25 @@ export default async function ThisWeekPage() {
     .select("id, week_number, airs_at, theme, is_finale")
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
-    .order("week_number", { ascending: false })
-    .limit(1);
-  const latestEpisodeId = completedEpisodes?.[0]?.id ?? null;
+    .order("week_number", { ascending: false });
+
+  // Defaults to the latest completed week; ?week=<episode id> (from the
+  // switcher) picks an older one. An unrecognized id falls back to latest
+  // rather than silently rendering nothing.
+  const selectedEpisode =
+    (weekParam ? completedEpisodes?.find((e) => e.id === weekParam) : null) ?? completedEpisodes?.[0] ?? null;
+  const selectedEpisodeId = selectedEpisode?.id ?? null;
 
   const [{ data: danceScores }, { data: episodeResults }, { data: danceStyles }, { data: allCouples }] =
     await Promise.all([
-      latestEpisodeId
-        ? supabase.from("dance_scores").select("id, episode_id, couple_id, dance_style_id, total_score").eq("episode_id", latestEpisodeId)
+      selectedEpisodeId
+        ? supabase.from("dance_scores").select("id, episode_id, couple_id, dance_style_id, total_score").eq("episode_id", selectedEpisodeId)
         : Promise.resolve({ data: [] }),
-      latestEpisodeId
+      selectedEpisodeId
         ? supabase
             .from("episode_results")
             .select("episode_id, couple_id, outcome, was_bottom_two, was_bottom_three")
-            .eq("episode_id", latestEpisodeId)
+            .eq("episode_id", selectedEpisodeId)
         : Promise.resolve({ data: [] }),
       supabase.from("dance_styles").select("id, name").order("name"),
       supabase
@@ -77,7 +89,7 @@ export default async function ThisWeekPage() {
   // week's elimination/top-scorer call — this is what makes eliminations
   // and safe calls read as personally relevant instead of just generic
   // show news. Picks are looked up against the episode being shown here
-  // (the latest completed one), not the upcoming episode Your Picks deals
+  // (whichever week is selected), not the upcoming episode Your Picks deals
   // with — a past call, not a pending one.
   const [{ data: rosterSlots }, { data: pastPredictions }] = await Promise.all([
     supabase
@@ -86,12 +98,12 @@ export default async function ThisWeekPage() {
       .eq("manager_id", user.id)
       .in("league_id", leagueIds)
       .is("end_week", null),
-    latestEpisodeId
+    selectedEpisodeId
       ? supabase
           .from("predictions")
           .select("league_id, predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
           .eq("manager_id", user.id)
-          .eq("episode_id", latestEpisodeId)
+          .eq("episode_id", selectedEpisodeId)
           .in("league_id", leagueIds)
       : Promise.resolve({ data: [] }),
   ]);
@@ -165,8 +177,16 @@ export default async function ThisWeekPage() {
       </div>
 
       <div className="pb-20 sm:pb-0">
+        <PageHeader title="This Week">
+          {selectedEpisodeId && (
+            <WeekSwitcher
+              currentEpisodeId={selectedEpisodeId}
+              weeks={(completedEpisodes ?? []).map((e) => ({ id: e.id, weekNumber: e.week_number, theme: e.theme }))}
+            />
+          )}
+        </PageHeader>
         <WeeklyResultsView
-          episodes={completedEpisodes ?? []}
+          episodes={selectedEpisode ? [selectedEpisode] : []}
           episodeResults={episodeResults ?? []}
           danceScores={danceScores ?? []}
           danceStyles={danceStyles ?? []}
