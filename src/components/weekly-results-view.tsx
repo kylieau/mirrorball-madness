@@ -44,6 +44,7 @@ export function WeeklyResultsView({
   nameByManager,
   scoresByEpisode,
   currentUserId,
+  leaguesByCouple,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
@@ -51,9 +52,15 @@ export function WeeklyResultsView({
   danceStyles: Named[];
   couples: Couple[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
-  nameByManager: Record<string, string>;
-  scoresByEpisode: Record<string, ManagerWeekScore[]>;
-  currentUserId: string;
+  // Manager-scoped props are only meaningful within a single league — omit
+  // all three to render the cross-league "This week" view (no Points by
+  // team section) instead. leaguesByCouple is the cross-league view's own
+  // addition: which of the viewer's leagues have this couple on their
+  // roster, so eliminations/safe calls read as personally relevant.
+  nameByManager?: Record<string, string>;
+  scoresByEpisode?: Record<string, ManagerWeekScore[]>;
+  currentUserId?: string;
+  leaguesByCouple?: Record<string, string[]>;
 }) {
   const episode = episodes[0];
 
@@ -106,7 +113,7 @@ export function WeeklyResultsView({
     .sort((a, b) => b.total - a.total);
 
   const eliminated = outcomes.filter((r) => r.outcome === "eliminated");
-  const managerScores = [...(scoresByEpisode[episode.id] ?? [])].sort((a, b) => b.totalPoints - a.totalPoints);
+  const managerScores = [...(scoresByEpisode?.[episode.id] ?? [])].sort((a, b) => b.totalPoints - a.totalPoints);
 
   return (
     <div>
@@ -146,6 +153,11 @@ export function WeeklyResultsView({
                   {r.parts ? <CoupleName {...r.parts} /> : "Unknown"}
                   {r.danceLabel && <span className="block text-xs font-normal text-muted-foreground">{r.danceLabel}</span>}
                 </p>
+                {leaguesByCouple?.[r.couple_id] && leaguesByCouple[r.couple_id].length > 0 && (
+                  <p className="mt-0.5 text-xs text-accent">
+                    On your roster in {leaguesByCouple[r.couple_id].join(", ")}
+                  </p>
+                )}
               </div>
               <div className="shrink-0 text-right text-xs text-muted-foreground">
                 <span className="block font-heading text-base font-semibold text-foreground">{r.total}</span>
@@ -156,7 +168,7 @@ export function WeeklyResultsView({
         })}
       </div>
 
-      {managerScores.length > 0 && (
+      {managerScores.length > 0 && nameByManager && (
         <>
           <div className="mb-2 mt-6 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
             <span>Points by team</span>

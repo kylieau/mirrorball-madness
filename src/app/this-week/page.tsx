@@ -2,15 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { HomeDashboard } from "@/components/home-dashboard";
-import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
-import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
+import { WeeklyResultsView } from "@/components/weekly-results-view";
+import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { HomeIcon, ListChecksIcon, PencilLineIcon, SettingsIcon, TrophyIcon } from "lucide-react";
 
 const TAB_ITEM_CLASSES =
   "flex flex-1 flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-sm font-medium sm:flex-row sm:gap-1.5 sm:px-3";
 
-export default async function TodayPage() {
+export default async function ThisWeekPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -36,86 +35,60 @@ export default async function TodayPage() {
   }
 
   const firstLeagueId = leagueRefs[0].id;
-
-  const { data: upcomingEpisode } = await supabase
-    .from("episodes")
-    .select("id, week_number")
-    .eq("status", "upcoming")
-    .order("week_number", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const leagueIds = leagueRefs.map((l) => l.id);
+  const leagueNameById = new Map(leagueRefs.map((l) => [l.id, l.name]));
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const { data: completedEpisodes } = await supabase
     .from("episodes")
-    .select("id")
+    .select("id, week_number, airs_at, theme, is_finale")
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
     .order("week_number", { ascending: false })
     .limit(1);
-  const latestCompletedEpisodeId = completedEpisodes?.[0]?.id ?? null;
+  const latestEpisodeId = completedEpisodes?.[0]?.id ?? null;
 
-  const RECENT_JOIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-  const joinCutoffMs = Date.now() - RECENT_JOIN_WINDOW_MS;
-
-  const summaries = await Promise.all(
-    leagueRefs.map((league) =>
-      computeLeagueHomeSummary(supabase, user.id, league, upcomingEpisode ?? null, latestCompletedEpisodeId, joinCutoffMs)
-    )
-  );
-
-  // Eliminations are season-global, so this only needs fetching once and
-  // applies the same to every Dance-Card league the couple's manager is in.
-  let latestEliminatedNames: string[] = [];
-  if (latestCompletedEpisodeId) {
-    const [{ data: episodeResults }, { data: couples }] = await Promise.all([
-      supabase.from("episode_results").select("couple_id, outcome").eq("episode_id", latestCompletedEpisodeId),
+  const [{ data: danceScores }, { data: episodeResults }, { data: danceStyles }, { data: allCouples }] =
+    await Promise.all([
+      latestEpisodeId
+        ? supabase.from("dance_scores").select("id, episode_id, couple_id, dance_style_id, total_score").eq("episode_id", latestEpisodeId)
+        : Promise.resolve({ data: [] }),
+      latestEpisodeId
+        ? supabase
+            .from("episode_results")
+            .select("episode_id, couple_id, outcome, was_bottom_two, was_bottom_three")
+            .eq("episode_id", latestEpisodeId)
+        : Promise.resolve({ data: [] }),
+      supabase.from("dance_styles").select("id, name").order("name"),
       supabase
         .from("couples")
         .select("id, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"),
     ]);
-    const displayNames = buildCoupleDisplayNames(
-      (couples ?? []).map((c) => ({
-        id: c.id,
-        celebrity_name: c.celebrity?.name ?? "Unknown",
-        pro_name: c.pro?.name ?? "Unknown",
-      }))
-    );
-    latestEliminatedNames = (episodeResults ?? [])
-      .filter((r) => r.outcome === "eliminated")
-      .map((r) => displayNames.get(r.couple_id))
-      .filter((parts): parts is NonNullable<typeof parts> => !!parts)
-      .map((parts) => formatCoupleName(parts));
-  }
 
-  const leagues = summaries.map((s) => ({
-    id: s.id,
-    name: s.name,
-    rank: s.rank,
-    totalMembers: s.totalMembers,
-    totalPoints: s.totalPoints,
-    picksDue: s.picksDue,
-    danceCardOn: s.danceCardOn,
-    curtainCallOn: s.curtainCallOn,
-    grandFinaleOn: s.grandFinaleOn,
+  const flatCouples = (allCouples ?? []).map((c) => ({
+    id: c.id,
+    celebrity_name: c.celebrity?.name ?? "Unknown",
+    pro_name: c.pro?.name ?? "Unknown",
   }));
+  const coupleDisplayNames = buildCoupleDisplayNames(flatCouples);
 
-  const urgentDeadline =
-    summaries
-      .filter((s) => s.picksDue && s.nextDeadline)
-      .map((s) => ({ leagueId: s.id, leagueName: s.name, moduleLabel: s.nextDeadline!.label, iso: s.nextDeadline!.iso }))
-      .sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime())[0] ?? null;
+  // Which of the viewer's own leagues have each couple on their Dance Card
+  // roster right now — this is what makes eliminations/safe calls read as
+  // personally relevant instead of just generic show news.
+  const { data: rosterSlots } = await supabase
+    .from("roster_slots")
+    .select("league_id, couple_id")
+    .eq("manager_id", user.id)
+    .in("league_id", leagueIds)
+    .is("end_week", null);
 
-  const recentActivity = [
-    ...summaries.flatMap((s) =>
-      s.danceCardOn ? latestEliminatedNames.map((name) => `${name} eliminated — ${s.name}`) : []
-    ),
-    ...summaries.filter((s) => s.tookLead).map((s) => `${s.name}: you took the points lead`),
-    ...summaries
-      .flatMap((s) => s.recentJoins.map((j) => ({ ...j, leagueName: s.name })))
-      .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
-      .map((j) => `${j.name} joined ${j.leagueName}`),
-  ].slice(0, 3);
+  const leaguesByCouple: Record<string, string[]> = {};
+  for (const slot of rosterSlots ?? []) {
+    if (!slot.couple_id) continue;
+    const leagueName = leagueNameById.get(slot.league_id);
+    if (!leagueName) continue;
+    (leaguesByCouple[slot.couple_id] ??= []).push(leagueName);
+  }
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
@@ -146,19 +119,27 @@ export default async function TodayPage() {
       </div>
 
       <div className="pb-20 sm:pb-0">
-        <HomeDashboard leagues={leagues} urgentDeadline={urgentDeadline} recentActivity={recentActivity} />
+        <WeeklyResultsView
+          episodes={completedEpisodes ?? []}
+          episodeResults={episodeResults ?? []}
+          danceScores={danceScores ?? []}
+          danceStyles={danceStyles ?? []}
+          couples={flatCouples}
+          coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
+          leaguesByCouple={leaguesByCouple}
+        />
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:border-b sm:pb-0">
         <div className="flex w-full justify-around p-1 sm:w-fit sm:justify-start sm:gap-1">
-          <span className={`${TAB_ITEM_CLASSES} text-accent`}>
+          <Link href="/today" className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
             <HomeIcon className="size-5 sm:size-4" />
             <span className="text-[10px] sm:text-sm">Home</span>
-          </span>
-          <Link href="/this-week" className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
+          </Link>
+          <span className={`${TAB_ITEM_CLASSES} text-accent`}>
             <ListChecksIcon className="size-5 sm:size-4" />
             <span className="text-[10px] sm:text-sm">This week</span>
-          </Link>
+          </span>
           <Link href={`/leagues/${firstLeagueId}?tab=yourpicks`} className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
             <PencilLineIcon className="size-5 sm:size-4" />
             <span className="text-[10px] sm:text-sm">Your picks</span>

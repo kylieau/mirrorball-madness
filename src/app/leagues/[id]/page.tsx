@@ -11,12 +11,14 @@ import { StandingsModuleBreakdown } from "@/components/standings-module-breakdow
 import { RosterCard } from "@/components/roster-card";
 import { PickEmBox } from "@/components/pick-em-box";
 import { GrandFinaleBox } from "@/components/grand-finale-box";
+import { DraftStatusCard } from "@/components/draft-status-card";
+import { RecastNudgeCard } from "@/components/recast-nudge-card";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { LeagueHeader } from "@/components/league-header";
 import { LeagueTabs } from "@/components/league-tabs";
-import { WeeklyResultsView } from "@/components/weekly-results-view";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { getStandingMessage } from "@/lib/standings-message";
+import { getPickAssignment } from "@/lib/draft";
 
 export default async function LeaguePage({
   params,
@@ -52,6 +54,7 @@ export default async function LeaguePage({
   const isCommissioner = league.commissioner_id === user.id;
 
   const danceCardOn = scoringSettings?.judges_score_category_enabled ?? true;
+  const waiversOn = league.waiver_mode === "waivers";
   const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
   const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
   const grandFinaleDeadline = scoringSettings?.bonus_picks_deadline ?? null;
@@ -61,7 +64,7 @@ export default async function LeaguePage({
     await Promise.all([
       supabase
         .from("league_members")
-        .select("user_id, role, joined_at, profiles(display_name)")
+        .select("user_id, role, joined_at, draft_position, profiles(display_name)")
         .eq("league_id", id)
         .order("joined_at"),
       supabase
@@ -74,7 +77,8 @@ export default async function LeaguePage({
           "couple_id, couples(status, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name))"
         )
         .eq("league_id", id)
-        .eq("manager_id", user.id),
+        .eq("manager_id", user.id)
+        .is("end_week", null),
       supabase
         .from("couples")
         .select(
@@ -90,13 +94,7 @@ export default async function LeaguePage({
     ]);
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [
-    { data: premiereEpisode },
-    { data: completedEpisodes },
-    { data: danceScores },
-    { data: episodeResults },
-    { data: danceStyles },
-  ] = await Promise.all([
+  const [{ data: premiereEpisode }, { data: completedEpisodes }] = await Promise.all([
     supabase
       .from("episodes")
       .select("airs_at")
@@ -105,15 +103,11 @@ export default async function LeaguePage({
       .maybeSingle(),
     supabase
       .from("episodes")
-      .select("id, week_number, airs_at, theme, is_finale")
+      .select("id, week_number")
       .eq("season_id", activeSeasonId ?? "")
       .eq("status", "completed")
-      .order("week_number", { ascending: false }),
-    supabase.from("dance_scores").select("id, episode_id, couple_id, dance_style_id, total_score"),
-    supabase
-      .from("episode_results")
-      .select("episode_id, couple_id, outcome, was_bottom_two, was_bottom_three"),
-    supabase.from("dance_styles").select("id, name").order("name"),
+      .order("week_number", { ascending: false })
+      .limit(1),
   ]);
 
   const pointsByManager = new Map<string, number>();
@@ -349,6 +343,25 @@ export default async function LeaguePage({
       status: r.couples!.status,
     }));
 
+  const openSlotCount = rosterCouples.filter(
+    (c) => c.status === "eliminated" || c.status === "withdrawn"
+  ).length;
+
+  let onTheClockName: string | null = null;
+  let isMyTurn = false;
+  let draftPickCount = 0;
+  if (danceCardOn && league.draft_status === "in_progress") {
+    const { count } = await supabase
+      .from("draft_picks")
+      .select("id", { count: "exact", head: true })
+      .eq("league_id", id);
+    draftPickCount = count ?? 0;
+    const { draftPosition } = getPickAssignment(draftPickCount + 1, (members ?? []).length);
+    const onTheClock = (members ?? []).find((m) => m.draft_position === draftPosition);
+    onTheClockName = onTheClock?.profiles?.display_name ?? null;
+    isMyTurn = onTheClock?.user_id === user.id;
+  }
+
   const { data: myMemberships } = await supabase
     .from("league_members")
     .select("leagues(id, name)")
@@ -387,7 +400,7 @@ export default async function LeaguePage({
         leagueName={league.name}
         inviteCode={league.invite_code}
         danceCardOn={danceCardOn}
-        waiversOn={league.waiver_mode === "waivers"}
+        waiversOn={waiversOn}
         league={league}
         scoringSettings={scoringSettings}
         canEdit={isCommissioner}
@@ -418,17 +431,21 @@ export default async function LeaguePage({
                 revealedPredictions={revealedPredictions}
               />
             )}
-            {danceCardOn &&
-              (rosterCouples.length > 0 ? (
-                <RosterCard couples={rosterCouples} totalPoints={pointsByManager.get(user.id) ?? 0} />
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Your Dance Card Roster</CardTitle>
-                    <CardDescription>No roster yet — check the draft room.</CardDescription>
-                  </CardHeader>
-                </Card>
-              ))}
+            {danceCardOn && (
+              <DraftStatusCard
+                leagueId={id}
+                draftStatus={league.draft_status}
+                isCommissioner={isCommissioner}
+                memberCount={(members ?? []).length}
+                pickCount={draftPickCount}
+                onTheClockName={onTheClockName}
+                isMyTurn={isMyTurn}
+              />
+            )}
+            {danceCardOn && rosterCouples.length > 0 && (
+              <RosterCard couples={rosterCouples} totalPoints={pointsByManager.get(user.id) ?? 0} />
+            )}
+            {danceCardOn && waiversOn && <RecastNudgeCard leagueId={id} openSlotCount={openSlotCount} />}
             {grandFinaleOn && (
               <GrandFinaleBox
                 leagueId={id}
@@ -451,19 +468,6 @@ export default async function LeaguePage({
               </Card>
             )}
           </div>
-        }
-        thisWeek={
-          <WeeklyResultsView
-            episodes={completedEpisodes ?? []}
-            episodeResults={episodeResults ?? []}
-            danceScores={danceScores ?? []}
-            danceStyles={danceStyles ?? []}
-            couples={flatCouples}
-            coupleDisplayNames={Object.fromEntries(allDisplayNames)}
-            nameByManager={nameByManager}
-            scoresByEpisode={scoresByEpisode}
-            currentUserId={user.id}
-          />
         }
         standings={
           <div>
