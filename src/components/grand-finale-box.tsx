@@ -125,7 +125,11 @@ export function GrandFinaleBox({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
-          {order.map((coupleId, i) => (
+          {/* Displayed winner-first (reverse of storage order, which stays
+              elimination-ascending to match what the RPC expects) so "1."
+              lines up with the predicted winner named above, not with
+              whoever's predicted to leave first. */}
+          {[...order].reverse().map((coupleId, i) => (
             <div key={coupleId} className="flex items-center justify-between border-b border-border py-1 last:border-b-0">
               <span>
                 {i + 1}. {nameFor(coupleId)}
@@ -232,7 +236,7 @@ export function GrandFinaleBox({
       <CardHeader>
         <CardTitle>Grand Finale</CardTitle>
         <CardDescription>
-          Review your predicted order, first eliminated to season winner. Use the arrows to fine-tune.
+          Review your predicted order, season winner to first eliminated. Use the arrows to fine-tune.
           {deadline ? ` Locks at ${formattedDeadline}.` : ""}
         </CardDescription>
       </CardHeader>
@@ -240,34 +244,42 @@ export function GrandFinaleBox({
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         <div className="flex flex-col gap-1">
-          {order.map((coupleId, i) => (
-            <div
-              key={coupleId}
-              className="flex items-center justify-between rounded-md border border-border px-3 py-1.5 text-sm"
-            >
-              <span>
-                {i + 1}. {nameFor(coupleId)}
-              </span>
-              <span className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={i === 0}
-                  onClick={() => moveEntry(i, -1)}
-                >
-                  ↑
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={i === order.length - 1}
-                  onClick={() => moveEntry(i, 1)}
-                >
-                  ↓
-                </Button>
-              </span>
-            </div>
-          ))}
+          {/* Displayed winner-first, same reasoning as renderSummary above.
+              order[] itself stays elimination-ascending (index 0 = first
+              eliminated), so each arrow's actualIndex maps back into it:
+              ↑ (toward 1st place) moves toward the end of order[], ↓ moves
+              toward the start. */}
+          {[...order].reverse().map((coupleId, displayIndex) => {
+            const actualIndex = order.length - 1 - displayIndex;
+            return (
+              <div
+                key={coupleId}
+                className="flex items-center justify-between rounded-md border border-border px-3 py-1.5 text-sm"
+              >
+                <span>
+                  {displayIndex + 1}. {nameFor(coupleId)}
+                </span>
+                <span className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={displayIndex === 0}
+                    onClick={() => moveEntry(actualIndex, 1)}
+                  >
+                    ↑
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={displayIndex === order.length - 1}
+                    onClick={() => moveEntry(actualIndex, -1)}
+                  >
+                    ↓
+                  </Button>
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         <div className="flex gap-2">
