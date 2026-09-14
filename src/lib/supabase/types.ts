@@ -419,6 +419,7 @@ export type Database = {
           created_at: string
           draft_scheduled_at: string | null
           draft_status: string
+          draft_type: string
           id: string
           invite_code: string
           name: string
@@ -433,6 +434,7 @@ export type Database = {
           created_at?: string
           draft_scheduled_at?: string | null
           draft_status?: string
+          draft_type?: string
           id?: string
           invite_code: string
           name: string
@@ -447,6 +449,7 @@ export type Database = {
           created_at?: string
           draft_scheduled_at?: string | null
           draft_status?: string
+          draft_type?: string
           id?: string
           invite_code?: string
           name?: string
@@ -647,9 +650,9 @@ export type Database = {
           bonus_picks_points_per_correct: number
           bonus_picks_scoring_method: string | null
           bonus_picks_tier_size: number | null
+          elimination_prediction_points: number
           eliminations_category_enabled: boolean
           eliminations_category_weight: number
-          elimination_prediction_points: number
           first_place_points: number
           judges_score_category_enabled: boolean
           judges_score_category_weight: number
@@ -670,9 +673,9 @@ export type Database = {
           bonus_picks_points_per_correct?: number
           bonus_picks_scoring_method?: string | null
           bonus_picks_tier_size?: number | null
+          elimination_prediction_points?: number
           eliminations_category_enabled?: boolean
           eliminations_category_weight?: number
-          elimination_prediction_points?: number
           first_place_points?: number
           judges_score_category_enabled?: boolean
           judges_score_category_weight?: number
@@ -693,9 +696,9 @@ export type Database = {
           bonus_picks_points_per_correct?: number
           bonus_picks_scoring_method?: string | null
           bonus_picks_tier_size?: number | null
+          elimination_prediction_points?: number
           eliminations_category_enabled?: boolean
           eliminations_category_weight?: number
-          elimination_prediction_points?: number
           first_place_points?: number
           judges_score_category_enabled?: boolean
           judges_score_category_weight?: number
@@ -898,6 +901,7 @@ export type Database = {
           created_at: string
           draft_scheduled_at: string | null
           draft_status: string
+          draft_type: string
           id: string
           invite_code: string
           name: string
@@ -914,10 +918,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      delete_league: {
-        Args: { p_league_id: string }
-        Returns: undefined
-      }
+      delete_league: { Args: { p_league_id: string }; Returns: undefined }
       finalize_waiver_claim: {
         Args: { p_claim_id: string }
         Returns: {
@@ -947,6 +948,7 @@ export type Database = {
           created_at: string
           draft_scheduled_at: string | null
           draft_status: string
+          draft_type: string
           id: string
           invite_code: string
           name: string
@@ -963,10 +965,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      leave_league: {
-        Args: { p_league_id: string }
-        Returns: undefined
-      }
+      leave_league: { Args: { p_league_id: string }; Returns: undefined }
       make_draft_pick: {
         Args: { p_couple_id: string; p_league_id: string }
         Returns: {
@@ -1025,6 +1024,7 @@ export type Database = {
           created_at: string
           draft_scheduled_at: string | null
           draft_status: string
+          draft_type: string
           id: string
           invite_code: string
           name: string
@@ -1053,6 +1053,7 @@ export type Database = {
           created_at: string
           draft_scheduled_at: string | null
           draft_status: string
+          draft_type: string
           id: string
           invite_code: string
           name: string
@@ -1136,6 +1137,8 @@ export type Database = {
       }
       update_league_settings: {
         Args: {
+          p_draft_scheduled_at: string
+          p_draft_type: string
           p_league_id: string
           p_pick_time_limit_seconds: number
           p_prediction_lock_hours_before_air: number
@@ -1147,6 +1150,7 @@ export type Database = {
           created_at: string
           draft_scheduled_at: string | null
           draft_status: string
+          draft_type: string
           id: string
           invite_code: string
           name: string
@@ -1167,11 +1171,11 @@ export type Database = {
         Args: {
           p_bonus_picks_category_enabled: boolean
           p_bonus_picks_category_weight: number
-          p_bonus_picks_deadline: string | null
-          p_bonus_picks_distance_penalty: number | null
+          p_bonus_picks_deadline: string
+          p_bonus_picks_distance_penalty: number
           p_bonus_picks_points_per_correct: number
-          p_bonus_picks_scoring_method: string | null
-          p_bonus_picks_tier_size: number | null
+          p_bonus_picks_scoring_method: string
+          p_bonus_picks_tier_size: number
           p_elimination_prediction_points: number
           p_eliminations_category_enabled: boolean
           p_eliminations_category_weight: number
@@ -1194,9 +1198,9 @@ export type Database = {
           bonus_picks_points_per_correct: number
           bonus_picks_scoring_method: string | null
           bonus_picks_tier_size: number | null
+          elimination_prediction_points: number
           eliminations_category_enabled: boolean
           eliminations_category_weight: number
-          elimination_prediction_points: number
           first_place_points: number
           judges_score_category_enabled: boolean
           judges_score_category_weight: number

@@ -51,6 +51,8 @@ export type LeagueSettingsInput = {
   waiverClaimMethod: "reverse_standings" | "fcfs" | "manual";
   pickTimeLimitSeconds: number;
   predictionLockHoursBeforeAir: number;
+  draftType: "snake" | "linear";
+  draftScheduledAt: string | null;
 };
 
 export async function updateLeagueSettings(
@@ -67,6 +69,10 @@ export async function updateLeagueSettings(
     p_waiver_claim_method: (input.waiverMode === "waivers" ? input.waiverClaimMethod : null) as string,
     p_pick_time_limit_seconds: input.pickTimeLimitSeconds,
     p_prediction_lock_hours_before_air: input.predictionLockHoursBeforeAir,
+    p_draft_type: input.draftType,
+    // Same generated-type gap as p_waiver_claim_method above: draft_scheduled_at
+    // is nullable in Postgres, but the RPC arg type doesn't model that.
+    p_draft_scheduled_at: input.draftScheduledAt as string,
   });
 
   if (error) return { error: error.message };
@@ -112,10 +118,12 @@ export async function updateScoringCategories(
     p_eliminations_category_weight: input.eliminationsCategoryWeight,
     p_bonus_picks_category_weight: input.bonusPicksCategoryWeight,
     p_judges_score_starts_week: input.judgesScoreStartsWeek,
-    p_bonus_picks_deadline: input.bonusPicksDeadline,
-    p_bonus_picks_scoring_method: input.bonusPicksScoringMethod,
-    p_bonus_picks_distance_penalty: input.bonusPicksDistancePenalty,
-    p_bonus_picks_tier_size: input.bonusPicksTierSize,
+    // These four are nullable in Postgres; the generated RPC arg type doesn't
+    // model that (same gap as p_waiver_claim_method/p_draft_scheduled_at above).
+    p_bonus_picks_deadline: input.bonusPicksDeadline as string,
+    p_bonus_picks_scoring_method: input.bonusPicksScoringMethod as string,
+    p_bonus_picks_distance_penalty: input.bonusPicksDistancePenalty as number,
+    p_bonus_picks_tier_size: input.bonusPicksTierSize as number,
     p_judges_score_multiplier: input.judgesScoreMultiplier,
     p_survival_points: input.survivalPoints,
     p_first_place_points: input.firstPlacePoints,
