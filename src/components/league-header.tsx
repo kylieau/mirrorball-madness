@@ -49,6 +49,7 @@ export function LeagueHeader({
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") ?? "yourpicks";
   const title = activeTab === "standings" ? "Standings" : "Your Picks";
+  const settingsHref = `/settings?from=${encodeURIComponent(`/leagues/${leagueId}?tab=${activeTab}`)}`;
 
   return (
     <Sheet>
@@ -71,7 +72,7 @@ export function LeagueHeader({
             <SettingsIcon />
           </SheetTrigger>
           <Button
-            render={<Link href="/settings" />}
+            render={<Link href={settingsHref} />}
             nativeButton={false}
             size="icon-sm"
             aria-label="Account settings"

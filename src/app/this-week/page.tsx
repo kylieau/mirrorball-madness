@@ -156,7 +156,7 @@ export default async function ThisWeekPage({
         </Link>
         <div className="flex gap-2">
           <Button
-            render={<Link href="/settings" />}
+            render={<Link href="/settings?from=%2Fthis-week" />}
             nativeButton={false}
             variant="outline"
             size="icon-sm"
@@ -165,7 +165,7 @@ export default async function ThisWeekPage({
             <SettingsIcon />
           </Button>
           <Button
-            render={<Link href="/settings" />}
+            render={<Link href="/settings?from=%2Fthis-week" />}
             nativeButton={false}
             size="icon-sm"
             aria-label="Account settings"

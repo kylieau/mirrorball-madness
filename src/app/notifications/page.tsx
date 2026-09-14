@@ -3,8 +3,15 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeLeagueSummary } from "@/lib/league-summary";
+import { safeRelativePath } from "@/lib/safe-relative-path";
 
-export default async function NotificationsPage() {
+export default async function NotificationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
+  const { from } = await searchParams;
+  const settingsHref = from ? `/settings?from=${encodeURIComponent(safeRelativePath(from, "/leagues"))}` : "/settings";
   const supabase = await createClient();
 
   const {
@@ -38,7 +45,7 @@ export default async function NotificationsPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
-      <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground">
+      <Link href={settingsHref} className="text-sm text-muted-foreground hover:text-foreground">
         ‹ Settings
       </Link>
       <div>

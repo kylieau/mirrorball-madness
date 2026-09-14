@@ -87,7 +87,7 @@ export function AdminResultsTabs({
           </Link>
           <div className="flex gap-2">
             <Button
-              render={<Link href="/settings" />}
+              render={<Link href="/settings?from=%2Fadmin%2Fresults" />}
               nativeButton={false}
               variant="outline"
               size="icon-sm"
@@ -96,7 +96,7 @@ export function AdminResultsTabs({
               <SettingsIcon />
             </Button>
             <Button
-              render={<Link href="/settings" />}
+              render={<Link href="/settings?from=%2Fadmin%2Fresults" />}
               nativeButton={false}
               size="icon-sm"
               aria-label="Account settings"

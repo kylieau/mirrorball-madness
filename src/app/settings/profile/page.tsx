@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { safeRelativePath } from "@/lib/safe-relative-path";
 
 export default async function ProfilePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; from?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, from } = await searchParams;
+  const settingsHref = from ? `/settings?from=${encodeURIComponent(safeRelativePath(from, "/leagues"))}` : "/settings";
   const supabase = await createClient();
 
   const {
@@ -31,7 +33,7 @@ export default async function ProfilePage({
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
-      <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground">
+      <Link href={settingsHref} className="text-sm text-muted-foreground hover:text-foreground">
         ‹ Settings
       </Link>
       <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
