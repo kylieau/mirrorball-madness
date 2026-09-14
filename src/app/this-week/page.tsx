@@ -184,7 +184,7 @@ export default async function ThisWeekPage() {
           </Link>
           <span className={`${TAB_ITEM_CLASSES} text-accent`}>
             <ListChecksIcon className="size-5 sm:size-4" />
-            <span className="text-[10px] sm:text-sm">This week</span>
+            <span className="text-[10px] sm:text-sm">This Week</span>
           </span>
           <Link href={`/leagues/${firstLeagueId}?tab=yourpicks`} className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
             <PencilLineIcon className="size-5 sm:size-4" />

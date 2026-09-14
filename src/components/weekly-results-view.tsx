@@ -53,7 +53,7 @@ export function WeeklyResultsView({
   couples: Couple[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
   // Manager-scoped props are only meaningful within a single league — omit
-  // all three to render the cross-league "This week" view (no Points by
+  // all three to render the cross-league "This Week" view (no Points by
   // team section) instead. leaguesByCouple is the cross-league view's own
   // addition: which of the viewer's leagues have this couple on their
   // roster, so eliminations/safe calls read as personally relevant.
@@ -67,7 +67,7 @@ export function WeeklyResultsView({
   if (!episode) {
     return (
       <div>
-        <h1 className="font-heading text-2xl font-semibold">This week</h1>
+        <h1 className="font-heading text-2xl font-semibold">This Week</h1>
         <div className="mt-2.5 mb-4 h-0.5 w-9 rounded-full bg-primary" />
         <p className="mb-4 text-sm text-muted-foreground">Season hasn&apos;t started yet</p>
         <Card>
@@ -117,7 +117,7 @@ export function WeeklyResultsView({
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-semibold">This week</h1>
+      <h1 className="font-heading text-2xl font-semibold">This Week</h1>
       <div className="mt-2.5 mb-4 h-0.5 w-9 rounded-full bg-primary" />
       <p className="mb-4 text-sm text-muted-foreground">
         Week {episode.week_number}
@@ -133,7 +133,7 @@ export function WeeklyResultsView({
         </div>
       )}
 
-      <div className="mb-2 text-sm font-semibold text-accent">This week&apos;s dances</div>
+      <div className="mb-2 text-sm font-semibold text-accent">This Week&apos;s dances</div>
       <div className="flex flex-col gap-2.5">
         {outcomes.map((r) => {
           const tag = outcomeTag(r);
