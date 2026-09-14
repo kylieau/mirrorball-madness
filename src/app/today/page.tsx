@@ -101,11 +101,10 @@ export default async function TodayPage() {
     grandFinaleOn: s.grandFinaleOn,
   }));
 
-  const urgentDeadline =
-    summaries
-      .filter((s) => s.picksDue && s.nextDeadline)
-      .map((s) => ({ leagueId: s.id, leagueName: s.name, moduleLabel: s.nextDeadline!.label, iso: s.nextDeadline!.iso }))
-      .sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime())[0] ?? null;
+  const deadlines = summaries
+    .filter((s) => s.picksDue && s.nextDeadline)
+    .map((s) => ({ leagueId: s.id, leagueName: s.name, moduleLabel: s.nextDeadline!.label, iso: s.nextDeadline!.iso }))
+    .sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime());
 
   const recentActivity = [
     ...summaries.flatMap((s) =>
@@ -148,7 +147,7 @@ export default async function TodayPage() {
 
       <div className="pb-20 sm:pb-0">
         <PageHeader title="Home" />
-        <HomeDashboard leagues={leagues} urgentDeadline={urgentDeadline} recentActivity={recentActivity} />
+        <HomeDashboard leagues={leagues} deadlines={deadlines} recentActivity={recentActivity} />
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:border-b sm:pb-0">

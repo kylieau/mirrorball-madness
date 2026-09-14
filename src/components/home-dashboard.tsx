@@ -17,11 +17,11 @@ type HomeLeague = {
 
 export function HomeDashboard({
   leagues,
-  urgentDeadline,
+  deadlines,
   recentActivity,
 }: {
   leagues: HomeLeague[];
-  urgentDeadline: { leagueId: string; leagueName: string; moduleLabel: string; iso: string } | null;
+  deadlines: { leagueId: string; leagueName: string; moduleLabel: string; iso: string }[];
   recentActivity: string[];
 }) {
   const needingPicks = leagues.filter((l) => l.picksDue).length;
@@ -33,13 +33,18 @@ export function HomeDashboard({
         {needingPicks > 0 ? ` · ${needingPicks} need${needingPicks === 1 ? "s" : ""} picks` : " · all caught up"}
       </p>
 
-      {urgentDeadline && (
-        <DeadlineStub
-          label={`${urgentDeadline.leagueName} · ${urgentDeadline.moduleLabel}`}
-          headline={`Closes in ${formatCountdown(urgentDeadline.iso)}`}
-          ctaLabel="Make picks"
-          href={`/leagues/${urgentDeadline.leagueId}?tab=yourpicks`}
-        />
+      {deadlines.length > 0 && (
+        <div className="flex flex-col gap-2.5">
+          {deadlines.map((d) => (
+            <DeadlineStub
+              key={d.leagueId}
+              label={`${d.leagueName} · ${d.moduleLabel}`}
+              headline={`Closes in ${formatCountdown(d.iso)}`}
+              ctaLabel="Make picks"
+              href={`/leagues/${d.leagueId}?tab=yourpicks`}
+            />
+          ))}
+        </div>
       )}
 
       <div className="mb-2 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
