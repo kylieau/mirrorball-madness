@@ -19,11 +19,14 @@ export default async function WaiversPage({
     redirect("/login");
   }
 
-  const { data: league } = await supabase
-    .from("leagues")
-    .select("id, name, waiver_mode, waiver_claim_method, commissioner_id")
-    .eq("id", id)
-    .single();
+  const [{ data: league }, { data: membership }] = await Promise.all([
+    supabase
+      .from("leagues")
+      .select("id, name, waiver_mode, waiver_claim_method")
+      .eq("id", id)
+      .single(),
+    supabase.from("league_members").select("role").eq("league_id", id).eq("user_id", user.id).maybeSingle(),
+  ]);
 
   if (!league) {
     notFound();
@@ -111,7 +114,7 @@ export default async function WaiversPage({
     <WaiversPanel
       leagueId={id}
       claimMethod={league.waiver_claim_method!}
-      isCommissioner={league.commissioner_id === user.id}
+      isCommissioner={membership?.role === "commissioner"}
       openSlots={openSlots}
       availableCouples={availableCouples}
       coupleDisplayNames={Object.fromEntries(displayNames)}

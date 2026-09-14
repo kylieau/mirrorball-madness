@@ -46,6 +46,38 @@ export async function removeMember(
   return { error: null };
 }
 
+export async function promoteMember(
+  leagueId: string,
+  userId: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("promote_to_commissioner", {
+    p_league_id: leagueId,
+    p_user_id: userId,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/leagues/${leagueId}`);
+  return { error: null };
+}
+
+export async function demoteMember(
+  leagueId: string,
+  userId: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("demote_commissioner", {
+    p_league_id: leagueId,
+    p_user_id: userId,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/leagues/${leagueId}`);
+  return { error: null };
+}
+
 export type LeagueSettingsInput = {
   waiverMode: "locked" | "waivers";
   waiverClaimMethod: "reverse_standings" | "fcfs" | "manual";

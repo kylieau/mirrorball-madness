@@ -24,7 +24,7 @@ export default async function LeaguesPage({
 
   const { data: memberships } = await supabase
     .from("league_members")
-    .select("role, leagues(id, name, commissioner_id)")
+    .select("role, leagues(id, name)")
     .eq("user_id", user.id);
 
   return (
@@ -52,7 +52,7 @@ export default async function LeaguesPage({
           <div className="flex flex-col gap-2">
             {memberships.map((m) => {
               const league = m.leagues!;
-              const isCommissioner = league.commissioner_id === user.id;
+              const isCommissioner = m.role === "commissioner";
               return (
                 <Card key={league.id}>
                   <CardContent className="flex items-center justify-between gap-3 py-4">

@@ -919,6 +919,10 @@ export type Database = {
         }
       }
       delete_league: { Args: { p_league_id: string }; Returns: undefined }
+      demote_commissioner: {
+        Args: { p_league_id: string; p_user_id: string }
+        Returns: undefined
+      }
       finalize_waiver_claim: {
         Args: { p_claim_id: string }
         Returns: {
@@ -940,6 +944,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      is_league_commissioner: { Args: { p_league_id: string }; Returns: boolean }
       is_league_member: { Args: { p_league_id: string }; Returns: boolean }
       join_league: {
         Args: { p_invite_code: string }
@@ -990,6 +995,10 @@ export type Database = {
       }
       process_reverse_standings_waivers: {
         Args: { p_league_id: string }
+        Returns: undefined
+      }
+      promote_to_commissioner: {
+        Args: { p_league_id: string; p_user_id: string }
         Returns: undefined
       }
       reject_waiver_claim: {

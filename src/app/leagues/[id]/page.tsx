@@ -51,8 +51,6 @@ export default async function LeaguePage({
     .eq("league_id", id)
     .single();
 
-  const isCommissioner = league.commissioner_id === user.id;
-
   const danceCardOn = scoringSettings?.judges_score_category_enabled ?? true;
   const waiversOn = league.waiver_mode === "waivers";
   const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
@@ -92,6 +90,8 @@ export default async function LeaguePage({
         .limit(1)
         .maybeSingle(),
     ]);
+
+  const isCommissioner = (members ?? []).some((m) => m.user_id === user.id && m.role === "commissioner");
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const [{ data: premiereEpisode }, { data: completedEpisodes }] = await Promise.all([

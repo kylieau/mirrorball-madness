@@ -467,7 +467,9 @@ language plpgsql
 security definer set search_path = ''
 as $$
 begin
-  if exists (select 1 from public.leagues where commissioner_id = auth.uid()) then
+  if exists (
+    select 1 from public.league_members where user_id = auth.uid() and role = 'commissioner'
+  ) then
     raise exception 'You are the commissioner of at least one league — leave or hand those off before requesting deletion';
   end if;
 
@@ -599,18 +601,16 @@ $$;
 -- grand_finale_predictions/weekly_manager_scores for the departing manager —
 -- those stay intact for the league's own history/standings math. Leaving
 -- just revokes membership/visibility going forward, same as a real sports
--- league handles someone dropping out mid-season. No ownership-transfer flow
--- exists yet, so the commissioner can't leave their own league at all.
+-- league handles someone dropping out mid-season. A commissioner can't leave
+-- directly — demote_commissioner to manager first (blocked if they're the
+-- last commissioner), then leave normally.
 create function public.leave_league(p_league_id uuid)
 returns void
 language plpgsql
 security definer set search_path = ''
 as $$
 begin
-  if exists (
-    select 1 from public.leagues
-    where id = p_league_id and commissioner_id = auth.uid()
-  ) then
+  if public.is_league_commissioner(p_league_id) then
     raise exception 'Commissioners can''t leave their own league';
   end if;
 
@@ -626,18 +626,16 @@ $$;
 -- Commissioner-initiated counterpart to leave_league — same deliberate
 -- non-cascade (roster_slots/predictions/weekly_manager_scores stay intact
 -- for league history), just triggered on someone else's behalf. The
--- `role != 'commissioner'` guard means this can never remove a commissioner
--- (there's exactly one per league, and no ownership-transfer flow exists).
+-- `role != 'commissioner'` guard means a commissioner (co- or original)
+-- has to be demoted via demote_commissioner before they can be removed —
+-- keeps "remove" and "demote" as two separate, deliberate actions.
 create function public.remove_league_member(p_league_id uuid, p_user_id uuid)
 returns void
 language plpgsql
 security definer set search_path = ''
 as $$
 begin
-  if not exists (
-    select 1 from public.leagues
-    where id = p_league_id and commissioner_id = auth.uid()
-  ) then
+  if not public.is_league_commissioner(p_league_id) then
     raise exception 'Only the commissioner can remove a member';
   end if;
 
@@ -650,6 +648,64 @@ begin
 
   if not found then
     raise exception 'That person is not a removable member of this league';
+  end if;
+end;
+$$;
+
+-- Full parity: any commissioner (original or promoted) can promote another
+-- member, and once promoted a co-commissioner is indistinguishable from the
+-- original — same privileges everywhere, including promoting/demoting
+-- others.
+create function public.promote_to_commissioner(p_league_id uuid, p_user_id uuid)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  if not public.is_league_commissioner(p_league_id) then
+    raise exception 'Only a commissioner can promote a member';
+  end if;
+
+  update public.league_members
+  set role = 'commissioner'
+  where league_id = p_league_id and user_id = p_user_id and role = 'manager';
+
+  if not found then
+    raise exception 'That person is not a promotable member of this league';
+  end if;
+end;
+$$;
+
+-- Blocked when it would leave the league with zero commissioners — every
+-- league must always have at least one. No separate ownership-transfer
+-- flow: with co-commissioners, demoting yourself (as long as someone else
+-- still holds the role) is that flow.
+create function public.demote_commissioner(p_league_id uuid, p_user_id uuid)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_commissioner_count int;
+begin
+  if not public.is_league_commissioner(p_league_id) then
+    raise exception 'Only a commissioner can demote another commissioner';
+  end if;
+
+  select count(*) into v_commissioner_count
+  from public.league_members
+  where league_id = p_league_id and role = 'commissioner';
+
+  if v_commissioner_count <= 1 then
+    raise exception 'A league must have at least one commissioner';
+  end if;
+
+  update public.league_members
+  set role = 'manager'
+  where league_id = p_league_id and user_id = p_user_id and role = 'commissioner';
+
+  if not found then
+    raise exception 'That person is not a commissioner of this league';
   end if;
 end;
 $$;
@@ -670,14 +726,14 @@ begin
     raise exception 'League name is required';
   end if;
 
-  update public.leagues
-  set name = trim(p_name)
-  where id = p_league_id and commissioner_id = auth.uid()
-  returning * into v_league;
-
-  if not found then
+  if not public.is_league_commissioner(p_league_id) then
     raise exception 'Only the commissioner can rename this league';
   end if;
+
+  update public.leagues
+  set name = trim(p_name)
+  where id = p_league_id
+  returning * into v_league;
 
   return v_league;
 end;
@@ -695,12 +751,12 @@ language plpgsql
 security definer set search_path = ''
 as $$
 begin
-  delete from public.leagues
-  where id = p_league_id and commissioner_id = auth.uid();
-
-  if not found then
+  if not public.is_league_commissioner(p_league_id) then
     raise exception 'Only the commissioner can delete this league';
   end if;
+
+  delete from public.leagues
+  where id = p_league_id;
 end;
 $$;
 
@@ -708,12 +764,16 @@ revoke execute on function public.create_league(text, boolean, boolean, boolean)
 revoke execute on function public.join_league(text) from public;
 revoke execute on function public.leave_league(uuid) from public;
 revoke execute on function public.remove_league_member(uuid, uuid) from public;
+revoke execute on function public.promote_to_commissioner(uuid, uuid) from public;
+revoke execute on function public.demote_commissioner(uuid, uuid) from public;
 revoke execute on function public.rename_league(uuid, text) from public;
 revoke execute on function public.delete_league(uuid) from public;
 grant execute on function public.create_league(text, boolean, boolean, boolean) to authenticated;
 grant execute on function public.join_league(text) to authenticated;
 grant execute on function public.leave_league(uuid) to authenticated;
 grant execute on function public.remove_league_member(uuid, uuid) to authenticated;
+grant execute on function public.promote_to_commissioner(uuid, uuid) to authenticated;
+grant execute on function public.demote_commissioner(uuid, uuid) to authenticated;
 grant execute on function public.rename_league(uuid, text) to authenticated;
 grant execute on function public.delete_league(uuid) to authenticated;
 
@@ -740,6 +800,30 @@ $$;
 
 revoke execute on function public.is_league_member(uuid) from public;
 grant execute on function public.is_league_member(uuid) to authenticated;
+
+-- Same rationale as is_league_member above. Every "only the commissioner
+-- can..." check used to compare against leagues.commissioner_id directly,
+-- which only ever held one person. league_members.role already supported
+-- 'commissioner' on any number of rows per league — it just never had more
+-- than one in practice — so that's the real source of truth for co-
+-- commissioners (added via promote_to_commissioner below), not the single
+-- commissioner_id column. commissioner_id is left in place purely as a
+-- record of who originally created the league; nothing checks it anymore.
+create function public.is_league_commissioner(p_league_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1 from public.league_members
+    where league_id = p_league_id and user_id = auth.uid() and role = 'commissioner'
+  );
+$$;
+
+revoke execute on function public.is_league_commissioner(uuid) from public;
+grant execute on function public.is_league_commissioner(uuid) to authenticated;
 
 create policy "leagues are viewable by members"
 on public.leagues for select
@@ -793,6 +877,10 @@ as $$
 declare
   v_league public.leagues;
 begin
+  if not public.is_league_commissioner(p_league_id) then
+    raise exception 'Only the commissioner can update league settings';
+  end if;
+
   -- draft_type/draft_scheduled_at only take effect pre-draft: changing the
   -- pick-order math or the scheduled time after picks are already underway
   -- would corrupt whose-turn-it-is for a draft already in progress.
@@ -804,12 +892,8 @@ begin
     prediction_lock_hours_before_air = p_prediction_lock_hours_before_air,
     draft_type = case when draft_status = 'not_started' then p_draft_type else draft_type end,
     draft_scheduled_at = case when draft_status = 'not_started' then p_draft_scheduled_at else draft_scheduled_at end
-  where id = p_league_id and commissioner_id = auth.uid()
+  where id = p_league_id
   returning * into v_league;
-
-  if not found then
-    raise exception 'Only the commissioner can update league settings';
-  end if;
 
   return v_league;
 end;
@@ -850,6 +934,10 @@ as $$
 declare
   v_settings public.scoring_settings;
 begin
+  if not public.is_league_commissioner(p_league_id) then
+    raise exception 'Only the commissioner can update scoring categories';
+  end if;
+
   update public.scoring_settings
   set
     judges_score_category_enabled = p_judges_score_category_enabled,
@@ -873,15 +961,7 @@ begin
     bonus_picks_points_per_correct = p_bonus_picks_points_per_correct,
     scoring_configured = true
   where league_id = p_league_id
-    and exists (
-      select 1 from public.leagues
-      where id = p_league_id and commissioner_id = auth.uid()
-    )
   returning * into v_settings;
-
-  if not found then
-    raise exception 'Only the commissioner can update scoring categories';
-  end if;
 
   return v_settings;
 end;
@@ -939,7 +1019,7 @@ declare
 begin
   select * into v_league from public.leagues where id = p_league_id for update;
 
-  if not found or v_league.commissioner_id <> auth.uid() then
+  if not found or not public.is_league_commissioner(p_league_id) then
     raise exception 'Only the commissioner can set the draft order';
   end if;
 
@@ -993,7 +1073,7 @@ declare
 begin
   select * into v_league from public.leagues where id = p_league_id for update;
 
-  if not found or v_league.commissioner_id <> auth.uid() then
+  if not found or not public.is_league_commissioner(p_league_id) then
     raise exception 'Only the commissioner can start the draft';
   end if;
 
@@ -1525,7 +1605,7 @@ declare
 begin
   select * into v_league from public.leagues where id = p_league_id for update;
 
-  if not found or v_league.commissioner_id <> auth.uid() then
+  if not found or not public.is_league_commissioner(p_league_id) then
     raise exception 'Only the commissioner can process recasts';
   end if;
 
@@ -1570,15 +1650,13 @@ security definer set search_path = ''
 as $$
 declare
   v_claim public.waiver_claims;
-  v_league public.leagues;
 begin
   select * into v_claim from public.waiver_claims where id = p_claim_id;
   if not found then
     raise exception 'Recast not found';
   end if;
 
-  select * into v_league from public.leagues where id = v_claim.league_id;
-  if v_league.commissioner_id <> auth.uid() then
+  if not public.is_league_commissioner(v_claim.league_id) then
     raise exception 'Only the commissioner can approve recasts';
   end if;
 
@@ -1597,15 +1675,13 @@ security definer set search_path = ''
 as $$
 declare
   v_claim public.waiver_claims;
-  v_league public.leagues;
 begin
   select * into v_claim from public.waiver_claims where id = p_claim_id;
   if not found then
     raise exception 'Recast not found';
   end if;
 
-  select * into v_league from public.leagues where id = v_claim.league_id;
-  if v_league.commissioner_id <> auth.uid() then
+  if not public.is_league_commissioner(v_claim.league_id) then
     raise exception 'Only the commissioner can reject recasts';
   end if;
 

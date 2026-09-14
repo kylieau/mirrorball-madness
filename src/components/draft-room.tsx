@@ -141,7 +141,7 @@ export function DraftRoom({
     0
   );
 
-  const isCommissioner = league.commissioner_id === currentUserId;
+  const isCommissioner = members.some((m) => m.user_id === currentUserId && m.role === "commissioner");
 
   function coupleParts(coupleId: string): CoupleNameParts | null {
     if (coupleDisplayNames[coupleId]) return coupleDisplayNames[coupleId];
