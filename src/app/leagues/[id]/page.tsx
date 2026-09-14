@@ -11,14 +11,11 @@ import { StandingsModuleBreakdown } from "@/components/standings-module-breakdow
 import { RosterCard } from "@/components/roster-card";
 import { PickEmBox } from "@/components/pick-em-box";
 import { GrandFinaleBox } from "@/components/grand-finale-box";
-import { DraftStatusCard } from "@/components/draft-status-card";
-import { RecastNudgeCard } from "@/components/recast-nudge-card";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { LeagueHeader } from "@/components/league-header";
 import { LeagueTabs } from "@/components/league-tabs";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { getStandingMessage } from "@/lib/standings-message";
-import { getPickAssignment } from "@/lib/draft";
 
 export default async function LeaguePage({
   params,
@@ -343,25 +340,6 @@ export default async function LeaguePage({
       status: r.couples!.status,
     }));
 
-  const openSlotCount = rosterCouples.filter(
-    (c) => c.status === "eliminated" || c.status === "withdrawn"
-  ).length;
-
-  let onTheClockName: string | null = null;
-  let isMyTurn = false;
-  let draftPickCount = 0;
-  if (danceCardOn && league.draft_status === "in_progress") {
-    const { count } = await supabase
-      .from("draft_picks")
-      .select("id", { count: "exact", head: true })
-      .eq("league_id", id);
-    draftPickCount = count ?? 0;
-    const { draftPosition } = getPickAssignment(draftPickCount + 1, (members ?? []).length);
-    const onTheClock = (members ?? []).find((m) => m.draft_position === draftPosition);
-    onTheClockName = onTheClock?.profiles?.display_name ?? null;
-    isMyTurn = onTheClock?.user_id === user.id;
-  }
-
   const { data: myMemberships } = await supabase
     .from("league_members")
     .select("leagues(id, name)")
@@ -431,21 +409,9 @@ export default async function LeaguePage({
                 revealedPredictions={revealedPredictions}
               />
             )}
-            {danceCardOn && (
-              <DraftStatusCard
-                leagueId={id}
-                draftStatus={league.draft_status}
-                isCommissioner={isCommissioner}
-                memberCount={(members ?? []).length}
-                pickCount={draftPickCount}
-                onTheClockName={onTheClockName}
-                isMyTurn={isMyTurn}
-              />
-            )}
             {danceCardOn && rosterCouples.length > 0 && (
               <RosterCard couples={rosterCouples} totalPoints={pointsByManager.get(user.id) ?? 0} />
             )}
-            {danceCardOn && waiversOn && <RecastNudgeCard leagueId={id} openSlotCount={openSlotCount} />}
             {grandFinaleOn && (
               <GrandFinaleBox
                 leagueId={id}
