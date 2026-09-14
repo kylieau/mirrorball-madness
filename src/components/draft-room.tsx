@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { getPickAssignment } from "@/lib/draft";
 import { setDraftOrder, startDraft, makeDraftPick } from "@/app/leagues/[id]/draft/actions";
@@ -15,6 +16,7 @@ import {
 import type { Database } from "@/lib/supabase/types";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
+import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 
 type League = Database["public"]["Tables"]["leagues"]["Row"];
 type Member = {
@@ -115,9 +117,14 @@ export function DraftRoom({
   const availableCouples = couples.filter((c) => !draftedCoupleIds.has(c.id));
   const totalSlots = members.length * league.roster_size;
   const nextPickNumber = picks.length + 1;
-  const { round, draftPosition } = getPickAssignment(nextPickNumber, members.length);
+  const { round, draftPosition } = getPickAssignment(
+    nextPickNumber,
+    members.length,
+    league.draft_type as "snake" | "linear"
+  );
   const onTheClock = members.find((m) => m.draft_position === draftPosition);
   const isMyTurn = league.draft_status === "in_progress" && onTheClock?.user_id === currentUserId;
+  const formattedScheduledAt = useFormattedDeadline(league.draft_scheduled_at);
 
   const [turnStartedAt, setTurnStartedAt] = useState(() => Date.now());
   useEffect(() => {
@@ -193,6 +200,11 @@ export function DraftRoom({
     return (
       <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">Draft hasn&apos;t started</h1>
+        {league.draft_scheduled_at && (
+          <p className="text-sm text-muted-foreground">
+            Scheduled for {formattedScheduledAt || "…"}
+          </p>
+        )}
         {error && <p className="text-sm text-destructive">{error}</p>}
         {isCommissioner ? (
           <>
@@ -273,22 +285,63 @@ export function DraftRoom({
     );
   }
 
+  if (league.draft_status === "completed") {
+    const myPicks = picks
+      .filter((p) => p.manager_id === currentUserId)
+      .sort((a, b) => a.round - b.round);
+
+    return (
+      <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-16">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">Draft complete!</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {league.name} — {members.length} managers, {league.roster_size} rounds, every roster is set
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 rounded-md bg-emerald/20 px-3 py-2 text-sm font-medium text-emerald-text">
+          <span>✓</span>
+          Your roster is locked in
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Your roster</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {myPicks.map((p) => (
+              <div key={p.id} className="flex items-baseline justify-between text-sm">
+                <span>
+                  {(() => {
+                    const parts = coupleParts(p.couple_id);
+                    return parts ? <CoupleName {...parts} /> : "Unknown couple";
+                  })()}
+                </span>
+                <span className="text-muted-foreground">Rd {p.round}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Button render={<Link href={`/leagues/${league.id}`} />} nativeButton={false}>
+          Back to {league.name}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{league.name} draft</h1>
         {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-        {league.draft_status === "completed" ? (
-          <p className="mt-1 text-sm text-muted-foreground">Draft complete.</p>
-        ) : (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Round {round} · Pick {nextPickNumber} of {totalSlots} —{" "}
-            <span className="font-medium text-foreground">
-              {isMyTurn ? "Your turn" : `${onTheClock?.profiles?.display_name ?? "..."}'s turn`}
-            </span>{" "}
-            · {secondsRemaining}s
-          </p>
-        )}
+        <p className="mt-1 text-sm text-muted-foreground">
+          Round {round} · Pick {nextPickNumber} of {totalSlots} —{" "}
+          <span className="font-medium text-foreground">
+            {isMyTurn ? "Your turn" : `${onTheClock?.profiles?.display_name ?? "..."}'s turn`}
+          </span>{" "}
+          · {secondsRemaining}s
+        </p>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">

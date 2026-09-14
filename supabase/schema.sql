@@ -83,6 +83,7 @@ create table leagues (
   waiver_mode text not null default 'locked' check (waiver_mode in ('locked', 'waivers')),
   waiver_claim_method text check (waiver_claim_method in ('reverse_standings', 'fcfs', 'manual')),
   draft_scheduled_at timestamptz,
+  draft_type text not null default 'snake' check (draft_type in ('snake', 'linear')),
   pick_time_limit_seconds int not null default 90,
   draft_status text not null default 'not_started' check (draft_status in ('not_started', 'in_progress', 'completed')),
   -- How long before an episode's real-world airs_at this league's Pick 'Em
@@ -781,7 +782,9 @@ create function public.update_league_settings(
   p_waiver_mode text,
   p_waiver_claim_method text,
   p_pick_time_limit_seconds int,
-  p_prediction_lock_hours_before_air numeric
+  p_prediction_lock_hours_before_air numeric,
+  p_draft_type text,
+  p_draft_scheduled_at timestamptz
 )
 returns public.leagues
 language plpgsql
@@ -790,12 +793,17 @@ as $$
 declare
   v_league public.leagues;
 begin
+  -- draft_type/draft_scheduled_at only take effect pre-draft: changing the
+  -- pick-order math or the scheduled time after picks are already underway
+  -- would corrupt whose-turn-it-is for a draft already in progress.
   update public.leagues
   set
     waiver_mode = p_waiver_mode,
     waiver_claim_method = p_waiver_claim_method,
     pick_time_limit_seconds = p_pick_time_limit_seconds,
-    prediction_lock_hours_before_air = p_prediction_lock_hours_before_air
+    prediction_lock_hours_before_air = p_prediction_lock_hours_before_air,
+    draft_type = case when draft_status = 'not_started' then p_draft_type else draft_type end,
+    draft_scheduled_at = case when draft_status = 'not_started' then p_draft_scheduled_at else draft_scheduled_at end
   where id = p_league_id and commissioner_id = auth.uid()
   returning * into v_league;
 
@@ -1078,8 +1086,9 @@ begin
   v_round := ((v_next_pick - 1) / v_member_count) + 1;
   v_position_in_round := v_next_pick - (v_round - 1) * v_member_count;
 
-  -- Snake order: odd rounds go 1..N, even rounds go N..1.
-  if v_round % 2 = 1 then
+  -- Snake order: odd rounds go 1..N, even rounds go N..1. Linear repeats
+  -- 1..N every round.
+  if v_league.draft_type = 'linear' or v_round % 2 = 1 then
     v_draft_position_needed := v_position_in_round;
   else
     v_draft_position_needed := v_member_count - v_position_in_round + 1;

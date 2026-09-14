@@ -16,6 +16,7 @@ export async function submitWaiverClaim(
   });
   if (error) return { error: error.message };
   revalidatePath(`/leagues/${leagueId}/waivers`);
+  revalidatePath(`/leagues/${leagueId}`);
   return { error: null };
 }
 

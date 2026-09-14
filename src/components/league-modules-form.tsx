@@ -30,6 +30,7 @@ import { explainGrandFinaleMethod } from "@/lib/grand-finale-explainer";
 type ScoringMethod = "exact_position" | "distance_based" | "binary_tier";
 type WaiverMode = "locked" | "waivers";
 type WaiverClaimMethod = "reverse_standings" | "fcfs" | "manual";
+type DraftType = "snake" | "linear";
 
 type ScoringSettings = {
   judges_score_category_enabled: boolean;
@@ -59,6 +60,9 @@ type League = {
   waiver_claim_method: string | null;
   pick_time_limit_seconds: number;
   prediction_lock_hours_before_air: number;
+  draft_status: string;
+  draft_type: string;
+  draft_scheduled_at: string | null;
 };
 
 const METHOD_ITEMS: Record<ScoringMethod, string> = {
@@ -82,6 +86,11 @@ const WAIVER_CLAIM_METHOD_ITEMS: Record<WaiverClaimMethod, string> = {
   reverse_standings: "Reverse standings",
   fcfs: "First come, first served",
   manual: "Manual (commissioner decides)",
+};
+
+const DRAFT_TYPE_ITEMS: Record<DraftType, string> = {
+  snake: "Snake (reverses order each round)",
+  linear: "Linear (same order every round)",
 };
 
 export function LeagueModulesForm({
@@ -142,6 +151,12 @@ export function LeagueModulesForm({
     (league.waiver_claim_method as WaiverClaimMethod) ?? "reverse_standings"
   );
   const [pickTimeLimitSeconds, setPickTimeLimitSeconds] = useState(league.pick_time_limit_seconds);
+  const [draftType, setDraftType] = useState<DraftType>((league.draft_type as DraftType) ?? "snake");
+  const [draftScheduledAt, setDraftScheduledAt] = useState(
+    league.draft_scheduled_at ? utcIsoToLocalInput(league.draft_scheduled_at) : ""
+  );
+  const formattedDraftScheduledAt = useFormattedDeadline(draftScheduledAt || null);
+  const draftNotStarted = league.draft_status === "not_started";
 
   const [eliminationPredictionPoints, setEliminationPredictionPoints] = useState(
     scoringSettings?.elimination_prediction_points ?? 30
@@ -240,6 +255,8 @@ export function LeagueModulesForm({
       waiverClaimMethod,
       pickTimeLimitSeconds,
       predictionLockHoursBeforeAir,
+      draftType,
+      draftScheduledAt: draftScheduledAt ? airsAtToUtcIso(draftScheduledAt) : null,
     };
 
     const [scoringResult, leagueResult] = await Promise.all([
@@ -309,6 +326,10 @@ export function LeagueModulesForm({
                 <SettingRow label="Recast Method" value={WAIVER_CLAIM_METHOD_ITEMS[waiverClaimMethod]} />
               )}
               <SettingRow label="Draft Pick Timer" value={`${pickTimeLimitSeconds}s`} />
+              <SettingRow label="Draft Type" value={DRAFT_TYPE_ITEMS[draftType]} />
+              {draftScheduledAt && (
+                <SettingRow label="Draft Scheduled For" value={formattedDraftScheduledAt || "—"} />
+              )}
             </CardContent>
           </Card>
         )}
@@ -575,6 +596,48 @@ export function LeagueModulesForm({
                 )}
               </div>
             </div>
+
+            {draftNotStarted ? (
+              <div className="border-t border-border pt-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="draftType">Draft Type</Label>
+                    <Select
+                      items={DRAFT_TYPE_ITEMS}
+                      value={draftType}
+                      onValueChange={(v) => setDraftType((v as DraftType) ?? "snake")}
+                    >
+                      <SelectTrigger id="draftType" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="snake">Snake</SelectItem>
+                        <SelectItem value="linear">Linear</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="draftScheduledAt">
+                      Draft Scheduled For{browserTimeZone ? ` (${browserTimeZone})` : ""}
+                    </Label>
+                    <Input
+                      id="draftScheduledAt"
+                      type="datetime-local"
+                      value={draftScheduledAt}
+                      onChange={(e) => setDraftScheduledAt(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <p className="pt-2 text-sm text-muted-foreground">
+                  The scheduled time is informational only — the commissioner still starts the draft manually from
+                  the draft room whenever your league is ready.
+                </p>
+              </div>
+            ) : (
+              <div className="border-t border-border pt-4 text-sm text-muted-foreground">
+                Draft Type and Scheduled For can only be changed before the draft starts.
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

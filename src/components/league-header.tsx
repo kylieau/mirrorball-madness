@@ -57,15 +57,6 @@ export function LeagueHeader({
           🪩 Mirrorball Madness
         </Link>
         <div className="flex gap-2">
-          {danceCardOn && (
-            <Button
-              render={<Link href={`/leagues/${leagueId}/draft`} />}
-              nativeButton={false}
-              size="sm"
-            >
-              Draft room
-            </Button>
-          )}
           {danceCardOn && waiversOn && (
             <Button
               render={<Link href={`/leagues/${leagueId}/waivers`} />}

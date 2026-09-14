@@ -11,11 +11,14 @@ import { StandingsModuleBreakdown } from "@/components/standings-module-breakdow
 import { RosterCard } from "@/components/roster-card";
 import { PickEmBox } from "@/components/pick-em-box";
 import { GrandFinaleBox } from "@/components/grand-finale-box";
+import { DraftStatusCard } from "@/components/draft-status-card";
+import { RecastNudgeCard } from "@/components/recast-nudge-card";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { LeagueHeader } from "@/components/league-header";
 import { LeagueTabs } from "@/components/league-tabs";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { getStandingMessage } from "@/lib/standings-message";
+import { getPickAssignment } from "@/lib/draft";
 
 export default async function LeaguePage({
   params,
@@ -71,7 +74,7 @@ export default async function LeaguePage({
       supabase
         .from("roster_slots")
         .select(
-          "couple_id, couples(status, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name))"
+          "slot_number, couple_id, couples(status, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name))"
         )
         .eq("league_id", id)
         .eq("manager_id", user.id)
@@ -340,6 +343,61 @@ export default async function LeaguePage({
       status: r.couples!.status,
     }));
 
+  const openSlotCount = rosterCouples.filter(
+    (c) => c.status === "eliminated" || c.status === "withdrawn"
+  ).length;
+
+  let recastOpenSlots: { slotNumber: number; formerCoupleName: string }[] = [];
+  let recastAvailableCouples: { id: string; celebrity_name: string; pro_name: string }[] = [];
+  if (danceCardOn && waiversOn && openSlotCount > 0) {
+    recastOpenSlots = (rosterSlots ?? [])
+      .filter((s) => s.couples?.status === "eliminated" || s.couples?.status === "withdrawn")
+      .map((s) => ({
+        slotNumber: s.slot_number,
+        formerCoupleName: formatCoupleName(
+          allDisplayNames.get(s.couple_id!) ?? {
+            celebrity: s.couples!.celebrity?.name ?? "Unknown",
+            pro: s.couples!.pro?.name ?? "Unknown",
+          }
+        ),
+      }));
+
+    const { data: leagueRosteredSlots } = await supabase
+      .from("roster_slots")
+      .select("couple_id")
+      .eq("league_id", id)
+      .is("end_week", null);
+    const rosteredCoupleIds = new Set((leagueRosteredSlots ?? []).map((s) => s.couple_id));
+    recastAvailableCouples = activeCouples
+      .filter((c) => !rosteredCoupleIds.has(c.id))
+      .map((c) => ({ id: c.id, celebrity_name: c.celebrity_name, pro_name: c.pro_name }))
+      .sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
+  }
+
+  // Reverse-standings recast priority is worst-record-first — the lowest
+  // scorer gets priority #1. Only meaningful for that claim method; other
+  // methods (fcfs/manual) have no stable pre-computed priority to show.
+  const recastPriorityRank = standings.length - rank + 1;
+
+  let onTheClockName: string | null = null;
+  let isMyTurn = false;
+  let draftPickCount = 0;
+  if (danceCardOn && league.draft_status === "in_progress") {
+    const { count } = await supabase
+      .from("draft_picks")
+      .select("id", { count: "exact", head: true })
+      .eq("league_id", id);
+    draftPickCount = count ?? 0;
+    const { draftPosition } = getPickAssignment(
+      draftPickCount + 1,
+      (members ?? []).length,
+      league.draft_type as "snake" | "linear"
+    );
+    const onTheClock = (members ?? []).find((m) => m.draft_position === draftPosition);
+    onTheClockName = onTheClock?.profiles?.display_name ?? null;
+    isMyTurn = onTheClock?.user_id === user.id;
+  }
+
   const { data: myMemberships } = await supabase
     .from("league_members")
     .select("leagues(id, name)")
@@ -409,8 +467,31 @@ export default async function LeaguePage({
                 revealedPredictions={revealedPredictions}
               />
             )}
+            {danceCardOn && (
+              <DraftStatusCard
+                leagueId={id}
+                draftStatus={league.draft_status}
+                scheduledAt={league.draft_scheduled_at}
+                isCommissioner={isCommissioner}
+                memberCount={(members ?? []).length}
+                pickCount={draftPickCount}
+                onTheClockName={onTheClockName}
+                isMyTurn={isMyTurn}
+              />
+            )}
             {danceCardOn && rosterCouples.length > 0 && (
               <RosterCard couples={rosterCouples} totalPoints={pointsByManager.get(user.id) ?? 0} />
+            )}
+            {danceCardOn && waiversOn && (
+              <RecastNudgeCard
+                leagueId={id}
+                openSlots={recastOpenSlots}
+                availableCouples={recastAvailableCouples}
+                coupleDisplayNames={Object.fromEntries(allDisplayNames)}
+                claimMethod={league.waiver_claim_method}
+                priorityRank={recastPriorityRank}
+                totalManagers={standings.length}
+              />
             )}
             {grandFinaleOn && (
               <GrandFinaleBox
