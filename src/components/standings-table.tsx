@@ -1,4 +1,6 @@
 import { cn } from "cn";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RankBadge } from "@/components/rank-badge";
 
 type StandingsRow = {
   managerId: string;
@@ -11,10 +13,18 @@ export function StandingsTable({
   standings,
   currentUserId,
   latestCompletedWeek,
+  viewerRank,
+  viewerTotalPoints,
+  categoryBreakdown,
+  standingMessage,
 }: {
   standings: StandingsRow[];
   currentUserId: string;
   latestCompletedWeek: number | null;
+  viewerRank: number;
+  viewerTotalPoints: number;
+  categoryBreakdown: { label: string; points: number }[];
+  standingMessage: { placement: string; comment: string };
 }) {
   const sorted = [...standings].sort((a, b) => b.totalPoints - a.totalPoints);
 
@@ -22,9 +32,43 @@ export function StandingsTable({
     <div>
       <h1 className="font-heading text-2xl font-semibold">Standings</h1>
       <div className="mt-2.5 mb-4 h-0.5 w-9 rounded-full bg-primary" />
-      {latestCompletedWeek !== null && (
-        <p className="mb-4 text-sm text-muted-foreground">Through week {latestCompletedWeek}</p>
+
+      <div className="flex items-center gap-3.5">
+        <RankBadge rank={viewerRank} />
+        <div>
+          <p className="font-heading text-base font-semibold">{viewerTotalPoints} pts</p>
+          <p className="text-sm text-muted-foreground">of {standings.length} players</p>
+        </div>
+      </div>
+
+      {categoryBreakdown.length > 0 && (
+        <div className="mt-4 flex gap-2">
+          {categoryBreakdown.map((c) => (
+            <div key={c.label} className="flex-1 rounded-xl border border-border bg-card px-2 py-2.5 text-center">
+              <p className="font-heading text-base font-semibold">{c.points}</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">{c.label}</p>
+            </div>
+          ))}
+        </div>
       )}
+
+      {standingMessage.comment && (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>{standingMessage.placement}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">{standingMessage.comment}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="mb-2 mt-6 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
+        <span>Leaderboard</span>
+        {latestCompletedWeek !== null && (
+          <span className="font-normal text-muted-foreground">through wk {latestCompletedWeek}</span>
+        )}
+      </div>
 
       <div className="flex flex-col">
         {sorted.map((row, i) => {

@@ -7,8 +7,8 @@ import { HomeIcon, PencilLineIcon, ListChecksIcon, TrophyIcon } from "lucide-rea
 
 const TABS = [
   { value: "home", label: "Home", icon: HomeIcon },
-  { value: "yourpicks", label: "Your picks", icon: PencilLineIcon },
   { value: "thisweek", label: "This week", icon: ListChecksIcon },
+  { value: "yourpicks", label: "Your picks", icon: PencilLineIcon },
   { value: "standings", label: "Standings", icon: TrophyIcon },
 ] as const;
 
@@ -26,16 +26,17 @@ export function LeagueTabs({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const activeTab = searchParams.get("tab") ?? "home";
+  const activeTab = searchParams.get("tab") ?? "thisweek";
 
   function handleValueChange(value: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", value);
     // The "League created!" banner is a one-time toast tied to the first
-    // Home visit — leaving Home counts as acknowledging it, so drop it from
-    // the URL here rather than tracking dismissal separately. Once it's
-    // gone from the params, nothing re-adds it, so it can't resurface.
-    if (value !== "home") {
+    // visit (This week is the landing tab) — leaving it counts as
+    // acknowledging the banner, so drop it from the URL here rather than
+    // tracking dismissal separately. Once it's gone from the params,
+    // nothing re-adds it, so it can't resurface.
+    if (value !== "thisweek") {
       params.delete("justCreated");
     }
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ChevronDownIcon, CheckIcon } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
@@ -21,10 +22,17 @@ export function LeagueSwitcher({
   currentLeagueId: string;
   leagues: SwitcherLeague[];
 }) {
+  const searchParams = useSearchParams();
   const current = leagues.find((l) => l.id === currentLeagueId);
 
-  // Nothing to switch to — the chip would just open a one-item sheet.
-  if (leagues.length <= 1) {
+  // The switcher sheet is only interactive on Your Picks and Standings —
+  // Home and This Week show the league name as a plain label, matching the
+  // mockup's split between a static "leaguelabel" and the tappable
+  // "switcher" chip.
+  const activeTab = searchParams.get("tab") ?? "thisweek";
+  const isSwitcherTab = activeTab === "yourpicks" || activeTab === "standings";
+
+  if (!isSwitcherTab || leagues.length <= 1) {
     return <h1 className="font-heading text-lg font-semibold">{current?.name}</h1>;
   }
 
