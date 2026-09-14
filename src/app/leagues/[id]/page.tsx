@@ -19,6 +19,7 @@ import { LeagueTabs } from "@/components/league-tabs";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { getStandingMessage } from "@/lib/standings-message";
 import { getPickAssignment } from "@/lib/draft";
+import { computeCoupleWeeklyPoints, deriveCoupleWeeklyTag } from "@/lib/roster-weekly-points";
 
 export default async function LeaguePage({
   params,
@@ -57,6 +58,10 @@ export default async function LeaguePage({
   const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
   const grandFinaleDeadline = scoringSettings?.bonus_picks_deadline ?? null;
   const grandFinaleLocked = !!grandFinaleDeadline && new Date() >= new Date(grandFinaleDeadline);
+  // Section labels (🔮/🪩/🏆) only earn their keep once there's more than
+  // one topic on the page to tell apart — a single-module league goes
+  // straight to its content, same as before.
+  const showSectionLabels = [curtainCallOn, danceCardOn, grandFinaleOn].filter(Boolean).length >= 2;
 
   const [{ data: members }, { data: allScores }, { data: rosterSlots }, { data: allCouples }, { data: upcomingEpisode }] =
     await Promise.all([
@@ -333,6 +338,35 @@ export default async function LeaguePage({
     ] as const
   ).filter((c): c is { label: string; points: number } => !!c);
 
+  const rosterCoupleIds = (rosterSlots ?? [])
+    .map((r) => r.couple_id)
+    .filter((cid): cid is string => !!cid);
+
+  const [{ data: rosterDanceScores }, { data: rosterEpisodeResults }] =
+    latestCompletedEpisodeId && rosterCoupleIds.length > 0
+      ? await Promise.all([
+          supabase
+            .from("dance_scores")
+            .select("couple_id, total_score")
+            .eq("episode_id", latestCompletedEpisodeId)
+            .in("couple_id", rosterCoupleIds),
+          supabase
+            .from("episode_results")
+            .select("couple_id, was_bottom_two")
+            .eq("episode_id", latestCompletedEpisodeId)
+            .in("couple_id", rosterCoupleIds),
+        ])
+      : [{ data: [] as { couple_id: string; total_score: number }[] }, { data: [] as { couple_id: string; was_bottom_two: boolean }[] }];
+
+  // A couple can dance more than once in a night (e.g. a finale), so their
+  // week's judges' score is the sum across every dance_scores row, same as
+  // This Week sums per couple.
+  const weeklyScoreByCouple = new Map<string, number>();
+  for (const row of rosterDanceScores ?? []) {
+    weeklyScoreByCouple.set(row.couple_id, (weeklyScoreByCouple.get(row.couple_id) ?? 0) + row.total_score);
+  }
+  const wasBottomTwoByCouple = new Map((rosterEpisodeResults ?? []).map((r) => [r.couple_id, r.was_bottom_two]));
+
   const rosterCouples = (rosterSlots ?? [])
     .filter((r) => r.couples)
     .map((r) => ({
@@ -340,7 +374,14 @@ export default async function LeaguePage({
         celebrity: r.couples!.celebrity?.name ?? "Unknown",
         pro: r.couples!.pro?.name ?? "Unknown",
       }),
+      coupleId: r.couple_id!,
       status: r.couples!.status,
+      weeklyPoints: computeCoupleWeeklyPoints(
+        weeklyScoreByCouple.get(r.couple_id!) ?? 0,
+        scoringSettings?.judges_score_multiplier ?? 1,
+        scoringSettings?.judges_score_category_weight ?? 1
+      ),
+      tag: deriveCoupleWeeklyTag(r.couples!.status, wasBottomTwoByCouple.get(r.couple_id!) ?? false),
     }));
 
   const openSlotCount = rosterCouples.filter(
@@ -456,52 +497,63 @@ export default async function LeaguePage({
         yourPicks={
           <div className="flex flex-col gap-6">
             {curtainCallOn && (
-              <PickEmBox
-                leagueId={id}
-                episode={upcomingEpisode ?? null}
-                lockAt={lockAt}
-                activeCouples={activeCouples}
-                coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
-                existingPrediction={ownPrediction}
-                isLocked={isLocked}
-                revealedPredictions={revealedPredictions}
-              />
+              <div className="flex flex-col gap-3">
+                {showSectionLabels && <SectionLabel icon="🔮" label="This week's picks" first />}
+                <PickEmBox
+                  leagueId={id}
+                  episode={upcomingEpisode ?? null}
+                  lockAt={lockAt}
+                  activeCouples={activeCouples}
+                  coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
+                  existingPrediction={ownPrediction}
+                  isLocked={isLocked}
+                  revealedPredictions={revealedPredictions}
+                />
+              </div>
             )}
             {danceCardOn && (
-              <DraftStatusCard
-                leagueId={id}
-                draftStatus={league.draft_status}
-                scheduledAt={league.draft_scheduled_at}
-                isCommissioner={isCommissioner}
-                memberCount={(members ?? []).length}
-                pickCount={draftPickCount}
-                onTheClockName={onTheClockName}
-                isMyTurn={isMyTurn}
-              />
-            )}
-            {danceCardOn && rosterCouples.length > 0 && (
-              <RosterCard couples={rosterCouples} totalPoints={pointsByManager.get(user.id) ?? 0} />
-            )}
-            {danceCardOn && waiversOn && (
-              <RecastNudgeCard
-                leagueId={id}
-                openSlots={recastOpenSlots}
-                availableCouples={recastAvailableCouples}
-                coupleDisplayNames={Object.fromEntries(allDisplayNames)}
-                claimMethod={league.waiver_claim_method}
-                priorityRank={recastPriorityRank}
-                totalManagers={standings.length}
-              />
+              <div className="flex flex-col gap-3">
+                {showSectionLabels && <SectionLabel icon="🪩" label="Your roster" first={!curtainCallOn} />}
+                <DraftStatusCard
+                  leagueId={id}
+                  draftStatus={league.draft_status}
+                  scheduledAt={league.draft_scheduled_at}
+                  isCommissioner={isCommissioner}
+                  memberCount={(members ?? []).length}
+                  pickCount={draftPickCount}
+                  onTheClockName={onTheClockName}
+                  isMyTurn={isMyTurn}
+                />
+                {rosterCouples.length > 0 && (
+                  <RosterCard couples={rosterCouples} totalPoints={pointsByManager.get(user.id) ?? 0} />
+                )}
+                {waiversOn && (
+                  <RecastNudgeCard
+                    leagueId={id}
+                    openSlots={recastOpenSlots}
+                    availableCouples={recastAvailableCouples}
+                    coupleDisplayNames={Object.fromEntries(allDisplayNames)}
+                    claimMethod={league.waiver_claim_method}
+                    priorityRank={recastPriorityRank}
+                    totalManagers={standings.length}
+                  />
+                )}
+              </div>
             )}
             {grandFinaleOn && (
-              <GrandFinaleBox
-                leagueId={id}
-                couples={seasonCouples}
-                coupleDisplayNames={Object.fromEntries(allDisplayNames)}
-                existingOrder={grandFinaleOrder}
-                deadline={grandFinaleDeadline}
-                isLocked={grandFinaleLocked}
-              />
+              <div className="flex flex-col gap-3">
+                {showSectionLabels && (
+                  <SectionLabel icon="🏆" label="Grand Finale" first={!curtainCallOn && !danceCardOn} />
+                )}
+                <GrandFinaleBox
+                  leagueId={id}
+                  couples={seasonCouples}
+                  coupleDisplayNames={Object.fromEntries(allDisplayNames)}
+                  existingOrder={grandFinaleOrder}
+                  deadline={grandFinaleDeadline}
+                  isLocked={grandFinaleLocked}
+                />
+              </div>
             )}
             {!curtainCallOn && !danceCardOn && !grandFinaleOn && (
               <Card>
@@ -536,6 +588,25 @@ export default async function LeaguePage({
           </div>
         }
       />
+    </div>
+  );
+}
+
+// Only rendered once 2+ modules are on (see showSectionLabels above) — a
+// single-module league has nothing to disambiguate, so it skips straight
+// to its one card. `first` drops the divider a later section gets, since
+// nothing above it needs separating from.
+function SectionLabel({ icon, label, first }: { icon: string; label: string; first?: boolean }) {
+  return (
+    <div
+      className={
+        first
+          ? "flex items-center gap-1.5 text-sm font-semibold text-accent"
+          : "flex items-center gap-1.5 border-t border-border pt-4 text-sm font-semibold text-accent"
+      }
+    >
+      <span>{icon}</span>
+      {label}
     </div>
   );
 }

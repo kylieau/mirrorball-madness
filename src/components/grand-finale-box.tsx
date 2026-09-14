@@ -102,33 +102,66 @@ export function GrandFinaleBox({
     setSubmitting(false);
   }
 
-  if (isLocked) {
+  // Shared read-only treatment for both "locked" and "saved, still
+  // editable" — surfaces the predicted winner prominently instead of just
+  // the full order, matching every "Your predicted winner" mockup
+  // regardless of which other modules are on. Keeps GrandFinaleBox a single
+  // card shape everywhere it renders rather than a Grand-Finale-only
+  // variant and a combined-with-other-modules variant.
+  function renderSummary(locked: boolean) {
+    const winnerId = order[order.length - 1];
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Grand Finale</CardTitle>
-          <CardDescription>Predictions are locked.</CardDescription>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle>Your predicted winner</CardTitle>
+            <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
+              {locked ? "Locked" : "Saved"}
+            </span>
+          </div>
+          <CardDescription>
+            {nameFor(winnerId)} to take the mirrorball.
+            {locked ? " Predictions are locked." : " Can still be edited before the deadline."}
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
-          {!existingOrder ? (
-            <p className="text-muted-foreground">
-              You didn&apos;t submit a Full-Order Prediction before the deadline.
-            </p>
-          ) : (
-            existingOrder.map((coupleId, i) => (
-              <div key={coupleId} className="flex items-center justify-between border-b border-border py-1 last:border-b-0">
-                <span>
-                  {i + 1}. {nameFor(coupleId)}
-                </span>
-                <span className="text-muted-foreground">
-                  {coupleById.get(coupleId) ? statusLabel(coupleById.get(coupleId)!) : "Unknown"}
-                </span>
-              </div>
-            ))
+          {order.map((coupleId, i) => (
+            <div key={coupleId} className="flex items-center justify-between border-b border-border py-1 last:border-b-0">
+              <span>
+                {i + 1}. {nameFor(coupleId)}
+              </span>
+              <span className="text-muted-foreground">
+                {coupleById.get(coupleId) ? statusLabel(coupleById.get(coupleId)!) : "Unknown"}
+              </span>
+            </div>
+          ))}
+          {!locked && (
+            <Button variant="outline" size="sm" className="mt-2 self-start" onClick={() => setReviewing(false)}>
+              Edit order
+            </Button>
           )}
         </CardContent>
       </Card>
     );
+  }
+
+  if (isLocked) {
+    if (!existingOrder) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Grand Finale</CardTitle>
+            <CardDescription>Predictions are locked.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              You didn&apos;t submit a Full-Order Prediction before the deadline.
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
+    return renderSummary(true);
   }
 
   if (phase === "select") {
@@ -191,37 +224,7 @@ export function GrandFinaleBox({
   }
 
   if (reviewing) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Grand Finale</CardTitle>
-          <CardDescription>
-            Your predicted order, first eliminated to season winner.
-            {deadline ? ` Locks at ${formattedDeadline}.` : ""}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <div className="flex items-center gap-2 text-sm text-emerald-text">
-            <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald/30 text-[10px]">
-              ✓
-            </span>
-            Order saved
-          </div>
-          <div className="flex flex-col gap-1 text-sm">
-            {order.map((coupleId, i) => (
-              <div key={coupleId} className="flex items-center justify-between border-b border-border py-1 last:border-b-0">
-                <span>
-                  {i + 1}. {nameFor(coupleId)}
-                </span>
-              </div>
-            ))}
-          </div>
-          <Button variant="outline" size="sm" className="self-start" onClick={() => setReviewing(false)}>
-            Edit order
-          </Button>
-        </CardContent>
-      </Card>
-    );
+    return renderSummary(false);
   }
 
   return (
