@@ -14,7 +14,9 @@ import {
   removeDraftCustomMoment,
   publishEpisodeDraft,
   startCorrection,
+  applySeasonSettings,
   type SaveDraftResultsInput,
+  type SeasonSettingsInput,
 } from "@/lib/results-draft";
 
 // Returns userId alongside error so callers that need to stamp
@@ -94,6 +96,15 @@ export async function startEpisodeCorrection(episodeId: string): Promise<{ error
   if (access.error) return { error: access.error };
 
   const result = await startCorrection(createAdminClient(), episodeId, access.userId);
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function updateSeasonSettings(input: SeasonSettingsInput): Promise<{ error: string | null }> {
+  const access = await requireResultsAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await applySeasonSettings(createAdminClient(), input);
   if (!result.error) revalidatePath("/admin/results");
   return result;
 }

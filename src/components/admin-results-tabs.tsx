@@ -47,6 +47,12 @@ type Episode = {
   results_published_at: string | null;
   results_published_by: string | null;
 };
+type Season = {
+  id: string;
+  premiere_date: string | null;
+  total_episodes: number | null;
+  finale_date: string | null;
+} | null;
 
 const TABS = [
   { value: "enter", label: "Enter Results", icon: PlusCircleIcon },
@@ -71,6 +77,7 @@ export function AdminResultsTabs({
   episodeResults,
   draftsByEpisode,
   publishedByNames,
+  season,
 }: {
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
@@ -87,6 +94,7 @@ export function AdminResultsTabs({
   episodeResults: EpisodeResult[];
   draftsByEpisode: Record<string, DraftState>;
   publishedByNames: Record<string, string>;
+  season: Season;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["value"]>("enter");
   // Lifted here so View Results' "Correct Results"/"Continue draft" can
@@ -153,7 +161,12 @@ export function AdminResultsTabs({
           />
         </TabsContent>
         <TabsContent value="schedule">
-          <ScheduleManager episodes={episodes} />
+          <ScheduleManager
+            episodes={episodes}
+            episodeResults={episodeResults}
+            draftsByEpisode={draftsByEpisode}
+            season={season}
+          />
         </TabsContent>
         <TabsContent value="manage">
           <JudgesDanceStylesManager judges={judges} danceStyles={danceStyles} />

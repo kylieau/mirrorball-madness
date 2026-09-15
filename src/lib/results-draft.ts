@@ -219,6 +219,31 @@ export async function removeDraftCustomMoment(
   return { error: error?.message ?? null };
 }
 
+export type SeasonSettingsInput = {
+  seasonId: string;
+  premiereDate: string | null;
+  totalEpisodes: number | null;
+  finaleDate: string | null;
+};
+
+// Schedule-tab display only ("TBD" when null) — episodes.airs_at stays the
+// actual per-week source of truth every scoring/locking read uses, so this
+// never feeds a computation.
+export async function applySeasonSettings(
+  admin: SupabaseClient<Database>,
+  input: SeasonSettingsInput
+): Promise<{ error: string | null }> {
+  const { error } = await admin
+    .from("seasons")
+    .update({
+      premiere_date: input.premiereDate,
+      total_episodes: input.totalEpisodes,
+      finale_date: input.finaleDate,
+    })
+    .eq("id", input.seasonId);
+  return { error: error?.message ?? null };
+}
+
 async function deleteAllDraftRows(admin: SupabaseClient<Database>, episodeId: string): Promise<void> {
   // draft_judge_scores cascades from draft_dance_scores, so clearing that
   // is enough for those two.

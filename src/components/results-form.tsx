@@ -31,7 +31,12 @@ import {
 } from "@/components/ui/sheet";
 import { buildPeopleDisplayNames, type CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName, coupleNameNode } from "@/components/couple-name";
-import { deriveResultsStatus, type EpisodeResultsStatus } from "@/lib/results-status";
+import {
+  deriveResultsStatus,
+  RESULTS_STATUS_BADGE_VARIANT,
+  RESULTS_STATUS_BADGE_LABEL,
+  type EpisodeResultsStatus,
+} from "@/lib/results-status";
 import { useRelativeTimeAgo } from "@/lib/use-browser-time-zone";
 import type { DraftState } from "@/lib/results-draft";
 
@@ -154,19 +159,6 @@ function buildRowsFromDraft(draft: DraftState | undefined, couples: Couple[]): R
 
   return rows;
 }
-
-const STATUS_BADGE_VARIANT: Record<EpisodeResultsStatus, "outline" | "secondary" | "default"> = {
-  not_started: "outline",
-  draft: "secondary",
-  draft_correcting: "secondary",
-  published: "default",
-};
-const STATUS_BADGE_LABEL: Record<EpisodeResultsStatus, string> = {
-  not_started: "Not started",
-  draft: "Draft",
-  draft_correcting: "Correcting",
-  published: "Published",
-};
 
 export function ResultsForm({
   activeCouples,
@@ -462,7 +454,7 @@ export function ResultsForm({
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle>Enter Results</CardTitle>
-            {status && <Badge variant={STATUS_BADGE_VARIANT[status]}>{STATUS_BADGE_LABEL[status]}</Badge>}
+            {status && <Badge variant={RESULTS_STATUS_BADGE_VARIANT[status]}>{RESULTS_STATUS_BADGE_LABEL[status]}</Badge>}
           </div>
           {selectedEpisode && (
             <CardDescription>

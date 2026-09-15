@@ -1,17 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { scheduleEpisode } from "@/app/admin/results/actions";
+import { scheduleEpisode, updateSeasonSettings } from "@/app/admin/results/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
   useBrowserTimeZone,
   airsAtToUtcIso,
   utcIsoToLocalInput,
   nextTuesdayAt8pmEasternForInput,
 } from "@/lib/use-browser-time-zone";
+import {
+  deriveResultsStatus,
+  RESULTS_STATUS_BADGE_VARIANT,
+  RESULTS_STATUS_BADGE_LABEL,
+} from "@/lib/results-status";
+import type { DraftState } from "@/lib/results-draft";
+import { ChevronRightIcon, PlusIcon } from "lucide-react";
 
 type Episode = {
   id: string;
@@ -20,12 +29,113 @@ type Episode = {
   theme: string | null;
   is_elimination_week: boolean;
   is_finale: boolean;
+  results_published_at: string | null;
 };
+type EpisodeResult = { episode_id: string; couple_id: string };
+type Season = {
+  id: string;
+  premiere_date: string | null;
+  total_episodes: number | null;
+  finale_date: string | null;
+} | null;
 
-export function ScheduleManager({ episodes }: { episodes: Episode[] }) {
+function SeasonSettingsCard({ season }: { season: Season }) {
+  const [premiereDate, setPremiereDate] = useState(season?.premiere_date ?? "");
+  const [totalEpisodes, setTotalEpisodes] = useState(season?.total_episodes?.toString() ?? "");
+  const [finaleDate, setFinaleDate] = useState(season?.finale_date ?? "");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  if (!season) return null;
+
+  async function handleSave() {
+    setError(null);
+    setSaved(false);
+    setSubmitting(true);
+    const result = await updateSeasonSettings({
+      seasonId: season!.id,
+      premiereDate: premiereDate || null,
+      totalEpisodes: totalEpisodes ? Number(totalEpisodes) : null,
+      finaleDate: finaleDate || null,
+    });
+    if (result.error) setError(result.error);
+    else setSaved(true);
+    setSubmitting(false);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Season Settings</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="flex flex-col gap-2">
+            <Label>Premiere Date</Label>
+            <Input
+              type="date"
+              value={premiereDate}
+              placeholder="TBD"
+              onChange={(e) => {
+                setPremiereDate(e.target.value);
+                setSaved(false);
+              }}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Total Episodes</Label>
+            <Input
+              type="number"
+              min={1}
+              value={totalEpisodes}
+              placeholder="TBD"
+              onChange={(e) => {
+                setTotalEpisodes(e.target.value);
+                setSaved(false);
+              }}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Finale Date</Label>
+            <Input
+              type="date"
+              value={finaleDate}
+              placeholder="TBD"
+              onChange={(e) => {
+                setFinaleDate(e.target.value);
+                setSaved(false);
+              }}
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button size="sm" onClick={handleSave} disabled={submitting}>
+            {submitting ? "Saving..." : "Save"}
+          </Button>
+          {saved && <p className="text-sm text-muted-foreground">Saved.</p>}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function ScheduleManager({
+  episodes,
+  episodeResults,
+  draftsByEpisode,
+  season,
+}: {
+  episodes: Episode[];
+  episodeResults: EpisodeResult[];
+  draftsByEpisode: Record<string, DraftState>;
+  season: Season;
+}) {
   const sortedEpisodes = [...episodes].sort((a, b) => a.week_number - b.week_number);
   const browserTimeZone = useBrowserTimeZone();
 
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [weekNumber, setWeekNumber] = useState(
     sortedEpisodes.length > 0 ? sortedEpisodes[sortedEpisodes.length - 1].week_number + 1 : 1
@@ -56,13 +166,21 @@ export function ScheduleManager({ episodes }: { episodes: Episode[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function startEdit(e: Episode) {
+  function openAddEpisode() {
+    setError(null);
+    resetForm();
+    setSheetOpen(true);
+  }
+
+  function openEditEpisode(e: Episode) {
+    setError(null);
     setEditingId(e.id);
     setWeekNumber(e.week_number);
     setAirsAt(utcIsoToLocalInput(e.airs_at));
     setTheme(e.theme ?? "");
     setIsEliminationWeek(e.is_elimination_week);
     setIsFinale(e.is_finale);
+    setSheetOpen(true);
   }
 
   function resetForm() {
@@ -96,19 +214,83 @@ export function ScheduleManager({ episodes }: { episodes: Episode[] }) {
       setError(result.error);
     } else {
       resetForm();
+      setSheetOpen(false);
     }
     setSubmitting(false);
   }
 
+  function coupleCount(episodeId: string): number {
+    const publishedCount = episodeResults.filter((r) => r.episode_id === episodeId).length;
+    if (publishedCount > 0) return publishedCount;
+    return draftsByEpisode[episodeId]?.entries.length ?? 0;
+  }
+
   return (
     <div className="flex flex-col gap-6">
+      <SeasonSettingsCard season={season} />
+
       <Card>
-        <CardHeader>
-          <CardTitle>{editingId ? "Edit Scheduled Episode" : "Schedule a New Episode"}</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Scheduled Episodes</CardTitle>
+          <Button size="sm" onClick={openAddEpisode}>
+            <PlusIcon className="size-4" />
+            Add Episode
+          </Button>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <CardContent className="flex flex-col gap-0 p-0">
+          {sortedEpisodes.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">Nothing scheduled yet.</p>
+          ) : (
+            sortedEpisodes.map((e) => {
+              const status = deriveResultsStatus(
+                { results_published_at: e.results_published_at },
+                !!draftsByEpisode[e.id]?.hasDraft
+              );
+              const count = coupleCount(e.id);
+              return (
+                <button
+                  key={e.id}
+                  onClick={() => openEditEpisode(e)}
+                  className="flex w-full items-center justify-between gap-3 border-b border-border p-4 text-left last:border-b-0 hover:bg-accent/50"
+                >
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">
+                        Week {e.week_number}
+                        {e.theme ? ` — ${e.theme}` : ""}
+                      </p>
+                      <Badge variant={RESULTS_STATUS_BADGE_VARIANT[status]}>
+                        {RESULTS_STATUS_BADGE_LABEL[status]}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(e.airs_at).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                      {count > 0 && ` · ${count} couple${count === 1 ? "" : "s"} scored`}
+                    </p>
+                  </div>
+                  <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+                </button>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{editingId ? "Edit Scheduled Episode" : "Schedule a New Episode"}</SheetTitle>
+            <SheetDescription>
+              Air date/theme here are informational scheduling only — actual results are entered on the
+              Enter Results tab.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col gap-4 px-4 pb-4">
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="flex flex-col gap-2">
               <Label>Week Number</Label>
               <Input
@@ -120,13 +302,9 @@ export function ScheduleManager({ episodes }: { episodes: Episode[] }) {
             </div>
             <div className="flex flex-col gap-2">
               <Label>Air Date{browserTimeZone ? ` (${browserTimeZone})` : ""}</Label>
-              <Input
-                type="datetime-local"
-                value={airsAt}
-                onChange={(e) => setAirsAt(e.target.value)}
-              />
+              <Input type="datetime-local" value={airsAt} onChange={(e) => setAirsAt(e.target.value)} />
             </div>
-            <div className="flex flex-col gap-2 sm:col-span-2">
+            <div className="flex flex-col gap-2">
               <Label>Theme Night</Label>
               <Input
                 placeholder="e.g. Villains Night"
@@ -134,7 +312,7 @@ export function ScheduleManager({ episodes }: { episodes: Episode[] }) {
                 onChange={(e) => setTheme(e.target.value)}
               />
             </div>
-            <div className="flex items-center gap-4 sm:col-span-2">
+            <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -144,70 +322,21 @@ export function ScheduleManager({ episodes }: { episodes: Episode[] }) {
                 Elimination Week
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={isFinale}
-                  onChange={(e) => setIsFinale(e.target.checked)}
-                />
+                <input type="checkbox" checked={isFinale} onChange={(e) => setIsFinale(e.target.checked)} />
                 Finale
               </label>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={handleSave} disabled={submitting || !airsAt}>
-              {submitting ? "Saving..." : editingId ? "Save changes" : "Add to schedule"}
-            </Button>
-            {editingId && (
-              <Button variant="ghost" onClick={resetForm}>
+            <div className="flex gap-2">
+              <Button onClick={handleSave} disabled={submitting || !airsAt}>
+                {submitting ? "Saving..." : editingId ? "Save changes" : "Add to schedule"}
+              </Button>
+              <Button variant="ghost" onClick={() => setSheetOpen(false)}>
                 Cancel
               </Button>
-            )}
+            </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Scheduled Episodes</CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
-          {sortedEpisodes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nothing scheduled yet.</p>
-          ) : (
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="p-2 font-medium">Week</th>
-                  <th className="p-2 font-medium">Air Date</th>
-                  <th className="p-2 font-medium">Theme</th>
-                  <th className="p-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {sortedEpisodes.map((e) => (
-                  <tr
-                    key={e.id}
-                    className={`border-b border-border last:border-b-0 ${
-                      e.id === editingId ? "bg-accent/50" : ""
-                    }`}
-                  >
-                    <td className="whitespace-nowrap p-2 font-medium">{e.week_number}</td>
-                    <td className="whitespace-nowrap p-2">
-                      {new Date(e.airs_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                    </td>
-                    <td className="p-2">{e.theme ?? "—"}</td>
-                    <td className="p-2 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => startEdit(e)}>
-                        Edit
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

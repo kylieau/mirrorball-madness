@@ -25,6 +25,12 @@ export default async function AdminResultsPage() {
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
 
+  const { data: season } = await supabase
+    .from("seasons")
+    .select("id, premiere_date, total_episodes, finale_date")
+    .eq("id", activeSeasonId ?? "")
+    .single();
+
   const coupleFields =
     "id, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)";
 
@@ -118,6 +124,7 @@ export default async function AdminResultsPage() {
       episodeResults={episodeResults ?? []}
       draftsByEpisode={draftsByEpisode}
       publishedByNames={publishedByNames}
+      season={season}
     />
   );
 }

@@ -11,3 +11,17 @@ export function deriveResultsStatus(
   if (hasDraftRow) return episode.results_published_at ? "draft_correcting" : "draft";
   return episode.results_published_at ? "published" : "not_started";
 }
+
+export const RESULTS_STATUS_BADGE_VARIANT: Record<EpisodeResultsStatus, "outline" | "secondary" | "default"> = {
+  not_started: "outline",
+  draft: "secondary",
+  draft_correcting: "secondary",
+  published: "default",
+};
+
+export const RESULTS_STATUS_BADGE_LABEL: Record<EpisodeResultsStatus, string> = {
+  not_started: "Not started",
+  draft: "Draft",
+  draft_correcting: "Correcting",
+  published: "Published",
+};

@@ -18,7 +18,11 @@ import {
 } from "@/components/ui/dialog";
 import { buildPeopleDisplayNames, type CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
-import { deriveResultsStatus, type EpisodeResultsStatus } from "@/lib/results-status";
+import {
+  deriveResultsStatus,
+  RESULTS_STATUS_BADGE_VARIANT,
+  RESULTS_STATUS_BADGE_LABEL,
+} from "@/lib/results-status";
 import type { DraftState } from "@/lib/results-draft";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -52,19 +56,6 @@ type Episode = {
   is_finale: boolean;
   results_published_at: string | null;
   results_published_by: string | null;
-};
-
-const STATUS_BADGE_VARIANT: Record<EpisodeResultsStatus, "outline" | "secondary" | "default"> = {
-  not_started: "outline",
-  draft: "secondary",
-  draft_correcting: "secondary",
-  published: "default",
-};
-const STATUS_BADGE_LABEL: Record<EpisodeResultsStatus, string> = {
-  not_started: "Not started",
-  draft: "Draft",
-  draft_correcting: "Correcting",
-  published: "Published",
 };
 
 export function AllResultsView({
@@ -258,8 +249,8 @@ export function AllResultsView({
                           )}
                         </p>
                       </div>
-                      <Badge variant={STATUS_BADGE_VARIANT[ep.resultsStatus]}>
-                        {STATUS_BADGE_LABEL[ep.resultsStatus]}
+                      <Badge variant={RESULTS_STATUS_BADGE_VARIANT[ep.resultsStatus]}>
+                        {RESULTS_STATUS_BADGE_LABEL[ep.resultsStatus]}
                       </Badge>
                     </div>
                   </AccordionTrigger>
