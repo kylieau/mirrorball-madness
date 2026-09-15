@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettingRow } from "@/components/setting-row";
+import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
 import {
   Dialog,
   DialogClose,
@@ -69,9 +70,12 @@ export function LeagueInfoSection({
         <CardHeader>
           <CardTitle>League Info</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col">
-          <SettingRow label="Name" value={leagueName} />
-          <SettingRow label="Invite code" value={<span className="font-mono">{inviteCode}</span>} />
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col">
+            <SettingRow label="Name" value={leagueName} />
+            <SettingRow label="Invite code" value={<span className="font-mono">{inviteCode}</span>} />
+          </div>
+          <CopyInviteLinkButton inviteCode={inviteCode} />
         </CardContent>
       </Card>
     );
@@ -95,7 +99,10 @@ export function LeagueInfoSection({
           </div>
         </div>
 
-        <SettingRow label="Invite code" value={<span className="font-mono">{inviteCode}</span>} />
+        <div className="flex flex-col gap-2">
+          <SettingRow label="Invite code" value={<span className="font-mono">{inviteCode}</span>} />
+          <CopyInviteLinkButton inviteCode={inviteCode} />
+        </div>
 
         <div className="flex flex-col gap-2 border-t border-border pt-4">
           <p className="text-sm font-medium text-destructive">Danger zone</p>

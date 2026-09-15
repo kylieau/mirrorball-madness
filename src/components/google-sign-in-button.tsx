@@ -27,7 +27,7 @@ async function signInWithGoogleNative() {
   await Browser.open({ url: data.url });
 }
 
-export function GoogleSignInButton() {
+export function GoogleSignInButton({ next }: { next?: string }) {
   if (Capacitor.isNativePlatform()) {
     return (
       <Button
@@ -43,6 +43,7 @@ export function GoogleSignInButton() {
 
   return (
     <form action={signInWithGoogle}>
+      {next && <input type="hidden" name="next" value={next} />}
       <Button type="submit" variant="outline" className="w-full">
         Continue with Google
       </Button>

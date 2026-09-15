@@ -5,6 +5,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getDefaultLandingPath } from "@/lib/default-landing";
+import { safeRelativePath } from "@/lib/safe-relative-path";
+
+function resolveNextPath(formData: FormData): string {
+  const next = formData.get("next");
+  return safeRelativePath(typeof next === "string" ? next : undefined, getDefaultLandingPath());
+}
 
 export async function signIn(formData: FormData) {
   const supabase = await createClient();
@@ -19,7 +25,7 @@ export async function signIn(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  redirect(getDefaultLandingPath());
+  redirect(resolveNextPath(formData));
 }
 
 export async function signUp(formData: FormData) {
@@ -39,19 +45,22 @@ export async function signUp(formData: FormData) {
     redirect(`/sign-up?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect(
-    `/sign-up?message=${encodeURIComponent("Check your email to confirm your account")}`
-  );
+  revalidatePath("/", "layout");
+  redirect(resolveNextPath(formData));
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(formData: FormData) {
   const supabase = await createClient();
   const origin = (await headers()).get("origin");
+
+  const next = formData.get("next");
+  const validatedNext = safeRelativePath(typeof next === "string" ? next : undefined, "");
+  const callbackUrl = `${origin}/auth/callback${validatedNext ? `?next=${encodeURIComponent(validatedNext)}` : ""}`;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback`,
+      redirectTo: callbackUrl,
     },
   });
 

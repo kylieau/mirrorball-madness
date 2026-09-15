@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LeagueSwitcher, type SwitcherLeague } from "@/components/league-switcher";
 import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
+import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
 export function LeagueHeader({
@@ -70,11 +71,14 @@ export function LeagueHeader({
             <CardTitle>🎉 League created!</CardTitle>
             <CardDescription>Share this invite code with your league.</CardDescription>
           </CardHeader>
-          <CardContent className="flex items-center justify-between gap-4">
-            <span className="font-mono text-2xl font-bold tracking-widest">{inviteCode}</span>
-            <Button render={<Link href={leagueSettingsHref} />} nativeButton={false} size="sm">
-              Set league rules
-            </Button>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <span className="font-mono text-2xl font-bold tracking-widest">{inviteCode}</span>
+              <Button render={<Link href={leagueSettingsHref} />} nativeButton={false} size="sm">
+                Set league rules
+              </Button>
+            </div>
+            <CopyInviteLinkButton inviteCode={inviteCode} />
           </CardContent>
         </Card>
       )}

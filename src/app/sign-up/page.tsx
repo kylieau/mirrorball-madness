@@ -8,16 +8,17 @@ import { GoogleSignInButton } from "@/components/google-sign-in-button";
 export default async function SignUpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; message?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
-  const { error, message } = await searchParams;
+  const { error, next } = await searchParams;
+  const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : "/login";
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6 px-4 py-24">
       <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {message && <p className="text-sm text-muted-foreground">{message}</p>}
       <form action={signUp} className="flex flex-col gap-4">
+        {next && <input type="hidden" name="next" value={next} />}
         <div className="flex flex-col gap-2">
           <Label htmlFor="displayName">Display Name</Label>
           <Input id="displayName" name="displayName" required />
@@ -43,10 +44,10 @@ export default async function SignUpPage({
         or
         <div className="h-px flex-1 bg-border" />
       </div>
-      <GoogleSignInButton />
+      <GoogleSignInButton next={next} />
       <p className="text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="underline underline-offset-4">
+        <Link href={loginHref} className="underline underline-offset-4">
           Sign in
         </Link>
       </p>
