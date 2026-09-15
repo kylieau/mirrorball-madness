@@ -108,7 +108,7 @@ export function AdminResultsTabs({
 
   return (
     <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
-      <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-8">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-8">
         <TopBar {...accountSettingsData} email={viewerEmail} />
 
         <PageHeader title="Admin" />
@@ -131,7 +131,7 @@ export function AdminResultsTabs({
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 pb-20 pt-6 sm:pb-12">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pb-20 pt-6 sm:pb-12">
         <TabsContent value="enter">
           <ResultsForm
             activeCouples={activeCouples}
