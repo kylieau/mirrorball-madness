@@ -116,6 +116,29 @@ export async function applyEpisodeResults(
 
   if (episodeErr) return { error: episodeErr.message };
 
+  // Correcting a published week can un-resolve a couple (e.g. an
+  // elimination gets reversed) — read the old outcomes before they're
+  // wiped below so any couple that's no longer resolving this time around
+  // can be reverted to active, instead of being left permanently stuck on
+  // a stale eliminated/withdrawn/winner/runner_up/third_place status.
+  const { data: previousOutcomes } = await admin
+    .from("episode_results")
+    .select("couple_id, outcome")
+    .eq("episode_id", episode.id);
+
+  const previouslyResolvedIds = new Set(
+    (previousOutcomes ?? [])
+      .filter((r) => RESOLVING_OUTCOMES.has(r.outcome as Outcome))
+      .map((r) => r.couple_id)
+  );
+  const nowResolvedIds = new Set(
+    input.entries.filter((e) => RESOLVING_OUTCOMES.has(e.outcome)).map((e) => e.coupleId)
+  );
+  const revertedIds = [...previouslyResolvedIds].filter((id) => !nowResolvedIds.has(id));
+  if (revertedIds.length > 0) {
+    await admin.from("couples").update({ status: "active", elimination_week: null }).in("id", revertedIds);
+  }
+
   // judge_scores cascades from dance_scores, so clearing dance_scores is enough.
   await admin.from("dance_scores").delete().eq("episode_id", episode.id);
   await admin.from("episode_results").delete().eq("episode_id", episode.id);
@@ -313,6 +336,16 @@ export async function applyEpisodeResults(
       },
       grandFinalePointsByManager,
     });
+
+    // Full replace, not partial upsert: a correction can drop a manager's
+    // points for this episode to nothing (computeWeeklyScores then returns
+    // no row for them at all), and an upsert would leave their prior-call
+    // row stale forever. Deleting first — before the scores.length === 0
+    // check below — makes that exact case (corrected results zeroing out a
+    // league's scores) actually clear, instead of skipping the delete
+    // whenever there's nothing left to upsert. Harmless no-op on a
+    // first-time publish, since there's nothing to delete yet.
+    await admin.from("weekly_manager_scores").delete().eq("league_id", league.id).eq("episode_id", episode.id);
 
     if (scores.length === 0) continue;
 
