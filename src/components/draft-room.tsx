@@ -17,6 +17,7 @@ import type { Database } from "@/lib/supabase/types";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
+import { XIcon } from "lucide-react";
 
 type League = Database["public"]["Tables"]["leagues"]["Row"];
 type Member = {
@@ -42,6 +43,7 @@ export function DraftRoom({
   coupleDisplayNames,
   initialPicks,
   currentUserId,
+  closeHref,
 }: {
   league: League;
   members: Member[];
@@ -49,6 +51,7 @@ export function DraftRoom({
   coupleDisplayNames: Record<string, CoupleNameParts>;
   initialPicks: DraftPick[];
   currentUserId: string;
+  closeHref: string;
 }) {
   const [league, setLeague] = useState(initialLeague);
   const [members, setMembers] = useState(initialMembers);
@@ -199,6 +202,13 @@ export function DraftRoom({
 
     return (
       <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
+        <Link
+          href={closeHref}
+          aria-label="Close"
+          className="self-start text-muted-foreground hover:text-foreground"
+        >
+          <XIcon className="size-5" />
+        </Link>
         <h1 className="text-2xl font-semibold tracking-tight">Draft hasn&apos;t started</h1>
         {league.draft_scheduled_at && (
           <p className="text-sm text-muted-foreground">

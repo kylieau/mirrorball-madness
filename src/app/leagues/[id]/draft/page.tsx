@@ -1,14 +1,20 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DraftRoom } from "@/components/draft-room";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
+import { safeRelativePath } from "@/lib/safe-relative-path";
+import { XIcon } from "lucide-react";
 
 export default async function DraftPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const { id } = await params;
+  const { from } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -29,6 +35,8 @@ export default async function DraftPage({
     notFound();
   }
 
+  const closeHref = safeRelativePath(from, `/leagues/${id}?tab=yourpicks`);
+
   const { data: scoringSettings } = await supabase
     .from("scoring_settings")
     .select("judges_score_category_enabled")
@@ -37,7 +45,14 @@ export default async function DraftPage({
 
   if (scoringSettings && !scoringSettings.judges_score_category_enabled) {
     return (
-      <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-24 text-center">
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
+        <Link
+          href={closeHref}
+          aria-label="Close"
+          className="self-start text-muted-foreground hover:text-foreground"
+        >
+          <XIcon className="size-5" />
+        </Link>
         <h1 className="text-2xl font-semibold tracking-tight">Dance Card isn&apos;t enabled</h1>
         <p className="text-sm text-muted-foreground">
           This league isn&apos;t running the draft/roster module — the commissioner
@@ -86,6 +101,7 @@ export default async function DraftPage({
       coupleDisplayNames={coupleDisplayNames}
       initialPicks={picks ?? []}
       currentUserId={user.id}
+      closeHref={closeHref}
     />
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { XIcon } from "lucide-react";
 import {
   submitWaiverClaim,
   processReverseStandingsWaivers,
@@ -38,6 +40,7 @@ type Claim = {
 
 export function WaiversPanel({
   leagueId,
+  closeHref,
   claimMethod,
   isCommissioner,
   openSlots,
@@ -46,6 +49,7 @@ export function WaiversPanel({
   claims,
 }: {
   leagueId: string;
+  closeHref: string;
   claimMethod: string;
   isCommissioner: boolean;
   openSlots: OpenSlot[];
@@ -105,6 +109,9 @@ export function WaiversPanel({
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-12">
+      <Link href={closeHref} aria-label="Close" className="text-muted-foreground hover:text-foreground">
+        <XIcon className="size-5" />
+      </Link>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Recast</h1>
         <p className="mt-1 text-sm capitalize text-muted-foreground">
