@@ -1,45 +1,38 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-export async function updateEmail(formData: FormData) {
+export async function updateEmail(email: string): Promise<{ error: string | null }> {
   const supabase = await createClient();
-  const email = (formData.get("email") as string)?.trim();
-
-  if (!email) {
-    redirect(`/settings/account?error=${encodeURIComponent("Email is required")}`);
+  const trimmed = email.trim();
+  if (!trimmed) {
+    return { error: "Email is required" };
   }
 
-  const { error } = await supabase.auth.updateUser({ email });
-  if (error) {
-    redirect(`/settings/account?error=${encodeURIComponent(error.message)}`);
-  }
+  const { error } = await supabase.auth.updateUser({ email: trimmed });
+  if (error) return { error: error.message };
 
-  redirect(
-    `/settings/account?message=${encodeURIComponent("Check your new email to confirm the change")}`
-  );
+  return { error: null };
 }
 
-export async function updatePassword(formData: FormData) {
+export async function updatePassword(
+  password: string,
+  confirmPassword: string
+): Promise<{ error: string | null }> {
   const supabase = await createClient();
-  const password = formData.get("password") as string;
-  const confirmPassword = formData.get("confirmPassword") as string;
 
   if (!password || password.length < 6) {
-    redirect(`/settings/account?error=${encodeURIComponent("Password must be at least 6 characters")}`);
+    return { error: "Password must be at least 6 characters" };
   }
   if (password !== confirmPassword) {
-    redirect(`/settings/account?error=${encodeURIComponent("Passwords don't match")}`);
+    return { error: "Passwords don't match" };
   }
 
   const { error } = await supabase.auth.updateUser({ password });
-  if (error) {
-    redirect(`/settings/account?error=${encodeURIComponent(error.message)}`);
-  }
+  if (error) return { error: error.message };
 
-  redirect(`/settings/account?message=${encodeURIComponent("Password updated")}`);
+  return { error: null };
 }
 
 export async function requestAccountDeletion(): Promise<{ error: string | null }> {
@@ -47,17 +40,15 @@ export async function requestAccountDeletion(): Promise<{ error: string | null }
   const { error } = await supabase.rpc("request_account_deletion");
   if (error) return { error: error.message };
 
-  revalidatePath("/settings/account");
+  revalidatePath("/", "layout");
   return { error: null };
 }
 
-export async function cancelAccountDeletion() {
+export async function cancelAccountDeletion(): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("cancel_account_deletion");
-  if (error) {
-    redirect(`/settings/account?error=${encodeURIComponent(error.message)}`);
-  }
+  if (error) return { error: error.message };
 
-  revalidatePath("/settings/account");
-  redirect(`/settings/account?message=${encodeURIComponent("Deletion request canceled")}`);
+  revalidatePath("/", "layout");
+  return { error: null };
 }

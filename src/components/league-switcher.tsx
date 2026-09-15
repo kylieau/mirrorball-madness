@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDownIcon, CheckIcon } from "lucide-react";
+import { ChevronDownIcon, CheckIcon, SettingsIcon } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
+import { Button } from "@/components/ui/button";
 import { cn } from "cn";
 
 export type SwitcherLeague = {
@@ -45,30 +46,44 @@ export function LeagueSwitcher({
           {leagues.map((l) => {
             const isCurrent = l.id === currentLeagueId;
             return (
-              <Link
+              <div
                 key={l.id}
-                href={`/leagues/${l.id}?tab=${activeTab}`}
                 className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
               >
-                <div>
+                <Link href={`/leagues/${l.id}?tab=${activeTab}`} className="flex-1">
                   <p className={cn("text-sm font-semibold", isCurrent && "text-accent")}>{l.name}</p>
                   <p className="text-xs text-muted-foreground">
                     Rank {l.rank} of {l.totalMembers}
                     {isCurrent && ", currently viewing"}
                   </p>
+                </Link>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <Button
+                    render={
+                      <Link
+                        href={`/leagues/${l.id}/settings?from=${encodeURIComponent(`/leagues/${currentLeagueId}?tab=${activeTab}`)}`}
+                      />
+                    }
+                    nativeButton={false}
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`${l.name} settings`}
+                  >
+                    <SettingsIcon />
+                  </Button>
+                  {isCurrent ? (
+                    <CheckIcon className="size-4 text-accent" aria-hidden />
+                  ) : l.picksDue ? (
+                    <span className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
+                      Picks due
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                      All caught up
+                    </span>
+                  )}
                 </div>
-                {isCurrent ? (
-                  <CheckIcon className="size-4 shrink-0 text-accent" aria-hidden />
-                ) : l.picksDue ? (
-                  <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
-                    Picks due
-                  </span>
-                ) : (
-                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
-                    All caught up
-                  </span>
-                )}
-              </Link>
+              </div>
             );
           })}
         </div>

@@ -2,16 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TopBar } from "@/components/top-bar";
 import { computeLeagueSummary } from "@/lib/league-summary";
-import { safeRelativePath } from "@/lib/safe-relative-path";
+import { getAccountSettingsData } from "@/lib/account-settings-data";
 
-export default async function NotificationsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ from?: string }>;
-}) {
-  const { from } = await searchParams;
-  const settingsHref = from ? `/settings?from=${encodeURIComponent(safeRelativePath(from, "/leagues"))}` : "/settings";
+export default async function NotificationsPage() {
   const supabase = await createClient();
 
   const {
@@ -22,10 +17,13 @@ export default async function NotificationsPage({
     redirect("/login");
   }
 
-  const { data: memberships } = await supabase
-    .from("league_members")
-    .select("leagues(id, name)")
-    .eq("user_id", user.id);
+  const [{ data: memberships }, accountSettingsData] = await Promise.all([
+    supabase
+      .from("league_members")
+      .select("leagues(id, name)")
+      .eq("user_id", user.id),
+    getAccountSettingsData(supabase, user.id),
+  ]);
 
   const leagues = (memberships ?? []).map((m) => m.leagues!).filter(Boolean);
 
@@ -45,9 +43,8 @@ export default async function NotificationsPage({
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
-      <Link href={settingsHref} className="text-sm text-muted-foreground hover:text-foreground">
-        ‹ Settings
-      </Link>
+      <TopBar {...accountSettingsData} email={user.email ?? ""} />
+
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
         <p className="mt-1 text-sm text-muted-foreground">

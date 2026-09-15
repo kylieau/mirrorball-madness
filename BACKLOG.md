@@ -12,6 +12,8 @@ Currently in-app only (`/notifications`, reusing the same "picks needed" logic a
 
 (Kylie's own note from when this came up, in case it jogs something later: "see LA Home Wins.")
 
+**Notifications-as-dialog, deferred**: when Account Settings became a Sheet with Profile and Account & data converted to nested dialogs (see `scratch/league-settings-relocation-plan.md`), Notifications stayed a plain full page rather than also becoming a nested dialog — it's a scrollable content list (picks-due per league), not a settings form, so cramming it into a dialog wasn't an obvious win. Revisit if it turns out to matter.
+
 ## Appearance / overall aesthetic redesign
 
 The app currently has one deliberate fixed look (dark ballroom + gold, from the Phase 8 design pass) — no light/dark toggle is wanted. But there's appetite to redo the *whole* theme and visual aesthetic at some point, not just tweak it. Explicitly pushed to later rather than done alongside the Settings placeholder work.

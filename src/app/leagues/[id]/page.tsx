@@ -20,6 +20,7 @@ import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display"
 import { getStandingMessage } from "@/lib/standings-message";
 import { getPickAssignment } from "@/lib/draft";
 import { computeCoupleWeeklyPoints, deriveCoupleWeeklyTag } from "@/lib/roster-weekly-points";
+import { getAccountSettingsData } from "@/lib/account-settings-data";
 
 export default async function LeaguePage({
   params,
@@ -97,23 +98,16 @@ export default async function LeaguePage({
     ]);
 
   const isCommissioner = (members ?? []).some((m) => m.user_id === user.id && m.role === "commissioner");
+  const accountSettingsData = await getAccountSettingsData(supabase, user.id);
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [{ data: premiereEpisode }, { data: completedEpisodes }] = await Promise.all([
-    supabase
-      .from("episodes")
-      .select("airs_at")
-      .eq("season_id", activeSeasonId ?? "")
-      .eq("week_number", 1)
-      .maybeSingle(),
-    supabase
-      .from("episodes")
-      .select("id, week_number")
-      .eq("season_id", activeSeasonId ?? "")
-      .eq("status", "completed")
-      .order("week_number", { ascending: false })
-      .limit(1),
-  ]);
+  const { data: completedEpisodes } = await supabase
+    .from("episodes")
+    .select("id, week_number")
+    .eq("season_id", activeSeasonId ?? "")
+    .eq("status", "completed")
+    .order("week_number", { ascending: false })
+    .limit(1);
 
   const pointsByManager = new Map<string, number>();
   const rosterPointsByManager = new Map<string, number>();
@@ -474,23 +468,15 @@ export default async function LeaguePage({
 
       <LeagueHeader
         leagueId={id}
-        leagueName={league.name}
         inviteCode={league.invite_code}
         danceCardOn={danceCardOn}
         waiversOn={waiversOn}
-        league={league}
-        scoringSettings={scoringSettings}
         canEdit={isCommissioner}
-        premiereAirsAt={premiereEpisode?.airs_at ?? null}
         justCreated={justCreated === "1"}
         scoringConfigured={scoringSettings?.scoring_configured ?? true}
         switcherLeagues={switcherLeagues}
-        viewerDisplayName={members?.find((m) => m.user_id === user.id)?.profiles?.display_name ?? "?"}
-        members={(members ?? []).map((m) => ({
-          userId: m.user_id,
-          displayName: m.profiles?.display_name ?? "Unknown",
-          role: m.role,
-        }))}
+        accountSettingsData={accountSettingsData}
+        viewerEmail={user.email ?? ""}
       />
 
       <LeagueTabs

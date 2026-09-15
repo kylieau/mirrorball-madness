@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { DeadlineStub } from "@/components/deadline-stub";
 import { formatCountdown } from "@/lib/format-countdown";
+import { SettingsIcon } from "lucide-react";
 
 type HomeLeague = {
   id: string;
@@ -53,33 +56,46 @@ export function HomeDashboard({
       </div>
       <div className="flex flex-col gap-2.5">
         {leagues.map((l) => (
-          <Link key={l.id} href={`/leagues/${l.id}?tab=standings`} className="block">
-            <Card>
-              <CardContent className="flex items-start justify-between gap-3 py-4">
-                <div>
-                  <p className="font-heading text-sm font-semibold">{l.name}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Rank {l.rank} of {l.totalMembers} · {l.totalPoints} pts
-                  </p>
-                  <div className="mt-2 flex gap-1.5 text-sm">
-                    <span className={l.danceCardOn ? "opacity-100" : "opacity-30"}>🪩</span>
-                    <span className={l.curtainCallOn ? "opacity-100" : "opacity-30"}>🔮</span>
-                    <span className={l.grandFinaleOn ? "opacity-100" : "opacity-30"}>🏆</span>
-                  </div>
+          <Card key={l.id}>
+            <CardContent className="flex items-start justify-between gap-3 py-4">
+              <Link href={`/leagues/${l.id}?tab=standings`} className="flex-1">
+                <p className="font-heading text-sm font-semibold">{l.name}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Rank {l.rank} of {l.totalMembers} · {l.totalPoints} pts
+                </p>
+                <div className="mt-2 flex gap-1.5 text-sm">
+                  <span className={l.danceCardOn ? "opacity-100" : "opacity-30"}>🪩</span>
+                  <span className={l.curtainCallOn ? "opacity-100" : "opacity-30"}>🔮</span>
+                  <span className={l.grandFinaleOn ? "opacity-100" : "opacity-30"}>🏆</span>
                 </div>
+              </Link>
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <Button
+                  render={<Link href={`/leagues/${l.id}/settings?from=%2Ftoday`} />}
+                  nativeButton={false}
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`${l.name} settings`}
+                >
+                  <SettingsIcon />
+                </Button>
                 {l.picksDue ? (
-                  <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
+                  <span className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
                     Picks due
                   </span>
                 ) : (
-                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
                     All caught up
                   </span>
                 )}
-              </CardContent>
-            </Card>
-          </Link>
+              </div>
+            </CardContent>
+          </Card>
         ))}
+      </div>
+
+      <div className="mt-3">
+        <CreateJoinLeagueDialogs />
       </div>
 
       {recentActivity.length > 0 && (

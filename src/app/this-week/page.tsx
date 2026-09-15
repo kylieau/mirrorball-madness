@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
 import { WeekSwitcher } from "@/components/week-switcher";
 import { PageHeader } from "@/components/page-header";
+import { TopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
-import { HomeIcon, ListChecksIcon, PencilLineIcon, SettingsIcon, TrophyIcon } from "lucide-react";
+import { getAccountSettingsData } from "@/lib/account-settings-data";
+import { HomeIcon, ListChecksIcon, PencilLineIcon, TrophyIcon } from "lucide-react";
 
 const TAB_ITEM_CLASSES =
   "flex flex-1 flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-sm font-medium sm:flex-row sm:gap-1.5 sm:px-3";
@@ -26,13 +27,13 @@ export default async function ThisWeekPage({
     redirect("/login");
   }
 
-  const [{ data: memberships }, { data: profile }] = await Promise.all([
+  const [{ data: memberships }, accountSettingsData] = await Promise.all([
     supabase
       .from("league_members")
       .select("joined_at, leagues(id, name)")
       .eq("user_id", user.id)
       .order("joined_at", { ascending: true }),
-    supabase.from("profiles").select("display_name").eq("id", user.id).single(),
+    getAccountSettingsData(supabase, user.id),
   ]);
 
   const leagueRefs = (memberships ?? []).map((m) => m.leagues!).filter(Boolean);
@@ -150,31 +151,7 @@ export default async function ThisWeekPage({
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
-      <div className="flex items-start justify-between gap-4">
-        <Link href="/today" className="text-xs font-medium text-muted-foreground">
-          🪩 Mirrorball Madness
-        </Link>
-        <div className="flex gap-2">
-          <Button
-            render={<Link href="/settings?from=%2Fthis-week" />}
-            nativeButton={false}
-            variant="outline"
-            size="icon-sm"
-            aria-label="Settings"
-          >
-            <SettingsIcon />
-          </Button>
-          <Button
-            render={<Link href="/settings?from=%2Fthis-week" />}
-            nativeButton={false}
-            size="icon-sm"
-            aria-label="Account settings"
-            className="rounded-full font-bold"
-          >
-            {(profile?.display_name ?? "?").charAt(0).toUpperCase()}
-          </Button>
-        </div>
-      </div>
+      <TopBar {...accountSettingsData} email={user.email ?? ""} />
 
       <div className="pb-20 sm:pb-0">
         <PageHeader title="This Week">

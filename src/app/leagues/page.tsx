@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { LeaveLeagueButton } from "@/components/leave-league-button";
+import { TopBar } from "@/components/top-bar";
 import { Card, CardContent } from "@/components/ui/card";
+import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { CrownIcon } from "lucide-react";
 
 export default async function LeaguesPage({
@@ -22,14 +24,19 @@ export default async function LeaguesPage({
     redirect("/login");
   }
 
-  const { data: memberships } = await supabase
-    .from("league_members")
-    .select("role, leagues(id, name)")
-    .eq("user_id", user.id);
+  const [{ data: memberships }, accountSettingsData] = await Promise.all([
+    supabase
+      .from("league_members")
+      .select("role, leagues(id, name)")
+      .eq("user_id", user.id),
+    getAccountSettingsData(supabase, user.id),
+  ]);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
       <div className="flex flex-col gap-6">
+        <TopBar {...accountSettingsData} email={user.email ?? ""} />
+
         {memberships && memberships.length > 0 && (
           <Link
             href={`/leagues/${memberships[0].leagues!.id}`}
