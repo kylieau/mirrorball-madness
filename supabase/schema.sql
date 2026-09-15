@@ -47,7 +47,13 @@ create table seasons (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
   is_active boolean not null default false,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Schedule-tab display only ("TBD" when null) — episodes.airs_at is the
+  -- actual per-week source of truth used everywhere scoring/locking reads
+  -- a date; these three never feed a computation.
+  premiere_date date,
+  finale_date date,
+  total_episodes int check (total_episodes is null or total_episodes > 0)
 );
 
 create unique index seasons_one_active on seasons (is_active) where is_active;
@@ -267,6 +273,16 @@ create table episodes (
   is_elimination_week boolean not null default true,
   is_finale boolean not null default false,
   status text not null default 'upcoming' check (status in ('upcoming', 'locked', 'completed')),
+  -- guest_judge_name is free text, not a people(role='judge') row: people
+  -- exists to unify recurring individuals across seasons (draft picks,
+  -- judge_scores joins) — a guest judge is almost always a one-off with no
+  -- scoring identity of their own. If a guest judge actually scores a
+  -- dance, add them via the existing "Add judge" flow as a real people
+  -- row; this column is purely the descriptive "who guest-judged" caption.
+  guest_judge_name text,
+  judges_save_available boolean not null default false,
+  results_published_at timestamptz,
+  results_published_by uuid references profiles(id) on delete set null,
   unique (season_id, week_number)
 );
 
@@ -290,6 +306,7 @@ create table dance_scores (
   episode_id uuid not null references episodes(id) on delete cascade,
   couple_id uuid not null references couples(id),
   dance_style_id uuid not null references dance_styles(id),
+  song_title text,
   total_score numeric not null, -- e.g. 24 for 24/30 — sum of judge_scores
   created_at timestamptz not null default now()
 );
@@ -1233,6 +1250,74 @@ alter publication supabase_realtime add table public.draft_picks;
 -- DEFINER function.
 -- ============================================================
 
+-- Draft/Publish staging tables for results entry. No grants, no RLS policy
+-- at all — default-deny, service-role only. Access to /admin/results is
+-- already gated server-side (is_super_admin, or the
+-- RESULTS_ENTRY_OPEN_TO_ALL env flag an RLS policy can't see), so draft
+-- reads/writes go through the service-role client from code that already
+-- passed that check — the same trust boundary the live write path below
+-- already uses, just extended to reads for these new tables. A draft is
+-- promoted into the live tables (dance_scores/judge_scores/episode_results)
+-- by publishEpisodeDraft, then deleted from here — these never carry
+-- long-term history, only the in-progress week.
+create table draft_episode_overrides (
+  episode_id uuid primary key references episodes(id) on delete cascade,
+  guest_judge_name text,
+  judges_save_available boolean not null default false,
+  updated_at timestamptz not null default now(),
+  updated_by uuid references profiles(id) on delete set null
+);
+
+create table draft_dance_scores (
+  id uuid primary key default gen_random_uuid(),
+  episode_id uuid not null references episodes(id) on delete cascade,
+  couple_id uuid not null references couples(id),
+  dance_style_id uuid not null references dance_styles(id),
+  song_title text,
+  total_score numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table draft_judge_scores (
+  id uuid primary key default gen_random_uuid(),
+  draft_dance_score_id uuid not null references draft_dance_scores(id) on delete cascade,
+  judge_id uuid not null references people(id),
+  score numeric not null,
+  unique (draft_dance_score_id, judge_id)
+);
+
+create table draft_episode_results (
+  id uuid primary key default gen_random_uuid(),
+  episode_id uuid not null references episodes(id) on delete cascade,
+  couple_id uuid not null references couples(id),
+  outcome text not null check (outcome in ('safe', 'eliminated', 'withdrawn', 'bye', 'winner', 'runner_up', 'third_place')),
+  was_bottom_two boolean not null default false,
+  was_bottom_three boolean not null default false,
+  saved_by_judges boolean not null default false,
+  was_team_dance boolean not null default false,
+  had_immunity boolean not null default false,
+  bonus_points numeric not null default 0,
+  bonus_note text,
+  unique (episode_id, couple_id)
+);
+
+-- draft_episode_overrides' presence/absence for an episode is itself the
+-- "has a draft been started" signal (see deriveResultsStatus in
+-- src/lib/results-status.ts), and its updated_at drives "Draft saved N
+-- minutes ago."
+create table draft_episode_custom_moments (
+  id uuid primary key default gen_random_uuid(),
+  episode_id uuid not null references episodes(id) on delete cascade,
+  couple_id uuid references couples(id),
+  label text not null,
+  created_at timestamptz not null default now(),
+  created_by uuid references profiles(id) on delete set null
+);
+
+create index idx_draft_dance_scores_episode on draft_dance_scores(episode_id);
+create index idx_draft_episode_results_episode on draft_episode_results(episode_id);
+create index idx_draft_custom_moments_episode on draft_episode_custom_moments(episode_id);
+
 grant select on public.episodes to authenticated;
 create policy "episodes are viewable by all authenticated users"
 on public.episodes for select
@@ -1256,6 +1341,25 @@ using (true);
 grant select on public.episode_results to authenticated;
 create policy "episode results are viewable by all authenticated users"
 on public.episode_results for select
+using (true);
+
+-- Published "Special Moments" custom pills (Perfect Score/Judges' Save are
+-- computed at render time, not stored — this table is only for the
+-- manually-added ones). Same trust level as dance_scores/episode_results
+-- above: global, world-readable-to-authenticated, written only by the
+-- service-role results-entry path.
+create table episode_custom_moments (
+  id uuid primary key default gen_random_uuid(),
+  episode_id uuid not null references episodes(id) on delete cascade,
+  couple_id uuid references couples(id),
+  label text not null,
+  created_at timestamptz not null default now(),
+  created_by uuid references profiles(id) on delete set null
+);
+
+grant select on public.episode_custom_moments to authenticated;
+create policy "episode custom moments are viewable by all authenticated users"
+on public.episode_custom_moments for select
 using (true);
 
 grant select on public.weekly_manager_scores to authenticated;
