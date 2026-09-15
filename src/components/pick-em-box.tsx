@@ -26,6 +26,7 @@ export function PickEmBox({
   coupleDisplayNames,
   existingPrediction,
   isLocked,
+  isDoubleElimination,
   revealedPredictions,
 }: {
   leagueId: string;
@@ -35,17 +36,25 @@ export function PickEmBox({
   coupleDisplayNames: Record<string, CoupleNameParts>;
   existingPrediction: {
     predicted_eliminated_couple_id: string | null;
+    predicted_eliminated_couple_id_2: string | null;
     predicted_top_scorer_couple_id: string | null;
   } | null;
   isLocked: boolean;
+  isDoubleElimination: boolean;
   revealedPredictions?: {
     displayName: string;
     eliminatedLabel: string | null;
+    eliminatedLabel2: string | null;
     topScorerLabel: string | null;
   }[];
 }) {
   const [eliminatedId, setEliminatedId] = useState(
     existingPrediction?.predicted_eliminated_couple_id ?? ""
+  );
+  // Only read/rendered when isDoubleElimination -- a normal week's
+  // eliminatedId behavior above is untouched.
+  const [eliminatedId2, setEliminatedId2] = useState(
+    existingPrediction?.predicted_eliminated_couple_id_2 ?? ""
   );
   const [topScorerId, setTopScorerId] = useState(
     existingPrediction?.predicted_top_scorer_couple_id ?? ""
@@ -78,6 +87,32 @@ export function PickEmBox({
     );
   }
 
+  function toggleEliminated(coupleId: string) {
+    if (!isDoubleElimination) {
+      setEliminatedId(eliminatedId === coupleId ? "" : coupleId);
+      return;
+    }
+    if (eliminatedId === coupleId) {
+      setEliminatedId("");
+      return;
+    }
+    if (eliminatedId2 === coupleId) {
+      setEliminatedId2("");
+      return;
+    }
+    if (!eliminatedId) {
+      setEliminatedId(coupleId);
+    } else if (!eliminatedId2) {
+      setEliminatedId2(coupleId);
+    }
+  }
+
+  // On a double-elimination week, submit_prediction enforces "both slots
+  // filled or both blank" — mirror that here so Save is disabled on a
+  // half-filled state instead of erroring on submit.
+  const eliminationPickValid =
+    !isDoubleElimination || (!eliminatedId && !eliminatedId2) || (!!eliminatedId && !!eliminatedId2);
+
   async function handleSubmit() {
     setError(null);
     setSubmitting(true);
@@ -85,6 +120,7 @@ export function PickEmBox({
       leagueId,
       episode!.id,
       eliminatedId || null,
+      isDoubleElimination ? eliminatedId2 || null : null,
       topScorerId || null
     );
     if (result.error) setError(result.error);
@@ -92,7 +128,7 @@ export function PickEmBox({
     setSubmitting(false);
   }
 
-  const hasSavedPick = !!eliminatedId || !!topScorerId;
+  const hasSavedPick = !!eliminatedId || !!eliminatedId2 || !!topScorerId;
 
   return (
     <Card>
@@ -107,19 +143,26 @@ export function PickEmBox({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {isDoubleElimination && !isLocked && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            ⚡ Double Elimination — two couples go home tonight, call &apos;em both.
+          </div>
+        )}
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {!isLocked ? (
           editing ? (
             <>
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium">Who Gets Eliminated?</label>
+                <label className="text-sm font-medium">
+                  Who Gets Eliminated?{isDoubleElimination ? " (pick both!)" : ""}
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {activeCouples.map((c) => (
                     <Chip
                       key={c.id}
-                      selected={eliminatedId === c.id}
-                      onClick={() => setEliminatedId(eliminatedId === c.id ? "" : c.id)}
+                      selected={eliminatedId === c.id || eliminatedId2 === c.id}
+                      onClick={() => toggleEliminated(c.id)}
                     >
                       {nameFor(c.id)}
                     </Chip>
@@ -141,7 +184,7 @@ export function PickEmBox({
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleSubmit} disabled={submitting}>
+                <Button onClick={handleSubmit} disabled={submitting || !eliminationPickValid}>
                   {submitting ? "Saving..." : "Save prediction"}
                 </Button>
                 {hasSavedPick && (
@@ -162,7 +205,13 @@ export function PickEmBox({
               <div className="flex flex-col gap-1.5 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Eliminated</span>
-                  <span className="font-medium">{eliminatedId ? nameFor(eliminatedId) : "No pick"}</span>
+                  <span className="font-medium">
+                    {eliminatedId && eliminatedId2
+                      ? `${nameFor(eliminatedId)} & ${nameFor(eliminatedId2)}`
+                      : eliminatedId
+                        ? nameFor(eliminatedId)
+                        : "No pick"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Top scorer</span>
@@ -180,7 +229,9 @@ export function PickEmBox({
               <div key={i} className="flex items-center justify-between">
                 <span>{p.displayName}</span>
                 <span className="text-muted-foreground">
-                  {p.eliminatedLabel ?? "—"} / {p.topScorerLabel ?? "—"}
+                  {p.eliminatedLabel ?? "—"}
+                  {isDoubleElimination && p.eliminatedLabel2 && ` & ${p.eliminatedLabel2}`} /{" "}
+                  {p.topScorerLabel ?? "—"}
                 </span>
               </div>
             ))}

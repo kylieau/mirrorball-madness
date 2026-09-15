@@ -470,6 +470,39 @@ export type Database = {
           },
         ]
       }
+      episode_participants: {
+        Row: {
+          couple_id: string
+          created_at: string
+          episode_id: string
+        }
+        Insert: {
+          couple_id: string
+          created_at?: string
+          episode_id: string
+        }
+        Update: {
+          couple_id?: string
+          created_at?: string
+          episode_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_participants_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_participants_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       episode_results: {
         Row: {
           bonus_note: string | null
@@ -533,6 +566,7 @@ export type Database = {
           expected_dance_count: number
           guest_judge_name: string | null
           id: string
+          is_double_elimination_week: boolean
           is_elimination_week: boolean
           is_finale: boolean
           judges_save_available: boolean
@@ -548,6 +582,7 @@ export type Database = {
           expected_dance_count?: number
           guest_judge_name?: string | null
           id?: string
+          is_double_elimination_week?: boolean
           is_elimination_week?: boolean
           is_finale?: boolean
           judges_save_available?: boolean
@@ -563,6 +598,7 @@ export type Database = {
           expected_dance_count?: number
           guest_judge_name?: string | null
           id?: string
+          is_double_elimination_week?: boolean
           is_elimination_week?: boolean
           is_finale?: boolean
           judges_save_available?: boolean
@@ -804,6 +840,7 @@ export type Database = {
           league_id: string
           manager_id: string
           predicted_eliminated_couple_id: string | null
+          predicted_eliminated_couple_id_2: string | null
           predicted_top_scorer_couple_id: string | null
           submitted_at: string
         }
@@ -813,6 +850,7 @@ export type Database = {
           league_id: string
           manager_id: string
           predicted_eliminated_couple_id?: string | null
+          predicted_eliminated_couple_id_2?: string | null
           predicted_top_scorer_couple_id?: string | null
           submitted_at?: string
         }
@@ -822,6 +860,7 @@ export type Database = {
           league_id?: string
           manager_id?: string
           predicted_eliminated_couple_id?: string | null
+          predicted_eliminated_couple_id_2?: string | null
           predicted_top_scorer_couple_id?: string | null
           submitted_at?: string
         }
@@ -845,6 +884,13 @@ export type Database = {
             columns: ["manager_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "predictions_predicted_eliminated_couple_id_2_fkey"
+            columns: ["predicted_eliminated_couple_id_2"]
+            isOneToOne: false
+            referencedRelation: "couples"
             referencedColumns: ["id"]
           },
           {
@@ -1417,6 +1463,7 @@ export type Database = {
           p_episode_id: string
           p_league_id: string
           p_predicted_eliminated_couple_id: string
+          p_predicted_eliminated_couple_id_2: string
           p_predicted_top_scorer_couple_id: string
         }
         Returns: {
@@ -1425,6 +1472,7 @@ export type Database = {
           league_id: string
           manager_id: string
           predicted_eliminated_couple_id: string | null
+          predicted_eliminated_couple_id_2: string | null
           predicted_top_scorer_couple_id: string | null
           submitted_at: string
         }

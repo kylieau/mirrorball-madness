@@ -58,11 +58,16 @@ export type ScheduleEpisodeInput = {
   theme: string | null;
   isEliminationWeek: boolean;
   isFinale: boolean;
+  isDoubleEliminationWeek: boolean;
+  // Empty = unrestricted (every currently-active couple participates) — the
+  // ordinary case. Only populated for a split-broadcast episode (e.g. a
+  // two-night premiere where half the cast dances each night).
+  participantCoupleIds: string[];
 };
 
-// Sets week/date/theme/elimination-week/finale — everything known ahead of
-// air — leaving expected_dance_count and status untouched on an existing
-// episode, since those are owned by the results-entry flow below.
+// Sets week/date/theme/elimination-week/finale/participants — everything
+// known ahead of air — leaving expected_dance_count and status untouched on
+// an existing episode, since those are owned by the results-entry flow below.
 export async function applyEpisodeSchedule(
   admin: SupabaseClient<Database>,
   input: ScheduleEpisodeInput
@@ -70,18 +75,34 @@ export async function applyEpisodeSchedule(
   const { seasonId, error: seasonErr } = await getActiveSeasonId(admin);
   if (seasonErr || !seasonId) return { error: seasonErr };
 
-  const { error } = await admin.from("episodes").upsert(
-    {
-      season_id: seasonId,
-      week_number: input.weekNumber,
-      airs_at: input.airsAt,
-      theme: input.theme,
-      is_elimination_week: input.isEliminationWeek,
-      is_finale: input.isFinale,
-    },
-    { onConflict: "season_id,week_number" }
-  );
-  return { error: error?.message ?? null };
+  const { data: episode, error } = await admin
+    .from("episodes")
+    .upsert(
+      {
+        season_id: seasonId,
+        week_number: input.weekNumber,
+        airs_at: input.airsAt,
+        theme: input.theme,
+        is_elimination_week: input.isEliminationWeek,
+        is_finale: input.isFinale,
+        is_double_elimination_week: input.isDoubleEliminationWeek,
+      },
+      { onConflict: "season_id,week_number" }
+    )
+    .select()
+    .single();
+  if (error) return { error: error.message };
+
+  // Full replace, same convention as dance_scores/episode_results below.
+  await admin.from("episode_participants").delete().eq("episode_id", episode.id);
+  if (input.participantCoupleIds.length > 0) {
+    const { error: participantsErr } = await admin.from("episode_participants").insert(
+      input.participantCoupleIds.map((coupleId) => ({ episode_id: episode.id, couple_id: coupleId }))
+    );
+    if (participantsErr) return { error: participantsErr.message };
+  }
+
+  return { error: null };
 }
 
 // Takes an already-authorized admin (service-role) client — the caller is
@@ -274,7 +295,7 @@ export async function applyEpisodeResults(
         .or(`end_week.is.null,end_week.gte.${input.weekNumber}`),
       admin
         .from("predictions")
-        .select("manager_id, predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
+        .select("manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
         .eq("league_id", league.id)
         .eq("episode_id", episode.id),
     ]);
@@ -336,9 +357,11 @@ export async function applyEpisodeResults(
       predictions: (predictions ?? []).map((p) => ({
         managerId: p.manager_id,
         predictedEliminatedCoupleId: p.predicted_eliminated_couple_id,
+        predictedEliminatedCoupleId2: p.predicted_eliminated_couple_id_2,
         predictedTopScorerCoupleId: p.predicted_top_scorer_couple_id,
       })),
       isFinale: episode.is_finale,
+      isDoubleElimination: episode.is_double_elimination_week,
       categoryWeights: {
         judges: scoringSettings.judges_score_category_weight,
         eliminations: scoringSettings.eliminations_category_weight,

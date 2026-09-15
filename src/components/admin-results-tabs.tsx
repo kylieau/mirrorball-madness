@@ -47,6 +47,7 @@ type Episode = {
   status: string;
   is_finale: boolean;
   is_elimination_week: boolean;
+  is_double_elimination_week: boolean;
   results_published_at: string | null;
   results_published_by: string | null;
 };
@@ -81,6 +82,7 @@ export function AdminResultsTabs({
   draftsByEpisode,
   publishedByNames,
   season,
+  participantsByEpisode,
 }: {
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
@@ -98,6 +100,7 @@ export function AdminResultsTabs({
   draftsByEpisode: Record<string, DraftState>;
   publishedByNames: Record<string, string>;
   season: Season;
+  participantsByEpisode: Record<string, string[]>;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["value"]>("enter");
   // Lifted here so View Results' "Correct Results"/"Continue draft" can
@@ -146,6 +149,7 @@ export function AdminResultsTabs({
             episodes={episodes}
             draftsByEpisode={draftsByEpisode}
             forceSelectEpisodeId={forceSelectEpisodeId}
+            participantsByEpisode={participantsByEpisode}
           />
         </TabsContent>
         <TabsContent value="view">
@@ -169,6 +173,8 @@ export function AdminResultsTabs({
             episodeResults={episodeResults}
             draftsByEpisode={draftsByEpisode}
             season={season}
+            activeCouples={activeCouples}
+            participantsByEpisode={participantsByEpisode}
           />
         </TabsContent>
         <TabsContent value="manage">

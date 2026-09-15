@@ -30,6 +30,9 @@ export type EpisodeOutcome = {
 export type Prediction = {
   managerId: string;
   predictedEliminatedCoupleId: string | null;
+  // Only meaningful when isDoubleElimination is true (a manager must guess
+  // both couples going home that week, not just one) — ignored otherwise.
+  predictedEliminatedCoupleId2: string | null;
   predictedTopScorerCoupleId: string | null;
 };
 
@@ -73,6 +76,7 @@ export function computeWeeklyScores({
   episodeOutcomes,
   predictions,
   isFinale,
+  isDoubleElimination,
   categoryWeights = { judges: 1, eliminations: 1, bonus: 1 },
   grandFinalePointsByManager = {},
 }: {
@@ -82,6 +86,7 @@ export function computeWeeklyScores({
   episodeOutcomes: EpisodeOutcome[];
   predictions: Prediction[];
   isFinale: boolean;
+  isDoubleElimination: boolean;
   categoryWeights?: CategoryWeights;
   grandFinalePointsByManager?: Record<string, number>;
 }): WeeklyManagerScore[] {
@@ -126,6 +131,13 @@ export function computeWeeklyScores({
   for (const p of predictions) {
     let points = 0;
     if (p.predictedEliminatedCoupleId && eliminatedCoupleIds.has(p.predictedEliminatedCoupleId)) {
+      points += scoringSettings.eliminationPredictionPoints;
+    }
+    if (
+      isDoubleElimination &&
+      p.predictedEliminatedCoupleId2 &&
+      eliminatedCoupleIds.has(p.predictedEliminatedCoupleId2)
+    ) {
       points += scoringSettings.eliminationPredictionPoints;
     }
     if (p.predictedTopScorerCoupleId && topScorerCoupleIds.has(p.predictedTopScorerCoupleId)) {

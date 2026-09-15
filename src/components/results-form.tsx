@@ -40,6 +40,7 @@ import {
 import { useRelativeTimeAgo } from "@/lib/use-browser-time-zone";
 import type { DraftState } from "@/lib/results-draft";
 import { formatEpisodeLabel } from "@/lib/format-week";
+import { resolveEpisodeCoupleIds } from "@/lib/episode-participants";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type CoupleWithStatus = Couple & {
@@ -54,6 +55,7 @@ type ScheduledEpisode = {
   theme: string | null;
   is_elimination_week: boolean;
   is_finale: boolean;
+  is_double_elimination_week: boolean;
   results_published_at: string | null;
 };
 type Outcome = "safe" | "eliminated" | "withdrawn" | "bye" | "winner" | "runner_up" | "third_place";
@@ -174,6 +176,7 @@ export function ResultsForm({
   episodes,
   draftsByEpisode,
   forceSelectEpisodeId,
+  participantsByEpisode,
 }: {
   activeCouples: Couple[];
   allCouplesWithStatus: CoupleWithStatus[];
@@ -187,6 +190,7 @@ export function ResultsForm({
   // AdminResultsTabs) to jump here already pointed at that episode, once
   // startEpisodeCorrection has seeded a fresh draft for it.
   forceSelectEpisodeId?: string | null;
+  participantsByEpisode: Record<string, string[]>;
 }) {
   const sortedEpisodes = [...episodes].sort((a, b) => a.week_number - b.week_number);
   const router = useRouter();
@@ -199,6 +203,16 @@ export function ResultsForm({
 
   const selectedEpisode = sortedEpisodes.find((e) => e.id === selectedEpisodeId) ?? null;
   const isFinale = selectedEpisode?.is_finale ?? false;
+
+  // Narrows the couple list to whoever actually performed this episode (a
+  // split-broadcast premiere) — empty participants config means everyone,
+  // the ordinary case.
+  const episodeCouples = resolveEpisodeCoupleIds(
+    activeCouples.map((c) => c.id),
+    participantsByEpisode[selectedEpisode?.id ?? ""] ?? []
+  )
+    .map((id) => activeCouples.find((c) => c.id === id))
+    .filter((c): c is Couple => !!c);
 
   const [expectedDanceCount, setExpectedDanceCount] = useState(1);
   const [guestJudgeName, setGuestJudgeName] = useState("");
@@ -232,7 +246,7 @@ export function ResultsForm({
     const draft = draftsByEpisode[selectedEpisode.id];
     setGuestJudgeName(draft?.guestJudgeName ?? "");
     setJudgesSaveAvailable(draft?.judgesSaveAvailable ?? false);
-    setRows(buildRowsFromDraft(draft, activeCouples));
+    setRows(buildRowsFromDraft(draft, episodeCouples));
     setCustomMoments(draft?.customMoments ?? []);
     setDraftSavedAt(draft?.updatedAt ?? null);
     setHasDraft(draft?.hasDraft ?? false);
@@ -257,7 +271,7 @@ export function ResultsForm({
       episodeId: selectedEpisode!.id,
       guestJudgeName: guestJudgeName.trim() || null,
       judgesSaveAvailable,
-      entries: activeCouples.map((c) => {
+      entries: episodeCouples.map((c) => {
         const row = rows[c.id] ?? emptyRow();
         return {
           coupleId: c.id,
@@ -426,7 +440,7 @@ export function ResultsForm({
   // no new storage, matches the plan's "computed at render time" call.
   const perfectScorePills: { coupleId: string; danceStyleId: string }[] = [];
   const judgesSavePills: string[] = [];
-  for (const c of activeCouples) {
+  for (const c of episodeCouples) {
     const row = rows[c.id];
     if (!row) continue;
     if (row.savedByJudges) judgesSavePills.push(c.id);
@@ -499,6 +513,15 @@ export function ResultsForm({
 
       {selectedEpisode && (
         <>
+          {selectedEpisode.is_double_elimination_week && (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+              <p className="font-medium">⚡ Double Elimination Week</p>
+              <p className="mt-0.5 text-amber-800/90 dark:text-amber-300/90">
+                Mark two couples Eliminated below — Curtain Call is collecting two guesses from
+                managers this week.
+              </p>
+            </div>
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Episode Details</CardTitle>
@@ -564,7 +587,7 @@ export function ResultsForm({
                 <Sheet open={teamSheetOpen} onOpenChange={setTeamSheetOpen}>
                   <SheetTrigger render={<Button variant="outline" size="sm" />}>Score a Team Dance</SheetTrigger>
                   <TeamDanceSheetContent
-                    couples={activeCouples}
+                    couples={episodeCouples}
                     coupleParts={coupleParts}
                     danceStyles={danceStyles}
                     judges={judges}
@@ -580,7 +603,7 @@ export function ResultsForm({
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              {activeCouples.map((c) => {
+              {episodeCouples.map((c) => {
                 const row = rows[c.id] ?? emptyRow();
                 const statusValue = statusValueFromRow(row.outcome, row.wasBottomTwo, row.wasBottomThree);
                 const canAddDance = row.dances.length < expectedDanceCount;
@@ -755,7 +778,7 @@ export function ResultsForm({
                 <div className="flex flex-col gap-1">
                   <Label className="text-xs text-muted-foreground">Couple (optional)</Label>
                   <Select
-                    items={{ "": "—", ...Object.fromEntries(activeCouples.map((c) => [c.id, coupleNameNode(coupleParts(c))])) }}
+                    items={{ "": "—", ...Object.fromEntries(episodeCouples.map((c) => [c.id, coupleNameNode(coupleParts(c))])) }}
                     value={customMomentCoupleId}
                     onValueChange={(v) => setCustomMomentCoupleId(v ?? "")}
                   >
@@ -764,7 +787,7 @@ export function ResultsForm({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">—</SelectItem>
-                      {activeCouples.map((c) => (
+                      {episodeCouples.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {coupleNameNode(coupleParts(c))}
                         </SelectItem>

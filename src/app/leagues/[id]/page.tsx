@@ -90,7 +90,7 @@ export default async function LeaguePage({
         ),
       supabase
         .from("episodes")
-        .select("id, week_number, airs_at")
+        .select("id, week_number, airs_at, is_double_elimination_week")
         .eq("status", "upcoming")
         .order("week_number", { ascending: true })
         .limit(1)
@@ -249,7 +249,12 @@ export default async function LeaguePage({
   let lockAt: string | null = null;
   let ownPrediction = null;
   let revealedPredictions:
-    | { displayName: string; eliminatedLabel: string | null; topScorerLabel: string | null }[]
+    | {
+        displayName: string;
+        eliminatedLabel: string | null;
+        eliminatedLabel2: string | null;
+        topScorerLabel: string | null;
+      }[]
     | undefined;
 
   if (upcomingEpisode && curtainCallOn) {
@@ -262,7 +267,7 @@ export default async function LeaguePage({
 
     const { data } = await supabase
       .from("predictions")
-      .select("predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
+      .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
       .eq("league_id", id)
       .eq("episode_id", upcomingEpisode.id)
       .eq("manager_id", user.id)
@@ -272,7 +277,9 @@ export default async function LeaguePage({
     if (isLocked) {
       const { data: allPredictions } = await supabase
         .from("predictions")
-        .select("manager_id, predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
+        .select(
+          "manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
+        )
         .eq("league_id", id)
         .eq("episode_id", upcomingEpisode.id);
 
@@ -280,12 +287,16 @@ export default async function LeaguePage({
         const eliminatedParts = p.predicted_eliminated_couple_id
           ? allDisplayNames.get(p.predicted_eliminated_couple_id)
           : undefined;
+        const eliminatedParts2 = p.predicted_eliminated_couple_id_2
+          ? allDisplayNames.get(p.predicted_eliminated_couple_id_2)
+          : undefined;
         const topScorerParts = p.predicted_top_scorer_couple_id
           ? allDisplayNames.get(p.predicted_top_scorer_couple_id)
           : undefined;
         return {
           displayName: nameByManager[p.manager_id] ?? "Unknown",
           eliminatedLabel: eliminatedParts ? formatCoupleName(eliminatedParts) : null,
+          eliminatedLabel2: eliminatedParts2 ? formatCoupleName(eliminatedParts2) : null,
           topScorerLabel: topScorerParts ? formatCoupleName(topScorerParts) : null,
         };
       });
@@ -493,6 +504,7 @@ export default async function LeaguePage({
                   coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
                   existingPrediction={ownPrediction}
                   isLocked={isLocked}
+                  isDoubleElimination={upcomingEpisode?.is_double_elimination_week ?? false}
                   revealedPredictions={revealedPredictions}
                 />
               </div>

@@ -276,6 +276,11 @@ create table episodes (
   expected_dance_count int not null default 1, -- informational only, doesn't gate how many dances a couple can actually submit
   is_elimination_week boolean not null default true,
   is_finale boolean not null default false,
+  -- Set ahead of air time on the Schedule tab. Gates Curtain Call's Pick 'Em
+  -- to collecting two elimination guesses instead of one (submit_prediction
+  -- enforces "0 or 2, never 1" filled slots) — results entry itself already
+  -- supports any number of eliminations per episode with no flag needed.
+  is_double_elimination_week boolean not null default false,
   status text not null default 'upcoming' check (status in ('upcoming', 'locked', 'completed')),
   -- guest_judge_name is free text, not a people(role='judge') row: people
   -- exists to unify recurring individuals across seasons (draft picks,
@@ -367,9 +372,17 @@ create table predictions (
   manager_id uuid not null references profiles(id),
   episode_id uuid not null references episodes(id),
   predicted_eliminated_couple_id uuid references couples(id),
+  -- Only ever set on an episodes.is_double_elimination_week episode — both
+  -- slots filled or both null, enforced in submit_prediction (a cross-table
+  -- check isn't possible here). A normal week's predictions never touch it.
+  predicted_eliminated_couple_id_2 uuid references couples(id),
   predicted_top_scorer_couple_id uuid references couples(id),
   submitted_at timestamptz not null default now(),
-  unique (league_id, manager_id, episode_id)
+  unique (league_id, manager_id, episode_id),
+  constraint predictions_distinct_eliminated_picks check (
+    predicted_eliminated_couple_id_2 is null
+    or predicted_eliminated_couple_id_2 <> predicted_eliminated_couple_id
+  )
 );
 
 -- ============================================================
@@ -1366,6 +1379,26 @@ create policy "episode custom moments are viewable by all authenticated users"
 on public.episode_custom_moments for select
 using (true);
 
+-- Explicit "who actually performed in this episode." No row for an episode
+-- means unrestricted (every currently-active couple participates) — this is
+-- only ever populated for a split-broadcast episode (e.g. a two-night
+-- premiere where half the cast dances each night), never for an ordinary
+-- week. Same trust level as episode_custom_moments above: written only by
+-- the service-role results-entry path (applyEpisodeSchedule).
+create table episode_participants (
+  episode_id uuid not null references episodes(id) on delete cascade,
+  couple_id uuid not null references couples(id),
+  created_at timestamptz not null default now(),
+  primary key (episode_id, couple_id)
+);
+
+create index idx_episode_participants_episode on episode_participants(episode_id);
+
+grant select on public.episode_participants to authenticated;
+create policy "episode participants are viewable by all authenticated users"
+on public.episode_participants for select
+using (true);
+
 grant select on public.weekly_manager_scores to authenticated;
 create policy "weekly manager scores are viewable by league members"
 on public.weekly_manager_scores for select
@@ -1416,6 +1449,7 @@ create function public.submit_prediction(
   p_league_id uuid,
   p_episode_id uuid,
   p_predicted_eliminated_couple_id uuid,
+  p_predicted_eliminated_couple_id_2 uuid,
   p_predicted_top_scorer_couple_id uuid
 )
 returns public.predictions
@@ -1424,6 +1458,7 @@ security definer set search_path = ''
 as $$
 declare
   v_lock_at timestamptz;
+  v_is_double_elim boolean;
   v_prediction public.predictions;
 begin
   if not public.is_league_member(p_league_id) then
@@ -1437,8 +1472,23 @@ begin
     raise exception 'Curtain Call is not enabled for this league';
   end if;
 
-  if not exists (select 1 from public.episodes where id = p_episode_id) then
+  select is_double_elimination_week into v_is_double_elim
+  from public.episodes where id = p_episode_id;
+
+  if v_is_double_elim is null then
     raise exception 'Episode not found';
+  end if;
+
+  if v_is_double_elim then
+    if (p_predicted_eliminated_couple_id is null) <> (p_predicted_eliminated_couple_id_2 is null) then
+      raise exception 'Pick both couples going home this week, or leave both blank to skip';
+    end if;
+    if p_predicted_eliminated_couple_id_2 is not null
+       and p_predicted_eliminated_couple_id_2 = p_predicted_eliminated_couple_id then
+      raise exception 'Pick two different couples for your double elimination guesses';
+    end if;
+  elsif p_predicted_eliminated_couple_id_2 is not null then
+    raise exception 'This episode is not a double elimination week';
   end if;
 
   v_lock_at := public.prediction_lock_at(p_league_id, p_episode_id);
@@ -1449,14 +1499,17 @@ begin
 
   insert into public.predictions (
     league_id, manager_id, episode_id,
-    predicted_eliminated_couple_id, predicted_top_scorer_couple_id
+    predicted_eliminated_couple_id, predicted_eliminated_couple_id_2,
+    predicted_top_scorer_couple_id
   )
   values (
     p_league_id, auth.uid(), p_episode_id,
-    p_predicted_eliminated_couple_id, p_predicted_top_scorer_couple_id
+    p_predicted_eliminated_couple_id, p_predicted_eliminated_couple_id_2,
+    p_predicted_top_scorer_couple_id
   )
   on conflict (league_id, manager_id, episode_id) do update set
     predicted_eliminated_couple_id = excluded.predicted_eliminated_couple_id,
+    predicted_eliminated_couple_id_2 = excluded.predicted_eliminated_couple_id_2,
     predicted_top_scorer_couple_id = excluded.predicted_top_scorer_couple_id,
     submitted_at = now()
   returning * into v_prediction;
@@ -1465,8 +1518,8 @@ begin
 end;
 $$;
 
-revoke execute on function public.submit_prediction(uuid, uuid, uuid, uuid) from public;
-grant execute on function public.submit_prediction(uuid, uuid, uuid, uuid) to authenticated;
+revoke execute on function public.submit_prediction(uuid, uuid, uuid, uuid, uuid) from public;
+grant execute on function public.submit_prediction(uuid, uuid, uuid, uuid, uuid) to authenticated;
 
 -- ============================================================
 -- Grand Finale predictions: same "owner pre-lock, league-wide post-lock"

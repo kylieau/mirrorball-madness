@@ -30,9 +30,11 @@ type Episode = {
   theme: string | null;
   is_elimination_week: boolean;
   is_finale: boolean;
+  is_double_elimination_week: boolean;
   results_published_at: string | null;
 };
 type EpisodeResult = { episode_id: string; couple_id: string };
+type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Season = {
   id: string;
   premiere_date: string | null;
@@ -127,14 +129,19 @@ export function ScheduleManager({
   episodeResults,
   draftsByEpisode,
   season,
+  activeCouples,
+  participantsByEpisode,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
   draftsByEpisode: Record<string, DraftState>;
   season: Season;
+  activeCouples: Couple[];
+  participantsByEpisode: Record<string, string[]>;
 }) {
   const sortedEpisodes = [...episodes].sort((a, b) => a.week_number - b.week_number);
   const browserTimeZone = useBrowserTimeZone();
+  const allActiveCoupleIds = new Set(activeCouples.map((c) => c.id));
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -145,6 +152,8 @@ export function ScheduleManager({
   const [theme, setTheme] = useState("");
   const [isEliminationWeek, setIsEliminationWeek] = useState(true);
   const [isFinale, setIsFinale] = useState(false);
+  const [isDoubleEliminationWeek, setIsDoubleEliminationWeek] = useState(false);
+  const [participantCoupleIds, setParticipantCoupleIds] = useState<Set<string>>(allActiveCoupleIds);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -181,6 +190,9 @@ export function ScheduleManager({
     setTheme(e.theme ?? "");
     setIsEliminationWeek(e.is_elimination_week);
     setIsFinale(e.is_finale);
+    setIsDoubleEliminationWeek(e.is_double_elimination_week);
+    const configured = participantsByEpisode[e.id];
+    setParticipantCoupleIds(configured && configured.length > 0 ? new Set(configured) : allActiveCoupleIds);
     setSheetOpen(true);
   }
 
@@ -193,6 +205,17 @@ export function ScheduleManager({
     setTheme("");
     setIsEliminationWeek(true);
     setIsFinale(false);
+    setIsDoubleEliminationWeek(false);
+    setParticipantCoupleIds(allActiveCoupleIds);
+  }
+
+  function toggleParticipant(coupleId: string) {
+    setParticipantCoupleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(coupleId)) next.delete(coupleId);
+      else next.add(coupleId);
+      return next;
+    });
   }
 
   async function handleSave() {
@@ -204,12 +227,21 @@ export function ScheduleManager({
     }
 
     setSubmitting(true);
+    // Sending every active couple back as "participants" is functionally
+    // identical to sending none (resolveEpisodeCoupleIds treats an empty
+    // list as unrestricted) — but sending [] keeps ordinary weeks writing
+    // zero episode_participants rows and needing zero admin attention.
+    const isFullCast =
+      participantCoupleIds.size === allActiveCoupleIds.size &&
+      [...allActiveCoupleIds].every((id) => participantCoupleIds.has(id));
     const result = await scheduleEpisode({
       weekNumber,
       airsAt: airsAtUtc,
       theme: theme.trim() || null,
       isEliminationWeek,
       isFinale,
+      isDoubleEliminationWeek,
+      participantCoupleIds: isFullCast ? [] : [...participantCoupleIds],
     });
     if (result.error) {
       setError(result.error);
@@ -313,12 +345,15 @@ export function ScheduleManager({
                 onChange={(e) => setTheme(e.target.value)}
               />
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={isEliminationWeek}
-                  onChange={(e) => setIsEliminationWeek(e.target.checked)}
+                  onChange={(e) => {
+                    setIsEliminationWeek(e.target.checked);
+                    if (!e.target.checked) setIsDoubleEliminationWeek(false);
+                  }}
                 />
                 Elimination Week
               </label>
@@ -326,6 +361,50 @@ export function ScheduleManager({
                 <input type="checkbox" checked={isFinale} onChange={(e) => setIsFinale(e.target.checked)} />
                 Finale
               </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={isDoubleEliminationWeek}
+                  disabled={!isEliminationWeek}
+                  onChange={(e) => setIsDoubleEliminationWeek(e.target.checked)}
+                />
+                Double Elimination
+              </label>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <Label>Who&apos;s Performing?</Label>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() =>
+                    setParticipantCoupleIds(
+                      participantCoupleIds.size === allActiveCoupleIds.size
+                        ? new Set()
+                        : new Set(allActiveCoupleIds)
+                    )
+                  }
+                >
+                  {participantCoupleIds.size === allActiveCoupleIds.size ? "Clear all" : "Select all"}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Leave everyone checked for an ordinary week. Uncheck couples who aren&apos;t performing this
+                episode (e.g. a split-broadcast premiere) — Enter Results and Curtain Call will only show
+                who&apos;s checked here.
+              </p>
+              <div className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-lg border border-border p-2">
+                {activeCouples.map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 py-1 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={participantCoupleIds.has(c.id)}
+                      onChange={() => toggleParticipant(c.id)}
+                    />
+                    {c.celebrity_name} &amp; {c.pro_name}
+                  </label>
+                ))}
+              </div>
             </div>
             <div className="flex gap-2">
               <Button onClick={handleSave} disabled={submitting || !airsAt}>

@@ -43,6 +43,7 @@ export default async function AdminResultsPage() {
     { data: danceScores },
     { data: judgeScores },
     { data: episodeResults },
+    { data: episodeParticipants },
   ] = await Promise.all([
     supabase
       .from("couples")
@@ -55,7 +56,7 @@ export default async function AdminResultsPage() {
     supabase
       .from("episodes")
       .select(
-        "id, week_number, airs_at, theme, status, is_finale, is_elimination_week, results_published_at, results_published_by"
+        "id, week_number, airs_at, theme, status, is_finale, is_elimination_week, is_double_elimination_week, results_published_at, results_published_by"
       )
       .order("week_number"),
     supabase
@@ -67,6 +68,7 @@ export default async function AdminResultsPage() {
       .select(
         "episode_id, couple_id, outcome, was_bottom_two, was_bottom_three, saved_by_judges, was_team_dance, had_immunity, bonus_points, bonus_note"
       ),
+    supabase.from("episode_participants").select("episode_id, couple_id"),
   ]);
 
   const flatten = (rows: typeof activeCouplesRaw) =>
@@ -107,6 +109,11 @@ export default async function AdminResultsPage() {
       : { data: [] };
   const publishedByNames = Object.fromEntries((publisherProfiles ?? []).map((p) => [p.id, p.display_name]));
 
+  const participantsByEpisode: Record<string, string[]> = {};
+  for (const p of episodeParticipants ?? []) {
+    (participantsByEpisode[p.episode_id] ??= []).push(p.couple_id);
+  }
+
   return (
     <AdminResultsTabs
       accountSettingsData={accountSettingsData}
@@ -125,6 +132,7 @@ export default async function AdminResultsPage() {
       draftsByEpisode={draftsByEpisode}
       publishedByNames={publishedByNames}
       season={season}
+      participantsByEpisode={participantsByEpisode}
     />
   );
 }

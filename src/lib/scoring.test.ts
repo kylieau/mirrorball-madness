@@ -29,6 +29,7 @@ describe("computeWeeklyScores", () => {
       ],
       predictions: [],
       isFinale: false,
+      isDoubleElimination: false,
     });
 
     const alice = result.find((r) => r.managerId === "alice")!;
@@ -49,6 +50,7 @@ describe("computeWeeklyScores", () => {
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 0 }],
       predictions: [],
       isFinale: false,
+      isDoubleElimination: false,
     });
 
     expect(result[0].rosterPoints).toBe(24 + 27 + 10);
@@ -64,9 +66,10 @@ describe("computeWeeklyScores", () => {
       // was in the bottom two and saved by judges, so outcome is "safe".
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 0 }],
       predictions: [
-        { managerId: "bob", predictedEliminatedCoupleId: "couple-1", predictedTopScorerCoupleId: null },
+        { managerId: "bob", predictedEliminatedCoupleId: "couple-1", predictedEliminatedCoupleId2: null, predictedTopScorerCoupleId: null },
       ],
       isFinale: false,
+      isDoubleElimination: false,
     });
 
     const alice = result.find((r) => r.managerId === "alice")!;
@@ -96,6 +99,7 @@ describe("computeWeeklyScores", () => {
       ],
       predictions: [],
       isFinale: true,
+      isDoubleElimination: false,
     });
 
     const alice = result.find((r) => r.managerId === "alice")!;
@@ -115,6 +119,7 @@ describe("computeWeeklyScores", () => {
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "winner", bonusPoints: 0 }],
       predictions: [],
       isFinale: false,
+      isDoubleElimination: false,
     });
 
     expect(result[0].rosterPoints).toBe(30 + 10);
@@ -127,9 +132,10 @@ describe("computeWeeklyScores", () => {
       danceScores: [],
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "withdrawn", bonusPoints: 0 }],
       predictions: [
-        { managerId: "bob", predictedEliminatedCoupleId: "couple-1", predictedTopScorerCoupleId: null },
+        { managerId: "bob", predictedEliminatedCoupleId: "couple-1", predictedEliminatedCoupleId2: null, predictedTopScorerCoupleId: null },
       ],
       isFinale: false,
+      isDoubleElimination: false,
     });
 
     const alice = result.find((r) => r.managerId === "alice")!;
@@ -147,6 +153,7 @@ describe("computeWeeklyScores", () => {
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "bye", bonusPoints: 0 }],
       predictions: [],
       isFinale: false,
+      isDoubleElimination: false,
     });
 
     expect(result[0].rosterPoints).toBe(0);
@@ -160,6 +167,7 @@ describe("computeWeeklyScores", () => {
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 3 }],
       predictions: [],
       isFinale: false,
+      isDoubleElimination: false,
     });
 
     expect(result[0].rosterPoints).toBe(20 + 10 + 3); // dance + survival + dance-off bonus
@@ -178,10 +186,11 @@ describe("computeWeeklyScores", () => {
         { coupleId: "couple-2", outcome: "safe", bonusPoints: 0 },
       ],
       predictions: [
-        { managerId: "alice", predictedEliminatedCoupleId: null, predictedTopScorerCoupleId: "couple-2" },
-        { managerId: "bob", predictedEliminatedCoupleId: null, predictedTopScorerCoupleId: "couple-1" },
+        { managerId: "alice", predictedEliminatedCoupleId: null, predictedEliminatedCoupleId2: null, predictedTopScorerCoupleId: "couple-2" },
+        { managerId: "bob", predictedEliminatedCoupleId: null, predictedEliminatedCoupleId2: null, predictedTopScorerCoupleId: "couple-1" },
       ],
       isFinale: false,
+      isDoubleElimination: false,
     });
 
     const alice = result.find((r) => r.managerId === "alice")!;
@@ -198,9 +207,10 @@ describe("computeWeeklyScores", () => {
       danceScores: [{ coupleId: "couple-1", totalScore: 20 }],
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 0 }],
       predictions: [
-        { managerId: "alice", predictedEliminatedCoupleId: null, predictedTopScorerCoupleId: "couple-1" },
+        { managerId: "alice", predictedEliminatedCoupleId: null, predictedEliminatedCoupleId2: null, predictedTopScorerCoupleId: "couple-1" },
       ],
       isFinale: false,
+      isDoubleElimination: false,
       categoryWeights: { judges: 2, eliminations: 0.5, bonus: 1 },
       grandFinalePointsByManager: { alice: 10 },
     });
@@ -220,10 +230,127 @@ describe("computeWeeklyScores", () => {
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 0 }],
       predictions: [],
       isFinale: false,
+      isDoubleElimination: false,
     });
 
     expect(result[0].totalPoints).toBe(30);
     expect(result[0].grandFinalePoints).toBe(0);
+  });
+});
+
+describe("computeWeeklyScores — double elimination", () => {
+  const episodeOutcomes = [
+    { coupleId: "couple-1", outcome: "eliminated" as const, bonusPoints: 0 },
+    { coupleId: "couple-2", outcome: "eliminated" as const, bonusPoints: 0 },
+    { coupleId: "couple-3", outcome: "safe" as const, bonusPoints: 0 },
+  ];
+
+  it("awards zero prediction points when neither guess is correct", () => {
+    const result = computeWeeklyScores({
+      scoringSettings: settings,
+      rosterSlots: [],
+      danceScores: [],
+      episodeOutcomes,
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: "couple-3",
+          predictedEliminatedCoupleId2: "couple-3",
+          predictedTopScorerCoupleId: null,
+        },
+      ],
+      isFinale: false,
+      isDoubleElimination: true,
+    });
+
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(0);
+  });
+
+  it("awards one guess's worth of points when only the first slot is correct", () => {
+    const result = computeWeeklyScores({
+      scoringSettings: settings,
+      rosterSlots: [],
+      danceScores: [],
+      episodeOutcomes,
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: "couple-1",
+          predictedEliminatedCoupleId2: "couple-3",
+          predictedTopScorerCoupleId: null,
+        },
+      ],
+      isFinale: false,
+      isDoubleElimination: true,
+    });
+
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(20);
+  });
+
+  it("awards one guess's worth of points when only the second slot is correct", () => {
+    const result = computeWeeklyScores({
+      scoringSettings: settings,
+      rosterSlots: [],
+      danceScores: [],
+      episodeOutcomes,
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: "couple-3",
+          predictedEliminatedCoupleId2: "couple-2",
+          predictedTopScorerCoupleId: null,
+        },
+      ],
+      isFinale: false,
+      isDoubleElimination: true,
+    });
+
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(20);
+  });
+
+  it("awards double points (one per guess) when both guesses are correct", () => {
+    const result = computeWeeklyScores({
+      scoringSettings: settings,
+      rosterSlots: [],
+      danceScores: [],
+      episodeOutcomes,
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: "couple-1",
+          predictedEliminatedCoupleId2: "couple-2",
+          predictedTopScorerCoupleId: null,
+        },
+      ],
+      isFinale: false,
+      isDoubleElimination: true,
+    });
+
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(40);
+  });
+
+  it("ignores a populated second slot entirely when isDoubleElimination is false (normal week unaffected)", () => {
+    const result = computeWeeklyScores({
+      scoringSettings: settings,
+      rosterSlots: [],
+      danceScores: [],
+      episodeOutcomes,
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: "couple-1",
+          // Stray/unexpected data on a normal week -- should never happen in
+          // practice (the RPC rejects it), but the pure function must still
+          // ignore it defensively rather than accidentally double-score.
+          predictedEliminatedCoupleId2: "couple-2",
+          predictedTopScorerCoupleId: null,
+        },
+      ],
+      isFinale: false,
+      isDoubleElimination: false,
+    });
+
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(20);
   });
 });
 
