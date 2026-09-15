@@ -4,9 +4,9 @@ import Link from "next/link";
 import { ChevronDownIcon, CheckIcon } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "cn";
-import { formatWeekLabel } from "@/lib/format-week";
+import { formatEpisodeLabel } from "@/lib/format-week";
 
-export type SwitcherWeek = { id: string; weekNumber: number; weekPart: number; theme: string | null };
+export type SwitcherWeek = { id: string; weekNumber: number; theme: string | null };
 
 // Lives in This Week's switcher slot — the cross-league analog of the
 // league switcher: browse past weeks' entered results instead of just the
@@ -26,7 +26,7 @@ export function WeekSwitcher({
   return (
     <Sheet>
       <SheetTrigger className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-        {current ? formatWeekLabel(current.weekNumber, current.weekPart) : ""}
+        {current ? formatEpisodeLabel(current.weekNumber) : ""}
         <ChevronDownIcon className="size-3.5 text-accent" aria-hidden />
       </SheetTrigger>
       <SheetContent side="top" showCloseButton={false} className="mx-auto max-w-md rounded-b-2xl border-x">
@@ -43,7 +43,7 @@ export function WeekSwitcher({
                 className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
               >
                 <p className={cn("text-sm font-semibold", isCurrent && "text-accent")}>
-                  {formatWeekLabel(w.weekNumber, w.weekPart)}
+                  {formatEpisodeLabel(w.weekNumber)}
                   {w.theme ? ` — ${w.theme}` : ""}
                 </p>
                 {isCurrent && <CheckIcon className="size-4 shrink-0 text-accent" aria-hidden />}

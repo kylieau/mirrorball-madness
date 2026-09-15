@@ -26,6 +26,7 @@ import {
   utcIsoToLocalInput,
 } from "@/lib/use-browser-time-zone";
 import { explainGrandFinaleMethod } from "@/lib/grand-finale-explainer";
+import { formatEpisodeLabel } from "@/lib/format-week";
 
 type ScoringMethod = "exact_position" | "distance_based" | "binary_tier";
 type WaiverMode = "locked" | "waivers";
@@ -65,6 +66,8 @@ type League = {
   draft_scheduled_at: string | null;
 };
 
+type SeasonEpisode = { week_number: number; theme: string | null };
+
 const METHOD_ITEMS: Record<ScoringMethod, string> = {
   exact_position: "Exact position",
   distance_based: "Distance-based partial credit",
@@ -99,12 +102,14 @@ export function LeagueModulesForm({
   scoringSettings,
   canEdit,
   premiereAirsAt,
+  seasonEpisodes,
 }: {
   leagueId: string;
   league: League;
   scoringSettings: ScoringSettings | null;
   canEdit: boolean;
   premiereAirsAt: string | null;
+  seasonEpisodes: SeasonEpisode[];
 }) {
   const browserTimeZone = useBrowserTimeZone();
 
@@ -128,8 +133,11 @@ export function LeagueModulesForm({
     scoringSettings?.bonus_picks_category_weight ?? 1
   );
 
-  const [judgesStartsWeek, setJudgesStartsWeek] = useState<1 | 2>(
-    (scoringSettings?.judges_score_starts_week as 1 | 2) ?? 1
+  const [judgesStartsWeek, setJudgesStartsWeek] = useState(scoringSettings?.judges_score_starts_week ?? 1);
+  const startsWeekItems = Object.fromEntries(
+    seasonEpisodes.length > 0
+      ? seasonEpisodes.map((e) => [String(e.week_number), formatEpisodeLabel(e.week_number)])
+      : [[String(judgesStartsWeek), formatEpisodeLabel(judgesStartsWeek)]]
   );
   const [judgesScoreMultiplier, setJudgesScoreMultiplier] = useState(
     scoringSettings?.judges_score_multiplier ?? 1
@@ -315,7 +323,7 @@ export function LeagueModulesForm({
               <CardDescription>Draft, roster, Recast, and judges&apos; score points.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col">
-              <SettingRow label="Draft counts from" value={`Week ${judgesStartsWeek}`} />
+              <SettingRow label="Draft counts from" value={formatEpisodeLabel(judgesStartsWeek)} />
               <SettingRow label="Judges' Score Multiplier" value={judgesScoreMultiplier} />
               <SettingRow label="Survival Points" value={survivalPoints} />
               <SettingRow label="1st Place Bonus" value={firstPlacePoints} />
@@ -481,16 +489,19 @@ export function LeagueModulesForm({
               <div className="flex flex-col gap-2">
                 <Label htmlFor="judgesStartsWeek">Draft counts from</Label>
                 <Select
-                  items={{ "1": "Week 1", "2": "Week 2" }}
+                  items={startsWeekItems}
                   value={String(judgesStartsWeek)}
-                  onValueChange={(v) => setJudgesStartsWeek(v === "2" ? 2 : 1)}
+                  onValueChange={(v) => v && setJudgesStartsWeek(Number(v))}
                 >
                   <SelectTrigger id="judgesStartsWeek" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">Week 1</SelectItem>
-                    <SelectItem value="2">Week 2</SelectItem>
+                    {Object.entries(startsWeekItems).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

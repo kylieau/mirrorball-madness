@@ -14,7 +14,7 @@ import { Chip } from "@/components/chip";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { coupleNameNode } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
-import { formatWeekLabel } from "@/lib/format-week";
+import { formatEpisodeLabel } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 
@@ -29,7 +29,7 @@ export function PickEmBox({
   revealedPredictions,
 }: {
   leagueId: string;
-  episode: { id: string; week_number: number; week_part: number } | null;
+  episode: { id: string; week_number: number } | null;
   lockAt: string | null;
   activeCouples: Couple[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
@@ -97,7 +97,7 @@ export function PickEmBox({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Curtain Call — {formatWeekLabel(episode.week_number, episode.week_part)}</CardTitle>
+        <CardTitle>Curtain Call — {formatEpisodeLabel(episode.week_number)}</CardTitle>
         <CardDescription>
           {isLocked
             ? "Predictions are locked for this episode."

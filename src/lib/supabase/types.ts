@@ -19,7 +19,6 @@ export type Database = {
           celebrity_id: string
           created_at: string
           elimination_week: number | null
-          elimination_week_part: number | null
           id: string
           pro_id: string
           season_id: string
@@ -29,7 +28,6 @@ export type Database = {
           celebrity_id: string
           created_at?: string
           elimination_week?: number | null
-          elimination_week_part?: number | null
           id?: string
           pro_id: string
           season_id: string
@@ -39,7 +37,6 @@ export type Database = {
           celebrity_id?: string
           created_at?: string
           elimination_week?: number | null
-          elimination_week_part?: number | null
           id?: string
           pro_id?: string
           season_id?: string
@@ -545,7 +542,6 @@ export type Database = {
           status: string
           theme: string | null
           week_number: number
-          week_part: number
         }
         Insert: {
           airs_at: string
@@ -561,7 +557,6 @@ export type Database = {
           status?: string
           theme?: string | null
           week_number: number
-          week_part?: number
         }
         Update: {
           airs_at?: string
@@ -577,7 +572,6 @@ export type Database = {
           status?: string
           theme?: string | null
           week_number?: number
-          week_part?: number
         }
         Relationships: [
           {

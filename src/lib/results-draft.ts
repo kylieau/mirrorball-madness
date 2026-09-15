@@ -269,7 +269,7 @@ export async function publishEpisodeDraft(
 
   const { data: episode, error: episodeErr } = await admin
     .from("episodes")
-    .select("week_number, week_part, airs_at, theme")
+    .select("week_number, airs_at, theme")
     .eq("id", episodeId)
     .single();
   if (episodeErr || !episode) return { error: episodeErr?.message ?? "Episode not found" };
@@ -305,7 +305,6 @@ export async function publishEpisodeDraft(
 
   const result = await applyEpisodeResults(admin, {
     weekNumber: episode.week_number,
-    weekPart: episode.week_part,
     airsAt: episode.airs_at,
     theme: episode.theme,
     expectedDanceCount,

@@ -32,7 +32,6 @@ export default async function NotificationsPage() {
     .select("id, week_number")
     .eq("status", "upcoming")
     .order("week_number", { ascending: true })
-    .order("week_part", { ascending: true })
     .limit(1)
     .maybeSingle();
 

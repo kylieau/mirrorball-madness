@@ -120,7 +120,7 @@ export type ScoringCategoriesInput = {
   judgesScoreCategoryWeight: number;
   eliminationsCategoryWeight: number;
   bonusPicksCategoryWeight: number;
-  judgesScoreStartsWeek: 1 | 2;
+  judgesScoreStartsWeek: number;
   bonusPicksDeadline: string | null;
   bonusPicksScoringMethod: "exact_position" | "distance_based" | "binary_tier" | null;
   bonusPicksDistancePenalty: number | null;

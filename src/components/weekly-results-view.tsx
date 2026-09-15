@@ -2,7 +2,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { CoupleName } from "@/components/couple-name";
 import { cn } from "cn";
 import type { CoupleNameParts } from "@/lib/couple-display";
-import { formatWeekLabel } from "@/lib/format-week";
+import { formatEpisodeLabel } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -23,7 +23,6 @@ type EpisodeResult = {
 type Episode = {
   id: string;
   week_number: number;
-  week_part: number;
   airs_at: string;
   theme: string | null;
   is_finale: boolean;
@@ -124,7 +123,7 @@ export function WeeklyResultsView({
   return (
     <div>
       <p className="mb-4 text-sm text-muted-foreground">
-        {formatWeekLabel(episode.week_number, episode.week_part)}
+        {formatEpisodeLabel(episode.week_number)}
         {episode.theme ? ` — ${episode.theme}` : ""}, the actual results
       </p>
 

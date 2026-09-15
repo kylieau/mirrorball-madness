@@ -24,7 +24,7 @@ import {
   RESULTS_STATUS_BADGE_LABEL,
 } from "@/lib/results-status";
 import type { DraftState } from "@/lib/results-draft";
-import { formatWeekLabel, weekSortKey } from "@/lib/format-week";
+import { formatEpisodeLabel } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -51,7 +51,6 @@ type EpisodeResult = {
 type Episode = {
   id: string;
   week_number: number;
-  week_part: number;
   airs_at: string;
   theme: string | null;
   status: string;
@@ -168,14 +167,12 @@ export function AllResultsView({
       ),
     }))
     .filter((e) => e.resultsStatus !== "not_started")
-    .sort((a, b) => weekSortKey(b.week_number, b.week_part) - weekSortKey(a.week_number, a.week_part));
+    .sort((a, b) => b.week_number - a.week_number);
 
   const mostRecentPublishedEpisode = episodes
     .filter((e) => e.results_published_at)
-    .sort((a, b) => weekSortKey(b.week_number, b.week_part) - weekSortKey(a.week_number, a.week_part))[0];
-  const mostRecentPublishedWeekKey = mostRecentPublishedEpisode
-    ? weekSortKey(mostRecentPublishedEpisode.week_number, mostRecentPublishedEpisode.week_part)
-    : 0;
+    .sort((a, b) => b.week_number - a.week_number)[0];
+  const mostRecentPublishedWeekNumber = mostRecentPublishedEpisode?.week_number ?? 0;
 
   async function handleCorrect(episodeId: string) {
     setError(null);
@@ -230,8 +227,7 @@ export function AllResultsView({
               const coupleCount = results.length > 0 ? results.length : draftsByEpisode[ep.id]?.entries.length ?? 0;
               const publishedByName = ep.results_published_by ? publishedByNames[ep.results_published_by] : null;
               const isCorrectingOlderWeek =
-                ep.resultsStatus === "published" &&
-                weekSortKey(ep.week_number, ep.week_part) !== mostRecentPublishedWeekKey;
+                ep.resultsStatus === "published" && ep.week_number !== mostRecentPublishedWeekNumber;
 
               return (
                 <AccordionItem key={ep.id} value={ep.id}>
@@ -239,7 +235,7 @@ export function AllResultsView({
                     <div className="flex w-full items-center justify-between gap-3 pr-2">
                       <div>
                         <p className="font-medium">
-                          {formatWeekLabel(ep.week_number, ep.week_part)}
+                          {formatEpisodeLabel(ep.week_number)}
                           {ep.theme ? ` — ${ep.theme}` : ""}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -310,17 +306,14 @@ export function AllResultsView({
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
-                              <DialogTitle>Correct {formatWeekLabel(ep.week_number, ep.week_part)}?</DialogTitle>
+                              <DialogTitle>Correct {formatEpisodeLabel(ep.week_number)}?</DialogTitle>
                               <DialogDescription>
                                 This discards any unsaved draft edits for this week and starts a fresh
                                 correction from what&apos;s currently published. Nothing changes for players
                                 until you publish again.
                                 {isCorrectingOlderWeek && mostRecentPublishedEpisode && (
                                   <span className="mt-2 block text-amber-700 dark:text-amber-400">
-                                    {formatWeekLabel(
-                                      mostRecentPublishedEpisode.week_number,
-                                      mostRecentPublishedEpisode.week_part
-                                    )}{" "}
+                                    {formatEpisodeLabel(mostRecentPublishedEpisode.week_number)}{" "}
                                     has already been published after this week — correcting an elimination
                                     here won&apos;t recompute that later week automatically. Double-check it
                                     still makes sense afterward.
@@ -367,11 +360,7 @@ export function AllResultsView({
                 total: dances.reduce((sum, d) => sum + d.total_score, 0),
               };
             })
-            .sort(
-              (a, b) =>
-                weekSortKey(a.episode?.week_number ?? 0, a.episode?.week_part ?? 1) -
-                weekSortKey(b.episode?.week_number ?? 0, b.episode?.week_part ?? 1)
-            );
+            .sort((a, b) => (a.episode?.week_number ?? 0) - (b.episode?.week_number ?? 0));
 
           return (
             <Card key={c.id}>
@@ -395,7 +384,7 @@ export function AllResultsView({
                       <Fragment key={i}>
                         <tr className={h.dances.length === 0 ? "border-b border-border last:border-b-0" : undefined}>
                           <td className="whitespace-nowrap p-2">
-                            {h.episode ? formatWeekLabel(h.episode.week_number, h.episode.week_part) : "Week ?"}
+                            {h.episode ? formatEpisodeLabel(h.episode.week_number) : "Episode ?"}
                             {h.episode?.theme ? ` — ${h.episode.theme}` : ""}
                           </td>
                           <td className="p-2">{h.total}</td>

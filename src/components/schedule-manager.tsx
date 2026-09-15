@@ -20,13 +20,12 @@ import {
   RESULTS_STATUS_BADGE_LABEL,
 } from "@/lib/results-status";
 import type { DraftState } from "@/lib/results-draft";
-import { formatWeekLabel } from "@/lib/format-week";
+import { formatEpisodeLabel } from "@/lib/format-week";
 import { ChevronRightIcon, PlusIcon } from "lucide-react";
 
 type Episode = {
   id: string;
   week_number: number;
-  week_part: number;
   airs_at: string;
   theme: string | null;
   is_elimination_week: boolean;
@@ -134,9 +133,7 @@ export function ScheduleManager({
   draftsByEpisode: Record<string, DraftState>;
   season: Season;
 }) {
-  const sortedEpisodes = [...episodes].sort(
-    (a, b) => a.week_number - b.week_number || a.week_part - b.week_part
-  );
+  const sortedEpisodes = [...episodes].sort((a, b) => a.week_number - b.week_number);
   const browserTimeZone = useBrowserTimeZone();
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -151,19 +148,6 @@ export function ScheduleManager({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Adding a new episode under a week_number that's already scheduled (e.g.
-  // a two-night premiere) slots it in as the next part of that week instead
-  // of erroring — no separate "Part" field for the ordinary case.
-  const otherEpisodesThisWeek = sortedEpisodes.filter(
-    (e) => e.week_number === weekNumber && e.id !== editingId
-  );
-  const editingEpisode = editingId ? episodes.find((e) => e.id === editingId) : null;
-  const weekPart = editingEpisode
-    ? editingEpisode.week_part
-    : otherEpisodesThisWeek.length > 0
-      ? Math.max(...otherEpisodesThisWeek.map((e) => e.week_part)) + 1
-      : 1;
 
   // Next Tuesday 8pm ET for the first-ever episode; otherwise a week after
   // whatever's already the last scheduled one, so scheduling several weeks in
@@ -222,7 +206,6 @@ export function ScheduleManager({
     setSubmitting(true);
     const result = await scheduleEpisode({
       weekNumber,
-      weekPart,
       airsAt: airsAtUtc,
       theme: theme.trim() || null,
       isEliminationWeek,
@@ -274,7 +257,7 @@ export function ScheduleManager({
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">
-                        {formatWeekLabel(e.week_number, e.week_part)}
+                        {formatEpisodeLabel(e.week_number)}
                         {e.theme ? ` — ${e.theme}` : ""}
                       </p>
                       <Badge variant={RESULTS_STATUS_BADGE_VARIANT[status]}>
@@ -310,19 +293,13 @@ export function ScheduleManager({
           <div className="flex flex-col gap-4 px-4 pb-4">
             {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="flex flex-col gap-2">
-              <Label>Week Number</Label>
+              <Label>Episode Number</Label>
               <Input
                 type="number"
                 min={1}
                 value={weekNumber}
                 onChange={(e) => setWeekNumber(Number(e.target.value))}
               />
-              {!editingId && otherEpisodesThisWeek.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Week {weekNumber} is already scheduled — this will be added as a second episode that
-                  week (e.g. a two-night premiere), not replace it.
-                </p>
-              )}
             </div>
             <div className="flex flex-col gap-2">
               <Label>Air Date{browserTimeZone ? ` (${browserTimeZone})` : ""}</Label>

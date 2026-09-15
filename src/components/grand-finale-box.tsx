@@ -13,7 +13,7 @@ import {
 import { coupleNameNode } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
-import { formatWeekLabel } from "@/lib/format-week";
+import { formatEpisodeLabel } from "@/lib/format-week";
 
 type Couple = {
   id: string;
@@ -21,7 +21,6 @@ type Couple = {
   pro_name: string;
   status: string;
   elimination_week: number | null;
-  elimination_week_part: number | null;
 };
 
 function statusLabel(couple: Couple): string {
@@ -33,9 +32,9 @@ function statusLabel(couple: Couple): string {
     case "third_place":
       return "Third place";
     case "eliminated":
-      return `Eliminated — ${formatWeekLabel(couple.elimination_week!, couple.elimination_week_part ?? 1)}`;
+      return `Eliminated — ${formatEpisodeLabel(couple.elimination_week!)}`;
     case "withdrawn":
-      return `Withdrew — ${formatWeekLabel(couple.elimination_week!, couple.elimination_week_part ?? 1)}`;
+      return `Withdrew — ${formatEpisodeLabel(couple.elimination_week!)}`;
     default:
       return "Still competing";
   }
