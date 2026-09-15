@@ -49,10 +49,11 @@ export default async function ThisWeekPage({
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const { data: completedEpisodes } = await supabase
     .from("episodes")
-    .select("id, week_number, airs_at, theme, is_finale")
+    .select("id, week_number, week_part, airs_at, theme, is_finale")
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
-    .order("week_number", { ascending: false });
+    .order("week_number", { ascending: false })
+    .order("week_part", { ascending: false });
 
   // Defaults to the latest completed week; ?week=<episode id> (from the
   // switcher) picks an older one. An unrecognized id falls back to latest
@@ -158,7 +159,12 @@ export default async function ThisWeekPage({
           {selectedEpisodeId && (
             <WeekSwitcher
               currentEpisodeId={selectedEpisodeId}
-              weeks={(completedEpisodes ?? []).map((e) => ({ id: e.id, weekNumber: e.week_number, theme: e.theme }))}
+              weeks={(completedEpisodes ?? []).map((e) => ({
+                id: e.id,
+                weekNumber: e.week_number,
+                weekPart: e.week_part,
+                theme: e.theme,
+              }))}
             />
           )}
         </PageHeader>

@@ -86,13 +86,14 @@ export default async function LeaguePage({
       supabase
         .from("couples")
         .select(
-          "id, status, season_id, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
+          "id, status, season_id, elimination_week, elimination_week_part, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
         ),
       supabase
         .from("episodes")
-        .select("id, week_number, airs_at")
+        .select("id, week_number, week_part, airs_at")
         .eq("status", "upcoming")
         .order("week_number", { ascending: true })
+        .order("week_part", { ascending: true })
         .limit(1)
         .maybeSingle(),
     ]);
@@ -107,6 +108,7 @@ export default async function LeaguePage({
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
     .order("week_number", { ascending: false })
+    .order("week_part", { ascending: false })
     .limit(1);
 
   const pointsByManager = new Map<string, number>();
@@ -231,6 +233,7 @@ export default async function LeaguePage({
     status: c.status,
     season_id: c.season_id,
     elimination_week: c.elimination_week,
+    elimination_week_part: c.elimination_week_part,
     celebrity_name: c.celebrity?.name ?? "Unknown",
     pro_name: c.pro?.name ?? "Unknown",
   }));

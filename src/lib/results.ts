@@ -27,6 +27,7 @@ export type EntrySubmission = {
 
 export type EpisodeResultsInput = {
   weekNumber: number;
+  weekPart: number;
   airsAt: string;
   theme: string | null;
   expectedDanceCount: number;
@@ -54,6 +55,7 @@ async function getActiveSeasonId(
 
 export type ScheduleEpisodeInput = {
   weekNumber: number;
+  weekPart: number;
   airsAt: string;
   theme: string | null;
   isEliminationWeek: boolean;
@@ -74,12 +76,13 @@ export async function applyEpisodeSchedule(
     {
       season_id: seasonId,
       week_number: input.weekNumber,
+      week_part: input.weekPart,
       airs_at: input.airsAt,
       theme: input.theme,
       is_elimination_week: input.isEliminationWeek,
       is_finale: input.isFinale,
     },
-    { onConflict: "season_id,week_number" }
+    { onConflict: "season_id,week_number,week_part" }
   );
   return { error: error?.message ?? null };
 }
@@ -101,6 +104,7 @@ export async function applyEpisodeResults(
       {
         season_id: seasonId,
         week_number: input.weekNumber,
+        week_part: input.weekPart,
         airs_at: input.airsAt,
         theme: input.theme,
         expected_dance_count: input.expectedDanceCount,
@@ -110,7 +114,7 @@ export async function applyEpisodeResults(
         // later flips it to completed.
         status: input.entries.length > 0 ? "completed" : "upcoming",
       },
-      { onConflict: "season_id,week_number" }
+      { onConflict: "season_id,week_number,week_part" }
     )
     .select()
     .single();
@@ -137,7 +141,10 @@ export async function applyEpisodeResults(
   );
   const revertedIds = [...previouslyResolvedIds].filter((id) => !nowResolvedIds.has(id));
   if (revertedIds.length > 0) {
-    await admin.from("couples").update({ status: "active", elimination_week: null }).in("id", revertedIds);
+    await admin
+      .from("couples")
+      .update({ status: "active", elimination_week: null, elimination_week_part: null })
+      .in("id", revertedIds);
   }
 
   // judge_scores cascades from dance_scores, so clearing dance_scores is enough.
@@ -203,12 +210,12 @@ export async function applyEpisodeResults(
     if (e.outcome === "eliminated" || e.outcome === "withdrawn") {
       await admin
         .from("couples")
-        .update({ status: e.outcome, elimination_week: input.weekNumber })
+        .update({ status: e.outcome, elimination_week: input.weekNumber, elimination_week_part: input.weekPart })
         .eq("id", e.coupleId);
     } else if (e.outcome === "winner" || e.outcome === "runner_up" || e.outcome === "third_place") {
       await admin
         .from("couples")
-        .update({ status: e.outcome, elimination_week: null })
+        .update({ status: e.outcome, elimination_week: null, elimination_week_part: null })
         .eq("id", e.coupleId);
     }
   }
@@ -236,22 +243,30 @@ export async function applyEpisodeResults(
   if (newlyResolvedCoupleIds.length > 0) {
     const { data: seasonCouples, error: seasonCouplesErr } = await admin
       .from("couples")
-      .select("id, status, elimination_week")
+      .select("id, status, elimination_week, elimination_week_part")
       .eq("season_id", seasonId);
     if (seasonCouplesErr) return { error: seasonCouplesErr.message };
 
     totalCouples = (seasonCouples ?? []).length;
 
-    // Dense rank by elimination_week: couples eliminated the same week (a
-    // double-elimination) share a position, both scored against it.
-    const eliminationWeeks = [
+    // Dense rank by (elimination_week, elimination_week_part): couples
+    // eliminated in the same episode (a true double-elimination) share a
+    // position, both scored against it. Different week_parts of the same
+    // week_number (e.g. a two-night premiere) are NOT tied — night one's
+    // elimination ranks strictly before night two's.
+    const eliminationKey = (week: number, part: number) => `${week}.${part}`;
+    const eliminationSlots = [
       ...new Set(
         (seasonCouples ?? [])
           .filter((c) => c.status === "eliminated" || c.status === "withdrawn")
-          .map((c) => c.elimination_week!)
+          .map((c) => eliminationKey(c.elimination_week!, c.elimination_week_part ?? 1))
       ),
-    ].sort((a, b) => a - b);
-    const rankByWeek = new Map(eliminationWeeks.map((week, i) => [week, i + 1]));
+    ].sort((a, b) => {
+      const [aWeek, aPart] = a.split(".").map(Number);
+      const [bWeek, bPart] = b.split(".").map(Number);
+      return aWeek - bWeek || aPart - bPart;
+    });
+    const rankBySlot = new Map(eliminationSlots.map((slot, i) => [slot, i + 1]));
 
     for (const couple of seasonCouples ?? []) {
       if (couple.status === "winner") actualPositionByCouple.set(couple.id, totalCouples);
@@ -261,7 +276,10 @@ export async function applyEpisodeResults(
         (couple.status === "eliminated" || couple.status === "withdrawn") &&
         couple.elimination_week !== null
       ) {
-        actualPositionByCouple.set(couple.id, rankByWeek.get(couple.elimination_week)!);
+        actualPositionByCouple.set(
+          couple.id,
+          rankBySlot.get(eliminationKey(couple.elimination_week, couple.elimination_week_part ?? 1))!
+        );
       }
     }
   }

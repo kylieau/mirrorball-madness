@@ -209,6 +209,12 @@ create table couples (
   -- never becomes a couples.status value at all — the couple stays 'active'.
   status text not null default 'active' check (status in ('active', 'eliminated', 'withdrawn', 'winner', 'runner_up', 'third_place')),
   elimination_week int,
+  -- Paired with elimination_week to break ties between two couples eliminated
+  -- in the same week_number but on different nights (episodes.week_part) —
+  -- without it, Grand Finale elimination-order scoring would wrongly treat a
+  -- night-one and night-two elimination as simultaneous. Null whenever
+  -- elimination_week is null; always 1 for an ordinary single-episode week.
+  elimination_week_part int,
   created_at timestamptz not null default now(),
   unique (season_id, celebrity_id, pro_id)
 );
@@ -267,6 +273,11 @@ create table episodes (
   id uuid primary key default gen_random_uuid(),
   season_id uuid not null references seasons(id),
   week_number int not null, -- resets to 1 each season, so unique per-season below, not globally
+  -- Distinguishes multiple broadcasts within the same week_number (e.g. a
+  -- two-night premiere with a separate elimination each night) without
+  -- shifting every later week's number. 1 for the ordinary one-episode-a-week
+  -- case — this column is invisible in the UI until a second part exists.
+  week_part int not null default 1 check (week_part > 0),
   airs_at timestamptz not null, -- actual real-world air date/time; set per episode, not assumed weekly-regular
   theme text, -- e.g. "Villains Night" — free text, not a managed list; themes rarely repeat
   expected_dance_count int not null default 1, -- informational only, doesn't gate how many dances a couple can actually submit
@@ -283,7 +294,7 @@ create table episodes (
   judges_save_available boolean not null default false,
   results_published_at timestamptz,
   results_published_by uuid references profiles(id) on delete set null,
-  unique (season_id, week_number)
+  unique (season_id, week_number, week_part)
 );
 
 -- Admin-managed, extensible by the "add a dance style" admin form rather than

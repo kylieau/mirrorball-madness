@@ -56,6 +56,7 @@ export default async function LeagueSettingsPage({
     .select("airs_at")
     .eq("season_id", activeSeasonId ?? "")
     .eq("week_number", 1)
+    .eq("week_part", 1)
     .maybeSingle();
 
   const closeHref = safeRelativePath(from, `/leagues/${id}?tab=yourpicks`);

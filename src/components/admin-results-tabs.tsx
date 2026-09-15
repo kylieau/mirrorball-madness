@@ -14,7 +14,11 @@ import type { DraftState } from "@/lib/results-draft";
 import { PlusCircleIcon, ListChecksIcon, CalendarIcon, SettingsIcon } from "lucide-react";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
-type CoupleWithStatus = Couple & { status: string; elimination_week: number | null };
+type CoupleWithStatus = Couple & {
+  status: string;
+  elimination_week: number | null;
+  elimination_week_part: number | null;
+};
 type Named = { id: string; name: string };
 type DanceScore = {
   id: string;
@@ -39,6 +43,7 @@ type EpisodeResult = {
 type Episode = {
   id: string;
   week_number: number;
+  week_part: number;
   airs_at: string;
   theme: string | null;
   status: string;

@@ -39,13 +39,19 @@ import {
 } from "@/lib/results-status";
 import { useRelativeTimeAgo } from "@/lib/use-browser-time-zone";
 import type { DraftState } from "@/lib/results-draft";
+import { formatWeekLabel } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
-type CoupleWithStatus = Couple & { status: string; elimination_week: number | null };
+type CoupleWithStatus = Couple & {
+  status: string;
+  elimination_week: number | null;
+  elimination_week_part: number | null;
+};
 type Named = { id: string; name: string };
 type ScheduledEpisode = {
   id: string;
   week_number: number;
+  week_part: number;
   airs_at: string;
   theme: string | null;
   is_elimination_week: boolean;
@@ -184,7 +190,9 @@ export function ResultsForm({
   // startEpisodeCorrection has seeded a fresh draft for it.
   forceSelectEpisodeId?: string | null;
 }) {
-  const sortedEpisodes = [...episodes].sort((a, b) => a.week_number - b.week_number);
+  const sortedEpisodes = [...episodes].sort(
+    (a, b) => a.week_number - b.week_number || a.week_part - b.week_part
+  );
   const router = useRouter();
 
   const [selectedEpisodeId, setSelectedEpisodeId] = useState("");
@@ -413,7 +421,7 @@ export function ResultsForm({
   const episodeItems = Object.fromEntries(
     sortedEpisodes.map((e) => [
       e.id,
-      `Week ${e.week_number}${e.theme ? ` — ${e.theme}` : ""} — ${new Date(e.airs_at).toLocaleDateString()}`,
+      `${formatWeekLabel(e.week_number, e.week_part)}${e.theme ? ` — ${e.theme}` : ""} — ${new Date(e.airs_at).toLocaleDateString()}`,
     ])
   );
   const danceStyleItems = Object.fromEntries(danceStyles.map((d) => [d.id, d.name]));
@@ -435,7 +443,11 @@ export function ResultsForm({
 
   const eliminationOrder = allCouplesWithStatus
     .filter((c) => c.elimination_week !== null || c.status === "winner" || c.status === "runner_up" || c.status === "third_place")
-    .sort((a, b) => (a.elimination_week ?? 999) - (b.elimination_week ?? 999));
+    .sort(
+      (a, b) =>
+        (a.elimination_week ?? 999) - (b.elimination_week ?? 999) ||
+        (a.elimination_week_part ?? 999) - (b.elimination_week_part ?? 999)
+    );
 
   return (
     <div className="flex flex-col gap-6 pb-24">
@@ -793,7 +805,7 @@ export function ResultsForm({
                     <span className="text-muted-foreground">
                       {c.status === "winner" || c.status === "runner_up" || c.status === "third_place"
                         ? STATUS_LABELS[c.status as StatusValue]
-                        : `Week ${c.elimination_week}`}
+                        : formatWeekLabel(c.elimination_week!, c.elimination_week_part ?? 1)}
                     </span>
                   </div>
                 ))}

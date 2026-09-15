@@ -28,6 +28,7 @@ Full concept and phased build plan live in conversation history until they're wo
   - `people` unifies celebrities/pros/judges under one table (`role` column) so the same real person across seasons/dances is one row, not re-typed text.
   - Every `league_id → leagues(id)` foreign key cascades on delete; **no** `manager_id`/`user_id`/`commissioner_id → profiles(id)` foreign key does. Deleting a league cleans up completely; deleting a profile/auth user does not (and will fail outright) if that person has any league history anywhere.
   - `leagues` are not season-scoped — a league persists across seasons; only `couples`/`episodes` (and anything keyed to them) carry a `season_id`, resolved via `active_season_id()`. Any new couples/episodes-related query should ask "does this need `season_id = active_season_id()`?"
+  - `episodes.week_number` is not unique per season — `episodes.week_part` (default 1) distinguishes multiple broadcasts within the same week_number, e.g. a two-night premiere with a separate elimination each night, without renumbering every later week. `couples.elimination_week_part` mirrors it for the same reason on the elimination side (so Grand Finale order-scoring doesn't treat a night-one and night-two elimination as tied). Any query keying off `week_number` alone (`.eq`, `.order`, "most recent week" logic) needs `week_part` as a tiebreaker/secondary filter — use `formatWeekLabel`/`weekSortKey` from `src/lib/format-week.ts` rather than hand-rolling "Week N" text or numeric comparisons.
 
 ## Environment Gotchas
 

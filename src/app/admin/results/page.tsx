@@ -49,15 +49,16 @@ export default async function AdminResultsPage() {
       .select(coupleFields)
       .eq("status", "active")
       .eq("season_id", activeSeasonId ?? ""),
-    supabase.from("couples").select(`${coupleFields}, status, elimination_week`),
+    supabase.from("couples").select(`${coupleFields}, status, elimination_week, elimination_week_part`),
     supabase.from("people").select("id, name").eq("role", "judge").order("name"),
     supabase.from("dance_styles").select("id, name").order("name"),
     supabase
       .from("episodes")
       .select(
-        "id, week_number, airs_at, theme, status, is_finale, is_elimination_week, results_published_at, results_published_by"
+        "id, week_number, week_part, airs_at, theme, status, is_finale, is_elimination_week, results_published_at, results_published_by"
       )
-      .order("week_number"),
+      .order("week_number")
+      .order("week_part"),
     supabase
       .from("dance_scores")
       .select("id, episode_id, couple_id, dance_style_id, total_score"),
@@ -87,6 +88,7 @@ export default async function AdminResultsPage() {
       pro_name: c.pro?.name ?? "Unknown",
       status: c.status,
       elimination_week: c.elimination_week,
+      elimination_week_part: c.elimination_week_part,
     }))
     .sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
 
