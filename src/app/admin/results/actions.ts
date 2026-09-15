@@ -10,13 +10,21 @@ import {
   type EpisodeResultsInput,
   type ScheduleEpisodeInput,
 } from "@/lib/results";
+import {
+  saveDraftResults,
+  addDraftCustomMoment,
+  removeDraftCustomMoment,
+  type SaveDraftResultsInput,
+} from "@/lib/results-draft";
 
-async function requireResultsAccess(): Promise<{ error: string | null }> {
+// Returns userId alongside error so callers that need to stamp
+// updatedBy/createdBy/publishedBy don't need a second auth round trip.
+async function requireResultsAccess(): Promise<{ error: string | null; userId: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated" };
+  if (!user) return { error: "Not authenticated", userId: "" };
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -24,15 +32,15 @@ async function requireResultsAccess(): Promise<{ error: string | null }> {
     .eq("id", user.id)
     .single();
 
-  if (!profile?.is_super_admin && !resultsEntryOpenToAll()) return { error: "Not authorized" };
-  return { error: null };
+  if (!profile?.is_super_admin && !resultsEntryOpenToAll()) return { error: "Not authorized", userId: "" };
+  return { error: null, userId: user.id };
 }
 
 export async function submitEpisodeResults(
   input: EpisodeResultsInput
 ): Promise<{ error: string | null }> {
   const access = await requireResultsAccess();
-  if (access.error) return access;
+  if (access.error) return { error: access.error };
 
   const result = await applyEpisodeResults(createAdminClient(), input);
   if (!result.error) revalidatePath("/admin/results");
@@ -43,9 +51,42 @@ export async function scheduleEpisode(
   input: ScheduleEpisodeInput
 ): Promise<{ error: string | null }> {
   const access = await requireResultsAccess();
-  if (access.error) return access;
+  if (access.error) return { error: access.error };
 
   const result = await applyEpisodeSchedule(createAdminClient(), input);
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function saveEpisodeDraft(
+  input: Omit<SaveDraftResultsInput, "updatedBy">
+): Promise<{ error: string | null }> {
+  const access = await requireResultsAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await saveDraftResults(createAdminClient(), { ...input, updatedBy: access.userId });
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function addEpisodeCustomMoment(input: {
+  episodeId: string;
+  coupleId: string | null;
+  label: string;
+}): Promise<{ error: string | null }> {
+  const access = await requireResultsAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await addDraftCustomMoment(createAdminClient(), { ...input, createdBy: access.userId });
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function removeEpisodeCustomMoment(momentId: string): Promise<{ error: string | null }> {
+  const access = await requireResultsAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await removeDraftCustomMoment(createAdminClient(), momentId);
   if (!result.error) revalidatePath("/admin/results");
   return result;
 }

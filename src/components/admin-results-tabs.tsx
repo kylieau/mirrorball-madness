@@ -10,9 +10,11 @@ import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
+import type { DraftState } from "@/lib/results-draft";
 import { PlusCircleIcon, ListChecksIcon, CalendarIcon, SettingsIcon } from "lucide-react";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
+type CoupleWithStatus = Couple & { status: string; elimination_week: number | null };
 type Named = { id: string; name: string };
 type DanceScore = {
   id: string;
@@ -42,6 +44,7 @@ type Episode = {
   status: string;
   is_finale: boolean;
   is_elimination_week: boolean;
+  results_published_at: string | null;
 };
 
 const TABS = [
@@ -56,6 +59,7 @@ export function AdminResultsTabs({
   viewerEmail,
   activeCouples,
   allCouples,
+  allCouplesWithStatus,
   activeCoupleDisplayNames,
   allCoupleDisplayNames,
   judges,
@@ -64,11 +68,13 @@ export function AdminResultsTabs({
   danceScores,
   judgeScores,
   episodeResults,
+  draftsByEpisode,
 }: {
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
   activeCouples: Couple[];
   allCouples: Couple[];
+  allCouplesWithStatus: CoupleWithStatus[];
   activeCoupleDisplayNames: Record<string, CoupleNameParts>;
   allCoupleDisplayNames: Record<string, CoupleNameParts>;
   judges: Named[];
@@ -77,6 +83,7 @@ export function AdminResultsTabs({
   danceScores: DanceScore[];
   judgeScores: JudgeScore[];
   episodeResults: EpisodeResult[];
+  draftsByEpisode: Record<string, DraftState>;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["value"]>("enter");
 
@@ -108,11 +115,14 @@ export function AdminResultsTabs({
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 pb-20 pt-6 sm:pb-12">
         <TabsContent value="enter">
           <ResultsForm
-            couples={activeCouples}
+            activeCouples={activeCouples}
+            allCouplesWithStatus={allCouplesWithStatus}
             coupleDisplayNames={activeCoupleDisplayNames}
+            allCoupleDisplayNames={allCoupleDisplayNames}
             judges={judges}
             danceStyles={danceStyles}
             episodes={episodes}
+            draftsByEpisode={draftsByEpisode}
           />
         </TabsContent>
         <TabsContent value="view">

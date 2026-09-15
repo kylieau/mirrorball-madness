@@ -41,6 +41,36 @@ export function useFormattedDeadline(iso: string | null | undefined): string {
   return formatted;
 }
 
+// "Draft saved 3 minutes ago" — same hydration-safety reasoning as
+// useFormattedDeadline (the server has no meaningful "now" to diff
+// against), plus a periodic re-render so it keeps ticking while the form
+// stays open instead of freezing at whatever it read on mount.
+export function formatRelativeTimeAgo(iso: string, now: Date = new Date()): string {
+  const diffSec = Math.round((now.getTime() - new Date(iso).getTime()) / 1000);
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
+  const diffHour = Math.round(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} hour${diffHour === 1 ? "" : "s"} ago`;
+  const diffDay = Math.round(diffHour / 24);
+  return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`;
+}
+
+export function useRelativeTimeAgo(iso: string | null): string {
+  const [formatted, setFormatted] = useState("");
+  useEffect(() => {
+    if (!iso) {
+      setFormatted("");
+      return;
+    }
+    const update = () => setFormatted(formatRelativeTimeAgo(iso));
+    update();
+    const interval = setInterval(update, 30_000);
+    return () => clearInterval(interval);
+  }, [iso]);
+  return formatted;
+}
+
 export function airsAtToUtcIso(localValue: string): string | null {
   if (!localValue) return null;
   const date = new Date(localValue);

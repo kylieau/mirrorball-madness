@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminResultsTabs } from "@/components/admin-results-tabs";
 import { resultsEntryOpenToAll } from "@/lib/results";
+import { loadDraftForEpisode, type DraftState } from "@/lib/results-draft";
 import { buildCoupleDisplayNames, sortJudgesForDisplay } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 
@@ -41,12 +43,12 @@ export default async function AdminResultsPage() {
       .select(coupleFields)
       .eq("status", "active")
       .eq("season_id", activeSeasonId ?? ""),
-    supabase.from("couples").select(coupleFields),
+    supabase.from("couples").select(`${coupleFields}, status, elimination_week`),
     supabase.from("people").select("id, name").eq("role", "judge").order("name"),
     supabase.from("dance_styles").select("id, name").order("name"),
     supabase
       .from("episodes")
-      .select("id, week_number, airs_at, theme, status, is_finale, is_elimination_week")
+      .select("id, week_number, airs_at, theme, status, is_finale, is_elimination_week, results_published_at")
       .order("week_number"),
     supabase
       .from("dance_scores")
@@ -70,6 +72,25 @@ export default async function AdminResultsPage() {
 
   const activeCouples = flatten(activeCouplesRaw);
   const allCouples = flatten(allCouplesRaw);
+  const allCouplesWithStatus = (allCouplesRaw ?? [])
+    .map((c) => ({
+      id: c.id,
+      celebrity_name: c.celebrity?.name ?? "Unknown",
+      pro_name: c.pro?.name ?? "Unknown",
+      status: c.status,
+      elimination_week: c.elimination_week,
+    }))
+    .sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
+
+  // Draft tables grant nothing to authenticated — this is the one place the
+  // page needs the admin client instead of the user's own, to read every
+  // scheduled episode's in-progress draft up front (so the form can
+  // rehydrate immediately on episode selection instead of round-tripping).
+  const admin = createAdminClient();
+  const draftEntries = await Promise.all(
+    (episodes ?? []).map(async (e) => [e.id, await loadDraftForEpisode(admin, e.id)] as const)
+  );
+  const draftsByEpisode: Record<string, DraftState> = Object.fromEntries(draftEntries);
 
   return (
     <AdminResultsTabs
@@ -77,6 +98,7 @@ export default async function AdminResultsPage() {
       viewerEmail={user.email ?? ""}
       activeCouples={activeCouples}
       allCouples={allCouples}
+      allCouplesWithStatus={allCouplesWithStatus}
       activeCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(activeCouples))}
       allCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(allCouples))}
       judges={sortJudgesForDisplay(judges ?? [])}
@@ -85,6 +107,7 @@ export default async function AdminResultsPage() {
       danceScores={danceScores ?? []}
       judgeScores={judgeScores ?? []}
       episodeResults={episodeResults ?? []}
+      draftsByEpisode={draftsByEpisode}
     />
   );
 }
