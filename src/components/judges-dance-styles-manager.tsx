@@ -4,9 +4,74 @@ import { useState } from "react";
 import { addJudge, addDanceStyle } from "@/app/admin/results/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PlusIcon } from "lucide-react";
 
 type Named = { id: string; name: string };
+
+function NamedItemsCard({
+  title,
+  description,
+  items,
+  placeholder,
+  addLabel,
+  onAdd,
+}: {
+  title: string;
+  description?: string;
+  items: Named[];
+  placeholder: string;
+  addLabel: string;
+  onAdd: (name: string) => Promise<{ error: string | null }>;
+}) {
+  const [newName, setNewName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleAdd() {
+    setError(null);
+    setBusy(true);
+    const result = await onAdd(newName);
+    if (result.error) setError(result.error);
+    else setNewName("");
+    setBusy(false);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        {description && <CardDescription>{description}</CardDescription>}
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {items.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {items.map((item) => (
+              <Badge key={item.id} variant="secondary">
+                {item.name}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">None yet.</p>
+        )}
+        <div className="flex gap-2">
+          <Input
+            placeholder={placeholder}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+          <Button onClick={handleAdd} disabled={busy || !newName.trim()}>
+            <PlusIcon className="size-4" />
+            {addLabel}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function JudgesDanceStylesManager({
   judges,
@@ -15,90 +80,24 @@ export function JudgesDanceStylesManager({
   judges: Named[];
   danceStyles: Named[];
 }) {
-  const [newJudgeName, setNewJudgeName] = useState("");
-  const [newDanceStyleName, setNewDanceStyleName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function handleAddJudge() {
-    setError(null);
-    setBusy(true);
-    const result = await addJudge(newJudgeName);
-    if (result.error) setError(result.error);
-    else setNewJudgeName("");
-    setBusy(false);
-  }
-
-  async function handleAddDanceStyle() {
-    setError(null);
-    setBusy(true);
-    const result = await addDanceStyle(newDanceStyleName);
-    if (result.error) setError(result.error);
-    else setNewDanceStyleName("");
-    setBusy(false);
-  }
-
   return (
     <div className="flex flex-col gap-6">
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      <NamedItemsCard
+        title="Judges"
+        description="Shown as an optional score input on every dance — leave blank for judges who didn't score a given dance (e.g. most weeks for a guest judge)."
+        items={judges}
+        placeholder="Guest Judge Name"
+        addLabel="Add judge"
+        onAdd={addJudge}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Judges</CardTitle>
-          <CardDescription>
-            Shown as an optional score input on every dance — leave blank for
-            judges who didn&apos;t score a given dance (e.g. most weeks for a
-            guest judge).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            {judges.map((j) => (
-              <p key={j.id} className="text-sm">
-                {j.name}
-              </p>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Guest Judge Name"
-              value={newJudgeName}
-              onChange={(e) => setNewJudgeName(e.target.value)}
-            />
-            <Button onClick={handleAddJudge} disabled={busy || !newJudgeName.trim()}>
-              Add judge
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Dance Styles</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            {danceStyles.map((d) => (
-              <p key={d.id} className="text-sm">
-                {d.name}
-              </p>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <Input
-              placeholder="New Dance Style"
-              value={newDanceStyleName}
-              onChange={(e) => setNewDanceStyleName(e.target.value)}
-            />
-            <Button
-              onClick={handleAddDanceStyle}
-              disabled={busy || !newDanceStyleName.trim()}
-            >
-              Add dance style
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <NamedItemsCard
+        title="Dance Styles"
+        items={danceStyles}
+        placeholder="New Dance Style"
+        addLabel="Add dance style"
+        onAdd={addDanceStyle}
+      />
     </div>
   );
 }
