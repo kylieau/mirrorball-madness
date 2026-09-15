@@ -1,15 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ResultsForm } from "@/components/results-form";
 import { AllResultsView } from "@/components/all-results-view";
 import { ScheduleManager } from "@/components/schedule-manager";
 import { JudgesDanceStylesManager } from "@/components/judges-dance-styles-manager";
 import { PageHeader } from "@/components/page-header";
+import { TopBar } from "@/components/top-bar";
 import type { CoupleNameParts } from "@/lib/couple-display";
+import type { AccountSettingsData } from "@/lib/account-settings-data";
 import { PlusCircleIcon, ListChecksIcon, CalendarIcon, SettingsIcon } from "lucide-react";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -52,7 +52,8 @@ const TABS = [
 ] as const;
 
 export function AdminResultsTabs({
-  viewerDisplayName,
+  accountSettingsData,
+  viewerEmail,
   activeCouples,
   allCouples,
   activeCoupleDisplayNames,
@@ -64,7 +65,8 @@ export function AdminResultsTabs({
   judgeScores,
   episodeResults,
 }: {
-  viewerDisplayName: string;
+  accountSettingsData: AccountSettingsData;
+  viewerEmail: string;
   activeCouples: Couple[];
   allCouples: Couple[];
   activeCoupleDisplayNames: Record<string, CoupleNameParts>;
@@ -81,31 +83,7 @@ export function AdminResultsTabs({
   return (
     <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
       <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-8">
-        <div className="flex items-start justify-between gap-4">
-          <Link href="/today" className="text-xs font-medium text-muted-foreground">
-            🪩 Mirrorball Madness
-          </Link>
-          <div className="flex gap-2">
-            <Button
-              render={<Link href="/settings?from=%2Fadmin%2Fresults" />}
-              nativeButton={false}
-              variant="outline"
-              size="icon-sm"
-              aria-label="Settings"
-            >
-              <SettingsIcon />
-            </Button>
-            <Button
-              render={<Link href="/settings?from=%2Fadmin%2Fresults" />}
-              nativeButton={false}
-              size="icon-sm"
-              aria-label="Account settings"
-              className="rounded-full font-bold"
-            >
-              {viewerDisplayName.charAt(0).toUpperCase()}
-            </Button>
-          </div>
-        </div>
+        <TopBar {...accountSettingsData} email={viewerEmail} />
 
         <PageHeader title="Admin" />
       </div>

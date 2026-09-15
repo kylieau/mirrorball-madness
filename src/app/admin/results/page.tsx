@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AdminResultsTabs } from "@/components/admin-results-tabs";
 import { resultsEntryOpenToAll } from "@/lib/results";
 import { buildCoupleDisplayNames, sortJudgesForDisplay } from "@/lib/couple-display";
+import { getAccountSettingsData } from "@/lib/account-settings-data";
 
 export default async function AdminResultsPage() {
   const supabase = await createClient();
@@ -14,13 +15,9 @@ export default async function AdminResultsPage() {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_super_admin, display_name")
-    .eq("id", user.id)
-    .single();
+  const accountSettingsData = await getAccountSettingsData(supabase, user.id);
 
-  if (!profile?.is_super_admin && !resultsEntryOpenToAll()) {
+  if (!accountSettingsData.isSuperAdmin && !resultsEntryOpenToAll()) {
     redirect("/");
   }
 
@@ -76,7 +73,8 @@ export default async function AdminResultsPage() {
 
   return (
     <AdminResultsTabs
-      viewerDisplayName={profile?.display_name ?? "?"}
+      accountSettingsData={accountSettingsData}
+      viewerEmail={user.email ?? ""}
       activeCouples={activeCouples}
       allCouples={allCouples}
       activeCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(activeCouples))}
