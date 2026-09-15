@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { saveEpisodeDraft, addEpisodeCustomMoment, removeEpisodeCustomMoment } from "@/app/admin/results/actions";
+import { useRouter } from "next/navigation";
+import {
+  saveEpisodeDraft,
+  addEpisodeCustomMoment,
+  removeEpisodeCustomMoment,
+  publishEpisodeResults,
+} from "@/app/admin/results/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -171,6 +177,7 @@ export function ResultsForm({
   danceStyles,
   episodes,
   draftsByEpisode,
+  forceSelectEpisodeId,
 }: {
   activeCouples: Couple[];
   allCouplesWithStatus: CoupleWithStatus[];
@@ -180,10 +187,20 @@ export function ResultsForm({
   danceStyles: Named[];
   episodes: ScheduledEpisode[];
   draftsByEpisode: Record<string, DraftState>;
+  // Set by AllResultsView's "Correct Results" button (lifted up into
+  // AdminResultsTabs) to jump here already pointed at that episode, once
+  // startEpisodeCorrection has seeded a fresh draft for it.
+  forceSelectEpisodeId?: string | null;
 }) {
   const sortedEpisodes = [...episodes].sort((a, b) => a.week_number - b.week_number);
+  const router = useRouter();
 
   const [selectedEpisodeId, setSelectedEpisodeId] = useState("");
+
+  useEffect(() => {
+    if (forceSelectEpisodeId) setSelectedEpisodeId(forceSelectEpisodeId);
+  }, [forceSelectEpisodeId]);
+
   const selectedEpisode = sortedEpisodes.find((e) => e.id === selectedEpisodeId) ?? null;
   const isFinale = selectedEpisode?.is_finale ?? false;
 
@@ -196,6 +213,7 @@ export function ResultsForm({
   const [hasDraft, setHasDraft] = useState(false);
 
   const [savingDraft, setSavingDraft] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [teamSheetOpen, setTeamSheetOpen] = useState(false);
@@ -223,11 +241,16 @@ export function ResultsForm({
     setDraftSavedAt(draft?.updatedAt ?? null);
     setHasDraft(draft?.hasDraft ?? false);
     setError(null);
-    // expectedDanceCount isn't part of the draft tables (it's a
-    // schedule-owned column, still set at Publish from this form's value)
-    // — default to 1 per episode rather than carrying it over.
+    // expectedDanceCount isn't part of the draft tables — it only caps how
+    // many "+ Dance" rows are offered per couple while drafting. Publish
+    // derives the real value from however many dances actually got
+    // entered, so there's nothing to carry over here; default to 1.
     setExpectedDanceCount(1);
-  }, [selectedEpisode?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Depends on the draft's own updatedAt/hasDraft, not just the episode
+    // id, so a fresh draft seeded by "Correct Results" (same episode,
+    // brand-new draft rows) still triggers a rehydrate even though the id
+    // didn't change.
+  }, [selectedEpisode?.id, draftsByEpisode[selectedEpisode?.id ?? ""]?.updatedAt, draftsByEpisode[selectedEpisode?.id ?? ""]?.hasDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const status: EpisodeResultsStatus | null = selectedEpisode
     ? deriveResultsStatus({ results_published_at: selectedEpisode.results_published_at }, hasDraft)
@@ -264,8 +287,8 @@ export function ResultsForm({
     };
   }
 
-  async function flushDraft() {
-    if (!selectedEpisode) return;
+  async function flushDraft(): Promise<{ error: string | null }> {
+    if (!selectedEpisode) return { error: null };
     setSavingDraft(true);
     const result = await saveEpisodeDraft(buildDraftInput());
     if (result.error) {
@@ -276,6 +299,27 @@ export function ResultsForm({
       setHasDraft(true);
     }
     setSavingDraft(false);
+    return result;
+  }
+
+  async function handlePublish() {
+    if (!selectedEpisode) return;
+    setError(null);
+    setPublishing(true);
+    // Flush any pending edits first so Publish never publishes stale data.
+    const saveResult = await flushDraft();
+    if (saveResult.error) {
+      setPublishing(false);
+      return;
+    }
+    const publishResult = await publishEpisodeResults(selectedEpisode.id);
+    if (publishResult.error) {
+      setError(publishResult.error);
+    } else {
+      setHasDraft(false);
+      router.refresh();
+    }
+    setPublishing(false);
   }
 
   function scheduleAutosave() {
@@ -765,13 +809,23 @@ export function ResultsForm({
             </Card>
           )}
 
-          <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-border bg-background px-4 py-3 sm:static sm:rounded-xl sm:border">
+          <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:static sm:flex-row sm:items-center sm:justify-between sm:rounded-xl sm:border">
             <p className="hidden text-xs text-muted-foreground sm:block">
               Publishing updates This Week &amp; Standings across every league immediately.
             </p>
-            <Button className="w-full sm:w-auto" onClick={flushDraft} disabled={savingDraft}>
-              {savingDraft ? "Saving..." : "Save Draft"}
-            </Button>
+            <div className="flex gap-2 sm:w-auto">
+              <Button
+                variant="outline"
+                className="flex-1 sm:flex-none"
+                onClick={() => void flushDraft()}
+                disabled={savingDraft || publishing}
+              >
+                {savingDraft ? "Saving..." : "Save Draft"}
+              </Button>
+              <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing}>
+                {publishing ? "Publishing..." : "Publish Results"}
+              </Button>
+            </div>
           </div>
         </>
       )}

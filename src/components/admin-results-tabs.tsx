@@ -45,6 +45,7 @@ type Episode = {
   is_finale: boolean;
   is_elimination_week: boolean;
   results_published_at: string | null;
+  results_published_by: string | null;
 };
 
 const TABS = [
@@ -69,6 +70,7 @@ export function AdminResultsTabs({
   judgeScores,
   episodeResults,
   draftsByEpisode,
+  publishedByNames,
 }: {
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
@@ -84,8 +86,17 @@ export function AdminResultsTabs({
   judgeScores: JudgeScore[];
   episodeResults: EpisodeResult[];
   draftsByEpisode: Record<string, DraftState>;
+  publishedByNames: Record<string, string>;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["value"]>("enter");
+  // Lifted here so View Results' "Correct Results"/"Continue draft" can
+  // jump to Enter Results already pointed at the right episode.
+  const [forceSelectEpisodeId, setForceSelectEpisodeId] = useState<string | null>(null);
+
+  function navigateToEpisode(episodeId: string) {
+    setForceSelectEpisodeId(episodeId);
+    setTab("enter");
+  }
 
   return (
     <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
@@ -123,6 +134,7 @@ export function AdminResultsTabs({
             danceStyles={danceStyles}
             episodes={episodes}
             draftsByEpisode={draftsByEpisode}
+            forceSelectEpisodeId={forceSelectEpisodeId}
           />
         </TabsContent>
         <TabsContent value="view">
@@ -135,6 +147,9 @@ export function AdminResultsTabs({
             coupleDisplayNames={allCoupleDisplayNames}
             judges={judges}
             danceStyles={danceStyles}
+            draftsByEpisode={draftsByEpisode}
+            publishedByNames={publishedByNames}
+            onNavigateToEpisode={navigateToEpisode}
           />
         </TabsContent>
         <TabsContent value="schedule">

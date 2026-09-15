@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import type { Outcome } from "@/lib/scoring";
+import { applyEpisodeResults, type EntrySubmission } from "@/lib/results";
 
 export type DraftJudgeScoreInput = { judgeId: string; score: number };
 
@@ -216,4 +217,186 @@ export async function removeDraftCustomMoment(
 ): Promise<{ error: string | null }> {
   const { error } = await admin.from("draft_episode_custom_moments").delete().eq("id", momentId);
   return { error: error?.message ?? null };
+}
+
+async function deleteAllDraftRows(admin: SupabaseClient<Database>, episodeId: string): Promise<void> {
+  // draft_judge_scores cascades from draft_dance_scores, so clearing that
+  // is enough for those two.
+  await admin.from("draft_episode_overrides").delete().eq("episode_id", episodeId);
+  await admin.from("draft_dance_scores").delete().eq("episode_id", episodeId);
+  await admin.from("draft_episode_results").delete().eq("episode_id", episodeId);
+  await admin.from("draft_episode_custom_moments").delete().eq("episode_id", episodeId);
+}
+
+// Builds an EpisodeResultsInput from the draft tables and calls the
+// existing, unmodified-in-signature applyEpisodeResults — the scoring/
+// prediction/Grand-Finale logic is never forked for drafts. On success,
+// promotes the episode-level fields and custom moments into the live
+// tables and deletes every draft row; on error, returns it and leaves all
+// draft rows intact so nothing gets promoted.
+export async function publishEpisodeDraft(
+  admin: SupabaseClient<Database>,
+  episodeId: string,
+  publishedBy: string
+): Promise<{ error: string | null }> {
+  const draft = await loadDraftForEpisode(admin, episodeId);
+  if (!draft.hasDraft) return { error: "No draft to publish for this episode" };
+
+  const { data: episode, error: episodeErr } = await admin
+    .from("episodes")
+    .select("week_number, airs_at, theme")
+    .eq("id", episodeId)
+    .single();
+  if (episodeErr || !episode) return { error: episodeErr?.message ?? "Episode not found" };
+
+  const dancesByCouple = new Map<string, DraftDanceState[]>();
+  for (const d of draft.dances) {
+    const list = dancesByCouple.get(d.coupleId) ?? [];
+    list.push(d);
+    dancesByCouple.set(d.coupleId, list);
+  }
+
+  // Derived from what was actually entered, not separately tracked — the
+  // form's "Dances (per couple)" field only caps how many rows you can add
+  // per couple while drafting, it isn't itself persisted anywhere.
+  const expectedDanceCount = Math.max(1, ...[...dancesByCouple.values()].map((list) => list.length));
+
+  const entries: EntrySubmission[] = draft.entries.map((e) => ({
+    coupleId: e.coupleId,
+    dances: (dancesByCouple.get(e.coupleId) ?? []).map((d) => ({
+      danceStyleId: d.danceStyleId,
+      songTitle: d.songTitle,
+      judgeScores: d.judgeScores,
+    })),
+    outcome: e.outcome,
+    wasBottomTwo: e.wasBottomTwo,
+    wasBottomThree: e.wasBottomThree,
+    savedByJudges: e.savedByJudges,
+    wasTeamDance: e.wasTeamDance,
+    hadImmunity: e.hadImmunity,
+    bonusPoints: e.bonusPoints,
+    bonusNote: e.bonusNote,
+  }));
+
+  const result = await applyEpisodeResults(admin, {
+    weekNumber: episode.week_number,
+    airsAt: episode.airs_at,
+    theme: episode.theme,
+    expectedDanceCount,
+    entries,
+  });
+  if (result.error) return result;
+
+  const { error: publishErr } = await admin
+    .from("episodes")
+    .update({
+      guest_judge_name: draft.guestJudgeName,
+      judges_save_available: draft.judgesSaveAvailable,
+      results_published_at: new Date().toISOString(),
+      results_published_by: publishedBy,
+    })
+    .eq("id", episodeId);
+  if (publishErr) return { error: publishErr.message };
+
+  await admin.from("episode_custom_moments").delete().eq("episode_id", episodeId);
+  if (draft.customMoments.length > 0) {
+    const { error: momentsErr } = await admin.from("episode_custom_moments").insert(
+      draft.customMoments.map((m) => ({
+        episode_id: episodeId,
+        couple_id: m.coupleId,
+        label: m.label,
+        created_by: publishedBy,
+      }))
+    );
+    if (momentsErr) return { error: momentsErr.message };
+  }
+
+  await deleteAllDraftRows(admin, episodeId);
+  return { error: null };
+}
+
+// Unconditionally overwrites the draft tables with copies of the live
+// data for this episode — the caller confirms first ("this discards any
+// unsaved draft edits for this week"), since overwriting an in-progress
+// unpublished draft is the one surprising case.
+export async function startCorrection(
+  admin: SupabaseClient<Database>,
+  episodeId: string,
+  startedBy: string
+): Promise<{ error: string | null }> {
+  const [{ data: episode, error: episodeErr }, { data: liveDances }, { data: liveResults }, { data: liveMoments }] =
+    await Promise.all([
+      admin.from("episodes").select("guest_judge_name, judges_save_available").eq("id", episodeId).single(),
+      admin
+        .from("dance_scores")
+        .select("couple_id, dance_style_id, song_title, total_score, judge_scores(judge_id, score)")
+        .eq("episode_id", episodeId),
+      admin.from("episode_results").select("*").eq("episode_id", episodeId),
+      admin.from("episode_custom_moments").select("couple_id, label").eq("episode_id", episodeId),
+    ]);
+  if (episodeErr || !episode) return { error: episodeErr?.message ?? "Episode not found" };
+
+  await deleteAllDraftRows(admin, episodeId);
+
+  const { error: overrideErr } = await admin.from("draft_episode_overrides").insert({
+    episode_id: episodeId,
+    guest_judge_name: episode.guest_judge_name,
+    judges_save_available: episode.judges_save_available,
+    updated_by: startedBy,
+  });
+  if (overrideErr) return { error: overrideErr.message };
+
+  for (const d of liveDances ?? []) {
+    const { data: draftDance, error: danceErr } = await admin
+      .from("draft_dance_scores")
+      .insert({
+        episode_id: episodeId,
+        couple_id: d.couple_id,
+        dance_style_id: d.dance_style_id,
+        song_title: d.song_title,
+        total_score: d.total_score,
+      })
+      .select()
+      .single();
+    if (danceErr) return { error: danceErr.message };
+
+    const judgeScores = d.judge_scores ?? [];
+    if (judgeScores.length > 0) {
+      const { error: judgeErr } = await admin.from("draft_judge_scores").insert(
+        judgeScores.map((js) => ({
+          draft_dance_score_id: draftDance.id,
+          judge_id: js.judge_id,
+          score: js.score,
+        }))
+      );
+      if (judgeErr) return { error: judgeErr.message };
+    }
+  }
+
+  if ((liveResults ?? []).length > 0) {
+    const { error: resultsErr } = await admin.from("draft_episode_results").insert(
+      liveResults!.map((r) => ({
+        episode_id: episodeId,
+        couple_id: r.couple_id,
+        outcome: r.outcome,
+        was_bottom_two: r.was_bottom_two,
+        was_bottom_three: r.was_bottom_three,
+        saved_by_judges: r.saved_by_judges,
+        was_team_dance: r.was_team_dance,
+        had_immunity: r.had_immunity,
+        bonus_points: r.bonus_points,
+        bonus_note: r.bonus_note,
+      }))
+    );
+    if (resultsErr) return { error: resultsErr.message };
+  }
+
+  if ((liveMoments ?? []).length > 0) {
+    const { error: momentsErr } = await admin.from("draft_episode_custom_moments").insert(
+      liveMoments!.map((m) => ({ episode_id: episodeId, couple_id: m.couple_id, label: m.label }))
+    );
+    if (momentsErr) return { error: momentsErr.message };
+  }
+
+  return { error: null };
 }

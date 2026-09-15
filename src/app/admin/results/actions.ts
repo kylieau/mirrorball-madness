@@ -4,16 +4,16 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  applyEpisodeResults,
   applyEpisodeSchedule,
   resultsEntryOpenToAll,
-  type EpisodeResultsInput,
   type ScheduleEpisodeInput,
 } from "@/lib/results";
 import {
   saveDraftResults,
   addDraftCustomMoment,
   removeDraftCustomMoment,
+  publishEpisodeDraft,
+  startCorrection,
   type SaveDraftResultsInput,
 } from "@/lib/results-draft";
 
@@ -34,17 +34,6 @@ async function requireResultsAccess(): Promise<{ error: string | null; userId: s
 
   if (!profile?.is_super_admin && !resultsEntryOpenToAll()) return { error: "Not authorized", userId: "" };
   return { error: null, userId: user.id };
-}
-
-export async function submitEpisodeResults(
-  input: EpisodeResultsInput
-): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
-  if (access.error) return { error: access.error };
-
-  const result = await applyEpisodeResults(createAdminClient(), input);
-  if (!result.error) revalidatePath("/admin/results");
-  return result;
 }
 
 export async function scheduleEpisode(
@@ -87,6 +76,24 @@ export async function removeEpisodeCustomMoment(momentId: string): Promise<{ err
   if (access.error) return { error: access.error };
 
   const result = await removeDraftCustomMoment(createAdminClient(), momentId);
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function publishEpisodeResults(episodeId: string): Promise<{ error: string | null }> {
+  const access = await requireResultsAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await publishEpisodeDraft(createAdminClient(), episodeId, access.userId);
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function startEpisodeCorrection(episodeId: string): Promise<{ error: string | null }> {
+  const access = await requireResultsAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await startCorrection(createAdminClient(), episodeId, access.userId);
   if (!result.error) revalidatePath("/admin/results");
   return result;
 }

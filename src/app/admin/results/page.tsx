@@ -48,7 +48,9 @@ export default async function AdminResultsPage() {
     supabase.from("dance_styles").select("id, name").order("name"),
     supabase
       .from("episodes")
-      .select("id, week_number, airs_at, theme, status, is_finale, is_elimination_week, results_published_at")
+      .select(
+        "id, week_number, airs_at, theme, status, is_finale, is_elimination_week, results_published_at, results_published_by"
+      )
       .order("week_number"),
     supabase
       .from("dance_scores")
@@ -92,6 +94,13 @@ export default async function AdminResultsPage() {
   );
   const draftsByEpisode: Record<string, DraftState> = Object.fromEntries(draftEntries);
 
+  const publisherIds = [...new Set((episodes ?? []).map((e) => e.results_published_by).filter((id): id is string => !!id))];
+  const { data: publisherProfiles } =
+    publisherIds.length > 0
+      ? await supabase.from("profiles").select("id, display_name").in("id", publisherIds)
+      : { data: [] };
+  const publishedByNames = Object.fromEntries((publisherProfiles ?? []).map((p) => [p.id, p.display_name]));
+
   return (
     <AdminResultsTabs
       accountSettingsData={accountSettingsData}
@@ -108,6 +117,7 @@ export default async function AdminResultsPage() {
       judgeScores={judgeScores ?? []}
       episodeResults={episodeResults ?? []}
       draftsByEpisode={draftsByEpisode}
+      publishedByNames={publishedByNames}
     />
   );
 }

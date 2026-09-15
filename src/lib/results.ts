@@ -8,6 +8,7 @@ export type JudgeScoreSubmission = { judgeId: string; score: number };
 
 export type DanceSubmission = {
   danceStyleId: string;
+  songTitle: string | null;
   judgeScores: JudgeScoreSubmission[];
 };
 
@@ -156,6 +157,7 @@ export async function applyEpisodeResults(
           episode_id: episode.id,
           couple_id: e.coupleId,
           dance_style_id: dance.danceStyleId,
+          song_title: dance.songTitle,
           total_score: totalScore,
         })
         .select()
