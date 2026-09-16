@@ -83,10 +83,10 @@ export function JudgesDanceStylesManager({
   return (
     <div className="flex flex-col gap-6">
       <NamedItemsCard
-        title="Judges"
-        description="Shown as an optional score input on every dance — leave blank for judges who didn't score a given dance (e.g. most weeks for a guest judge)."
+        title="Scoring judges"
+        description="The standing panel plus anyone who can give a score. Adding a name adds a score box on every dance — leave it blank on weeks they didn't judge."
         items={judges}
-        placeholder="Guest Judge Name"
+        placeholder="Judge name"
         addLabel="Add judge"
         onAdd={addJudge}
       />

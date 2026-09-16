@@ -202,7 +202,6 @@ export function ResultsForm({
     .filter((c): c is Couple => !!c);
 
   const [expectedDanceCount, setExpectedDanceCount] = useState(1);
-  const [guestJudgeName, setGuestJudgeName] = useState("");
   const [judgesSaveAvailable, setJudgesSaveAvailable] = useState(false);
   const [rows, setRows] = useState<Record<string, CoupleRow>>({});
   const [customMoments, setCustomMoments] = useState<DraftState["customMoments"]>([]);
@@ -253,7 +252,6 @@ export function ResultsForm({
     justSavedEpisodeId.current = null;
     if (wasSelfTriggered) return;
     const draft = draftsByEpisode[selectedEpisode.id];
-    setGuestJudgeName(draft?.guestJudgeName ?? "");
     setJudgesSaveAvailable(draft?.judgesSaveAvailable ?? false);
     setRows(buildRowsFromDraft(draft, episodeCouples));
     setCustomMoments(draft?.customMoments ?? []);
@@ -278,7 +276,9 @@ export function ResultsForm({
   function buildDraftInput() {
     return {
       episodeId: selectedEpisode!.id,
-      guestJudgeName: guestJudgeName.trim() || null,
+      // Caption column is no longer editable here (it never drove scores or
+      // display). Pass through any stored value so a draft save doesn't wipe it.
+      guestJudgeName: draftsByEpisode[selectedEpisode!.id]?.guestJudgeName ?? null,
       judgesSaveAvailable,
       entries: episodeCouples.map((c) => {
         const row = rows[c.id] ?? emptyRow();
@@ -557,18 +557,6 @@ export function ResultsForm({
                 <p className="text-sm">{selectedEpisode.theme ?? "—"}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="guestJudge">Guest Judge</Label>
-                <Input
-                  id="guestJudge"
-                  placeholder="None this week"
-                  value={guestJudgeName}
-                  onChange={(e) => {
-                    setGuestJudgeName(e.target.value);
-                    scheduleAutosave();
-                  }}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
                 <Label htmlFor="danceCount">Dances (per couple)</Label>
                 <Input
                   id="danceCount"
@@ -596,7 +584,9 @@ export function ResultsForm({
               </div>
               <p className="text-xs text-muted-foreground sm:col-span-2">
                 Enter raw judges&apos; scores — each league&apos;s Judges&apos; Score Multiplier
-                applies automatically once results are published.
+                applies automatically once results are published. To add a score box
+                (including a one-off guest), use Settings; leave the box blank on
+                weeks they didn&apos;t judge.
               </p>
             </CardContent>
           </Card>

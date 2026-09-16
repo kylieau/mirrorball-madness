@@ -283,12 +283,14 @@ create table episodes (
   -- supports any number of eliminations per episode with no flag needed.
   is_double_elimination_week boolean not null default false,
   status text not null default 'upcoming' check (status in ('upcoming', 'locked', 'completed')),
-  -- guest_judge_name is free text, not a people(role='judge') row: people
-  -- exists to unify recurring individuals across seasons (draft picks,
-  -- judge_scores joins) — a guest judge is almost always a one-off with no
-  -- scoring identity of their own. If a guest judge actually scores a
-  -- dance, add them via the existing "Add judge" flow as a real people
-  -- row; this column is purely the descriptive "who guest-judged" caption.
+  -- guest_judge_name is a leftover caption, not a people(role='judge') row.
+  -- It is not shown anywhere and is no longer editable in Enter Results —
+  -- if a guest actually scores, add them via Admin → Settings as a real
+  -- people row so they get a score box. Draft save/publish still pass the
+  -- stored value through so existing rows aren't wiped. people exists to
+  -- unify recurring individuals across seasons (draft picks, judge_scores
+  -- joins); a blank judge_scores row for a given dance means that judge
+  -- simply didn't score it that week.
   guest_judge_name text,
   judges_save_available boolean not null default false,
   results_published_at timestamptz,
