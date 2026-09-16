@@ -102,7 +102,7 @@ export function LeagueModulesForm({
   canEdit,
   seasonEpisodes,
   seasonNumber,
-  grandFinaleDeadline,
+  hardDeadlineAirsAt,
 }: {
   leagueId: string;
   league: League;
@@ -110,9 +110,11 @@ export function LeagueModulesForm({
   canEdit: boolean;
   seasonEpisodes: SeasonEpisode[];
   seasonNumber: number | null;
-  // Fully derived from the Hard Deadline (effective_grand_finale_deadline)
-  // — never commissioner-set, so there's nothing here for them to edit.
-  grandFinaleDeadline: string | null;
+  // The resolved Hard Deadline episode's air time (effective_grand_finale_
+  // deadline) — never commissioner-set, so there's nothing here for them to
+  // edit. Powers both the Season Clock card and Grand Finale's own Deadline
+  // row below.
+  hardDeadlineAirsAt: string | null;
 }) {
   const browserTimeZone = useBrowserTimeZone();
 
@@ -179,7 +181,7 @@ export function LeagueModulesForm({
     league.prediction_lock_hours_before_air
   );
 
-  const formattedGrandFinaleDeadline = useFormattedDeadline(grandFinaleDeadline);
+  const formattedHardDeadlineAirsAt = useFormattedDeadline(hardDeadlineAirsAt);
   const [bonusMethod, setBonusMethod] = useState<ScoringMethod>(
     (scoringSettings?.bonus_picks_scoring_method as ScoringMethod) ?? "exact_position"
   );
@@ -285,6 +287,23 @@ export function LeagueModulesForm({
 
         <Card>
           <CardHeader>
+            <CardTitle>Season Clock</CardTitle>
+            <CardDescription>Your league&apos;s Hard Deadline — the one week everything else locks around.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col">
+            <SettingRow label="Anchor week" value={formatEpisodeLabel(judgesStartsWeek, seasonNumber)} />
+            <SettingRow label="Currently locks" value={hardDeadlineAirsAt ? formattedHardDeadlineAirsAt : "—"} />
+            <p className="pt-2 text-sm text-muted-foreground">
+              Judges&apos; Score starts counting from this week (if Dance Card is on), and Grand
+              Finale locks the moment this episode airs. The draft is expected to finish by then
+              but isn&apos;t hard-blocked — if it&apos;s still open when this episode airs, the
+              deadline pushes to the next one automatically until the draft wraps.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Scoring Mix</CardTitle>
             <CardDescription>How much each active module counts toward Standings.</CardDescription>
           </CardHeader>
@@ -302,7 +321,6 @@ export function LeagueModulesForm({
               <CardDescription>Draft, roster, Recast, and judges&apos; score points.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col">
-              <SettingRow label="Draft counts from" value={formatEpisodeLabel(judgesStartsWeek, seasonNumber)} />
               <SettingRow label="Judges' Score Multiplier" value={judgesScoreMultiplier} />
               <SettingRow label="Survival Points" value={survivalPoints} />
               <SettingRow label="1st Place Bonus" value={firstPlacePoints} />
@@ -344,7 +362,7 @@ export function LeagueModulesForm({
             <CardContent className="flex flex-col">
               <SettingRow
                 label="Deadline"
-                value={grandFinaleDeadline ? formattedGrandFinaleDeadline : "—"}
+                value={hardDeadlineAirsAt ? formattedHardDeadlineAirsAt : "—"}
               />
               <SettingRow label="Points per correctly-placed couple" value={bonusPicksPointsPerCorrect} />
               <SettingRow label="Scoring method" value={METHOD_ITEMS[bonusMethod]} />
@@ -408,6 +426,48 @@ export function LeagueModulesForm({
 
       <Card>
         <CardHeader>
+          <CardTitle>Season Clock</CardTitle>
+          <CardDescription>Your league&apos;s Hard Deadline — the one week everything else locks around.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="judgesStartsWeek">Anchor week</Label>
+              <Select
+                items={startsWeekItems}
+                value={String(judgesStartsWeek)}
+                onValueChange={(v) => v && setJudgesStartsWeek(Number(v))}
+              >
+                <SelectTrigger id="judgesStartsWeek" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(startsWeekItems).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label>Currently locks</Label>
+              <p className="flex h-8 items-center text-sm">
+                {hardDeadlineAirsAt ? formattedHardDeadlineAirsAt : "—"}
+              </p>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Judges&apos; Score starts counting from this week (if Dance Card is on), and Grand
+            Finale locks the moment this episode airs. The draft is expected to finish by then but
+            isn&apos;t hard-blocked — if it&apos;s still open when this episode airs, the deadline
+            pushes to the next one automatically until the draft wraps.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Scoring Mix</CardTitle>
           <CardDescription>How much each active module counts toward Standings.</CardDescription>
         </CardHeader>
@@ -465,25 +525,6 @@ export function LeagueModulesForm({
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="judgesStartsWeek">Draft counts from</Label>
-                <Select
-                  items={startsWeekItems}
-                  value={String(judgesStartsWeek)}
-                  onValueChange={(v) => v && setJudgesStartsWeek(Number(v))}
-                >
-                  <SelectTrigger id="judgesStartsWeek" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(startsWeekItems).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="judgesScoreMultiplier">Judges&apos; Score Multiplier</Label>
                 <Input
@@ -687,10 +728,11 @@ export function LeagueModulesForm({
               <div className="flex flex-col gap-2">
                 <Label>Deadline{browserTimeZone ? ` (${browserTimeZone})` : ""}</Label>
                 <p className="flex h-8 items-center text-sm">
-                  {grandFinaleDeadline ? formattedGrandFinaleDeadline : "—"}
+                  {hardDeadlineAirsAt ? formattedHardDeadlineAirsAt : "—"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Locks automatically once its Hard Deadline episode airs — nothing to set here.
+                  Locks automatically at the Season Clock&apos;s anchor week (above) — nothing to
+                  set here.
                 </p>
               </div>
               <div className="flex flex-col gap-2">

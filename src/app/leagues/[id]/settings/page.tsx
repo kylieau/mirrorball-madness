@@ -51,7 +51,7 @@ export default async function LeagueSettingsPage({
   const isCommissioner = viewerMembership.role === "commissioner";
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [{ data: seasonEpisodes }, { data: activeSeason }, { data: grandFinaleDeadline }] = await Promise.all([
+  const [{ data: seasonEpisodes }, { data: activeSeason }, { data: hardDeadlineAirsAt }] = await Promise.all([
     supabase
       .from("episodes")
       .select("week_number, theme")
@@ -98,7 +98,7 @@ export default async function LeagueSettingsPage({
           canEdit={isCommissioner}
           seasonEpisodes={seasonEpisodes ?? []}
           seasonNumber={seasonNumber}
-          grandFinaleDeadline={grandFinaleDeadline ?? null}
+          hardDeadlineAirsAt={hardDeadlineAirsAt ?? null}
         />
       </div>
     </div>
