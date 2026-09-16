@@ -51,19 +51,14 @@ export default async function LeagueSettingsPage({
   const isCommissioner = viewerMembership.role === "commissioner";
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [{ data: premiereEpisode }, { data: seasonEpisodes }, { data: activeSeason }] = await Promise.all([
-    supabase
-      .from("episodes")
-      .select("airs_at")
-      .eq("season_id", activeSeasonId ?? "")
-      .eq("week_number", 1)
-      .maybeSingle(),
+  const [{ data: seasonEpisodes }, { data: activeSeason }, { data: grandFinaleDeadline }] = await Promise.all([
     supabase
       .from("episodes")
       .select("week_number, theme")
       .eq("season_id", activeSeasonId ?? "")
       .order("week_number"),
     supabase.from("seasons").select("season_number").eq("id", activeSeasonId ?? "").maybeSingle(),
+    supabase.rpc("effective_grand_finale_deadline", { p_league_id: id }),
   ]);
   const seasonNumber = activeSeason?.season_number ?? null;
 
@@ -101,9 +96,9 @@ export default async function LeagueSettingsPage({
           league={league}
           scoringSettings={scoringSettings}
           canEdit={isCommissioner}
-          premiereAirsAt={premiereEpisode?.airs_at ?? null}
           seasonEpisodes={seasonEpisodes ?? []}
           seasonNumber={seasonNumber}
+          grandFinaleDeadline={grandFinaleDeadline ?? null}
         />
       </div>
     </div>

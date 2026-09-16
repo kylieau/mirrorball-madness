@@ -57,7 +57,9 @@ export default async function LeaguePage({
   const waiversOn = league.waiver_mode === "waivers";
   const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
   const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
-  const grandFinaleDeadline = scoringSettings?.bonus_picks_deadline ?? null;
+  const grandFinaleDeadline = grandFinaleOn
+    ? (await supabase.rpc("effective_grand_finale_deadline", { p_league_id: id })).data ?? null
+    : null;
   const grandFinaleLocked = !!grandFinaleDeadline && new Date() >= new Date(grandFinaleDeadline);
   // Section labels (🔮/🪩/🏆) only earn their keep once there's more than
   // one topic on the page to tell apart — a single-module league goes

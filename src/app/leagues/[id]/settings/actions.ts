@@ -121,7 +121,6 @@ export type ScoringCategoriesInput = {
   eliminationsCategoryWeight: number;
   bonusPicksCategoryWeight: number;
   judgesScoreStartsWeek: number;
-  bonusPicksDeadline: string | null;
   bonusPicksScoringMethod: "exact_position" | "distance_based" | "binary_tier" | null;
   bonusPicksDistancePenalty: number | null;
   bonusPicksTierSize: number | null;
@@ -150,9 +149,8 @@ export async function updateScoringCategories(
     p_eliminations_category_weight: input.eliminationsCategoryWeight,
     p_bonus_picks_category_weight: input.bonusPicksCategoryWeight,
     p_judges_score_starts_week: input.judgesScoreStartsWeek,
-    // These four are nullable in Postgres; the generated RPC arg type doesn't
+    // These three are nullable in Postgres; the generated RPC arg type doesn't
     // model that (same gap as p_waiver_claim_method/p_draft_scheduled_at above).
-    p_bonus_picks_deadline: input.bonusPicksDeadline as string,
     p_bonus_picks_scoring_method: input.bonusPicksScoringMethod as string,
     p_bonus_picks_distance_penalty: input.bonusPicksDistancePenalty as number,
     p_bonus_picks_tier_size: input.bonusPicksTierSize as number,

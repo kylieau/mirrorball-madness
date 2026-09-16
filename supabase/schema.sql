@@ -160,7 +160,6 @@ create table scoring_settings (
 
   judges_score_starts_week int not null default 1 check (judges_score_starts_week > 0),
 
-  bonus_picks_deadline timestamptz,
   bonus_picks_scoring_method text check (bonus_picks_scoring_method in ('exact_position', 'distance_based', 'binary_tier')),
   bonus_picks_distance_penalty numeric, -- points docked per position off; only used by 'distance_based'
   bonus_picks_tier_size int, -- e.g. 3 for "top 3"; only used by 'binary_tier'
@@ -178,8 +177,7 @@ create table scoring_settings (
   ),
   constraint bonus_picks_config_required check (
     (not bonus_picks_category_enabled) or (
-      bonus_picks_deadline is not null
-      and bonus_picks_scoring_method is not null
+      bonus_picks_scoring_method is not null
       and (bonus_picks_scoring_method != 'distance_based' or bonus_picks_distance_penalty is not null)
       and (bonus_picks_scoring_method != 'binary_tier' or bonus_picks_tier_size is not null)
     )
@@ -557,9 +555,10 @@ begin
     raise exception 'League name is required';
   end if;
 
-  -- Grand Finale needs a deadline the moment it's enabled — there's no
-  -- honest deadline to default to before a season's Week 1 is scheduled, so
-  -- the commissioner's choice is only honored once a premiere date exists.
+  -- Grand Finale's deadline is derived from the Hard Deadline (see
+  -- effective_grand_finale_deadline below), which resolves to nothing until
+  -- a real episode exists — so enabling it before a season's Week 1 is
+  -- scheduled would leave it permanently locked with no honest deadline.
   select airs_at into v_premiere_airs_at
   from public.episodes
   where season_id = public.active_season_id() and week_number = 1;
@@ -593,7 +592,6 @@ begin
     eliminations_category_enabled,
     bonus_picks_category_enabled,
     bonus_picks_scoring_method,
-    bonus_picks_deadline,
     scoring_configured
   )
   values (
@@ -602,7 +600,6 @@ begin
     p_curtain_call_enabled,
     v_grand_finale_enabled,
     case when v_grand_finale_enabled then 'exact_position' end,
-    case when v_grand_finale_enabled then v_premiere_airs_at end,
     true
   );
 
@@ -951,7 +948,6 @@ create function public.update_scoring_categories(
   p_eliminations_category_weight numeric,
   p_bonus_picks_category_weight numeric,
   p_judges_score_starts_week int,
-  p_bonus_picks_deadline timestamptz,
   p_bonus_picks_scoring_method text,
   p_bonus_picks_distance_penalty numeric,
   p_bonus_picks_tier_size int,
@@ -970,21 +966,9 @@ security definer set search_path = ''
 as $$
 declare
   v_settings public.scoring_settings;
-  v_hard_deadline_airs_at timestamptz;
 begin
   if not public.is_league_commissioner(p_league_id) then
     raise exception 'Only the commissioner can update scoring categories';
-  end if;
-
-  if p_bonus_picks_deadline is not null then
-    select airs_at into v_hard_deadline_airs_at
-    from public.episodes
-    where season_id = public.active_season_id()
-      and week_number = public.effective_hard_deadline_week(p_league_id);
-
-    if v_hard_deadline_airs_at is not null and p_bonus_picks_deadline > v_hard_deadline_airs_at then
-      raise exception 'Grand Finale deadline must be before the Hard Deadline';
-    end if;
   end if;
 
   update public.scoring_settings
@@ -996,7 +980,6 @@ begin
     eliminations_category_weight = p_eliminations_category_weight,
     bonus_picks_category_weight = p_bonus_picks_category_weight,
     judges_score_starts_week = p_judges_score_starts_week,
-    bonus_picks_deadline = p_bonus_picks_deadline,
     bonus_picks_scoring_method = p_bonus_picks_scoring_method,
     bonus_picks_distance_penalty = p_bonus_picks_distance_penalty,
     bonus_picks_tier_size = p_bonus_picks_tier_size,
@@ -1017,9 +1000,9 @@ end;
 $$;
 
 revoke execute on function public.update_league_settings(uuid, text, text, int, numeric) from public;
-revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, timestamptz, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric) from public;
+revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric) from public;
 grant execute on function public.update_league_settings(uuid, text, text, int, numeric) to authenticated;
-grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, timestamptz, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric) to authenticated;
+grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric) to authenticated;
 
 -- ============================================================
 -- Draft: couples are global read-only reference data; starting the draft and
@@ -1471,13 +1454,13 @@ revoke execute on function public.prediction_lock_at(uuid, uuid) from public;
 grant execute on function public.prediction_lock_at(uuid, uuid) to authenticated;
 
 -- A single per-league "Hard Deadline," pinned to a real episode via
--- judges_score_starts_week (no new column) — it governs where the Grand
--- Finale deadline must fall before, and where Judges' Score starts
--- counting from. The draft is expected to finish by it but isn't hard-
--- blocked: if the draft is still open when that episode airs, the
--- *effective* deadline auto-advances to the next not-yet-aired episode
--- (this function), and make_draft_pick freezes that advanced value into
--- judges_score_starts_week once the draft actually completes.
+-- judges_score_starts_week (no new column) — it's where the Grand Finale
+-- deadline (effective_grand_finale_deadline below) is pinned to, and where
+-- Judges' Score starts counting from. The draft is expected to finish by it
+-- but isn't hard-blocked: if the draft is still open when that episode
+-- airs, the *effective* deadline auto-advances to the next not-yet-aired
+-- episode (this function), and make_draft_pick freezes that advanced value
+-- into judges_score_starts_week once the draft actually completes.
 create function public.effective_hard_deadline_week(p_league_id uuid)
 returns int
 language sql
@@ -1503,6 +1486,27 @@ $$;
 
 revoke execute on function public.effective_hard_deadline_week(uuid) from public;
 grant execute on function public.effective_hard_deadline_week(uuid) to authenticated;
+
+-- The Grand Finale deadline, fully derived from the Hard Deadline — no
+-- commissioner-set value exists anymore (see the removed
+-- scoring_settings.bonus_picks_deadline column). Returns null when that
+-- week's episode isn't scheduled yet (e.g. right after league creation,
+-- before Week 1 exists), which callers treat as "still locked."
+create function public.effective_grand_finale_deadline(p_league_id uuid)
+returns timestamptz
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select e.airs_at
+  from public.episodes e
+  where e.season_id = public.active_season_id()
+    and e.week_number = public.effective_hard_deadline_week(p_league_id);
+$$;
+
+revoke execute on function public.effective_grand_finale_deadline(uuid) from public;
+grant execute on function public.effective_grand_finale_deadline(uuid) to authenticated;
 
 create policy "predictions visible to owner pre-lock, league post-lock"
 on public.predictions for select
@@ -1592,9 +1596,9 @@ grant execute on function public.submit_prediction(uuid, uuid, uuid, uuid, uuid)
 
 -- ============================================================
 -- Grand Finale predictions: same "owner pre-lock, league-wide post-lock"
--- visibility as weekly predictions, but the lock moment is a single
--- commissioner-set deadline (scoring_settings.bonus_picks_deadline) rather
--- than one computed per episode, so no separate lock_at function is needed.
+-- visibility as weekly predictions, but the lock moment is the single
+-- effective_grand_finale_deadline() per league rather than one computed per
+-- episode, so no separate lock_at function is needed.
 -- ============================================================
 
 grant select on public.grand_finale_predictions to authenticated;
@@ -1605,10 +1609,7 @@ using (
   public.is_league_member(league_id)
   and (
     auth.uid() = manager_id
-    or now() >= (
-      select bonus_picks_deadline from public.scoring_settings
-      where league_id = grand_finale_predictions.league_id
-    )
+    or now() >= public.effective_grand_finale_deadline(league_id)
   )
 );
 
@@ -1626,15 +1627,16 @@ begin
     raise exception 'You are not a member of this league';
   end if;
 
-  select bonus_picks_deadline into v_deadline
-  from public.scoring_settings
-  where league_id = p_league_id and bonus_picks_category_enabled;
-
-  if v_deadline is null then
+  if not exists (
+    select 1 from public.scoring_settings
+    where league_id = p_league_id and bonus_picks_category_enabled
+  ) then
     raise exception 'Grand Finale is not enabled for this league';
   end if;
 
-  if now() >= v_deadline then
+  v_deadline := public.effective_grand_finale_deadline(p_league_id);
+
+  if v_deadline is null or now() >= v_deadline then
     raise exception 'Grand Finale predictions are locked';
   end if;
 

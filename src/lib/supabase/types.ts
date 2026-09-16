@@ -995,7 +995,6 @@ export type Database = {
         Row: {
           bonus_picks_category_enabled: boolean
           bonus_picks_category_weight: number
-          bonus_picks_deadline: string | null
           bonus_picks_distance_penalty: number | null
           bonus_picks_points_per_correct: number
           bonus_picks_scoring_method: string | null
@@ -1018,7 +1017,6 @@ export type Database = {
         Insert: {
           bonus_picks_category_enabled?: boolean
           bonus_picks_category_weight?: number
-          bonus_picks_deadline?: string | null
           bonus_picks_distance_penalty?: number | null
           bonus_picks_points_per_correct?: number
           bonus_picks_scoring_method?: string | null
@@ -1041,7 +1039,6 @@ export type Database = {
         Update: {
           bonus_picks_category_enabled?: boolean
           bonus_picks_category_weight?: number
-          bonus_picks_deadline?: string | null
           bonus_picks_distance_penalty?: number | null
           bonus_picks_points_per_correct?: number
           bonus_picks_scoring_method?: string | null
@@ -1284,6 +1281,14 @@ export type Database = {
       demote_commissioner: {
         Args: { p_league_id: string; p_user_id: string }
         Returns: undefined
+      }
+      effective_grand_finale_deadline: {
+        Args: { p_league_id: string }
+        Returns: string
+      }
+      effective_hard_deadline_week: {
+        Args: { p_league_id: string }
+        Returns: number
       }
       finalize_waiver_claim: {
         Args: { p_claim_id: string }
@@ -1547,7 +1552,6 @@ export type Database = {
         Args: {
           p_bonus_picks_category_enabled: boolean
           p_bonus_picks_category_weight: number
-          p_bonus_picks_deadline: string
           p_bonus_picks_distance_penalty: number
           p_bonus_picks_points_per_correct: number
           p_bonus_picks_scoring_method: string
@@ -1569,7 +1573,6 @@ export type Database = {
         Returns: {
           bonus_picks_category_enabled: boolean
           bonus_picks_category_weight: number
-          bonus_picks_deadline: string | null
           bonus_picks_distance_penalty: number | null
           bonus_picks_points_per_correct: number
           bonus_picks_scoring_method: string | null

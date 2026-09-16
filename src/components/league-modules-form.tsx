@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   updateScoringCategories,
   updateLeagueSettings,
@@ -41,7 +41,6 @@ type ScoringSettings = {
   eliminations_category_weight: number;
   bonus_picks_category_weight: number;
   judges_score_starts_week: number;
-  bonus_picks_deadline: string | null;
   bonus_picks_scoring_method: string | null;
   bonus_picks_distance_penalty: number | null;
   bonus_picks_tier_size: number | null;
@@ -101,17 +100,19 @@ export function LeagueModulesForm({
   league,
   scoringSettings,
   canEdit,
-  premiereAirsAt,
   seasonEpisodes,
   seasonNumber,
+  grandFinaleDeadline,
 }: {
   leagueId: string;
   league: League;
   scoringSettings: ScoringSettings | null;
   canEdit: boolean;
-  premiereAirsAt: string | null;
   seasonEpisodes: SeasonEpisode[];
   seasonNumber: number | null;
+  // Fully derived from the Hard Deadline (effective_grand_finale_deadline)
+  // — never commissioner-set, so there's nothing here for them to edit.
+  grandFinaleDeadline: string | null;
 }) {
   const browserTimeZone = useBrowserTimeZone();
 
@@ -178,10 +179,7 @@ export function LeagueModulesForm({
     league.prediction_lock_hours_before_air
   );
 
-  const [bonusDeadline, setBonusDeadline] = useState(
-    scoringSettings?.bonus_picks_deadline ? utcIsoToLocalInput(scoringSettings.bonus_picks_deadline) : ""
-  );
-  const formattedBonusDeadline = useFormattedDeadline(bonusDeadline || null);
+  const formattedGrandFinaleDeadline = useFormattedDeadline(grandFinaleDeadline);
   const [bonusMethod, setBonusMethod] = useState<ScoringMethod>(
     (scoringSettings?.bonus_picks_scoring_method as ScoringMethod) ?? "exact_position"
   );
@@ -192,17 +190,6 @@ export function LeagueModulesForm({
   const [bonusPicksPointsPerCorrect, setBonusPicksPointsPerCorrect] = useState(
     scoringSettings?.bonus_picks_points_per_correct ?? 50
   );
-
-  // Defaults the Grand Finale deadline to the premiere's air date when
-  // nothing's been saved yet — only on mount, client-side, since it needs
-  // the viewer's own time zone (same hydration-mismatch concern as the
-  // other datetime defaults in this app).
-  useEffect(() => {
-    if (!scoringSettings?.bonus_picks_deadline && premiereAirsAt) {
-      setBonusDeadline(utcIsoToLocalInput(premiereAirsAt));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -227,15 +214,6 @@ export function LeagueModulesForm({
       return;
     }
 
-    let bonusDeadlineUtc: string | null = null;
-    if (bonusEnabled) {
-      bonusDeadlineUtc = airsAtToUtcIso(bonusDeadline);
-      if (!bonusDeadlineUtc) {
-        setError("Set a valid Grand Finale deadline.");
-        return;
-      }
-    }
-
     setSubmitting(true);
 
     const scoringInput: ScoringCategoriesInput = {
@@ -246,7 +224,6 @@ export function LeagueModulesForm({
       eliminationsCategoryWeight: eliminationsWeight,
       bonusPicksCategoryWeight: bonusWeight,
       judgesScoreStartsWeek: judgesStartsWeek,
-      bonusPicksDeadline: bonusDeadlineUtc,
       bonusPicksScoringMethod: bonusEnabled ? bonusMethod : null,
       bonusPicksDistancePenalty: bonusEnabled && bonusMethod === "distance_based" ? bonusDistancePenalty : null,
       bonusPicksTierSize: bonusEnabled && bonusMethod === "binary_tier" ? bonusTierSize : null,
@@ -367,7 +344,7 @@ export function LeagueModulesForm({
             <CardContent className="flex flex-col">
               <SettingRow
                 label="Deadline"
-                value={bonusDeadline ? formattedBonusDeadline : "—"}
+                value={grandFinaleDeadline ? formattedGrandFinaleDeadline : "—"}
               />
               <SettingRow label="Points per correctly-placed couple" value={bonusPicksPointsPerCorrect} />
               <SettingRow label="Scoring method" value={METHOD_ITEMS[bonusMethod]} />
@@ -708,15 +685,14 @@ export function LeagueModulesForm({
           <CardContent className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="bonusDeadline">
-                  Deadline{browserTimeZone ? ` (${browserTimeZone})` : ""}
-                </Label>
-                <Input
-                  id="bonusDeadline"
-                  type="datetime-local"
-                  value={bonusDeadline}
-                  onChange={(e) => setBonusDeadline(e.target.value)}
-                />
+                <Label>Deadline{browserTimeZone ? ` (${browserTimeZone})` : ""}</Label>
+                <p className="flex h-8 items-center text-sm">
+                  {grandFinaleDeadline ? formattedGrandFinaleDeadline : "—"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Locks automatically at the Hard Deadline (Dance Card&apos;s &quot;Draft counts
+                  from&quot; setting, when it&apos;s on) — nothing to set here.
+                </p>
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="bonusPicksPointsPerCorrect">Points per correctly-placed couple</Label>

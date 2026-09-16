@@ -32,9 +32,7 @@ export async function computeLeagueHomeSummary(
   const [{ data: scoringSettings }, { data: members }, { data: scores }] = await Promise.all([
     supabase
       .from("scoring_settings")
-      .select(
-        "judges_score_category_enabled, eliminations_category_enabled, bonus_picks_category_enabled, bonus_picks_deadline"
-      )
+      .select("judges_score_category_enabled, eliminations_category_enabled, bonus_picks_category_enabled")
       .eq("league_id", league.id)
       .single(),
     supabase.from("league_members").select("user_id, joined_at, profiles(display_name)").eq("league_id", league.id),
@@ -68,7 +66,9 @@ export async function computeLeagueHomeSummary(
   const danceCardOn = scoringSettings?.judges_score_category_enabled ?? true;
   const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
   const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
-  const grandFinaleDeadline = scoringSettings?.bonus_picks_deadline ?? null;
+  const grandFinaleDeadline = grandFinaleOn
+    ? (await supabase.rpc("effective_grand_finale_deadline", { p_league_id: league.id })).data ?? null
+    : null;
   const grandFinaleLocked = !!grandFinaleDeadline && new Date() >= new Date(grandFinaleDeadline);
 
   let lockAt: string | null = null;
