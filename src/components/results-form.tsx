@@ -217,6 +217,7 @@ export function ResultsForm({
   const [addingCustomMoment, setAddingCustomMoment] = useState(false);
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushDraftRef = useRef<() => Promise<{ error: string | null }>>(async () => ({ error: null }));
   const draftSavedAgo = useRelativeTimeAgo(draftSavedAt);
 
   // saveEpisodeDraft's revalidatePath("/admin/results") makes Next
@@ -327,10 +328,20 @@ export function ResultsForm({
     setPublishing(false);
   }
 
+  // scheduleAutosave() runs synchronously right after the setRows() call
+  // that triggered it, in the same render — so flushDraft here would still
+  // close over the *pre-update* rows (setRows hasn't re-rendered yet). By
+  // the time the timer fires, that stale flushDraft would silently save
+  // the couple's *previous* status, wiping out whatever was just picked.
+  // flushDraftRef is reassigned on every render (below), so the callback
+  // always calls whichever flushDraft closure is current when it actually
+  // fires, not the one from the render that scheduled it.
+  flushDraftRef.current = flushDraft;
+
   function scheduleAutosave() {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => {
-      void flushDraft();
+      void flushDraftRef.current();
     }, 1500);
   }
 
@@ -824,7 +835,7 @@ export function ResultsForm({
             </Card>
           )}
 
-          <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:static sm:flex-row sm:items-center sm:justify-between sm:rounded-xl sm:border">
+          <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 border-t border-border bg-background px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between">
             <p className="hidden text-xs text-muted-foreground sm:block">
               Publishing updates This Week &amp; Standings across every league immediately.
             </p>
