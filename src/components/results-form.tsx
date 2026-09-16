@@ -162,6 +162,7 @@ export function ResultsForm({
   draftsByEpisode,
   forceSelectEpisodeId,
   participantsByEpisode,
+  seasonNumber,
 }: {
   activeCouples: Couple[];
   allCouplesWithStatus: CoupleWithStatus[];
@@ -171,6 +172,7 @@ export function ResultsForm({
   danceStyles: Named[];
   episodes: ScheduledEpisode[];
   draftsByEpisode: Record<string, DraftState>;
+  seasonNumber: number | null;
   // Set by AllResultsView's "Correct Results" button (lifted up into
   // AdminResultsTabs) to jump here already pointed at that episode, once
   // startEpisodeCorrection has seeded a fresh draft for it.
@@ -443,7 +445,7 @@ export function ResultsForm({
   const episodeItems = Object.fromEntries(
     sortedEpisodes.map((e) => [
       e.id,
-      `${formatEpisodeLabel(e.week_number)}${e.theme ? ` — ${e.theme}` : ""} — ${new Date(e.airs_at).toLocaleDateString()}`,
+      `${formatEpisodeLabel(e.week_number, seasonNumber)}${e.theme ? ` — ${e.theme}` : ""} — ${new Date(e.airs_at).toLocaleDateString()}`,
     ])
   );
   const danceStyleItems = Object.fromEntries(danceStyles.map((d) => [d.id, d.name]));
@@ -480,7 +482,7 @@ export function ResultsForm({
 
       {justPublished && selectedEpisode && (
         <div className="rounded-xl border border-emerald/40 bg-emerald/10 px-4 py-3 text-sm text-emerald-text">
-          <p className="font-medium">✅ {formatEpisodeLabel(selectedEpisode.week_number)} results published</p>
+          <p className="font-medium">✅ {formatEpisodeLabel(selectedEpisode.week_number, seasonNumber)} results published</p>
           <p className="mt-0.5 text-emerald-text/90">Now live on This Week &amp; Standings across every league.</p>
         </div>
       )}
@@ -852,7 +854,7 @@ export function ResultsForm({
                     <span className="text-muted-foreground">
                       {c.status === "winner" || c.status === "runner_up" || c.status === "third_place"
                         ? STATUS_LABELS[c.status as StatusValue]
-                        : formatEpisodeLabel(c.elimination_week!)}
+                        : formatEpisodeLabel(c.elimination_week!, seasonNumber)}
                     </span>
                   </div>
                 ))}

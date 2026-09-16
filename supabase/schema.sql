@@ -53,7 +53,10 @@ create table seasons (
   -- a date; these three never feed a computation.
   premiere_date date,
   finale_date date,
-  total_episodes int check (total_episodes is null or total_episodes > 0)
+  total_episodes int check (total_episodes is null or total_episodes > 0),
+  -- Display only (formatEpisodeLabel's "S{n}E{n}") — separate from name so
+  -- it doesn't depend on parsing free text like "Season 35".
+  season_number int
 );
 
 create unique index seasons_one_active on seasons (is_active) where is_active;

@@ -69,6 +69,7 @@ export function AllResultsView({
   draftsByEpisode,
   publishedByNames,
   onNavigateToEpisode,
+  seasonNumber,
 }: {
   episodes: Episode[];
   danceScores: DanceScore[];
@@ -81,6 +82,7 @@ export function AllResultsView({
   draftsByEpisode: Record<string, DraftState>;
   publishedByNames: Record<string, string>;
   onNavigateToEpisode: (episodeId: string) => void;
+  seasonNumber: number | null;
 }) {
   const [view, setView] = useState<"week" | "couple">("week");
   const [correctingId, setCorrectingId] = useState<string | null>(null);
@@ -235,7 +237,7 @@ export function AllResultsView({
                     <div className="flex w-full items-center justify-between gap-3 pr-2">
                       <div>
                         <p className="font-medium">
-                          {formatEpisodeLabel(ep.week_number)}
+                          {formatEpisodeLabel(ep.week_number, seasonNumber)}
                           {ep.theme ? ` — ${ep.theme}` : ""}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -306,14 +308,14 @@ export function AllResultsView({
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
-                              <DialogTitle>Correct {formatEpisodeLabel(ep.week_number)}?</DialogTitle>
+                              <DialogTitle>Correct {formatEpisodeLabel(ep.week_number, seasonNumber)}?</DialogTitle>
                               <DialogDescription>
                                 This discards any unsaved draft edits for this week and starts a fresh
                                 correction from what&apos;s currently published. Nothing changes for players
                                 until you publish again.
                                 {isCorrectingOlderWeek && mostRecentPublishedEpisode && (
                                   <span className="mt-2 block text-amber-700 dark:text-amber-400">
-                                    {formatEpisodeLabel(mostRecentPublishedEpisode.week_number)}{" "}
+                                    {formatEpisodeLabel(mostRecentPublishedEpisode.week_number, seasonNumber)}{" "}
                                     has already been published after this week — correcting an elimination
                                     here won&apos;t recompute that later week automatically. Double-check it
                                     still makes sense afterward.
@@ -384,7 +386,7 @@ export function AllResultsView({
                       <Fragment key={i}>
                         <tr className={h.dances.length === 0 ? "border-b border-border last:border-b-0" : undefined}>
                           <td className="whitespace-nowrap p-2">
-                            {h.episode ? formatEpisodeLabel(h.episode.week_number) : "Episode ?"}
+                            {h.episode ? formatEpisodeLabel(h.episode.week_number, seasonNumber) : "Episode ?"}
                             {h.episode?.theme ? ` — ${h.episode.theme}` : ""}
                           </td>
                           <td className="p-2">{h.outcome === "bye" ? "—" : h.total}</td>

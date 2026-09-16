@@ -40,6 +40,7 @@ type Season = {
   premiere_date: string | null;
   total_episodes: number | null;
   finale_date: string | null;
+  season_number: number | null;
 } | null;
 
 function SeasonSettingsCard({ season }: { season: Season }) {
@@ -289,7 +290,7 @@ export function ScheduleManager({
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">
-                        {formatEpisodeLabel(e.week_number)}
+                        {formatEpisodeLabel(e.week_number, season?.season_number ?? null)}
                         {e.theme ? ` — ${e.theme}` : ""}
                       </p>
                       <Badge variant={RESULTS_STATUS_BADGE_VARIANT[status]}>

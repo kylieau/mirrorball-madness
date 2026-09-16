@@ -28,6 +28,7 @@ export function PickEmBox({
   isLocked,
   isDoubleElimination,
   revealedPredictions,
+  seasonNumber,
 }: {
   leagueId: string;
   episode: { id: string; week_number: number } | null;
@@ -47,6 +48,7 @@ export function PickEmBox({
     eliminatedLabel2: string | null;
     topScorerLabel: string | null;
   }[];
+  seasonNumber: number | null;
 }) {
   const [eliminatedId, setEliminatedId] = useState(
     existingPrediction?.predicted_eliminated_couple_id ?? ""
@@ -133,7 +135,7 @@ export function PickEmBox({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Curtain Call — {formatEpisodeLabel(episode.week_number)}</CardTitle>
+        <CardTitle>Curtain Call — {formatEpisodeLabel(episode.week_number, seasonNumber)}</CardTitle>
         <CardDescription>
           {isLocked
             ? "Predictions are locked for this episode."

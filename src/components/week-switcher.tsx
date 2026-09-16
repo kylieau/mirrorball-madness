@@ -15,9 +15,11 @@ export type SwitcherWeek = { id: string; weekNumber: number; theme: string | nul
 export function WeekSwitcher({
   currentEpisodeId,
   weeks,
+  seasonNumber,
 }: {
   currentEpisodeId: string;
   weeks: SwitcherWeek[];
+  seasonNumber: number | null;
 }) {
   const current = weeks.find((w) => w.id === currentEpisodeId);
 
@@ -26,7 +28,7 @@ export function WeekSwitcher({
   return (
     <Sheet>
       <SheetTrigger className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-        {current ? formatEpisodeLabel(current.weekNumber) : ""}
+        {current ? formatEpisodeLabel(current.weekNumber, seasonNumber) : ""}
         <ChevronDownIcon className="size-3.5 text-accent" aria-hidden />
       </SheetTrigger>
       <SheetContent side="top" showCloseButton={false} className="mx-auto max-w-md rounded-b-2xl border-x">
@@ -43,7 +45,7 @@ export function WeekSwitcher({
                 className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
               >
                 <p className={cn("text-sm font-semibold", isCurrent && "text-accent")}>
-                  {formatEpisodeLabel(w.weekNumber)}
+                  {formatEpisodeLabel(w.weekNumber, seasonNumber)}
                   {w.theme ? ` — ${w.theme}` : ""}
                 </p>
                 {isCurrent && <CheckIcon className="size-4 shrink-0 text-accent" aria-hidden />}

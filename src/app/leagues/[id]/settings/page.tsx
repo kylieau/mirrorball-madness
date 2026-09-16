@@ -51,7 +51,7 @@ export default async function LeagueSettingsPage({
   const isCommissioner = viewerMembership.role === "commissioner";
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [{ data: premiereEpisode }, { data: seasonEpisodes }] = await Promise.all([
+  const [{ data: premiereEpisode }, { data: seasonEpisodes }, { data: activeSeason }] = await Promise.all([
     supabase
       .from("episodes")
       .select("airs_at")
@@ -63,7 +63,9 @@ export default async function LeagueSettingsPage({
       .select("week_number, theme")
       .eq("season_id", activeSeasonId ?? "")
       .order("week_number"),
+    supabase.from("seasons").select("season_number").eq("id", activeSeasonId ?? "").maybeSingle(),
   ]);
+  const seasonNumber = activeSeason?.season_number ?? null;
 
   const closeHref = safeRelativePath(from, `/leagues/${id}?tab=yourpicks`);
 
@@ -101,6 +103,7 @@ export default async function LeagueSettingsPage({
           canEdit={isCommissioner}
           premiereAirsAt={premiereEpisode?.airs_at ?? null}
           seasonEpisodes={seasonEpisodes ?? []}
+          seasonNumber={seasonNumber}
         />
       </div>
     </div>

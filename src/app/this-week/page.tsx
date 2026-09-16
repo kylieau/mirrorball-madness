@@ -47,6 +47,12 @@ export default async function ThisWeekPage({
   const leagueNameById = new Map(leagueRefs.map((l) => [l.id, l.name]));
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
+  const { data: activeSeason } = await supabase
+    .from("seasons")
+    .select("season_number")
+    .eq("id", activeSeasonId ?? "")
+    .maybeSingle();
+  const seasonNumber = activeSeason?.season_number ?? null;
   const { data: completedEpisodes } = await supabase
     .from("episodes")
     .select("id, week_number, airs_at, theme, is_finale")
@@ -163,6 +169,7 @@ export default async function ThisWeekPage({
                 weekNumber: e.week_number,
                 theme: e.theme,
               }))}
+              seasonNumber={seasonNumber}
             />
           )}
         </PageHeader>
@@ -174,6 +181,7 @@ export default async function ThisWeekPage({
           couples={flatCouples}
           coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
           leaguesByCouple={leaguesByCouple}
+          seasonNumber={seasonNumber}
         />
       </div>
 

@@ -23,7 +23,7 @@ type Couple = {
   elimination_week: number | null;
 };
 
-function statusLabel(couple: Couple): string {
+function statusLabel(couple: Couple, seasonNumber: number | null): string {
   switch (couple.status) {
     case "winner":
       return "Won the season";
@@ -32,9 +32,9 @@ function statusLabel(couple: Couple): string {
     case "third_place":
       return "Third place";
     case "eliminated":
-      return `Eliminated — ${formatEpisodeLabel(couple.elimination_week!)}`;
+      return `Eliminated — ${formatEpisodeLabel(couple.elimination_week!, seasonNumber)}`;
     case "withdrawn":
-      return `Withdrew — ${formatEpisodeLabel(couple.elimination_week!)}`;
+      return `Withdrew — ${formatEpisodeLabel(couple.elimination_week!, seasonNumber)}`;
     default:
       return "Still competing";
   }
@@ -47,6 +47,7 @@ export function GrandFinaleBox({
   existingOrder,
   deadline,
   isLocked,
+  seasonNumber,
 }: {
   leagueId: string;
   couples: Couple[];
@@ -54,6 +55,7 @@ export function GrandFinaleBox({
   existingOrder: string[] | null;
   deadline: string | null;
   isLocked: boolean;
+  seasonNumber: number | null;
 }) {
   const alphabeticalCouples = [...couples].sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
 
@@ -142,7 +144,7 @@ export function GrandFinaleBox({
                 {i + 1}. {nameFor(coupleId)}
               </span>
               <span className="text-muted-foreground">
-                {coupleById.get(coupleId) ? statusLabel(coupleById.get(coupleId)!) : "Unknown"}
+                {coupleById.get(coupleId) ? statusLabel(coupleById.get(coupleId)!, seasonNumber) : "Unknown"}
               </span>
             </div>
           ))}

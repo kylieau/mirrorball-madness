@@ -101,6 +101,12 @@ export default async function LeaguePage({
   const accountSettingsData = await getAccountSettingsData(supabase, user.id);
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
+  const { data: activeSeason } = await supabase
+    .from("seasons")
+    .select("season_number")
+    .eq("id", activeSeasonId ?? "")
+    .maybeSingle();
+  const seasonNumber = activeSeason?.season_number ?? null;
   const { data: completedEpisodes } = await supabase
     .from("episodes")
     .select("id, week_number, results_published_at")
@@ -507,6 +513,7 @@ export default async function LeaguePage({
                   isLocked={isLocked}
                   isDoubleElimination={upcomingEpisode?.is_double_elimination_week ?? false}
                   revealedPredictions={revealedPredictions}
+                  seasonNumber={seasonNumber}
                 />
               </div>
             )}
@@ -551,6 +558,7 @@ export default async function LeaguePage({
                   existingOrder={grandFinaleOrder}
                   deadline={grandFinaleDeadline}
                   isLocked={grandFinaleLocked}
+                  seasonNumber={seasonNumber}
                 />
               </div>
             )}

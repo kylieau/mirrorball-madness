@@ -103,6 +103,7 @@ export function LeagueModulesForm({
   canEdit,
   premiereAirsAt,
   seasonEpisodes,
+  seasonNumber,
 }: {
   leagueId: string;
   league: League;
@@ -110,6 +111,7 @@ export function LeagueModulesForm({
   canEdit: boolean;
   premiereAirsAt: string | null;
   seasonEpisodes: SeasonEpisode[];
+  seasonNumber: number | null;
 }) {
   const browserTimeZone = useBrowserTimeZone();
 
@@ -136,8 +138,8 @@ export function LeagueModulesForm({
   const [judgesStartsWeek, setJudgesStartsWeek] = useState(scoringSettings?.judges_score_starts_week ?? 1);
   const startsWeekItems = Object.fromEntries(
     seasonEpisodes.length > 0
-      ? seasonEpisodes.map((e) => [String(e.week_number), formatEpisodeLabel(e.week_number)])
-      : [[String(judgesStartsWeek), formatEpisodeLabel(judgesStartsWeek)]]
+      ? seasonEpisodes.map((e) => [String(e.week_number), formatEpisodeLabel(e.week_number, seasonNumber)])
+      : [[String(judgesStartsWeek), formatEpisodeLabel(judgesStartsWeek, seasonNumber)]]
   );
   const [judgesScoreMultiplier, setJudgesScoreMultiplier] = useState(
     scoringSettings?.judges_score_multiplier ?? 1
@@ -323,7 +325,7 @@ export function LeagueModulesForm({
               <CardDescription>Draft, roster, Recast, and judges&apos; score points.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col">
-              <SettingRow label="Draft counts from" value={formatEpisodeLabel(judgesStartsWeek)} />
+              <SettingRow label="Draft counts from" value={formatEpisodeLabel(judgesStartsWeek, seasonNumber)} />
               <SettingRow label="Judges' Score Multiplier" value={judgesScoreMultiplier} />
               <SettingRow label="Survival Points" value={survivalPoints} />
               <SettingRow label="1st Place Bonus" value={firstPlacePoints} />

@@ -1079,6 +1079,7 @@ export type Database = {
           is_active: boolean
           name: string
           premiere_date: string | null
+          season_number: number | null
           total_episodes: number | null
         }
         Insert: {
@@ -1088,6 +1089,7 @@ export type Database = {
           is_active?: boolean
           name: string
           premiere_date?: string | null
+          season_number?: number | null
           total_episodes?: number | null
         }
         Update: {
@@ -1097,6 +1099,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           premiere_date?: string | null
+          season_number?: number | null
           total_episodes?: number | null
         }
         Relationships: []

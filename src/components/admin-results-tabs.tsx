@@ -54,6 +54,7 @@ type Season = {
   premiere_date: string | null;
   total_episodes: number | null;
   finale_date: string | null;
+  season_number: number | null;
 } | null;
 
 const TABS = [
@@ -148,6 +149,7 @@ export function AdminResultsTabs({
             draftsByEpisode={draftsByEpisode}
             forceSelectEpisodeId={forceSelectEpisodeId}
             participantsByEpisode={participantsByEpisode}
+            seasonNumber={season?.season_number ?? null}
           />
         </TabsContent>
         <TabsContent value="view">
@@ -163,6 +165,7 @@ export function AdminResultsTabs({
             draftsByEpisode={draftsByEpisode}
             publishedByNames={publishedByNames}
             onNavigateToEpisode={navigateToEpisode}
+            seasonNumber={season?.season_number ?? null}
           />
         </TabsContent>
         <TabsContent value="schedule">

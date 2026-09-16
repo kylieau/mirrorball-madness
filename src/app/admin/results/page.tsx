@@ -27,7 +27,7 @@ export default async function AdminResultsPage() {
 
   const { data: season } = await supabase
     .from("seasons")
-    .select("id, premiere_date, total_episodes, finale_date")
+    .select("id, premiere_date, total_episodes, finale_date, season_number")
     .eq("id", activeSeasonId ?? "")
     .single();
 

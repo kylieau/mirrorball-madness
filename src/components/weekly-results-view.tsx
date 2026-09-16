@@ -48,6 +48,7 @@ export function WeeklyResultsView({
   scoresByEpisode,
   currentUserId,
   leaguesByCouple,
+  seasonNumber,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
@@ -64,6 +65,7 @@ export function WeeklyResultsView({
   scoresByEpisode?: Record<string, ManagerWeekScore[]>;
   currentUserId?: string;
   leaguesByCouple?: Record<string, string[]>;
+  seasonNumber: number | null;
 }) {
   const episode = episodes[0];
 
@@ -119,7 +121,7 @@ export function WeeklyResultsView({
   return (
     <div>
       <p className="mb-4 text-sm text-muted-foreground">
-        {formatEpisodeLabel(episode.week_number)}
+        {formatEpisodeLabel(episode.week_number, seasonNumber)}
         {episode.theme ? ` — ${episode.theme}` : ""}, the actual results
       </p>
 
