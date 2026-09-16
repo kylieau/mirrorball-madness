@@ -15,16 +15,12 @@ describe("computeCoupleWeeklyPoints", () => {
 });
 
 describe("deriveCoupleWeeklyTag", () => {
-  it("tags eliminated and withdrawn couples as eliminated regardless of bottom-two", () => {
-    expect(deriveCoupleWeeklyTag("eliminated", false)).toBe("eliminated");
-    expect(deriveCoupleWeeklyTag("withdrawn", true)).toBe("eliminated");
-  });
-
-  it("tags a still-competing couple in the bottom two", () => {
-    expect(deriveCoupleWeeklyTag("active", true)).toBe("bottom_two");
+  it("tags eliminated and withdrawn couples as eliminated", () => {
+    expect(deriveCoupleWeeklyTag("eliminated")).toBe("eliminated");
+    expect(deriveCoupleWeeklyTag("withdrawn")).toBe("eliminated");
   });
 
   it("defaults to safe", () => {
-    expect(deriveCoupleWeeklyTag("active", false)).toBe("safe");
+    expect(deriveCoupleWeeklyTag("active")).toBe("safe");
   });
 });

@@ -69,7 +69,7 @@ export default async function ThisWeekPage({
       selectedEpisodeId
         ? supabase
             .from("episode_results")
-            .select("episode_id, couple_id, outcome, was_bottom_two, was_bottom_three")
+            .select("episode_id, couple_id, outcome")
             .eq("episode_id", selectedEpisodeId)
         : Promise.resolve({ data: [] }),
       supabase.from("dance_styles").select("id, name").order("name"),

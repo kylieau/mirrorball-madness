@@ -40,8 +40,6 @@ type EpisodeResult = {
   episode_id: string;
   couple_id: string;
   outcome: string;
-  was_bottom_two: boolean;
-  was_bottom_three: boolean;
   saved_by_judges: boolean;
   was_team_dance: boolean;
   had_immunity: boolean;
@@ -115,8 +113,6 @@ export function AllResultsView({
 
   function noteLabel(r: EpisodeResult) {
     const notes: string[] = [];
-    if (r.was_bottom_two) notes.push("bottom 2");
-    if (r.was_bottom_three) notes.push("bottom 3");
     if (r.saved_by_judges) notes.push("judges' save");
     if (r.was_team_dance) notes.push("team dance");
     if (r.had_immunity) notes.push("immunity");

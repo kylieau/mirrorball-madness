@@ -61,9 +61,9 @@ describe("computeWeeklyScores", () => {
       scoringSettings: settings,
       rosterSlots: [{ managerId: "alice", coupleId: "couple-1" }],
       danceScores: [{ coupleId: "couple-1", totalScore: 20 }],
-      // was_bottom_two/saved_by_judges are historical flags the DB stores, but
-      // the scoring function only looks at the final `outcome` — this couple
-      // was in the bottom two and saved by judges, so outcome is "safe".
+      // saved_by_judges is a historical flag the DB stores, but the scoring
+      // function only looks at the final `outcome` — this couple was saved
+      // by judges, so outcome is "safe".
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 0 }],
       predictions: [
         { managerId: "bob", predictedEliminatedCoupleId: "couple-1", predictedEliminatedCoupleId2: null, predictedTopScorerCoupleId: null },

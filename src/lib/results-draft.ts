@@ -15,8 +15,6 @@ export type DraftEntryInput = {
   coupleId: string;
   dances: DraftDanceInput[];
   outcome: Outcome;
-  wasBottomTwo: boolean;
-  wasBottomThree: boolean;
   savedByJudges: boolean;
   wasTeamDance: boolean;
   hadImmunity: boolean;
@@ -43,8 +41,6 @@ export type DraftDanceState = {
 export type DraftEntryState = {
   coupleId: string;
   outcome: Outcome;
-  wasBottomTwo: boolean;
-  wasBottomThree: boolean;
   savedByJudges: boolean;
   wasTeamDance: boolean;
   hadImmunity: boolean;
@@ -135,8 +131,6 @@ export async function saveDraftResults(
     episode_id: input.episodeId,
     couple_id: e.coupleId,
     outcome: e.outcome,
-    was_bottom_two: e.wasBottomTwo,
-    was_bottom_three: e.wasBottomThree,
     saved_by_judges: e.savedByJudges,
     was_team_dance: e.wasTeamDance,
     had_immunity: e.hadImmunity,
@@ -183,8 +177,6 @@ export async function loadDraftForEpisode(
     entries: (draftResults ?? []).map((r) => ({
       coupleId: r.couple_id,
       outcome: r.outcome as Outcome,
-      wasBottomTwo: r.was_bottom_two,
-      wasBottomThree: r.was_bottom_three,
       savedByJudges: r.saved_by_judges,
       wasTeamDance: r.was_team_dance,
       hadImmunity: r.had_immunity,
@@ -294,8 +286,6 @@ export async function publishEpisodeDraft(
       judgeScores: d.judgeScores,
     })),
     outcome: e.outcome,
-    wasBottomTwo: e.wasBottomTwo,
-    wasBottomThree: e.wasBottomThree,
     savedByJudges: e.savedByJudges,
     wasTeamDance: e.wasTeamDance,
     hadImmunity: e.hadImmunity,
@@ -404,8 +394,6 @@ export async function startCorrection(
         episode_id: episodeId,
         couple_id: r.couple_id,
         outcome: r.outcome,
-        was_bottom_two: r.was_bottom_two,
-        was_bottom_three: r.was_bottom_three,
         saved_by_judges: r.saved_by_judges,
         was_team_dance: r.was_team_dance,
         had_immunity: r.had_immunity,

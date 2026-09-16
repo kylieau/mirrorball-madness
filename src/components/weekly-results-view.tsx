@@ -17,8 +17,6 @@ type EpisodeResult = {
   episode_id: string;
   couple_id: string;
   outcome: string;
-  was_bottom_two: boolean;
-  was_bottom_three: boolean;
 };
 type Episode = {
   id: string;
@@ -36,8 +34,6 @@ function outcomeTag(r: EpisodeResult): { label: string; className: string } {
   if (r.outcome === "runner_up") return { label: "Runner-up", className: "bg-primary/15 text-accent" };
   if (r.outcome === "third_place") return { label: "Third place", className: "bg-primary/15 text-accent" };
   if (r.outcome === "bye") return { label: "Bye", className: "bg-muted text-muted-foreground" };
-  if (r.was_bottom_two) return { label: "Bottom two", className: "bg-destructive/15 text-danger-text" };
-  if (r.was_bottom_three) return { label: "Bottom three", className: "bg-destructive/15 text-danger-text" };
   return { label: "Safe", className: "bg-emerald/20 text-emerald-text" };
 }
 

@@ -16,8 +16,6 @@ export type EntrySubmission = {
   coupleId: string;
   dances: DanceSubmission[];
   outcome: Outcome;
-  wasBottomTwo: boolean;
-  wasBottomThree: boolean;
   savedByJudges: boolean;
   wasTeamDance: boolean;
   hadImmunity: boolean;
@@ -205,8 +203,6 @@ export async function applyEpisodeResults(
     episode_id: episode.id,
     couple_id: e.coupleId,
     outcome: e.outcome,
-    was_bottom_two: e.wasBottomTwo,
-    was_bottom_three: e.wasBottomThree,
     saved_by_judges: e.savedByJudges,
     was_team_dance: e.wasTeamDance,
     had_immunity: e.hadImmunity,

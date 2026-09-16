@@ -59,30 +59,21 @@ type ScheduledEpisode = {
   results_published_at: string | null;
 };
 type Outcome = "safe" | "eliminated" | "withdrawn" | "bye" | "winner" | "runner_up" | "third_place";
-type StatusValue = Outcome | "bottom_two" | "bottom_three";
+type StatusValue = Outcome;
 
 const STATUS_LABELS: Record<StatusValue, string> = {
   safe: "Safe",
-  bottom_two: "Bottom 2",
-  bottom_three: "Bottom 3",
   eliminated: "Eliminated",
   withdrawn: "Withdrawn",
-  bye: "Bye",
+  bye: "Did Not Dance",
   winner: "Winner",
   runner_up: "Runner-up",
   third_place: "Third place",
 };
 
 function statusOptions(isFinale: boolean): StatusValue[] {
-  const base: StatusValue[] = ["safe", "bottom_two", "bottom_three", "eliminated", "withdrawn", "bye"];
+  const base: StatusValue[] = ["safe", "eliminated", "withdrawn", "bye"];
   return isFinale ? [...base, "winner", "runner_up", "third_place"] : base;
-}
-
-function statusValueFromRow(outcome: Outcome, wasBottomTwo: boolean, wasBottomThree: boolean): StatusValue {
-  if (outcome !== "safe") return outcome;
-  if (wasBottomTwo) return "bottom_two";
-  if (wasBottomThree) return "bottom_three";
-  return "safe";
 }
 
 type RowDance = {
@@ -94,8 +85,6 @@ type RowDance = {
 
 type CoupleRow = {
   outcome: Outcome;
-  wasBottomTwo: boolean;
-  wasBottomThree: boolean;
   savedByJudges: boolean;
   wasTeamDance: boolean;
   hadImmunity: boolean;
@@ -107,8 +96,6 @@ type CoupleRow = {
 function emptyRow(): CoupleRow {
   return {
     outcome: "safe",
-    wasBottomTwo: false,
-    wasBottomThree: false,
     savedByJudges: false,
     wasTeamDance: false,
     hadImmunity: false,
@@ -138,8 +125,6 @@ function buildRowsFromDraft(draft: DraftState | undefined, couples: Couple[]): R
   for (const entry of draft?.entries ?? []) {
     rows[entry.coupleId] = {
       outcome: entry.outcome,
-      wasBottomTwo: entry.wasBottomTwo,
-      wasBottomThree: entry.wasBottomThree,
       savedByJudges: entry.savedByJudges,
       wasTeamDance: entry.wasTeamDance,
       hadImmunity: entry.hadImmunity,
@@ -285,8 +270,6 @@ export function ResultsForm({
                 .map(([judgeId, v]) => ({ judgeId, score: Number(v) })),
             })),
           outcome: row.outcome,
-          wasBottomTwo: row.wasBottomTwo,
-          wasBottomThree: row.wasBottomThree,
           savedByJudges: row.savedByJudges,
           wasTeamDance: row.wasTeamDance,
           hadImmunity: row.hadImmunity,
@@ -351,12 +334,7 @@ export function ResultsForm({
   }
 
   function setStatus(coupleId: string, value: StatusValue) {
-    const outcome: Outcome = value === "bottom_two" || value === "bottom_three" ? "safe" : value;
-    updateRow(coupleId, {
-      outcome,
-      wasBottomTwo: value === "bottom_two",
-      wasBottomThree: value === "bottom_three",
-    });
+    updateRow(coupleId, { outcome: value });
   }
 
   function danceCountFor(coupleId: string): number {
@@ -605,7 +583,6 @@ export function ResultsForm({
             <CardContent className="flex flex-col gap-4">
               {episodeCouples.map((c) => {
                 const row = rows[c.id] ?? emptyRow();
-                const statusValue = statusValueFromRow(row.outcome, row.wasBottomTwo, row.wasBottomThree);
                 const canAddDance = row.dances.length < expectedDanceCount;
                 return (
                   <div key={c.id} className="rounded-xl border border-border p-3">
@@ -615,7 +592,7 @@ export function ResultsForm({
                       </p>
                       <Select
                         items={STATUS_LABELS}
-                        value={statusValue}
+                        value={row.outcome}
                         onValueChange={(v) => setStatus(c.id, (v as StatusValue) ?? "safe")}
                       >
                         <SelectTrigger className="w-40">
@@ -630,6 +607,13 @@ export function ResultsForm({
                         </SelectContent>
                       </Select>
                     </div>
+                    {row.outcome === "bye" && (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Covers odd-couple byes, two-night episode splits, and injury sit-outs —
+                        stays active, earns no survival bonus this week. Use Special Moments below
+                        to note why, if it&apos;s worth recording.
+                      </p>
+                    )}
 
                     <div className="mt-3 flex flex-col gap-2">
                       {row.dances.map((d) => (

@@ -1,4 +1,4 @@
-export type RosterWeeklyTag = "eliminated" | "bottom_two" | "safe";
+export type RosterWeeklyTag = "eliminated" | "safe";
 
 // Mirrors how a couple's raw judges' score becomes "points" everywhere else
 // in the app: judges_score_multiplier is applied before a score is ever
@@ -17,9 +17,8 @@ export function computeCoupleWeeklyPoints(
 
 // Deliberately excludes survival/podium bonuses, which are manager-level
 // rewards for an outcome rather than part of a single couple's score line —
-// the Safe/Bottom two/Eliminated tag already communicates that outcome.
-export function deriveCoupleWeeklyTag(coupleStatus: string, wasBottomTwo: boolean): RosterWeeklyTag {
+// the Safe/Eliminated tag already communicates that outcome.
+export function deriveCoupleWeeklyTag(coupleStatus: string): RosterWeeklyTag {
   if (coupleStatus === "eliminated" || coupleStatus === "withdrawn") return "eliminated";
-  if (wasBottomTwo) return "bottom_two";
   return "safe";
 }

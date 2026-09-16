@@ -348,21 +348,14 @@ export default async function LeaguePage({
     .map((r) => r.couple_id)
     .filter((cid): cid is string => !!cid);
 
-  const [{ data: rosterDanceScores }, { data: rosterEpisodeResults }] =
+  const { data: rosterDanceScores } =
     latestCompletedEpisodeId && rosterCoupleIds.length > 0
-      ? await Promise.all([
-          supabase
-            .from("dance_scores")
-            .select("couple_id, total_score")
-            .eq("episode_id", latestCompletedEpisodeId)
-            .in("couple_id", rosterCoupleIds),
-          supabase
-            .from("episode_results")
-            .select("couple_id, was_bottom_two")
-            .eq("episode_id", latestCompletedEpisodeId)
-            .in("couple_id", rosterCoupleIds),
-        ])
-      : [{ data: [] as { couple_id: string; total_score: number }[] }, { data: [] as { couple_id: string; was_bottom_two: boolean }[] }];
+      ? await supabase
+          .from("dance_scores")
+          .select("couple_id, total_score")
+          .eq("episode_id", latestCompletedEpisodeId)
+          .in("couple_id", rosterCoupleIds)
+      : { data: [] as { couple_id: string; total_score: number }[] };
 
   // A couple can dance more than once in a night (e.g. a finale), so their
   // week's judges' score is the sum across every dance_scores row, same as
@@ -371,7 +364,6 @@ export default async function LeaguePage({
   for (const row of rosterDanceScores ?? []) {
     weeklyScoreByCouple.set(row.couple_id, (weeklyScoreByCouple.get(row.couple_id) ?? 0) + row.total_score);
   }
-  const wasBottomTwoByCouple = new Map((rosterEpisodeResults ?? []).map((r) => [r.couple_id, r.was_bottom_two]));
 
   const rosterCouples = (rosterSlots ?? [])
     .filter((r) => r.couples)
@@ -387,7 +379,7 @@ export default async function LeaguePage({
         scoringSettings?.judges_score_multiplier ?? 1,
         scoringSettings?.judges_score_category_weight ?? 1
       ),
-      tag: deriveCoupleWeeklyTag(r.couples!.status, wasBottomTwoByCouple.get(r.couple_id!) ?? false),
+      tag: deriveCoupleWeeklyTag(r.couples!.status),
     }));
 
   const openSlotCount = rosterCouples.filter(

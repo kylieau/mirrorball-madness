@@ -31,8 +31,6 @@ type EpisodeResult = {
   episode_id: string;
   couple_id: string;
   outcome: string;
-  was_bottom_two: boolean;
-  was_bottom_three: boolean;
   saved_by_judges: boolean;
   was_team_dance: boolean;
   had_immunity: boolean;

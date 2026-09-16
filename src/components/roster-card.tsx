@@ -15,7 +15,6 @@ type RosterCouple = CoupleNameParts & {
 // shown on This Week or on a manager's own roster.
 const TAG_INFO: Record<RosterWeeklyTag, { label: string; className: string }> = {
   safe: { label: "Safe", className: "bg-emerald/20 text-emerald-text" },
-  bottom_two: { label: "Bottom two", className: "bg-destructive/15 text-danger-text" },
   eliminated: { label: "Eliminated", className: "bg-muted text-muted-foreground" },
 };
 
