@@ -1461,6 +1461,10 @@ grant execute on function public.prediction_lock_at(uuid, uuid) to authenticated
 -- airs, the *effective* deadline auto-advances to the next not-yet-aired
 -- episode (this function), and make_draft_pick freezes that advanced value
 -- into judges_score_starts_week once the draft actually completes.
+-- The whole auto-advance/freeze dance only exists to protect an in-progress
+-- draft — a league with Dance Card off never has one (draft_status stays
+-- 'not_started' forever), so it's treated the same as an already-completed
+-- draft: just the plain judges_score_starts_week value, no rolling forward.
 create function public.effective_hard_deadline_week(p_league_id uuid)
 returns int
 language sql
@@ -1469,7 +1473,7 @@ set search_path = ''
 stable
 as $$
   select case
-    when l.draft_status = 'completed' then ss.judges_score_starts_week
+    when l.draft_status = 'completed' or not ss.judges_score_category_enabled then ss.judges_score_starts_week
     else greatest(
       ss.judges_score_starts_week,
       coalesce(

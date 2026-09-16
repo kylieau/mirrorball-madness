@@ -690,8 +690,7 @@ export function LeagueModulesForm({
                   {grandFinaleDeadline ? formattedGrandFinaleDeadline : "—"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Locks automatically at the Hard Deadline (Dance Card&apos;s &quot;Draft counts
-                  from&quot; setting, when it&apos;s on) — nothing to set here.
+                  Locks automatically once its Hard Deadline episode airs — nothing to set here.
                 </p>
               </div>
               <div className="flex flex-col gap-2">
