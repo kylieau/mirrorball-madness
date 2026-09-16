@@ -10,6 +10,8 @@ npx supabase gen types typescript --project-id wssbwgtsejamlbvfofvu --schema pub
 
 Full concept and phased build plan live in conversation history until they're worth codifying here.
 
+Session continuity: [MEMORY_HANDOFF.md](MEMORY_HANDOFF.md) tracks the most recent working session's state (what changed, why, what's still unverified, what's next) — read it at the start of a new session before assuming this file alone has full context, and keep it updated as work wraps up.
+
 ## Rules
 
 - **Write clean code.** No dead code, no speculative abstractions, no comments explaining *what* code does — only *why*, when the reason isn't obvious from the code itself.
