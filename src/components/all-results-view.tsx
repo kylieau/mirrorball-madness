@@ -111,6 +111,10 @@ export function AllResultsView({
     danceScoresByEpisodeCouple.set(key, list);
   }
 
+  function outcomeLabel(outcome: string) {
+    return outcome === "bye" ? "DND" : outcome.replace("_", " ");
+  }
+
   function noteLabel(r: EpisodeResult) {
     const notes: string[] = [];
     if (r.saved_by_judges) notes.push("judges' save");
@@ -276,8 +280,8 @@ export function AllResultsView({
                                     <td className="whitespace-nowrap p-2">
                                       {r.parts ? <CoupleName {...r.parts} /> : "Unknown"}
                                     </td>
-                                    <td className="p-2">{r.total}</td>
-                                    <td className="whitespace-nowrap p-2 capitalize">{r.outcome.replace("_", " ")}</td>
+                                    <td className="p-2">{r.outcome === "bye" ? "—" : r.total}</td>
+                                    <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(r.outcome)}</td>
                                     <td className="p-2 text-muted-foreground">{noteLabel(r) || "—"}</td>
                                   </tr>
                                   {r.dances.map((d, i) => (
@@ -383,8 +387,8 @@ export function AllResultsView({
                             {h.episode ? formatEpisodeLabel(h.episode.week_number) : "Episode ?"}
                             {h.episode?.theme ? ` — ${h.episode.theme}` : ""}
                           </td>
-                          <td className="p-2">{h.total}</td>
-                          <td className="whitespace-nowrap p-2 capitalize">{h.outcome.replace("_", " ")}</td>
+                          <td className="p-2">{h.outcome === "bye" ? "—" : h.total}</td>
+                          <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(h.outcome)}</td>
                           <td className="p-2 text-muted-foreground">{noteLabel(h) || "—"}</td>
                         </tr>
                         {h.dances.map((d, j) => (

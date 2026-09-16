@@ -33,7 +33,7 @@ function outcomeTag(r: EpisodeResult): { label: string; className: string } {
   if (r.outcome === "winner") return { label: "Winner", className: "bg-primary/15 text-accent" };
   if (r.outcome === "runner_up") return { label: "Runner-up", className: "bg-primary/15 text-accent" };
   if (r.outcome === "third_place") return { label: "Third place", className: "bg-primary/15 text-accent" };
-  if (r.outcome === "bye") return { label: "Bye", className: "bg-muted text-muted-foreground" };
+  if (r.outcome === "bye") return { label: "DND", className: "bg-muted text-muted-foreground" };
   return { label: "Safe", className: "bg-emerald/20 text-emerald-text" };
 }
 
@@ -159,7 +159,9 @@ export function WeeklyResultsView({
                 ))}
               </div>
               <div className="shrink-0 text-right text-xs text-muted-foreground">
-                <span className="block font-heading text-base font-semibold text-foreground">{r.total}</span>
+                <span className="block font-heading text-base font-semibold text-foreground">
+                  {r.outcome === "bye" ? "—" : r.total}
+                </span>
                 judges&apos; pts
               </div>
             </div>

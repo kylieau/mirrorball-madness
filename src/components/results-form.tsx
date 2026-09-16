@@ -650,9 +650,10 @@ export function ResultsForm({
                     </div>
                     {row.outcome === "bye" && (
                       <p className="mt-1.5 text-xs text-muted-foreground">
-                        Covers odd-couple byes, two-night episode splits, and injury sit-outs —
-                        stays active, earns no survival bonus this week. Use Special Moments below
-                        to note why, if it&apos;s worth recording.
+                        For a couple still in the cast tonight who didn&apos;t perform (an
+                        odd-couple bye, a mid-competition injury) — stays active, earns no survival
+                        bonus this week. For a couple not appearing this broadcast at all, use
+                        &quot;Who&apos;s Performing?&quot; under Edit Scheduled Episode instead.
                       </p>
                     )}
 
@@ -714,7 +715,13 @@ export function ResultsForm({
                         </div>
                       ))}
                       {canAddDance && (
-                        <Button size="sm" variant="outline" className="self-start" onClick={() => addDance(c.id)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="self-start"
+                          disabled={row.outcome === "bye"}
+                          onClick={() => addDance(c.id)}
+                        >
                           + Dance
                         </Button>
                       )}

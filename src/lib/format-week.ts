@@ -1,3 +1,3 @@
 export function formatEpisodeLabel(episodeNumber: number): string {
-  return `Episode ${episodeNumber}`;
+  return `E${String(episodeNumber).padStart(2, "0")}`;
 }
