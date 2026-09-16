@@ -219,6 +219,14 @@ export function ResultsForm({
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftSavedAgo = useRelativeTimeAgo(draftSavedAt);
 
+  // saveEpisodeDraft's revalidatePath("/admin/results") makes Next
+  // auto-refresh this route's server props for the client that called it —
+  // including draftsByEpisode — which would otherwise re-trigger the
+  // rehydrate effect below and stomp whatever the admin has typed since.
+  // Sidesteps that by having flushDraft mark which episode it just saved,
+  // and the effect skips exactly that one self-triggered refresh.
+  const justSavedEpisodeId = useRef<string | null>(null);
+
   function coupleParts(c: Couple): CoupleNameParts {
     return coupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name };
   }
@@ -228,6 +236,9 @@ export function ResultsForm({
   // gap: the form's initial state *is* the persisted draft, not empty.
   useEffect(() => {
     if (!selectedEpisode) return;
+    const wasSelfTriggered = justSavedEpisodeId.current === selectedEpisode.id;
+    justSavedEpisodeId.current = null;
+    if (wasSelfTriggered) return;
     const draft = draftsByEpisode[selectedEpisode.id];
     setGuestJudgeName(draft?.guestJudgeName ?? "");
     setJudgesSaveAvailable(draft?.judgesSaveAvailable ?? false);
@@ -283,6 +294,7 @@ export function ResultsForm({
   async function flushDraft(): Promise<{ error: string | null }> {
     if (!selectedEpisode) return { error: null };
     setSavingDraft(true);
+    justSavedEpisodeId.current = selectedEpisode.id;
     const result = await saveEpisodeDraft(buildDraftInput());
     if (result.error) {
       setError(result.error);
