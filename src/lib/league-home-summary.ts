@@ -26,6 +26,7 @@ export async function computeLeagueHomeSummary(
   league: { id: string; name: string },
   upcomingEpisode: { id: string; week_number: number } | null,
   latestCompletedEpisodeId: string | null,
+  latestCompletedResultsPublishedAt: string | null,
   joinCutoffMs: number
 ): Promise<LeagueHomeSummary> {
   const [{ data: scoringSettings }, { data: members }, { data: scores }] = await Promise.all([
@@ -79,7 +80,11 @@ export async function computeLeagueHomeSummary(
     });
     lockAt = data;
     const isLocked = !!lockAt && new Date() >= new Date(lockAt);
-    if (!isLocked) {
+    // Don't nag about the next episode's pick until the previous episode's
+    // results are actually published — a league on its first episode (no
+    // previous episode at all) is unaffected.
+    const previousResultsPublished = !latestCompletedEpisodeId || !!latestCompletedResultsPublishedAt;
+    if (!isLocked && previousResultsPublished) {
       const { data: ownPrediction } = await supabase
         .from("predictions")
         .select("manager_id")

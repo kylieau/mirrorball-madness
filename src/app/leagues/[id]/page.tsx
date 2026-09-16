@@ -103,7 +103,7 @@ export default async function LeaguePage({
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const { data: completedEpisodes } = await supabase
     .from("episodes")
-    .select("id, week_number")
+    .select("id, week_number, results_published_at")
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
     .order("week_number", { ascending: false })
@@ -149,6 +149,7 @@ export default async function LeaguePage({
   // per episode.
   const latestCompletedEpisodeId = completedEpisodes?.[0]?.id ?? null;
   const latestCompletedWeek = completedEpisodes?.[0]?.week_number ?? null;
+  const latestCompletedResultsPublishedAt = completedEpisodes?.[0]?.results_published_at ?? null;
 
   const previousPointsByManager = new Map<string, number>();
   if (latestCompletedEpisodeId) {
@@ -457,7 +458,15 @@ export default async function LeaguePage({
       .map((m) => m.leagues!)
       .filter((l) => l.id !== id)
       .map((otherLeague) =>
-        computeLeagueHomeSummary(supabase, user.id, otherLeague, upcomingEpisode ?? null, latestCompletedEpisodeId, joinCutoffMs)
+        computeLeagueHomeSummary(
+          supabase,
+          user.id,
+          otherLeague,
+          upcomingEpisode ?? null,
+          latestCompletedEpisodeId,
+          latestCompletedResultsPublishedAt,
+          joinCutoffMs
+        )
       )
   );
 

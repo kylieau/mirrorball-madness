@@ -130,6 +130,7 @@ export async function applyEpisodeResults(
         // something to predict against before results exist. Adding entries
         // later flips it to completed.
         status: input.entries.length > 0 ? "completed" : "upcoming",
+        results_published_at: input.entries.length > 0 ? new Date().toISOString() : null,
       },
       { onConflict: "season_id,week_number" }
     )

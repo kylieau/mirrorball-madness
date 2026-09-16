@@ -50,19 +50,28 @@ export default async function TodayPage() {
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const { data: completedEpisodes } = await supabase
     .from("episodes")
-    .select("id")
+    .select("id, results_published_at")
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
     .order("week_number", { ascending: false })
     .limit(1);
   const latestCompletedEpisodeId = completedEpisodes?.[0]?.id ?? null;
+  const latestCompletedResultsPublishedAt = completedEpisodes?.[0]?.results_published_at ?? null;
 
   const RECENT_JOIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
   const joinCutoffMs = Date.now() - RECENT_JOIN_WINDOW_MS;
 
   const summaries = await Promise.all(
     leagueRefs.map((league) =>
-      computeLeagueHomeSummary(supabase, user.id, league, upcomingEpisode ?? null, latestCompletedEpisodeId, joinCutoffMs)
+      computeLeagueHomeSummary(
+        supabase,
+        user.id,
+        league,
+        upcomingEpisode ?? null,
+        latestCompletedEpisodeId,
+        latestCompletedResultsPublishedAt,
+        joinCutoffMs
+      )
     )
   );
 

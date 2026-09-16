@@ -967,9 +967,21 @@ security definer set search_path = ''
 as $$
 declare
   v_settings public.scoring_settings;
+  v_hard_deadline_airs_at timestamptz;
 begin
   if not public.is_league_commissioner(p_league_id) then
     raise exception 'Only the commissioner can update scoring categories';
+  end if;
+
+  if p_bonus_picks_deadline is not null then
+    select airs_at into v_hard_deadline_airs_at
+    from public.episodes
+    where season_id = public.active_season_id()
+      and week_number = public.effective_hard_deadline_week(p_league_id);
+
+    if v_hard_deadline_airs_at is not null and p_bonus_picks_deadline > v_hard_deadline_airs_at then
+      raise exception 'Grand Finale deadline must be before the Hard Deadline';
+    end if;
   end if;
 
   update public.scoring_settings
@@ -1222,6 +1234,12 @@ begin
     raise exception 'That couple is not part of the current season';
   end if;
 
+  if exists (
+    select 1 from public.couples where id = p_couple_id and status <> 'active'
+  ) then
+    raise exception 'That couple is not available';
+  end if;
+
   if exists (select 1 from public.draft_picks where league_id = p_league_id and couple_id = p_couple_id) then
     raise exception 'That couple has already been drafted';
   end if;
@@ -1236,6 +1254,20 @@ begin
     insert into public.roster_slots (league_id, manager_id, slot_number, couple_id, source, start_week)
     select league_id, manager_id, row_number() over (partition by manager_id order by pick_number), couple_id, 'draft', 1
     from public.draft_picks
+    where league_id = p_league_id;
+
+    -- Freezes the auto-advanced Hard Deadline (effective_hard_deadline_week)
+    -- into judges_score_starts_week now that the draft has actually
+    -- completed, so a real roster exists from this point on.
+    update public.scoring_settings
+    set judges_score_starts_week = greatest(
+      judges_score_starts_week,
+      coalesce(
+        (select min(week_number) from public.episodes
+         where season_id = public.active_season_id() and airs_at > now()),
+        judges_score_starts_week
+      )
+    )
     where league_id = p_league_id;
   end if;
 
@@ -1434,6 +1466,40 @@ $$;
 
 revoke execute on function public.prediction_lock_at(uuid, uuid) from public;
 grant execute on function public.prediction_lock_at(uuid, uuid) to authenticated;
+
+-- A single per-league "Hard Deadline," pinned to a real episode via
+-- judges_score_starts_week (no new column) — it governs where the Grand
+-- Finale deadline must fall before, and where Judges' Score starts
+-- counting from. The draft is expected to finish by it but isn't hard-
+-- blocked: if the draft is still open when that episode airs, the
+-- *effective* deadline auto-advances to the next not-yet-aired episode
+-- (this function), and make_draft_pick freezes that advanced value into
+-- judges_score_starts_week once the draft actually completes.
+create function public.effective_hard_deadline_week(p_league_id uuid)
+returns int
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select case
+    when l.draft_status = 'completed' then ss.judges_score_starts_week
+    else greatest(
+      ss.judges_score_starts_week,
+      coalesce(
+        (select min(e.week_number) from public.episodes e
+         where e.season_id = public.active_season_id() and e.airs_at > now()),
+        ss.judges_score_starts_week
+      )
+    )
+  end
+  from public.leagues l
+  join public.scoring_settings ss on ss.league_id = l.id
+  where l.id = p_league_id;
+$$;
+
+revoke execute on function public.effective_hard_deadline_week(uuid) from public;
+grant execute on function public.effective_hard_deadline_week(uuid) to authenticated;
 
 create policy "predictions visible to owner pre-lock, league post-lock"
 on public.predictions for select
