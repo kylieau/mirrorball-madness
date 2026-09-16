@@ -210,6 +210,7 @@ export function ResultsForm({
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [justPublished, setJustPublished] = useState(false);
 
   const [teamSheetOpen, setTeamSheetOpen] = useState(false);
   const [customMomentLabel, setCustomMomentLabel] = useState("");
@@ -227,6 +228,7 @@ export function ResultsForm({
   // Sidesteps that by having flushDraft mark which episode it just saved,
   // and the effect skips exactly that one self-triggered refresh.
   const justSavedEpisodeId = useRef<string | null>(null);
+  const previousEpisodeId = useRef<string | null>(null);
 
   function coupleParts(c: Couple): CoupleNameParts {
     return coupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name };
@@ -237,6 +239,14 @@ export function ResultsForm({
   // gap: the form's initial state *is* the persisted draft, not empty.
   useEffect(() => {
     if (!selectedEpisode) return;
+    // Only a genuine switch to a *different* episode should dismiss the
+    // "just published" banner — Publish's own revalidation re-runs this
+    // same effect for the episode that was just published (to pick up its
+    // fresh results_published_at), which must leave the banner alone.
+    if (previousEpisodeId.current !== selectedEpisode.id) {
+      previousEpisodeId.current = selectedEpisode.id;
+      setJustPublished(false);
+    }
     const wasSelfTriggered = justSavedEpisodeId.current === selectedEpisode.id;
     justSavedEpisodeId.current = null;
     if (wasSelfTriggered) return;
@@ -323,6 +333,7 @@ export function ResultsForm({
       setError(publishResult.error);
     } else {
       setHasDraft(false);
+      setJustPublished(true);
       router.refresh();
     }
     setPublishing(false);
@@ -466,6 +477,13 @@ export function ResultsForm({
           Pacific-time players.
         </p>
       </div>
+
+      {justPublished && selectedEpisode && (
+        <div className="rounded-xl border border-emerald/40 bg-emerald/10 px-4 py-3 text-sm text-emerald-text">
+          <p className="font-medium">✅ {formatEpisodeLabel(selectedEpisode.week_number)} results published</p>
+          <p className="mt-0.5 text-emerald-text/90">Now live on This Week &amp; Standings across every league.</p>
+        </div>
+      )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
