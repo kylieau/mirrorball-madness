@@ -77,20 +77,23 @@ export function PastPicksCard({
   coupleDisplayNames: Record<string, CoupleNameParts>;
 }) {
   const episodeLabel = formatEpisodeCasualWithTheme(episode.weekNumber, episode.theme);
-  const switcher = (
-    <WeekSwitcher
-      currentEpisodeId={episode.id}
-      weeks={weeks}
-      hrefFor={(w) => `/leagues/${leagueId}?tab=yourpicks&week=${w.id}`}
-    />
-  );
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Past picks</CardTitle>
         <CardDescription>{episodeLabel}</CardDescription>
-        {weeks.length > 1 && <CardAction>{switcher}</CardAction>}
+        {weeks.length > 1 && (
+          <CardAction>
+            <WeekSwitcher
+              currentEpisodeId={episode.id}
+              weeks={weeks.map((w) => ({
+                ...w,
+                href: `/leagues/${leagueId}?tab=yourpicks&week=${w.id}`,
+              }))}
+            />
+          </CardAction>
+        )}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {locked || !comparison ? (

@@ -11,20 +11,27 @@ export type SwitcherWeek = {
   weekNumber: number;
   theme: string | null;
   locked?: boolean;
+  // Must be a string (not a callback) — this component is a Client Component
+  // and Past picks is rendered from a Server Component. A function prop
+  // would throw at runtime ("Functions cannot be passed directly to Client
+  // Components") and take down the whole Your Picks page.
+  href?: string;
 };
 
+function weekHref(week: SwitcherWeek): string {
+  return week.href ?? `/this-week?week=${week.id}`;
+}
+
 // Lives in This Week's switcher slot — and Past picks on Your Picks, via
-// hrefFor — the cross-league analog of the league switcher: browse past
+// per-week href strings — the analog of the league switcher: browse past
 // weeks instead of just the latest. Nothing to switch to with only one
 // completed week, so it renders nothing rather than a dead chip.
 export function WeekSwitcher({
   currentEpisodeId,
   weeks,
-  hrefFor = (week) => `/this-week?week=${week.id}`,
 }: {
   currentEpisodeId: string;
   weeks: SwitcherWeek[];
-  hrefFor?: (week: SwitcherWeek) => string;
 }) {
   const current = weeks.find((w) => w.id === currentEpisodeId);
 
@@ -46,7 +53,7 @@ export function WeekSwitcher({
             return (
               <Link
                 key={w.id}
-                href={hrefFor(w)}
+                href={weekHref(w)}
                 className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
               >
                 <p className={cn("text-sm font-semibold", isCurrent && "text-accent")}>

@@ -2,7 +2,7 @@
 
 ## 1. Current State
 
-Past picks vs results is on `cursor/past-picks-vs-results-c74f` (draft PR into `main`). Owner-approved item from BACKLOG.md. League **Your Picks** tab only — not a new tab. Do not merge from the agent.
+Past picks vs results is on `cursor/past-picks-vs-results-c74f` (draft PR #15 into `main`). Owner-approved item from BACKLOG.md. League **Your Picks** tab only — not a new tab. Do not merge from the agent.
 
 ## 2. Changes Made
 
@@ -15,6 +15,7 @@ Past picks vs results is on `cursor/past-picks-vs-results-c74f` (draft PR into `
 
 - Top-scorer actual is the same notion as `computeWeeklyScores` (sum of `total_score`, ties all count, 0-high week has none) — extracted rather than invented a second truth.
 - BACKLOG originally said `formatEpisodeLabel`; owner later standardized fan tabs on `Ep. N`. This feature follows the fan helpers.
+- Preview crash (digest 403620019): `WeekSwitcher` is a Client Component; passing `hrefFor` as a function from the server Past picks card is illegal in the RSC payload and takes down Your Picks. Per-week string `href`s instead.
 
 ## 4. Backlog & Deferred Items
 
@@ -25,4 +26,6 @@ Past picks vs results is on `cursor/past-picks-vs-results-c74f` (draft PR into `
 After this work: `npm run lint` clean, `npm test` **146**, `npm run build` passed. Live phone click-path was not exercised here (no Supabase credentials in this container).
 
 ## 5. Next Steps
+
+1. Coordinator: phone (~390px) click-path — Your Picks → Past picks → switch episodes; Spoiler-Free lock. Do not merge from the agent.
 2. Otherwise wait.
