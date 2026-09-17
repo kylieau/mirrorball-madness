@@ -1,17 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDownIcon, CheckIcon } from "lucide-react";
+import { ChevronDownIcon, CheckIcon, LockIcon } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "cn";
 import { formatEpisodeCasualShort, formatEpisodeCasualWithTheme } from "@/lib/format-week";
 
-export type SwitcherWeek = { id: string; weekNumber: number; theme: string | null };
+export type SwitcherWeek = {
+  id: string;
+  weekNumber: number;
+  theme: string | null;
+  locked?: boolean;
+  // Must be a string (not a callback) — this component is a Client Component
+  // and Past picks is rendered from a Server Component. A function prop
+  // would throw at runtime ("Functions cannot be passed directly to Client
+  // Components") and take down the whole Your Picks page.
+  href?: string;
+};
 
-// Lives in This Week's switcher slot — the cross-league analog of the
-// league switcher: browse past weeks' entered results instead of just the
-// latest. Nothing to switch to with only one completed week, so it renders
-// nothing rather than a dead chip.
+function weekHref(week: SwitcherWeek): string {
+  return week.href ?? `/this-week?week=${week.id}`;
+}
+
+// Lives in This Week's switcher slot — and Past picks on Your Picks, via
+// per-week href strings — the analog of the league switcher: browse past
+// weeks instead of just the latest. Nothing to switch to with only one
+// completed week, so it renders nothing rather than a dead chip.
 export function WeekSwitcher({
   currentEpisodeId,
   weeks,
@@ -39,13 +53,17 @@ export function WeekSwitcher({
             return (
               <Link
                 key={w.id}
-                href={`/this-week?week=${w.id}`}
+                href={weekHref(w)}
                 className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
               >
                 <p className={cn("text-sm font-semibold", isCurrent && "text-accent")}>
                   {formatEpisodeCasualWithTheme(w.weekNumber, w.theme)}
                 </p>
-                {isCurrent && <CheckIcon className="size-4 shrink-0 text-accent" aria-hidden />}
+                {isCurrent ? (
+                  <CheckIcon className="size-4 shrink-0 text-accent" aria-hidden />
+                ) : w.locked ? (
+                  <LockIcon className="size-4 shrink-0 text-muted-foreground" aria-label="Locked until marked watched" />
+                ) : null}
               </Link>
             );
           })}

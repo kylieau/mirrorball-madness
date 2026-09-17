@@ -10,6 +10,7 @@ import { StandingsTable } from "@/components/standings-table";
 import { StandingsModuleBreakdown } from "@/components/standings-module-breakdown";
 import { RosterCard } from "@/components/roster-card";
 import { PickEmBox } from "@/components/pick-em-box";
+import { PastPicksCard } from "@/components/past-picks-card";
 import { GrandFinaleBox } from "@/components/grand-finale-box";
 import { DraftStatusCard } from "@/components/draft-status-card";
 import { RecastNudgeCard } from "@/components/recast-nudge-card";
@@ -23,16 +24,21 @@ import { computeCoupleWeeklyPoints, deriveCoupleWeeklyTag } from "@/lib/roster-w
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
+import {
+  buildPastPicksComparison,
+  isPastPicksLocked,
+  selectPastPicksEpisode,
+} from "@/lib/past-picks";
 
 export default async function LeaguePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; message?: string; justCreated?: string }>;
+  searchParams: Promise<{ error?: string; message?: string; justCreated?: string; week?: string }>;
 }) {
   const { id } = await params;
-  const { error, message, justCreated } = await searchParams;
+  const { error, message, justCreated, week: weekParam } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -107,7 +113,7 @@ export default async function LeaguePage({
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const { data: completedEpisodes } = await supabase
     .from("episodes")
-    .select("id, week_number, results_published_at")
+    .select("id, week_number, theme, is_double_elimination_week, results_published_at")
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
     .order("week_number", { ascending: false });
@@ -515,6 +521,48 @@ export default async function LeaguePage({
     })),
   ];
 
+  const pastPicksEpisode = curtainCallOn
+    ? selectPastPicksEpisode(completedEpisodes ?? [], cutoff.allowedEpisodeIds, weekParam)
+    : null;
+  const pastPicksLocked = pastPicksEpisode
+    ? isPastPicksLocked(pastPicksEpisode.id, cutoff.allowedEpisodeIds)
+    : false;
+  const pastPicksWeeks = (completedEpisodes ?? []).map((e) => ({
+    id: e.id,
+    weekNumber: e.week_number,
+    theme: e.theme,
+    locked: isPastPicksLocked(e.id, cutoff.allowedEpisodeIds),
+  }));
+
+  let pastPicksComparison = null;
+  if (pastPicksEpisode && !pastPicksLocked) {
+    const [{ data: pastPrediction }, { data: pastResults }, { data: pastDanceScores }] = await Promise.all([
+      supabase
+        .from("predictions")
+        .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
+        .eq("league_id", id)
+        .eq("episode_id", pastPicksEpisode.id)
+        .eq("manager_id", user.id)
+        .maybeSingle(),
+      supabase.from("episode_results").select("couple_id, outcome").eq("episode_id", pastPicksEpisode.id),
+      supabase.from("dance_scores").select("couple_id, total_score").eq("episode_id", pastPicksEpisode.id),
+    ]);
+
+    const predictionPoints =
+      (allScores ?? []).find((row) => row.episode_id === pastPicksEpisode.id && row.manager_id === user.id)
+        ?.prediction_points ?? 0;
+
+    pastPicksComparison = buildPastPicksComparison({
+      isDoubleElimination: pastPicksEpisode.is_double_elimination_week,
+      predictedEliminatedCoupleId: pastPrediction?.predicted_eliminated_couple_id ?? null,
+      predictedEliminatedCoupleId2: pastPrediction?.predicted_eliminated_couple_id_2 ?? null,
+      predictedTopScorerCoupleId: pastPrediction?.predicted_top_scorer_couple_id ?? null,
+      episodeOutcomes: (pastResults ?? []).map((r) => ({ coupleId: r.couple_id, outcome: r.outcome })),
+      danceScores: (pastDanceScores ?? []).map((s) => ({ coupleId: s.couple_id, totalScore: s.total_score })),
+      predictionPoints,
+    });
+  }
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -550,6 +598,20 @@ export default async function LeaguePage({
                   isDoubleElimination={upcomingEpisode?.is_double_elimination_week ?? false}
                   revealedPredictions={revealedPredictions}
                 />
+                {pastPicksEpisode && (
+                  <PastPicksCard
+                    leagueId={id}
+                    episode={{
+                      id: pastPicksEpisode.id,
+                      weekNumber: pastPicksEpisode.week_number,
+                      theme: pastPicksEpisode.theme,
+                    }}
+                    weeks={pastPicksWeeks}
+                    locked={pastPicksLocked}
+                    comparison={pastPicksComparison}
+                    coupleDisplayNames={Object.fromEntries(allDisplayNames)}
+                  />
+                )}
               </div>
             )}
             {danceCardOn && (
