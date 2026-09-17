@@ -2,6 +2,27 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Past picks vs results (Your Picks)
+
+Owner-approved, not started — do not implement UI/code until this is picked up. Lives on the league **Your Picks** tab (`?tab=yourpicks`), not a new Results tab.
+
+**Priority:** after the spoiler Mark-as-watched fix (PR #9 / live pain); ahead of a spectator role, as an engagement feature.
+
+**Shape:**
+
+- Keep the current week's Curtain Call form (`PickEmBox`) on top.
+- Below it (or via a switcher): **Past picks** — how *your* Curtain Call picks lined up against what happened.
+- Prefer an **episode switcher** (week/episode picker) to move between completed episodes — same mental model as This Week's `WeekSwitcher`; don't invent a second navigation paradigm. Labels should use `formatEpisodeLabel`.
+- Per selected completed episode, compact card/row:
+  - Your elim pick(s) → actual eliminated (✓/✗)
+  - Your top-scorer pick → actual top judge-total couple (✓/✗)
+  - Curtain Call points that week from existing `weekly_manager_scores.prediction_points` — don't recompute a second truth
+- Spoiler-Free: only show outcomes for weeks ≤ `last_watched_week`; unwatched weeks locked ("Mark as watched to see how you did") — no leaking unpublished-to-viewer results. Reuse the existing cutoff (`resolveSpoilerCutoff` / `allowedEpisodeIds`), don't bypass it.
+- v1 is **your** history only — no league-wide miss-rate leaderboard.
+- Skip "almost had it" / bottom-two nuance for v1.
+
+**Explicitly out of scope for this item:** implementing the feature from this note, spectator role, a separate Results tab.
+
 ## Account deletion processing
 
 `request_account_deletion` records a request (`profiles.deletion_requested_at`) but nothing surfaces the list of pending requests anywhere. Needs at minimum a way to query it (a Supabase dashboard SQL query is fine for now, given the scale); eventually a small admin view if this ever needs to happen regularly.
