@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
 import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
 import { PageHeader } from "@/components/page-header";
@@ -14,10 +14,6 @@ import {
   selectThisWeekEpisode,
   thisWeekHref,
 } from "@/lib/this-week-carousel";
-import { HomeIcon, ListChecksIcon, PencilLineIcon, TrophyIcon } from "lucide-react";
-
-const TAB_ITEM_CLASSES =
-  "flex flex-1 flex-col items-center gap-0.5 rounded-md px-2 py-1.5 text-sm font-medium sm:flex-row sm:gap-1.5 sm:px-3";
 
 export default async function ThisWeekPage({
   searchParams,
@@ -179,7 +175,7 @@ export default async function ThisWeekPage({
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
       <TopBar {...accountSettingsData} email={user.email ?? ""} />
 
-      <div className="pb-20 sm:pb-0">
+      <div className={BOTTOM_NAV_CLEARANCE}>
         <PageHeader title="Results">
           {selectedEpisode && (
             <EpisodeCarousel
@@ -221,26 +217,7 @@ export default async function ThisWeekPage({
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:border-b sm:pb-0">
-        <div className="flex w-full justify-around p-1 sm:w-fit sm:justify-start sm:gap-1">
-          <Link href="/today" className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
-            <HomeIcon className="size-5 sm:size-4" />
-            <span className="text-[10px] sm:text-sm">Home</span>
-          </Link>
-          <span className={`${TAB_ITEM_CLASSES} text-accent`}>
-            <ListChecksIcon className="size-5 sm:size-4" />
-            <span className="text-[10px] sm:text-sm">Results</span>
-          </span>
-          <Link href={`/leagues/${firstLeagueId}?tab=yourpicks`} className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
-            <PencilLineIcon className="size-5 sm:size-4" />
-            <span className="text-[10px] sm:text-sm">Picks</span>
-          </Link>
-          <Link href={`/leagues/${firstLeagueId}?tab=standings`} className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
-            <TrophyIcon className="size-5 sm:size-4" />
-            <span className="text-[10px] sm:text-sm">Standings</span>
-          </Link>
-        </div>
-      </div>
+      <FanBottomNav active="results" leagueId={firstLeagueId} />
     </div>
   );
 }

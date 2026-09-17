@@ -8,6 +8,7 @@ import { ScheduleManager } from "@/components/schedule-manager";
 import { JudgesDanceStylesManager } from "@/components/judges-dance-styles-manager";
 import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
+import { BOTTOM_NAV_CLEARANCE, BOTTOM_NAV_TABS_CLASS, BottomNav } from "@/components/bottom-nav";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import type { ScoringJudge } from "@/lib/scoring-judges";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
@@ -120,24 +121,22 @@ export function AdminResultsTabs({
         <PageHeader title="Admin" />
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:border-b sm:pb-0">
-        <div className="mx-auto max-w-2xl px-4">
-          <TabsList className="h-auto w-full justify-around rounded-none bg-transparent p-1 group-data-horizontal/tabs:h-auto sm:w-fit sm:justify-start sm:gap-1">
-            {TABS.map(({ value, label, icon: Icon }) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="h-auto flex-col gap-0.5 rounded-md px-2 py-1.5 sm:flex-row sm:gap-1.5 sm:px-3"
-              >
-                <Icon className="size-5 sm:size-4" />
-                <span className="text-[10px] sm:text-sm">{label}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </div>
-      </div>
+      <BottomNav>
+        <TabsList className={`${BOTTOM_NAV_TABS_CLASS} rounded-none group-data-horizontal/tabs:h-auto`}>
+          {TABS.map(({ value, label, icon: Icon }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="h-auto flex-col gap-0.5 rounded-md px-2 py-1.5 sm:flex-row sm:gap-1.5 sm:px-3"
+            >
+              <Icon className="size-5 sm:size-4" />
+              <span className="text-[10px] sm:text-sm">{label}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </BottomNav>
 
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pb-20 pt-6 sm:pb-12">
+      <div className={`mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pt-6 ${BOTTOM_NAV_CLEARANCE}`}>
         <TabsContent value="enter">
           <ResultsForm
             activeCouples={activeCouples}
