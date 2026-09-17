@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
+import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { HomeIcon, ListChecksIcon, PencilLineIcon, TrophyIcon } from "lucide-react";
 
 const TAB_ITEM_CLASSES =
@@ -60,12 +61,30 @@ export default async function ThisWeekPage({
     .eq("status", "completed")
     .order("week_number", { ascending: false });
 
-  // Defaults to the latest completed week; ?week=<episode id> (from the
-  // switcher) picks an older one. An unrecognized id falls back to latest
-  // rather than silently rendering nothing.
+  const cutoff = await resolveSpoilerCutoff(
+    supabase,
+    user.id,
+    activeSeasonId ?? null,
+    accountSettingsData.spoilerFreeMode,
+    completedEpisodes ?? []
+  );
+
+  // Defaults to the latest visible week; ?week=<episode id> (from the
+  // switcher) picks an older one. An unrecognized id, OR one the viewer
+  // hasn't watched yet under their spoiler cutoff, falls back to the latest
+  // visible week rather than leaking it via a direct URL.
   const selectedEpisode =
-    (weekParam ? completedEpisodes?.find((e) => e.id === weekParam) : null) ?? completedEpisodes?.[0] ?? null;
+    (weekParam ? cutoff.visibleEpisodes.find((e) => e.id === weekParam) : null) ?? cutoff.effectiveLatestEpisode ?? null;
   const selectedEpisodeId = selectedEpisode?.id ?? null;
+
+  // Only fires when nothing at all is visible yet (fresh account, or
+  // spoiler-free mode on with nothing marked watched) — an older visible
+  // week the viewer is browsing isn't itself a "reveal pending" state.
+  const trueLatestCompletedEpisode = completedEpisodes?.[0] ?? null;
+  const pendingReveal =
+    !selectedEpisode && trueLatestCompletedEpisode
+      ? { weekNumber: trueLatestCompletedEpisode.week_number, theme: trueLatestCompletedEpisode.theme }
+      : null;
 
   const [{ data: danceScores }, { data: episodeResults }, { data: danceStyles }, { data: allCouples }] =
     await Promise.all([
@@ -164,7 +183,7 @@ export default async function ThisWeekPage({
           {selectedEpisodeId && (
             <WeekSwitcher
               currentEpisodeId={selectedEpisodeId}
-              weeks={(completedEpisodes ?? []).map((e) => ({
+              weeks={cutoff.visibleEpisodes.map((e) => ({
                 id: e.id,
                 weekNumber: e.week_number,
                 theme: e.theme,
@@ -182,6 +201,7 @@ export default async function ThisWeekPage({
           coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
           leaguesByCouple={leaguesByCouple}
           seasonNumber={seasonNumber}
+          pendingReveal={pendingReveal}
         />
       </div>
 

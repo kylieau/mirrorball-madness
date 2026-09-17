@@ -917,6 +917,7 @@ export type Database = {
           display_name: string
           id: string
           is_super_admin: boolean
+          spoiler_free_mode: boolean
         }
         Insert: {
           avatar_url?: string | null
@@ -925,6 +926,7 @@ export type Database = {
           display_name: string
           id: string
           is_super_admin?: boolean
+          spoiler_free_mode?: boolean
         }
         Update: {
           avatar_url?: string | null
@@ -933,6 +935,7 @@ export type Database = {
           display_name?: string
           id?: string
           is_super_admin?: boolean
+          spoiler_free_mode?: boolean
         }
         Relationships: []
       }
@@ -1100,6 +1103,42 @@ export type Database = {
           total_episodes?: number | null
         }
         Relationships: []
+      }
+      spoiler_watch_progress: {
+        Row: {
+          last_watched_week: number
+          season_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          last_watched_week?: number
+          season_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          last_watched_week?: number
+          season_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spoiler_watch_progress_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spoiler_watch_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       waiver_claims: {
         Row: {
@@ -1358,6 +1397,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      mark_episodes_watched_through: {
+        Args: { p_week_number: number }
+        Returns: undefined
       }
       prediction_lock_at: {
         Args: { p_episode_id: string; p_league_id: string }

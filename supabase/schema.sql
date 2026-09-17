@@ -30,7 +30,12 @@ create table profiles (
   -- no safe automatic cascade to actually erase auth.users/profiles today.
   -- This column is just the in-app "yes, I asked to be deleted" record Apple's
   -- App Store review requires (5.1.1(v)); an operator processes it by hand.
-  deletion_requested_at timestamptz
+  deletion_requested_at timestamptz,
+  -- Spoiler-Free Mode: hides episode results app-wide until the viewer marks
+  -- that episode as watched (see spoiler_watch_progress below). Same trust
+  -- tier as display_name/avatar_url — a plain self-editable flag, no
+  -- side-effect check needed, unlike is_super_admin/deletion_requested_at.
+  spoiler_free_mode boolean not null default false
 );
 
 -- ============================================================
@@ -482,6 +487,7 @@ create trigger on_auth_user_created
 -- are the only columns a user should ever be able to set on their own row.
 grant select on public.profiles to authenticated;
 grant update (display_name, avatar_url) on public.profiles to authenticated;
+grant update (spoiler_free_mode) on public.profiles to authenticated;
 
 create policy "profiles are viewable by the owner"
 on public.profiles for select
@@ -1934,3 +1940,58 @@ revoke execute on function public.approve_waiver_claim(uuid) from public;
 revoke execute on function public.reject_waiver_claim(uuid) from public;
 grant execute on function public.approve_waiver_claim(uuid) to authenticated;
 grant execute on function public.reject_waiver_claim(uuid) to authenticated;
+
+-- ============================================================
+-- Spoiler-Free Mode: one high-water-mark row per (user, season) rather than
+-- a per-episode log — DWTS publishes sequentially, so "watched through
+-- Week 4" fully implies weeks 1-4 watched, with no real out-of-order case.
+-- Keyed by season_id (not league_id) since watch progress tracks the
+-- broadcast, not any one league. Filtering happens app-side (Server
+-- Components), not via RLS here — episodes/couples/episode_results/
+-- dance_scores/weekly_manager_scores stay world-readable-to-authenticated
+-- because they're shared by reads that must always see true state (draft
+-- board, waivers, Pick 'Em's couple picker); spoiler-safety is "protect the
+-- user from an accidental glance," not a security boundary.
+-- ============================================================
+
+create table public.spoiler_watch_progress (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  season_id uuid not null references public.seasons(id) on delete cascade,
+  last_watched_week int not null default 0 check (last_watched_week >= 0),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, season_id)
+);
+
+grant select on public.spoiler_watch_progress to authenticated;
+
+create policy "spoiler watch progress viewable by owner"
+on public.spoiler_watch_progress for select
+using (auth.uid() = user_id);
+
+-- No insert/update grant — every write goes through the function below,
+-- which does an atomic GREATEST upsert a plain client upsert can't express
+-- without a read-then-write race that could regress progress.
+create function public.mark_episodes_watched_through(p_week_number int)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_season_id uuid := public.active_season_id();
+begin
+  if v_season_id is null then
+    raise exception 'No active season';
+  end if;
+
+  insert into public.spoiler_watch_progress (user_id, season_id, last_watched_week, updated_at)
+  values (auth.uid(), v_season_id, p_week_number, now())
+  on conflict (user_id, season_id)
+  do update set
+    last_watched_week = greatest(public.spoiler_watch_progress.last_watched_week, excluded.last_watched_week),
+    updated_at = now();
+end;
+$$;
+
+revoke execute on function public.mark_episodes_watched_through(int) from public;
+grant execute on function public.mark_episodes_watched_through(int) to authenticated;

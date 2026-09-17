@@ -21,6 +21,8 @@ import { getStandingMessage } from "@/lib/standings-message";
 import { getPickAssignment } from "@/lib/draft";
 import { computeCoupleWeeklyPoints, deriveCoupleWeeklyTag } from "@/lib/roster-weekly-points";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
+import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 
 export default async function LeaguePage({
   params,
@@ -80,7 +82,7 @@ export default async function LeaguePage({
       supabase
         .from("roster_slots")
         .select(
-          "slot_number, couple_id, couples(status, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name))"
+          "slot_number, couple_id, couples(status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name))"
         )
         .eq("league_id", id)
         .eq("manager_id", user.id)
@@ -114,8 +116,21 @@ export default async function LeaguePage({
     .select("id, week_number, results_published_at")
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
-    .order("week_number", { ascending: false })
-    .limit(1);
+    .order("week_number", { ascending: false });
+  const { data: finaleEpisode } = await supabase
+    .from("episodes")
+    .select("week_number")
+    .eq("season_id", activeSeasonId ?? "")
+    .eq("is_finale", true)
+    .maybeSingle();
+
+  const cutoff = await resolveSpoilerCutoff(
+    supabase,
+    user.id,
+    activeSeasonId ?? null,
+    accountSettingsData.spoilerFreeMode,
+    completedEpisodes ?? []
+  );
 
   const pointsByManager = new Map<string, number>();
   const rosterPointsByManager = new Map<string, number>();
@@ -126,6 +141,7 @@ export default async function LeaguePage({
     { managerId: string; rosterPoints: number; predictionPoints: number; grandFinalePoints: number; totalPoints: number }[]
   > = {};
   for (const row of allScores ?? []) {
+    if (!cutoff.allowedEpisodeIds.has(row.episode_id)) continue;
     pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
     rosterPointsByManager.set(row.manager_id, (rosterPointsByManager.get(row.manager_id) ?? 0) + row.roster_points);
     predictionPointsByManager.set(
@@ -155,13 +171,14 @@ export default async function LeaguePage({
   // without the most recently completed episode's scores — no historical
   // snapshot table needed, since weekly_manager_scores already carries points
   // per episode.
-  const latestCompletedEpisodeId = completedEpisodes?.[0]?.id ?? null;
-  const latestCompletedWeek = completedEpisodes?.[0]?.week_number ?? null;
-  const latestCompletedResultsPublishedAt = completedEpisodes?.[0]?.results_published_at ?? null;
+  const latestCompletedEpisodeId = cutoff.effectiveLatestEpisode?.id ?? null;
+  const latestCompletedWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;
+  const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
 
   const previousPointsByManager = new Map<string, number>();
   if (latestCompletedEpisodeId) {
     for (const row of allScores ?? []) {
+      if (!cutoff.allowedEpisodeIds.has(row.episode_id)) continue;
       if (row.episode_id === latestCompletedEpisodeId) continue;
       previousPointsByManager.set(
         row.manager_id,
@@ -248,6 +265,18 @@ export default async function LeaguePage({
     (c) => c.status === "active" && c.season_id === activeSeasonId
   );
   const seasonCouples = flatCouples.filter((c) => c.season_id === activeSeasonId);
+  // Grand Finale predictions show every season couple's current status
+  // (winner/eliminated/still competing) — this spoiler-clamped copy is what
+  // gets rendered there instead of seasonCouples itself, which stays true
+  // everywhere else it's used (draft, waivers, display-name building).
+  const seasonCouplesSpoilerSafe = seasonCouples.map((c) => ({
+    ...c,
+    status: spoilerSafeCoupleStatus(
+      { status: c.status, eliminationWeek: c.elimination_week },
+      cutoff.effectiveLatestEpisode?.week_number ?? null,
+      finaleEpisode?.week_number ?? null
+    ),
+  }));
   // Historical lookups (roster, revealed predictions) span every couple this
   // league has ever touched; the Pick 'Em picker is scoped to just the couples
   // actually offered, so collisions are checked against that pool specifically.
@@ -381,13 +410,23 @@ export default async function LeaguePage({
         pro: r.couples!.pro?.name ?? "Unknown",
       }),
       coupleId: r.couple_id!,
+      // Deliberately the true status, not spoiler-clamped — this feeds
+      // openSlotCount/Recast below, which needs the real occupancy state to
+      // function (Recast framing is explicitly out of scope for v1 spoiler
+      // filtering). Only the displayed `tag` is clamped.
       status: r.couples!.status,
       weeklyPoints: computeCoupleWeeklyPoints(
         weeklyScoreByCouple.get(r.couple_id!) ?? 0,
         scoringSettings?.judges_score_multiplier ?? 1,
         scoringSettings?.judges_score_category_weight ?? 1
       ),
-      tag: deriveCoupleWeeklyTag(r.couples!.status),
+      tag: deriveCoupleWeeklyTag(
+        spoilerSafeCoupleStatus(
+          { status: r.couples!.status, eliminationWeek: r.couples!.elimination_week },
+          cutoff.effectiveLatestEpisode?.week_number ?? null,
+          finaleEpisode?.week_number ?? null
+        )
+      ),
     }));
 
   const openSlotCount = rosterCouples.filter(
@@ -465,7 +504,8 @@ export default async function LeaguePage({
           upcomingEpisode ?? null,
           latestCompletedEpisodeId,
           latestCompletedResultsPublishedAt,
-          joinCutoffMs
+          joinCutoffMs,
+          cutoff.allowedEpisodeIds
         )
       )
   );
@@ -555,7 +595,7 @@ export default async function LeaguePage({
                 )}
                 <GrandFinaleBox
                   leagueId={id}
-                  couples={seasonCouples}
+                  couples={seasonCouplesSpoilerSafe}
                   coupleDisplayNames={Object.fromEntries(allDisplayNames)}
                   existingOrder={grandFinaleOrder}
                   deadline={grandFinaleDeadline}

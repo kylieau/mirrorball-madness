@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
+import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { HomeIcon, ListChecksIcon, PencilLineIcon, TrophyIcon } from "lucide-react";
 
@@ -50,13 +51,29 @@ export default async function TodayPage() {
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const { data: completedEpisodes } = await supabase
     .from("episodes")
-    .select("id, results_published_at")
+    .select("id, week_number, results_published_at")
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
-    .order("week_number", { ascending: false })
-    .limit(1);
-  const latestCompletedEpisodeId = completedEpisodes?.[0]?.id ?? null;
-  const latestCompletedResultsPublishedAt = completedEpisodes?.[0]?.results_published_at ?? null;
+    .order("week_number", { ascending: false });
+
+  const cutoff = await resolveSpoilerCutoff(
+    supabase,
+    user.id,
+    activeSeasonId ?? null,
+    accountSettingsData.spoilerFreeMode,
+    completedEpisodes ?? []
+  );
+
+  const trueLatestCompletedEpisode = completedEpisodes?.[0] ?? null;
+  const latestCompletedEpisodeId = cutoff.effectiveLatestEpisode?.id ?? null;
+  const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
+  // Same season-wide figure on every league card (episodes aren't scoped
+  // per-league) — mirrors Standings' own "through wk N" label so Home and
+  // Standings never disagree about how caught-up the viewer is.
+  const weeksBehind =
+    trueLatestCompletedEpisode && trueLatestCompletedEpisode.id !== latestCompletedEpisodeId
+      ? trueLatestCompletedEpisode.week_number - (cutoff.effectiveLatestEpisode?.week_number ?? 0)
+      : 0;
 
   const RECENT_JOIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
   const joinCutoffMs = Date.now() - RECENT_JOIN_WINDOW_MS;
@@ -70,7 +87,8 @@ export default async function TodayPage() {
         upcomingEpisode ?? null,
         latestCompletedEpisodeId,
         latestCompletedResultsPublishedAt,
-        joinCutoffMs
+        joinCutoffMs,
+        cutoff.allowedEpisodeIds
       )
     )
   );
@@ -99,6 +117,15 @@ export default async function TodayPage() {
       .map((parts) => formatCoupleName(parts));
   }
 
+  // Only set once the true latest completed episode isn't itself visible —
+  // an older visible week the viewer just hasn't scrolled to isn't a "reveal
+  // pending" state, only "nothing new published yet vs. something published
+  // but not yet marked watched" is.
+  const pendingReveal =
+    trueLatestCompletedEpisode && trueLatestCompletedEpisode.id !== latestCompletedEpisodeId
+      ? { weekNumber: trueLatestCompletedEpisode.week_number }
+      : null;
+
   const leagues = summaries.map((s) => ({
     id: s.id,
     name: s.name,
@@ -109,6 +136,7 @@ export default async function TodayPage() {
     danceCardOn: s.danceCardOn,
     curtainCallOn: s.curtainCallOn,
     grandFinaleOn: s.grandFinaleOn,
+    weeksBehind,
   }));
 
   const deadlines = summaries
@@ -133,7 +161,12 @@ export default async function TodayPage() {
 
       <div className="pb-20 sm:pb-0">
         <PageHeader title="Home" />
-        <HomeDashboard leagues={leagues} deadlines={deadlines} recentActivity={recentActivity} />
+        <HomeDashboard
+          leagues={leagues}
+          deadlines={deadlines}
+          recentActivity={recentActivity}
+          pendingReveal={pendingReveal}
+        />
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:border-b sm:pb-0">

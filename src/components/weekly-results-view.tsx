@@ -1,5 +1,6 @@
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { CoupleName } from "@/components/couple-name";
+import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
 import { cn } from "cn";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeLabel } from "@/lib/format-week";
@@ -49,6 +50,7 @@ export function WeeklyResultsView({
   currentUserId,
   leaguesByCouple,
   seasonNumber,
+  pendingReveal,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
@@ -66,10 +68,36 @@ export function WeeklyResultsView({
   currentUserId?: string;
   leaguesByCouple?: Record<string, string[]>;
   seasonNumber: number | null;
+  // Set only when a completed episode exists but nothing is visible yet
+  // under the viewer's spoiler cutoff — replaces the generic empty state
+  // with a "go mark it as watched" teaser instead of pretending nothing's
+  // aired.
+  pendingReveal?: { weekNumber: number; theme: string | null } | null;
 }) {
   const episode = episodes[0];
 
   if (!episode) {
+    if (pendingReveal) {
+      return (
+        <div>
+          <p className="mb-4 text-sm text-muted-foreground">Spoiler-Free Mode is on</p>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {formatEpisodeLabel(pendingReveal.weekNumber, seasonNumber)}&apos;s results are ready
+              </CardTitle>
+              <CardDescription>
+                {pendingReveal.theme ? `${pendingReveal.theme}. ` : ""}Mark it as watched once you&apos;ve caught up
+                to see dances, scores, and who went home.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MarkWeekWatchedButton weekNumber={pendingReveal.weekNumber} />
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
     return (
       <div>
         <p className="mb-4 text-sm text-muted-foreground">Season hasn&apos;t started yet</p>

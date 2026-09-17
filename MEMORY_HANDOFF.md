@@ -2,71 +2,54 @@
 
 ## 1. Current State
 
-No active in-progress work — the session ended with everything committed and pushed to `origin/main` (latest: `eb6ccb4`). Backlog items exist (see §4) but nothing is mid-flight.
-
-This session covered several independent pieces of work, roughly in order:
-1. **Hard Deadline** feature (SQL) — a per-league derived deadline tied to a real episode's air time.
-2. **This Week tab bounce fix** — stale Router Cache redirect.
-3. **Needs-picks nudge timing fix** — gated on `results_published_at`.
-4. **Enter Results cleanup** — relabeled Bye → "Did Not Dance" (DND), removed the redundant Bottom 2/3 concept, fixed a real autosave data-loss bug, added a publish success banner.
-5. **Episode labels** — "E01" then "S35 E01" format everywhere.
-6. **Grand Finale deadline** — fully derived from the Hard Deadline (removed manual commissioner entry entirely).
-7. **Hard Deadline fix** — stopped it from perpetually rolling forward for leagues with Dance Card off.
-8. **"Season Clock" card** — moved the Hard Deadline's anchor setting out of the Dance-Card-only section into its own always-visible card.
+No active in-progress work — the Spoiler-Free Mode feature (full plan at the time: shared helpers, Settings UI, Home/This Week/Standings/roster/Grand Finale filtering) is implemented, migrated to production, and verified. Nothing is mid-flight. **Not yet committed** — the user hasn't asked for a commit yet; all changes are sitting in the working tree.
 
 ## 2. Changes Made
 
-All changes are committed to `main` (chronological):
+**New feature: Spoiler-Free Mode.** Per-user opt-in (`profiles.spoiler_free_mode`) that hides an episode's results app-wide (Home activity feed, This Week, Standings, roster couple tags, Grand Finale status) until the user explicitly marks that episode as watched. Manual "mark as watched" per episode, not a time delay — robust to DVR/tape-delay/multi-day-behind viewing. Filtering happens app-side (Server Components), not via RLS — the underlying tables stay world-readable-to-authenticated since draft/waivers/Pick 'Em always need true couple state regardless of the viewer's spoiler setting.
 
-| Commit | What |
-|---|---|
-| `ab77737` | Hard Deadline SQL functions (`effective_hard_deadline_week`), `make_draft_pick` elimination guard + freeze, This Week `revalidatePath` fix, `results_published_at` write + nudge gating |
-| `e5dc4ef` | Enter Results: Bye → "Did Not Dance", removed Bottom 2/3 |
-| `95da1d7` | Attempted fix for autosave revert bug (partial — addressed a secondary revalidation echo, not the root cause) |
-| `93bffc6` | **Real fix** for autosave data loss (stale closure in `scheduleAutosave` — see §3) + made Save/Publish bar always-visible regardless of window width |
-| `bdb5b55` | Added "✅ results published" success banner to Enter Results |
-| `92e49a2` | Did Not Dance: disabled "+Dance" button when selected; "DND"/"—" in View Results & This Week; `formatEpisodeLabel` → "E01" format |
-| `a2ee99e` | `seasons.season_number` column + threaded `seasonNumber` prop through ~8 components for episode labels |
-| `c593b49` | Episode label format: "S35E01" → "S35 E01" (space) |
-| `fc8d162` | **Grand Finale deadline fully derived** — dropped `scoring_settings.bonus_picks_deadline` column entirely, added `effective_grand_finale_deadline()` SQL function, removed manual date/time picker from League Settings |
-| `6d67b64` | Fixed Hard Deadline never freezing for Dance-Card-off leagues (`effective_hard_deadline_week` now treats "Dance Card off" same as "draft completed") |
-| `eb6ccb4` | Moved "Draft counts from" into a new always-visible **"Season Clock"** card; renamed `grandFinaleDeadline` prop → `hardDeadlineAirsAt` |
+**Schema** (migrated live, mirrored into `supabase/schema.sql`, types regenerated):
+- `profiles.spoiler_free_mode boolean not null default false` + column grant (same trust tier as `display_name`/`avatar_url`)
+- `spoiler_watch_progress` table: one high-water-mark row per `(user_id, season_id)` — `last_watched_week int`. Select-only grant (owner-scoped RLS); all writes go through `mark_episodes_watched_through(p_week_number)`, a `SECURITY DEFINER` function doing an atomic `GREATEST` upsert (never regresses progress).
 
-**Key files touched this session** (non-exhaustive, most-relevant):
-- `supabase/schema.sql` — source of truth, kept in sync with every migration below
-- `src/components/results-form.tsx`, `src/components/league-modules-form.tsx` — heaviest UI churn
-- `src/lib/format-week.ts`, `src/lib/league-home-summary.ts`, `src/lib/league-summary.ts`, `src/lib/roster-weekly-points.ts`
-- `src/app/leagues/[id]/page.tsx`, `src/app/leagues/[id]/settings/page.tsx`, `src/app/leagues/[id]/settings/actions.ts`
-- `src/app/admin/results/page.tsx`, `src/components/admin-results-tabs.tsx`, `src/components/all-results-view.tsx`, `src/components/weekly-results-view.tsx`
-- `src/app/this-week/page.tsx`, `src/components/week-switcher.tsx`, `src/components/pick-em-box.tsx`, `src/components/grand-finale-box.tsx`
-- `src/lib/supabase/types.ts` — hand-edited multiple times (no `SUPABASE_ACCESS_TOKEN` in this container to regenerate)
+**New app code:**
+- `src/lib/spoiler-cutoff.ts` — `resolveSpoilerCutoff()`, the shared helper every spoiler-aware page calls. Degenerates to "everything visible" when the mode is off, so callers never branch on the flag themselves.
+- `src/lib/spoiler-safe-couple-status.ts` (+ test) — pure function clamping a couple's status to `"active"` if its resolving week (elimination week, or the finale week for podium placements) is beyond the viewer's cutoff. **Deliberately uniform** — no differential "pending" tag on just the couple that changed, since that itself would leak which couple got hit (a mockup-review finding resolved during planning).
+- `src/lib/spoiler-mode.ts` — `setSpoilerFreeMode()`; on first-ever enable, seeds `last_watched_week` to **one week behind** the current latest completed week (clamped at 0) — see §3, this was deliberately reversed from the original plan's "seed to fully caught up" behavior.
+- Settings: `SpoilerModeToggle` component wired into both `AccountSettingsSheet` and `/settings` (deep-link parity), backed by `src/app/settings/actions.ts`.
+- This Week: `MarkWeekWatchedButton` + `src/app/this-week/actions.ts`; `?week=` param and the week switcher are now restricted to visible episodes only (closes a direct-URL bypass).
+- Home/Standings/roster/Grand Finale: `computeLeagueHomeSummary` takes a new `allowedEpisodeIds` filter param; `/today`, `/this-week`, `/leagues/[id]` all resolve a cutoff once per request and thread it through. Roster couple **tags** are spoiler-clamped but the underlying **status** field is deliberately left true — Recast/waivers open-slot detection depends on real occupancy state and is explicitly out of scope for v1 spoiler filtering.
 
-**Live migrations run against production** (all confirmed applied, all verified via live throwaway-account tests): Hard Deadline functions, `results_published_at` backfill, `seasons.season_number` column, Grand Finale deadline derivation (column drop + RLS policy rewrite + RPC signature change), Hard Deadline Dance-Card-off fix.
+**Key files touched:** `supabase/schema.sql`, `src/lib/supabase/types.ts`, `src/lib/account-settings-data.ts`, `src/lib/league-home-summary.ts`, `src/app/today/page.tsx`, `src/app/this-week/page.tsx`, `src/app/leagues/[id]/page.tsx`, `src/components/home-dashboard.tsx`, `src/components/weekly-results-view.tsx`, `src/components/standings-table.tsx`, `src/components/account-settings-sheet.tsx`, `src/app/settings/page.tsx`.
 
-**Uncommitted/untracked**: `ios/App/App.xcodeproj/project.pbxproj` has unrelated local changes (pre-existing, not touched this session, never staged) — leave alone. `scratch/` directory has this session's throwaway test scripts and migration hand-off `.sql` files — safe to ignore/delete, nothing in it is referenced by the app.
+**Live migration**: `scratch/add-spoiler-free-mode.sql` run by the user via the Supabase Dashboard SQL Editor, confirmed applied, then mirrored into `supabase/schema.sql`.
+
+**Verification**: `npx tsc --noEmit`, `npm run build`, `npm run lint` (clean except pre-existing unrelated scratch-file errors), `npm test` (69/69, including new `spoiler-safe-couple-status.test.ts`) all pass. Live integration checks (`scratch/verify-spoiler-free-mode.mts`) and full end-to-end QA against the running dev server via throwaway accounts (`scratch/qa-spoiler-free-mode.mjs`, `scratch/qa-settings-toggle.mjs`, `scratch/qa-seed-rewind.mts`) all pass — baseline-unchanged-when-off, an account with pre-existing watch progress that toggles on doesn't get anything retroactively hidden, fresh-account reveal flow (Home nudge → This Week teaser → mark-as-watched → reveals everywhere), `?week=` bypass blocked, Standings "not yet" explainer, settings toggle reflects DB state, and — after the §3 rewind-by-one change — enabling the mode for the very first time immediately gates the latest episode even when it's already been fully published.
+
+**Not exercised against live data**: the roster-couple "eliminated → clamped to Safe" visual case — Season 35 is only through its premiere week and nobody has been eliminated yet, so there was no real eliminated couple to point a throwaway roster at without writing fake elimination data into the live production season (deliberately avoided). Covered instead by the unit test and code review of the `deriveCoupleWeeklyTag(spoilerSafeCoupleStatus(...))` wiring in `leagues/[id]/page.tsx`. Worth a quick real-account glance once the season actually has its first elimination.
 
 ## 3. Key Decisions & Lessons Learned
 
-- **The Hard Deadline is a *derived* value, never stored.** `effective_hard_deadline_week(p_league_id)` and `effective_grand_finale_deadline(p_league_id)` are both plain SQL functions computed on every read — this pattern was deliberately extended (not just for the original Hard Deadline, but for Grand Finale's deadline too) specifically to avoid a stored value ever going stale relative to the thing it's derived from.
-- **The auto-advance/freeze mechanism only protects an in-progress draft.** It's meaningless for a league with Dance Card off (no draft ever runs), so `effective_hard_deadline_week` must treat "Dance Card off" the same as "draft completed" — otherwise the deadline perpetually rolls forward and never locks. This was a real bug the user caught by asking a good question, not something originally planned for.
-- **A hidden setting is a real product bug, not just a UX nit.** "Draft counts from" was previously only visible when Dance Card was on, but it always drove the Hard Deadline regardless — meaning Dance-Card-off leagues had literally no way to control their Grand Finale lock date. Fixed by making its home ("Season Clock") an always-visible card.
-- **Root-cause a bug before patching around it.** The Enter Results autosave "revert after a few seconds" bug went through two attempts: first fix (`95da1d7`) addressed a secondary Next.js revalidation echo and *did not* fix the actual symptom. Root cause was a classic React stale-closure bug: `scheduleAutosave()` runs synchronously right after `setRows()`, in the same render, so the debounced `flushDraft` closure it captured still read the *pre-update* state — silently persisting the previous value to the DB. Fixed (`93bffc6`) by keeping a `flushDraftRef` reassigned on every render, so the timer always calls whichever closure is current when it fires, not the one from the render that scheduled it. Lesson: when a live-DB check shows the *correct* value already persisted, the bug is client-side rendering/caching, not the write path — that redirected the second investigation correctly.
-- **No `SUPABASE_ACCESS_TOKEN` in this container** → `src/lib/supabase/types.ts` can never be regenerated automatically; every schema change this session required hand-editing this file to match. Double-check it stays in sync if picking up new schema work.
-- **No browser automation available in this container.** Every UI-facing change this session was verified via `tsc`/`lint`/`test`/`build` plus live Postgres integration tests (real throwaway `auth.admin.createUser()` accounts, never service-role, for anything gated on `auth.uid()`) — but actual visual/interaction verification in a browser was always deferred to the user. This will remain true for future sessions unless the environment changes.
-- **Always hand off schema changes as a separate `.sql` snippet**, wait for user confirmation it ran, then verify live before pushing app code that depends on it. This was followed consistently and caught real timing issues (e.g. pushing code that queries a column before the migration adding it had run).
-- **Signature changes to a SQL function need `DROP FUNCTION` + `CREATE FUNCTION`,** not `CREATE OR REPLACE`, or the old overload lingers. Only true drop-in swaps (no param added/removed) can use `CREATE OR REPLACE`. Applied correctly for `update_scoring_categories` (param removed) vs. `create_league`/`submit_grand_finale_prediction` (signature unchanged).
+- **This container CAN regenerate `types.ts`** when the user supplies a `SUPABASE_ACCESS_TOKEN` inline in chat — used this session, not persisted anywhere (not saved to `.env.local`, not exported for future sessions). A future session will need to ask again; don't assume the token carries over.
+- **No browser automation tool available in this container** (no `chromium-cli`, no `playwright` installed) — confirmed again this session. The established substitute: start the dev server, drive it with plain `fetch()` + a hand-rolled cookie jar from `createServerClient` (see any `scratch/verify-*.mts`/`scratch/qa-*.mjs`), asserting on response HTML. This is a real run of the app (actual HTTP requests to actual rendered Server Components), just without pixel-level visual confirmation.
+- **Concurrent dev servers on the same `.next` directory corrupt each other — this actually happened this session.** A `next dev` process was already running (started earlier, not by this session) when a second one was launched on top for QA; `rm -rf .next` to clear what looked like a stale build instead pulled the rug out from under the pre-existing process, producing `ENOENT`/500s on both. **Before starting a dev server, check for an existing one first** (`ps aux | grep "next dev"` or `lsof -i:3000`) and ask the user before killing anything you didn't start yourself — it may be their own session in another terminal. This session's incident resolved cleanly (user confirmed the pre-existing process wasn't theirs), but treat this as a standing caution, not a one-off.
+- **Recast/waivers correctness vs. spoiler safety is a real tension, not just a display choice.** `rosterCouples[].status` in `leagues/[id]/page.tsx` must stay the *true* status because `openSlotCount`/Recast-eligible-slot detection reads it — only the separately-computed `.tag` field (what `RosterCard` actually renders) gets spoiler-clamped. Clamping `status` itself would have silently hidden real open Recast slots from spoiler-shy users. Same reasoning applies anywhere else a couple's status feeds both a real feature and a spoiler-sensitive display — always clamp only at the display layer, never mutate the value functional code depends on.
+- **A differential visual treatment is itself a leak.** The plan's own mockup review caught this: tagging only the specific couple whose status changed (even generically, e.g. a "pending" badge) lets a manager with 3-4 rostered couples immediately infer which one got hit just from which one looks different — before watching anything. The fix (already baked into `spoilerSafeCoupleStatus`) is a uniform clamp so every couple renders indistinguishably from a genuinely-safe one during an unwatched week.
+- **Enable-time seeding was deliberately reversed to rewind one episode, not seed to fully caught up.** The original plan seeded `last_watched_week` to the current latest completed week on first enable, reasoning "never retroactively hide something already seen." The user overrode this after the feature shipped: since Spoiler-Free Mode is launching mid-season, a user can't be assumed to have definitely watched the most recent episode the instant they turn the setting on — so `setSpoilerFreeMode` now seeds to `latestCompletedWeek - 1` (clamped at 0), meaning the most recent episode is *always* immediately gated behind an explicit "mark as watched," even on the very first enable. The existing passive reveal-nudge UI (Home card / This Week teaser) needed zero changes to support this — it was already driven entirely by the cutoff value, so changing what gets seeded was sufficient on its own.
+- **No feature-announcement mechanism exists in this app, and building one isn't cheap.** Investigated (2026-09-16/17) whether to notify existing users about the new setting mid-season. `/notifications` (`src/lib/league-summary.ts`) is fully computed per request from two hardcoded derived signals (unmade Curtain Call / Grand Finale predictions) — there's no stored `notifications` table and no generic "message" concept to append to. There's also zero `localStorage` usage anywhere in `src` (confirmed again), so a dismissible "what's new" banner has no "have they seen it" tracking to build on either. No transactional email capability exists at all. Given both real options need new infrastructure, the user chose to build neither now — see backlog below.
 
 ## 4. Backlog & Deferred Items
 
-- **Manual browser verification still owed by the user** for the two most recent changes (not yet confirmed back to the assistant):
-  - "Season Clock" card appears for every league regardless of module toggles, positioned between Modules and Scoring Mix; editing/saving "Anchor week" works; Dance-Card-off leagues can now see/edit it (previously impossible).
-  - Grand Finale's own "Deadline" row still renders correctly and its caption references "Season Clock."
-- **View Results / This Week "DND" and "—" score display** (item 2/3 from an earlier checklist) — user said "can't tell yet, throw this on the backlog to check." Needs a real published episode with a Did Not Dance couple to verify in practice.
-- No other known open bugs or half-finished code paths as of end of session.
+- **Not committed yet.** All of the above sits in the working tree — ask the user whether/how they want it committed (likely one commit, given CLAUDE.md's "don't `git add -A`" caution and the unrelated pre-existing `ios/App/App.xcodeproj/project.pbxproj` diff still sitting there).
+- **Explicitly out of scope for v1** (per the original plan, not forgotten): Recast/waivers page framing, and `src/lib/league-summary.ts` → `/notifications`'s `rankBadge` (same unfiltered-sum leak shape as the Home fix, worth a v1.1 follow-up using the identical `allowedEpisodeIds` pattern).
+- **Roster-eliminated-couple clamp**: verify visually against a real account once Season 35 has an actual elimination (see §2).
+- **New-feature-announcement mechanism, deferred (2026-09-17)** — user's call: don't build either option now since both need new infrastructure, but keep them on the list:
+  - In-app Notifications feed entry announcing the feature — needs `/notifications`'s data model extended with a generic announcement/message concept first (it currently only derives two hardcoded prediction-deadline signals, nothing arbitrary).
+  - One-time dismissible banner shown on next visit — needs a "has this user seen it" tracking mechanism; likely `localStorage` since it's a pure per-viewer convenience, not state that needs to sync across devices or be read server-side.
 
 ## 5. Next Steps
 
 Nothing is actively queued. When resuming:
-1. Ask the user whether they've verified the "Season Clock" card and Grand Finale deadline display in the browser yet (§4) — if issues turn up, that's the first thing to fix.
-2. If/when a real episode gets published with a "Did Not Dance" couple, confirm the View Results / This Week display (§4 backlog item) actually renders "DND" / "—" as intended.
-3. Otherwise, wait for the user's next feature request or bug report — there is no pending implementation work.
+1. Confirm with the user whether they want this committed, and to what scope (this feature only — the unrelated `ios/App/App.xcodeproj/project.pbxproj` change predates this session and shouldn't be swept in).
+2. If a new schema change comes up, the same inline-token pattern for `types.ts` regeneration applies — ask the user for a fresh `SUPABASE_ACCESS_TOKEN` in chat, don't assume one is available.
+3. Otherwise, wait for the user's next feature request or bug report.

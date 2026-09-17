@@ -16,16 +16,19 @@ type HomeLeague = {
   danceCardOn: boolean;
   curtainCallOn: boolean;
   grandFinaleOn: boolean;
+  weeksBehind: number;
 };
 
 export function HomeDashboard({
   leagues,
   deadlines,
   recentActivity,
+  pendingReveal,
 }: {
   leagues: HomeLeague[];
   deadlines: { leagueId: string; leagueName: string; moduleLabel: string; iso: string }[];
   recentActivity: string[];
+  pendingReveal: { weekNumber: number } | null;
 }) {
   const needingPicks = leagues.filter((l) => l.picksDue).length;
 
@@ -35,6 +38,17 @@ export function HomeDashboard({
         {leagues.length} league{leagues.length === 1 ? "" : "s"}
         {needingPicks > 0 ? ` · ${needingPicks} need${needingPicks === 1 ? "s" : ""} picks` : " · all caught up"}
       </p>
+
+      {pendingReveal && (
+        <div className="mb-2.5">
+          <DeadlineStub
+            label="Spoiler-Free Mode"
+            headline={`Episode ${pendingReveal.weekNumber} results are in`}
+            ctaLabel="Mark as watched"
+            href="/this-week"
+          />
+        </div>
+      )}
 
       {deadlines.length > 0 && (
         <div className="flex flex-col gap-2.5">
@@ -82,6 +96,10 @@ export function HomeDashboard({
                 {l.picksDue ? (
                   <span className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
                     Picks due
+                  </span>
+                ) : l.weeksBehind > 0 ? (
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                    {l.weeksBehind} wk behind
                   </span>
                 ) : (
                   <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">

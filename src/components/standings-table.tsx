@@ -62,9 +62,11 @@ export function StandingsTable({
 
       <div className="mb-2 mt-6 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
         <span>Leaderboard</span>
-        {latestCompletedWeek !== null && (
-          <span className="font-normal text-muted-foreground">through wk {latestCompletedWeek}</span>
-        )}
+        <span className="font-normal text-muted-foreground">
+          {latestCompletedWeek !== null
+            ? `through wk ${latestCompletedWeek}`
+            : "Results appear once you mark an episode as watched"}
+        </span>
       </div>
 
       <div className="flex flex-col">

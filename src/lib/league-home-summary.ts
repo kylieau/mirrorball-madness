@@ -27,7 +27,11 @@ export async function computeLeagueHomeSummary(
   upcomingEpisode: { id: string; week_number: number } | null,
   latestCompletedEpisodeId: string | null,
   latestCompletedResultsPublishedAt: string | null,
-  joinCutoffMs: number
+  joinCutoffMs: number,
+  // null = unrestricted (current behavior). Callers pass the viewer's
+  // spoiler cutoff so rank/points here never account for an episode the
+  // viewer hasn't marked as watched yet.
+  allowedEpisodeIds: Set<string> | null = null
 ): Promise<LeagueHomeSummary> {
   const [{ data: scoringSettings }, { data: members }, { data: scores }] = await Promise.all([
     supabase
@@ -42,6 +46,7 @@ export async function computeLeagueHomeSummary(
   const pointsByManager = new Map<string, number>();
   const previousPointsByManager = new Map<string, number>();
   for (const row of scores ?? []) {
+    if (allowedEpisodeIds && !allowedEpisodeIds.has(row.episode_id)) continue;
     pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
     if (row.episode_id !== latestCompletedEpisodeId) {
       previousPointsByManager.set(row.manager_id, (previousPointsByManager.get(row.manager_id) ?? 0) + row.total_points);

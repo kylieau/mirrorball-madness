@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronRightIcon, XIcon } from "lucide-react";
 import { safeRelativePath } from "@/lib/safe-relative-path";
+import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
 
 const LINKED_ROWS = [
   { label: "Profile", href: "/settings/profile" },
@@ -38,7 +39,7 @@ export default async function SettingsPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_super_admin")
+    .select("is_super_admin, spoiler_free_mode")
     .eq("id", user.id)
     .single();
 
@@ -72,6 +73,7 @@ export default async function SettingsPage({
               <span>Appearance</span>
               <span className="text-xs">Coming soon</span>
             </div>
+            <SpoilerModeToggle initialEnabled={profile?.spoiler_free_mode ?? false} />
           </CardContent>
         </Card>
 

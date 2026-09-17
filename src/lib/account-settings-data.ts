@@ -5,6 +5,7 @@ export type AccountSettingsData = {
   displayName: string;
   isSuperAdmin: boolean;
   deletionRequestedAt: string | null;
+  spoilerFreeMode: boolean;
 };
 
 // One query for everything TopBar's avatar and AccountSettingsSheet need,
@@ -18,7 +19,7 @@ export async function getAccountSettingsData(
 ): Promise<AccountSettingsData> {
   const { data } = await supabase
     .from("profiles")
-    .select("display_name, is_super_admin, deletion_requested_at")
+    .select("display_name, is_super_admin, deletion_requested_at, spoiler_free_mode")
     .eq("id", userId)
     .single();
 
@@ -26,5 +27,6 @@ export async function getAccountSettingsData(
     displayName: data?.display_name ?? "?",
     isSuperAdmin: data?.is_super_admin ?? false,
     deletionRequestedAt: data?.deletion_requested_at ?? null,
+    spoilerFreeMode: data?.spoiler_free_mode ?? false,
   };
 }

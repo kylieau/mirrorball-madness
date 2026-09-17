@@ -21,6 +21,7 @@ import {
 import { ChevronRightIcon } from "lucide-react";
 import { ProfileForm } from "@/components/profile-form";
 import { AccountDataForm } from "@/components/account-data-form";
+import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 import { cn } from "cn";
 
@@ -39,6 +40,7 @@ export function AccountSettingsSheet({
   displayName,
   isSuperAdmin,
   deletionRequestedAt,
+  spoilerFreeMode,
   email,
 }: AccountSettingsData & { email: string }) {
   return (
@@ -80,6 +82,8 @@ export function AccountSettingsSheet({
               <span>Appearance</span>
               <span className="text-xs">Coming soon</span>
             </div>
+
+            <SpoilerModeToggle initialEnabled={spoilerFreeMode} />
 
             <Dialog>
               <DialogTrigger className={ROW_CLASSES}>
