@@ -51,7 +51,7 @@ export default async function AdminResultsPage() {
       .eq("status", "active")
       .eq("season_id", activeSeasonId ?? ""),
     supabase.from("couples").select(`${coupleFields}, status, elimination_week`),
-    supabase.from("people").select("id, name").eq("role", "judge").order("name"),
+    supabase.from("people").select("id, name, archived_at").eq("role", "judge").order("name"),
     supabase.from("dance_styles").select("id, name").order("name"),
     supabase
       .from("episodes")
@@ -123,7 +123,9 @@ export default async function AdminResultsPage() {
       allCouplesWithStatus={allCouplesWithStatus}
       activeCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(activeCouples))}
       allCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(allCouples))}
-      judges={sortJudgesForDisplay(judges ?? [])}
+      judges={sortJudgesForDisplay(
+        (judges ?? []).map((j) => ({ id: j.id, name: j.name, archivedAt: j.archived_at }))
+      )}
       danceStyles={danceStyles ?? []}
       episodes={episodes ?? []}
       danceScores={danceScores ?? []}

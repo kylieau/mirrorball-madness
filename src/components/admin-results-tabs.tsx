@@ -9,6 +9,7 @@ import { JudgesDanceStylesManager } from "@/components/judges-dance-styles-manag
 import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
 import type { CoupleNameParts } from "@/lib/couple-display";
+import type { ScoringJudge } from "@/lib/scoring-judges";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 import type { DraftState } from "@/lib/results-draft";
 import { PlusCircleIcon, ListChecksIcon, CalendarIcon, SettingsIcon } from "lucide-react";
@@ -90,7 +91,7 @@ export function AdminResultsTabs({
   allCouplesWithStatus: CoupleWithStatus[];
   activeCoupleDisplayNames: Record<string, CoupleNameParts>;
   allCoupleDisplayNames: Record<string, CoupleNameParts>;
-  judges: Named[];
+  judges: ScoringJudge[];
   danceStyles: Named[];
   episodes: Episode[];
   danceScores: DanceScore[];
