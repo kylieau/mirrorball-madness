@@ -13,36 +13,48 @@ export type PastPicksComparison = {
   predictionPoints: number;
 };
 
-export type PastPicksDisplayKind = "nailed" | "you" | "actual";
+export type PastPicksDisplayRow =
+  | { kind: "nailed"; coupleIds: string[] }
+  | { kind: "miss"; pickIds: string[]; actualIds: string[] };
 
-export type PastPicksDisplayRow = {
-  kind: PastPicksDisplayKind;
-  coupleIds: string[];
-};
-
-// Layout A: a hit collapses You+Actual into one "Nailed it" line so the
-// couple isn't printed twice. Misses / empty picks keep You vs Actual.
+// Layout A for hits: one "Nailed it" line so the couple isn't printed twice.
+// Layout 2 for misses: one strike→actual line per slot (no stacked Actual row).
 // Double-elim slots collapse independently, in slot order.
 export function collapsePickRows(picks: PickMatch[], actualIds: string[]): PastPicksDisplayRow[] {
-  const rows: PastPicksDisplayRow[] = [];
   const hitIds: string[] = [];
-  let hasMiss = false;
-
   for (const pick of picks) {
-    if (pick.correct && pick.pickId) {
-      if (!hitIds.includes(pick.pickId)) {
-        rows.push({ kind: "nailed", coupleIds: [pick.pickId] });
-        hitIds.push(pick.pickId);
-      }
-      continue;
+    if (pick.correct && pick.pickId && !hitIds.includes(pick.pickId)) {
+      hitIds.push(pick.pickId);
     }
-    hasMiss = true;
-    rows.push({ kind: "you", coupleIds: pick.pickId ? [pick.pickId] : [] });
   }
 
   const remainingActuals = actualIds.filter((id) => !hitIds.includes(id));
-  if (hasMiss) {
-    rows.push({ kind: "actual", coupleIds: remainingActuals });
+  const missCount = picks.filter((p) => !(p.correct && p.pickId)).length;
+  const rows: PastPicksDisplayRow[] = [];
+  let missIndex = 0;
+  let actualCursor = 0;
+
+  for (const pick of picks) {
+    if (pick.correct && pick.pickId) {
+      if (rows.some((row) => row.kind === "nailed" && row.coupleIds[0] === pick.pickId)) {
+        continue;
+      }
+      rows.push({ kind: "nailed", coupleIds: [pick.pickId] });
+      continue;
+    }
+
+    missIndex += 1;
+    const isLastMiss = missIndex === missCount;
+    const assigned = isLastMiss
+      ? remainingActuals.slice(actualCursor)
+      : remainingActuals.slice(actualCursor, actualCursor + 1);
+    if (!isLastMiss) actualCursor += assigned.length;
+
+    rows.push({
+      kind: "miss",
+      pickIds: pick.pickId ? [pick.pickId] : [],
+      actualIds: assigned,
+    });
   }
 
   return rows;

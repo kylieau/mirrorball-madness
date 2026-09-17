@@ -140,14 +140,12 @@ describe("collapsePickRows", () => {
     ]);
   });
 
-  it("keeps You vs Actual on a miss or empty pick", () => {
+  it("puts a miss on one strike→actual line, not a stacked Actual row", () => {
     expect(collapsePickRows([{ pickId: "b", correct: false }], ["a"])).toEqual([
-      { kind: "you", coupleIds: ["b"] },
-      { kind: "actual", coupleIds: ["a"] },
+      { kind: "miss", pickIds: ["b"], actualIds: ["a"] },
     ]);
     expect(collapsePickRows([{ pickId: null, correct: false }], ["a"])).toEqual([
-      { kind: "you", coupleIds: [] },
-      { kind: "actual", coupleIds: ["a"] },
+      { kind: "miss", pickIds: [], actualIds: ["a"] },
     ]);
   });
 
@@ -175,8 +173,20 @@ describe("collapsePickRows", () => {
       )
     ).toEqual([
       { kind: "nailed", coupleIds: ["a"] },
-      { kind: "you", coupleIds: ["c"] },
-      { kind: "actual", coupleIds: ["b"] },
+      { kind: "miss", pickIds: ["c"], actualIds: ["b"] },
+    ]);
+
+    expect(
+      collapsePickRows(
+        [
+          { pickId: "c", correct: false },
+          { pickId: "d", correct: false },
+        ],
+        ["a", "b"]
+      )
+    ).toEqual([
+      { kind: "miss", pickIds: ["c"], actualIds: ["a"] },
+      { kind: "miss", pickIds: ["d"], actualIds: ["b"] },
     ]);
 
     expect(
@@ -196,10 +206,9 @@ describe("collapsePickRows", () => {
     ]);
   });
 
-  it("on a miss, lists every actual including ties", () => {
+  it("on a miss, lists every actual including ties on that same line", () => {
     expect(collapsePickRows([{ pickId: "c", correct: false }], ["a", "b"])).toEqual([
-      { kind: "you", coupleIds: ["c"] },
-      { kind: "actual", coupleIds: ["a", "b"] },
+      { kind: "miss", pickIds: ["c"], actualIds: ["a", "b"] },
     ]);
   });
 });

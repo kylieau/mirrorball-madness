@@ -21,28 +21,24 @@ function CoupleNames({
   ids,
   names,
   fallback,
+  className,
 }: {
   ids: string[];
   names: Record<string, CoupleNameParts>;
   fallback: string;
+  className?: string;
 }) {
-  if (ids.length === 0) return <span className="font-normal text-muted-foreground">{fallback}</span>;
+  if (ids.length === 0) {
+    return <span className={className ?? "font-normal text-muted-foreground"}>{fallback}</span>;
+  }
   return (
-    <>
+    <span className={className}>
       {ids.map((id, i) => (
         <span key={id}>
           {i > 0 && ", "}
           <CoupleName {...(names[id] ?? { celebrity: "Unknown", pro: "Unknown" })} />
         </span>
       ))}
-    </>
-  );
-}
-
-function Mark({ hit }: { hit: boolean }) {
-  return (
-    <span className={hit ? "text-emerald-text" : "text-muted-foreground"} aria-label={hit ? "Correct" : "Miss"}>
-      {hit ? "✓" : "✗"}
     </span>
   );
 }
@@ -59,15 +55,46 @@ function ResultRows({
   return (
     <>
       {rows.map((row, i) => {
-        const label = row.kind === "nailed" ? "Nailed it" : row.kind === "you" ? "You" : "Actual";
-        const fallback = row.kind === "you" ? "No pick" : actualFallback;
-        const showMark = row.kind === "nailed" || (row.kind === "you" && row.coupleIds.length > 0);
+        if (row.kind === "nailed") {
+          return (
+            <div key={`nailed-${row.coupleIds.join("-") || i}`} className="flex items-start justify-between gap-3">
+              <span className="text-muted-foreground">Nailed it</span>
+              <span className="inline-flex items-center justify-end gap-1.5 text-right font-medium">
+                <CoupleNames ids={row.coupleIds} names={names} fallback="—" />
+                <span className="text-emerald-text" aria-label="Correct">
+                  ✓
+                </span>
+              </span>
+            </div>
+          );
+        }
+
         return (
-          <div key={`${row.kind}-${row.coupleIds.join("-") || i}`} className="flex items-start justify-between gap-3">
-            <span className="text-muted-foreground">{label}</span>
-            <span className="inline-flex items-center justify-end gap-1.5 text-right font-medium">
-              <CoupleNames ids={row.coupleIds} names={names} fallback={fallback} />
-              {showMark && <Mark hit={row.kind === "nailed"} />}
+          <div
+            key={`miss-${row.pickIds.join("-")}-${row.actualIds.join("-") || i}`}
+            className="flex items-start justify-between gap-3"
+          >
+            <span className="text-muted-foreground">You</span>
+            <span className="inline-flex max-w-[75%] flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-right">
+              {row.pickIds.length > 0 ? (
+                <CoupleNames
+                  ids={row.pickIds}
+                  names={names}
+                  fallback="No pick"
+                  className="font-normal text-muted-foreground line-through"
+                />
+              ) : (
+                <span className="font-normal text-muted-foreground">No pick</span>
+              )}
+              <span className="text-muted-foreground" aria-hidden>
+                →
+              </span>
+              <CoupleNames
+                ids={row.actualIds}
+                names={names}
+                fallback={actualFallback}
+                className="font-semibold text-foreground"
+              />
             </span>
           </div>
         );
