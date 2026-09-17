@@ -24,6 +24,8 @@ Carried forward (untouched):
 - Recast/waivers spoiler framing; `/notifications` `rankBadge` leak; roster-eliminated clamp; feature-announcement infra.
 - Real notification delivery (email / FCM / APNs) — this PR is UX guidance only.
 
+After this rebase: `npm run lint` clean, `npm test` **121**, `npm run build` passed (`/settings/add-to-home-screen` in the route list).
+
 ## 5. Next Steps
 
 1. Coordinator: phone (~390px) preview — avatar → **Add to Home Screen**. Home should have no A2HS card. Do not merge from the agent.
