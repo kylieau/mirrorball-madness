@@ -31,6 +31,7 @@ Session continuity: [MEMORY_HANDOFF.md](MEMORY_HANDOFF.md) tracks the most recen
   - Every `league_id → leagues(id)` foreign key cascades on delete; **no** `manager_id`/`user_id`/`commissioner_id → profiles(id)` foreign key does. Deleting a league cleans up completely; deleting a profile/auth user does not (and will fail outright) if that person has any league history anywhere.
   - `leagues` are not season-scoped — a league persists across seasons; only `couples`/`episodes` (and anything keyed to them) carry a `season_id`, resolved via `active_season_id()`. Any new couples/episodes-related query should ask "does this need `season_id = active_season_id()`?"
   - `episodes.week_number` is unique per season (a two-night-premiere `week_part` variant was tried and fully reverted) — display it with `formatEpisodeLabel` from `src/lib/format-week.ts` rather than hand-rolling "Week N"/"Episode N" text.
+  - Admin schedule / Enter Results *selection* lists are week-aware: unpublished episodes offer the currently-active cast only (so an already-eliminated couple can't be re-ticked onto next week). Published weeks keep whoever was still in as of that week (`elimination_week >= week_number`) so View Results / corrections don't lose the couple who went home that night. Helpers live in `src/lib/episode-cast.ts`.
 
 ## Environment Gotchas
 
