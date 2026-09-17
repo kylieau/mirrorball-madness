@@ -25,9 +25,11 @@ Carried forward (untouched):
 - Manual browser verification still owed for Season Clock + Grand Finale deadline caption.
 - View Results / This Week "DND" / "—" display still needs a real published Did Not Dance couple.
 
-This PR needs a phone (~390px) visual pass on Admin → Settings (Edit on a standing row and an archived row).
+Phone (~390px) visual pass on Admin → Settings is for the coordinator (owner has a dedicated test login). Do not put credentials in the PR, commits, docs, or screenshots.
+
+Lint / `npm test` (77) / `npm run build` passed in this environment.
 
 ## 5. Next Steps
 
-1. Review/merge the rename PR. Do not merge from the agent.
+1. Coordinator: visual review at ~390px (click-path is in the PR). Do not merge from the agent.
 2. Otherwise wait — nothing else is mid-flight.
