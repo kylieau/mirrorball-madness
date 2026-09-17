@@ -15,6 +15,7 @@ Not an off-by-two lookup. `effective_grand_finale_deadline` correctly reads `air
 - Settings now fetches `effective_hard_deadline_week` plus each episode's `airs_at`.
 - "Currently locks" / Grand Finale Deadline render as `S35 E03 · {datetime}` (looked up from that week's episode row).
 - Helper copy explains the roll-forward when anchor and lock weeks differ; Dance Card-off copy no longer mentions draft auto-advance.
+- When they differ, commissioners get **Update Anchor to match lock** — writes `judges_score_starts_week` to `effective_hard_deadline_week` (explicit tap, hidden when they already agree).
 - Pure-logic helpers in `src/lib/season-clock.ts`.
 
 After this rebase: `npm run lint` clean, `npm test` **132**, `npm run build` passed. Live League Settings UI was not exercised here (no DB credentials in the container). Phone (~390px) visual pass is for the coordinator.
@@ -37,5 +38,5 @@ A2HS (#6) is on `main`.
 
 ## 5. Next Steps
 
-1. Coordinator: phone (~390px) preview of League Settings → Season Clock (click-path is in the PR). Do not merge from the agent.
+1. Coordinator: phone (~390px) preview of League Settings → Season Clock. When Anchor ≠ Currently locks, tap **Update Anchor to match lock** and confirm they agree afterward. Do not merge from the agent.
 2. If the labeled lock is still E01 on 9/29, check Admin episode air dates.

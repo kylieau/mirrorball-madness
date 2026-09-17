@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   updateScoringCategories,
   updateLeagueSettings,
+  syncSeasonClockAnchor,
   type ScoringCategoriesInput,
   type LeagueSettingsInput,
 } from "@/app/leagues/[id]/settings/actions";
@@ -33,6 +35,7 @@ import {
   explainSeasonClock,
   formatLockWithEpisode,
   previewLockWeek,
+  shouldShowAnchorSyncControl,
 } from "@/lib/season-clock";
 
 type ScoringMethod = "exact_position" | "distance_based" | "binary_tier";
@@ -123,6 +126,7 @@ export function LeagueModulesForm({
   // next to its airs_at so the two can't look like a mismatched pair.
   effectiveHardDeadlineWeek: number | null;
 }) {
+  const router = useRouter();
   const browserTimeZone = useBrowserTimeZone();
 
   const [judgesEnabled, setJudgesEnabled] = useState(
@@ -200,7 +204,9 @@ export function LeagueModulesForm({
   );
 
   const [submitting, setSubmitting] = useState(false);
+  const [syncingAnchor, setSyncingAnchor] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const lockWeek = previewLockWeek({
@@ -229,9 +235,11 @@ export function LeagueModulesForm({
     lockWeek,
     seasonNumber,
   });
+  const showAnchorSync = shouldShowAnchorSyncControl(canEdit, judgesStartsWeek, lockWeek);
 
   async function handleSave() {
     setError(null);
+    setSyncError(null);
     setSuccess(false);
 
     if (!judgesEnabled && !eliminationsEnabled && !bonusEnabled) {
@@ -290,6 +298,21 @@ export function LeagueModulesForm({
     if (combinedError) setError(combinedError);
     else setSuccess(true);
     setSubmitting(false);
+  }
+
+  async function handleSyncAnchor() {
+    setError(null);
+    setSyncError(null);
+    setSuccess(false);
+    setSyncingAnchor(true);
+    const result = await syncSeasonClockAnchor(leagueId);
+    if (result.error) {
+      setSyncError(result.error);
+    } else if (result.anchorWeek != null) {
+      setJudgesStartsWeek(result.anchorWeek);
+      router.refresh();
+    }
+    setSyncingAnchor(false);
   }
 
   const isRequired = !scoringSettings?.scoring_configured;
@@ -487,6 +510,21 @@ export function LeagueModulesForm({
             </div>
           </div>
           <p className="text-sm text-muted-foreground">{seasonClockCopy}</p>
+          {showAnchorSync && (
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="self-start"
+                disabled={syncingAnchor || submitting}
+                onClick={handleSyncAnchor}
+              >
+                {syncingAnchor ? "Updating..." : "Update Anchor to match lock"}
+              </Button>
+              {syncError && <p className="text-sm text-destructive">{syncError}</p>}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -818,7 +856,7 @@ export function LeagueModulesForm({
       <div className="flex flex-col gap-2">
         {error && <p className="text-sm text-destructive">{error}</p>}
         {success && <p className="text-sm text-muted-foreground">Settings saved.</p>}
-        <Button onClick={handleSave} disabled={submitting} className="self-start">
+        <Button onClick={handleSave} disabled={submitting || syncingAnchor} className="self-start">
           {submitting ? "Saving..." : "Save settings"}
         </Button>
       </div>

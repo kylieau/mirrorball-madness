@@ -5,6 +5,7 @@ import {
   explainSeasonClock,
   formatLockWithEpisode,
   previewLockWeek,
+  shouldShowAnchorSyncControl,
 } from "./season-clock";
 
 const episodes = [
@@ -114,6 +115,14 @@ describe("explainSeasonClock", () => {
     });
     expect(copy).toBe("Grand Finale locks the moment S35 E01 airs.");
     expect(copy).not.toContain("pushes");
+  });
+});
+
+describe("shouldShowAnchorSyncControl", () => {
+  it("is only for a commissioner when the lock has rolled past the anchor", () => {
+    expect(shouldShowAnchorSyncControl(true, 1, 3)).toBe(true);
+    expect(shouldShowAnchorSyncControl(true, 3, 3)).toBe(false);
+    expect(shouldShowAnchorSyncControl(false, 1, 3)).toBe(false);
   });
 });
 

@@ -31,6 +31,14 @@ export function airsAtForWeek(
   return episodes.find((e) => e.week_number === weekNumber)?.airs_at ?? null;
 }
 
+export function shouldShowAnchorSyncControl(
+  canEdit: boolean,
+  anchorWeek: number,
+  lockWeek: number
+): boolean {
+  return canEdit && lockWeek !== anchorWeek;
+}
+
 export function formatLockWithEpisode(
   weekNumber: number,
   seasonNumber: number | null,
