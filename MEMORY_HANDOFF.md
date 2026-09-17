@@ -17,6 +17,8 @@ Home season strip redesign is on `cursor/home-season-strip-d84d` (draft PR #17 i
 - Defaulting to Up next mid-week would skip the week people are talking about (and that the spoiler callout may already be naming). Completed-as-cursor + arrow-to-upcoming is the split.
 - Transform carousel (not a This Week link, not scroll-snap-to-a-new-page). Deep-link from a slide is still out of scope.
 
+After this work: `npm run lint` clean, `npm test` **162**, `npm run build` passed. Live Home click-path was not exercised here (no Supabase credentials in this container). Phone (~390px) visual pass is for the coordinator.
+
 ## 4. Backlog & Deferred Items
 
 - Full season schedule dump / a schedule-detail page / lock-time hint / slide deep-link — still out of scope.
