@@ -63,9 +63,9 @@ export default async function LeaguePage({
     ? (await supabase.rpc("effective_grand_finale_deadline", { p_league_id: id })).data ?? null
     : null;
   const grandFinaleLocked = !!grandFinaleDeadline && new Date() >= new Date(grandFinaleDeadline);
-  // Section labels (🔮/🪩/🏆) only earn their keep once there's more than
-  // one topic on the page to tell apart — a single-module league goes
-  // straight to its content, same as before.
+  // Section labels (🔮 Curtain Call / 🪩 Dance Card / 🏆 Grand Finale) only
+  // earn their keep once there's more than one module on the page to tell
+  // apart — a single-module league goes straight to its content.
   const showSectionLabels = [curtainCallOn, danceCardOn, grandFinaleOn].filter(Boolean).length >= 2;
 
   const [{ data: members }, { data: allScores }, { data: rosterSlots }, { data: allCouples }, { data: upcomingEpisode }] =
@@ -544,7 +544,7 @@ export default async function LeaguePage({
           <div className="flex flex-col gap-6">
             {curtainCallOn && (
               <div className="flex flex-col gap-3">
-                {showSectionLabels && <SectionLabel icon="🔮" label="This week's picks" first />}
+                {showSectionLabels && <SectionLabel icon="🔮" label="Curtain Call" first />}
                 <PickEmBox
                   leagueId={id}
                   episode={upcomingEpisode ?? null}
@@ -561,7 +561,7 @@ export default async function LeaguePage({
             )}
             {danceCardOn && (
               <div className="flex flex-col gap-3">
-                {showSectionLabels && <SectionLabel icon="🪩" label="Your roster" first={!curtainCallOn} />}
+                {showSectionLabels && <SectionLabel icon="🪩" label="Dance Card" first={!curtainCallOn} />}
                 <DraftStatusCard
                   leagueId={id}
                   draftStatus={league.draft_status}

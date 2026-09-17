@@ -163,7 +163,7 @@ export function GrandFinaleBox({
       return (
         <Card>
           <CardHeader>
-            <CardTitle>Grand Finale</CardTitle>
+            <CardTitle>Your season ranking</CardTitle>
             <CardDescription>Predictions are locked.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -183,7 +183,7 @@ export function GrandFinaleBox({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Grand Finale</CardTitle>
+          <CardTitle>Your season ranking</CardTitle>
           <CardDescription>
             Tap couples in the order you think they&apos;ll be eliminated — first tap is who goes home first, last is your predicted winner. Saving needs every couple placed.
             {deadline ? ` Locks at ${formattedDeadline}.` : ""}
@@ -243,7 +243,7 @@ export function GrandFinaleBox({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Grand Finale</CardTitle>
+        <CardTitle>Your season ranking</CardTitle>
         <CardDescription>
           Review your predicted order, season winner to first eliminated. Use the arrows to fine-tune.
           {deadline ? ` Locks at ${formattedDeadline}.` : ""}

@@ -28,7 +28,7 @@ export function RosterCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your Dance Card Roster</CardTitle>
+        <CardTitle>Your roster</CardTitle>
         <CardDescription>{totalPoints} points this season</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5">
