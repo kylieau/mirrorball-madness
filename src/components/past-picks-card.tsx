@@ -89,9 +89,7 @@ export function PastPicksCard({
     <Card>
       <CardHeader>
         <CardTitle>Past picks</CardTitle>
-        <CardDescription>
-          {weeks.length > 1 ? "How your Curtain Call picks lined up" : episodeLabel}
-        </CardDescription>
+        <CardDescription>{episodeLabel}</CardDescription>
         {weeks.length > 1 && <CardAction>{switcher}</CardAction>}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

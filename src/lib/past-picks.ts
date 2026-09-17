@@ -1,4 +1,4 @@
-import { findEliminatedCoupleIds, findTopScorerCoupleIds, type DanceScore } from "@/lib/scoring";
+import { findEliminatedCoupleIds, findTopScorerCoupleIds, type DanceScore } from "./scoring";
 
 export type PickMatch = {
   pickId: string | null;
