@@ -17,7 +17,7 @@ Not an off-by-two lookup. `effective_grand_finale_deadline` correctly reads `air
 - Helper copy explains the roll-forward when anchor and lock weeks differ; Dance Card-off copy no longer mentions draft auto-advance.
 - Pure-logic helpers in `src/lib/season-clock.ts`.
 
-If the lock line still says **S35 E01 · 9/29**, the mismatch is Admin → Schedule (E01's `airs_at`), not this path.
+Lint / `npm test` (106) / `npm run build` passed in this environment. Live League Settings UI was not exercised here (no DB credentials in the container). Phone (~390px) visual pass is for the coordinator.
 
 ## 3. Key Decisions & Lessons Learned
 
