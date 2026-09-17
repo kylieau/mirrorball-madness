@@ -4,7 +4,6 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
-import { thisWeekHref } from "@/lib/this-week-carousel";
 
 function ArrowSlot({
   href,
@@ -37,28 +36,28 @@ function ArrowSlot({
   );
 }
 
-// Slim ← Ep. N — theme → control. Prev/next are real /this-week?week= links
-// so flipping re-renders results (or a theme peek) under spoiler cutoff.
-export function ThisWeekCarousel({
+// Slim ← Ep. N — theme → control shared by This Week and Past picks.
+// Prev/next are real links so flipping re-renders that week's body.
+export function EpisodeCarousel({
   weekNumber,
   theme,
-  prevId,
-  nextId,
+  prevHref,
+  nextHref,
 }: {
   weekNumber: number;
   theme: string | null;
-  prevId: string | null;
-  nextId: string | null;
+  prevHref: string | null;
+  nextHref: string | null;
 }) {
   const label = formatEpisodeCasualWithTheme(weekNumber, theme);
 
   return (
     <nav aria-label="Episodes" className="flex items-center justify-center">
-      <ArrowSlot href={prevId ? thisWeekHref(prevId) : null} label="Previous episode">
+      <ArrowSlot href={prevHref} label="Previous episode">
         <ChevronLeftIcon className="size-4" />
       </ArrowSlot>
       <p className="min-w-0 max-w-[calc(100%-5rem)] truncate text-center text-sm font-medium">{label}</p>
-      <ArrowSlot href={nextId ? thisWeekHref(nextId) : null} label="Next episode">
+      <ArrowSlot href={nextHref} label="Next episode">
         <ChevronRightIcon className="size-4" />
       </ArrowSlot>
     </nav>

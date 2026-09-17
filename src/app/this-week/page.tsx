@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
-import { ThisWeekCarousel, ThisWeekThemePeek } from "@/components/this-week-carousel";
+import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
 import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
@@ -12,6 +12,7 @@ import {
   adjacentThisWeekWeeks,
   buildThisWeekCarouselWeeks,
   selectThisWeekEpisode,
+  thisWeekHref,
 } from "@/lib/this-week-carousel";
 import { HomeIcon, ListChecksIcon, PencilLineIcon, TrophyIcon } from "lucide-react";
 
@@ -181,11 +182,11 @@ export default async function ThisWeekPage({
       <div className="pb-20 sm:pb-0">
         <PageHeader title="This Week">
           {selectedEpisode && (
-            <ThisWeekCarousel
+            <EpisodeCarousel
               weekNumber={selectedEpisode.week_number}
               theme={selectedEpisode.theme}
-              prevId={neighbors.prev?.id ?? null}
-              nextId={neighbors.next?.id ?? null}
+              prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
+              nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
             />
           )}
         </PageHeader>

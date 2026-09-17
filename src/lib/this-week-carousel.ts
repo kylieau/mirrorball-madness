@@ -57,3 +57,7 @@ export function adjacentThisWeekWeeks<E extends { id: string }>(
 export function thisWeekHref(episodeId: string): string {
   return `/this-week?week=${episodeId}`;
 }
+
+export function pastPicksHref(leagueId: string, episodeId: string): string {
+  return `/leagues/${leagueId}?tab=yourpicks&week=${episodeId}`;
+}

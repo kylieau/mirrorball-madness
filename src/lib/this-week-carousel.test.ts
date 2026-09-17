@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   adjacentThisWeekWeeks,
   buildThisWeekCarouselWeeks,
+  pastPicksHref,
   selectThisWeekEpisode,
   thisWeekHref,
   type ThisWeekCarouselEpisode,
@@ -107,5 +108,11 @@ describe("adjacentThisWeekWeeks", () => {
 describe("thisWeekHref", () => {
   it("flips This Week via ?week=", () => {
     expect(thisWeekHref("ep-2")).toBe("/this-week?week=ep-2");
+  });
+});
+
+describe("pastPicksHref", () => {
+  it("flips Past picks via ?tab=yourpicks&week=", () => {
+    expect(pastPicksHref("league-1", "ep-2")).toBe("/leagues/league-1?tab=yourpicks&week=ep-2");
   });
 });

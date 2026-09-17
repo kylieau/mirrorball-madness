@@ -1,21 +1,19 @@
 import {
   Card,
-  CardAction,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { CoupleName } from "@/components/couple-name";
+import { EpisodeCarousel } from "@/components/episode-carousel";
 import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
-import { WeekSwitcher, type SwitcherWeek } from "@/components/week-switcher";
 import type { CoupleNameParts } from "@/lib/couple-display";
-import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
 import {
   collapsePickRows,
   type PastPicksComparison,
   type PastPicksDisplayRow,
 } from "@/lib/past-picks";
+import { adjacentThisWeekWeeks, pastPicksHref } from "@/lib/this-week-carousel";
 
 function CoupleNames({
   ids,
@@ -113,29 +111,24 @@ export function PastPicksCard({
 }: {
   leagueId: string;
   episode: { id: string; weekNumber: number; theme: string | null };
-  weeks: SwitcherWeek[];
+  weeks: { id: string; weekNumber: number; theme: string | null }[];
   locked: boolean;
   comparison: PastPicksComparison | null;
   coupleDisplayNames: Record<string, CoupleNameParts>;
 }) {
-  const episodeLabel = formatEpisodeCasualWithTheme(episode.weekNumber, episode.theme);
+  const carouselWeeks = [...weeks].sort((a, b) => a.weekNumber - b.weekNumber);
+  const neighbors = adjacentThisWeekWeeks(carouselWeeks, episode.id);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Past picks</CardTitle>
-        <CardDescription>{episodeLabel}</CardDescription>
-        {weeks.length > 1 && (
-          <CardAction>
-            <WeekSwitcher
-              currentEpisodeId={episode.id}
-              weeks={weeks.map((w) => ({
-                ...w,
-                href: `/leagues/${leagueId}?tab=yourpicks&week=${w.id}`,
-              }))}
-            />
-          </CardAction>
-        )}
+        <EpisodeCarousel
+          weekNumber={episode.weekNumber}
+          theme={episode.theme}
+          prevHref={neighbors.prev ? pastPicksHref(leagueId, neighbors.prev.id) : null}
+          nextHref={neighbors.next ? pastPicksHref(leagueId, neighbors.next.id) : null}
+        />
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {locked || !comparison ? (
