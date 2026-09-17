@@ -18,6 +18,7 @@ After this pass: `npm run lint` clean, `npm test` **173**, `npm run build` passe
 
 ## 4. Backlog & Deferred Items
 
+- Bottom nav width/alignment (desktop `sm:w-fit` inset vs content column) and sticky-bottom-on-desktop — parked; do not implement on this PR.
 - Full season schedule dump / a schedule-detail page / lock-time hint / Home timeline — still out of scope.
 - Recast/waivers spoiler framing; `/notifications` `rankBadge` leak; roster-eliminated clamp; feature-announcement infra.
 
