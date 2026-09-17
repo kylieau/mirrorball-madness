@@ -15,6 +15,8 @@ Draft PR #17 (`cursor/home-season-strip-d84d`) now shares the slim episode carou
 
 - One visual control, two href helpers (`thisWeekHref` / `pastPicksHref`). Past picks still includes unwatched completed weeks so the lock card can prompt; This Week omits them so results cannot leak via `?week=`.
 
+After this pass: `npm run lint` clean, `npm test` **165**, `npm run build` passed. Live Your Picks click-path was not exercised here (no Supabase credentials). Phone (~390px) pass is for the coordinator.
+
 ## 4. Backlog & Deferred Items
 
 - Full season schedule dump / a schedule-detail page / lock-time hint / Home timeline — still out of scope.
