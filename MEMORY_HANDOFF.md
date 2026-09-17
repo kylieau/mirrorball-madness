@@ -2,34 +2,40 @@
 
 ## 1. Current State
 
-Judge rename is on `cursor/edit-scoring-judges-929a` (PR into `main`). No schema change — `people` already has `unique (name, role)` and `judge_scores.judge_id`.
+DND display verification on latest `main` (`ffd0654`). No code change. No live published `episode_results.outcome = 'bye'` row is available in this environment (no Supabase credentials), so the UI still cannot be confirmed against a real episode.
 
 ## 2. Changes Made
 
-Edit/rename for Scoring judges in Admin → Settings, alongside Archive/Restore:
+None. This session was verify-only.
 
-- Inline Edit on standing and archived rows (name becomes an input; Save / Cancel). Dance styles left as-is.
-- `renameScoringJudge` in `src/lib/admin-people.ts` via the existing thin server-action + admin-client write path. Updates `people.name` only.
-- Collision with another judge (standing or archived) is rejected — rename does not merge identities. Re-adding an archived name is still Restore via `insertScoringJudge`.
-- `judge_scores` / `draft_judge_scores` stay keyed by `judge_id`; past weeks keep working and will show the corrected name.
+Traced storage → render:
+
+- Stored as `episode_results.outcome = 'bye'` (check constraint). Admin Enter Results label is "Did Not Dance"; `couples.status` stays `active`.
+- Publish copies draft `outcome` through `publishEpisodeDraft` → `applyEpisodeResults` unchanged.
+- Admin View Results (by week / by couple) maps `bye` → outcome **DND** and pts **—** in `all-results-view.tsx`.
+- Public This Week uses `WeeklyResultsView` (`this-week/page.tsx`): badge **DND**, judges pts **—**.
+- Scoring already treats `bye` as no survival points (`NO_SURVIVAL_OUTCOMES`).
+
+Those three requested surfaces look correct. The remaining gap is a published week that actually contains a Did Not Dance couple.
 
 ## 3. Key Decisions & Lessons Learned
 
-- No modal and no dance-style rename. Judges already had a row + action-button layout from archive; Edit fits that. Styles are still badge chips — adding rename there is a different UI, not a one-liner.
-- Same uniqueness message as Add (`A judge with that name already exists`). Case-sensitive, matching `unique (name, role)` and the add-judge lookup.
+- Do not invent a fake production DND row to "complete" this check. Display is outcome-gated (`outcome === "bye"`), not total-gated, so leftover `0` dance totals would still render as **—** once the outcome is `bye`.
+- Dance Card roster (`roster-card.tsx` / `deriveCoupleWeeklyTag`) only knows Safe/Eliminated from `couples.status` and was out of scope. A DND couple stays `active`, so that card would still read Safe / `0 this wk` — different surface, different number (fantasy points, not judges' pts).
 
 ## 4. Backlog & Deferred Items
 
-Carried forward (untouched):
-
+- **DND live check (this session):** human publishes one Did Not Dance couple, then confirms Admin → View Results (by week and by couple) and public This Week. See below.
 - Manual browser verification still owed for Season Clock + Grand Finale deadline caption.
-- View Results / This Week "DND" / "—" display still needs a real published Did Not Dance couple.
-
-Phone (~390px) visual pass on Admin → Settings is for the coordinator (owner has a dedicated test login). Do not put credentials in the PR, commits, docs, or screenshots.
-
-Lint / `npm test` (77) / `npm run build` passed in this environment.
+- Phone (~390px) visual pass on Admin → Settings is for the coordinator (owner has a dedicated test login). Do not put credentials in the PR, commits, docs, or screenshots.
 
 ## 5. Next Steps
 
-1. Coordinator: visual review at ~390px (click-path is in the PR). Do not merge from the agent.
-2. Otherwise wait — nothing else is mid-flight.
+Human / live episode check (the only remaining DND work):
+
+1. Admin → Enter Results: set one participating couple to **Did Not Dance**, do not add dances, Publish.
+2. Admin → View Results → By week: that couple shows Outcome **DND**, Pts **—** (not `0`).
+3. Same week → By couple: that week's row shows **DND** / **—**.
+4. Public This Week (that episode): badge **DND**, judges' pts **—**.
+
+Until that week exists, treat DND display as code-complete and unverified in production.
