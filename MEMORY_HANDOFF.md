@@ -15,7 +15,7 @@ Draft PR #17 (`cursor/home-season-strip-d84d`): fan tabs read **Home / Results /
 
 - Label-only rename — do not retarget `/this-week` or `?tab=yourpicks`.
 
-After this pass: `npm run lint` clean, `npm test` **173**, `npm run build` passed. Live click-path was not exercised here (no Supabase credentials). Phone (~390px) pass is for the coordinator.
+After this pass: `npm run lint` clean, `npm test` **173**, `npm run build` passed. Results copy tweaks only. Live click-path was not exercised here (no Supabase credentials). Phone (~390px) pass is for the coordinator.
 
 ## 4. Backlog & Deferred Items
 
