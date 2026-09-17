@@ -17,6 +17,8 @@ Draft PR #17 (`cursor/home-season-strip-d84d`) was reshaped in place. Owner lock
 - This Week flipping must change the URL and re-fetch, not a client-only transform like the discarded Home carousel — results live behind `resolveSpoilerCutoff`.
 - Upcoming belongs on This Week as a theme peek; it does not belong on Home as a schedule strip.
 
+After this reshape: `npm run lint` clean, `npm test` **164**, `npm run build` passed. Live This Week click-path was not exercised here (no Supabase credentials in this container). Phone (~390px) visual pass is for the coordinator.
+
 ## 4. Backlog & Deferred Items
 
 - Full season schedule dump / a schedule-detail page / lock-time hint / Home timeline — still out of scope.
