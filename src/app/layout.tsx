@@ -15,6 +15,14 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 export const metadata: Metadata = {
   title: "Mirrorball Madness",
   description: "Fantasy sports for Dancing with the Stars.",
+  // Makes iOS "Add to Home Screen" open as a standalone web app (no Safari
+  // chrome) — required later for web push, and what the install notice asks
+  // people to do. Not a service worker / FCM setup.
+  appleWebApp: {
+    capable: true,
+    title: "Mirrorball Madness",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 // viewportFit: "cover" lets the app draw under the iPhone notch/status bar
@@ -24,6 +32,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#1e1420",
 };
 
 export default function RootLayout({
