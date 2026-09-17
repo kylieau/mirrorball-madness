@@ -45,6 +45,7 @@ export function LeagueTabs({
     // nothing re-adds it, so it can't resurface.
     if (value !== "yourpicks") {
       params.delete("justCreated");
+      params.delete("week");
     }
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }

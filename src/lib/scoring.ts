@@ -65,6 +65,36 @@ const PODIUM_POINTS_KEY: Record<string, keyof ScoringSettings> = {
 // again (doesn't open the roster slot, unlike eliminated/withdrawn).
 const NO_SURVIVAL_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn", "bye"]);
 
+export function sumDanceScoresByCouple(danceScores: DanceScore[]): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const { coupleId, totalScore } of danceScores) {
+    totals.set(coupleId, (totals.get(coupleId) ?? 0) + totalScore);
+  }
+  return totals;
+}
+
+// Same notion scoring uses for Curtain Call's top-scorer pick: highest sum
+// of dance_scores.total_score that episode, ties all count, a 0-high week
+// has no top scorer (nothing danced).
+function findTopScorerCoupleIdsFromTotals(totals: Map<string, number>): Set<string> {
+  const highestScore = Math.max(0, ...totals.values());
+  return new Set(
+    [...totals.entries()]
+      .filter(([, score]) => score === highestScore && highestScore > 0)
+      .map(([coupleId]) => coupleId)
+  );
+}
+
+export function findTopScorerCoupleIds(danceScores: DanceScore[]): Set<string> {
+  return findTopScorerCoupleIdsFromTotals(sumDanceScoresByCouple(danceScores));
+}
+
+export function findEliminatedCoupleIds(
+  episodeOutcomes: { coupleId: string; outcome: string }[]
+): Set<string> {
+  return new Set(episodeOutcomes.filter((o) => o.outcome === "eliminated").map((o) => o.coupleId));
+}
+
 // Pure and DB-free by design: the caller is responsible for fetching
 // already-week-scoped data (e.g. only roster_slots active this week) — this
 // function just does the arithmetic, which is what makes it unit-testable
@@ -90,24 +120,11 @@ export function computeWeeklyScores({
   categoryWeights?: CategoryWeights;
   grandFinalePointsByManager?: Record<string, number>;
 }): WeeklyManagerScore[] {
-  const coupleTotalScore = new Map<string, number>();
-  for (const { coupleId, totalScore } of danceScores) {
-    coupleTotalScore.set(coupleId, (coupleTotalScore.get(coupleId) ?? 0) + totalScore);
-  }
-
+  const coupleTotalScore = sumDanceScoresByCouple(danceScores);
   const outcomeByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.outcome]));
   const bonusPointsByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.bonusPoints]));
-
-  const highestScore = Math.max(0, ...coupleTotalScore.values());
-  const topScorerCoupleIds = new Set(
-    [...coupleTotalScore.entries()]
-      .filter(([, score]) => score === highestScore && highestScore > 0)
-      .map(([coupleId]) => coupleId)
-  );
-
-  const eliminatedCoupleIds = new Set(
-    episodeOutcomes.filter((o) => o.outcome === "eliminated").map((o) => o.coupleId)
-  );
+  const topScorerCoupleIds = findTopScorerCoupleIdsFromTotals(coupleTotalScore);
+  const eliminatedCoupleIds = findEliminatedCoupleIds(episodeOutcomes);
 
   const rosterPointsByManager = new Map<string, number>();
   for (const { managerId, coupleId } of rosterSlots) {

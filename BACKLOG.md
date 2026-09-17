@@ -22,24 +22,14 @@ Owner-approved, not started — do not implement UI/code until this is picked up
 
 ## Past picks vs results (Your Picks)
 
-Owner-approved, not started — do not implement UI/code until this is picked up. Lives on the league **Your Picks** tab (`?tab=yourpicks`), not a new Results tab.
+Implemented on the league **Your Picks** tab (`?tab=yourpicks`), below the current-week Curtain Call form. Not a new Results tab.
 
-**Priority:** after the spoiler Mark-as-watched fix (PR #9 / live pain); ahead of a spectator role, as an engagement feature.
+- Episode switcher reuses This Week's `WeekSwitcher` (`?tab=yourpicks&week=`). Fan labels: `formatEpisodeCasualShort` / `formatEpisodeCasualWithTheme` (`Ep. N`), not `formatEpisodeLabel`.
+- Per completed episode: your elim pick(s) vs actual, top-scorer pick vs highest `dance_scores.total_score` sum (same helper scoring uses), Curtain Call points from `weekly_manager_scores.prediction_points`.
+- Spoiler-Free: outcomes only for weeks in `resolveSpoilerCutoff` / `allowedEpisodeIds`. Unwatched completed weeks are selectable but locked (“Mark as watched to see how you did”) — no results leak.
+- v1 is **your** history only. Hidden when Curtain Call is off.
 
-**Shape:**
-
-- Keep the current week's Curtain Call form (`PickEmBox`) on top.
-- Below it (or via a switcher): **Past picks** — how *your* Curtain Call picks lined up against what happened.
-- Prefer an **episode switcher** (week/episode picker) to move between completed episodes — same mental model as This Week's `WeekSwitcher`; don't invent a second navigation paradigm. Labels should use `formatEpisodeLabel`.
-- Per selected completed episode, compact card/row:
-  - Your elim pick(s) → actual eliminated (✓/✗)
-  - Your top-scorer pick → actual top judge-total couple (✓/✗)
-  - Curtain Call points that week from existing `weekly_manager_scores.prediction_points` — don't recompute a second truth
-- Spoiler-Free: only show outcomes for weeks ≤ `last_watched_week`; unwatched weeks locked ("Mark as watched to see how you did") — no leaking unpublished-to-viewer results. Reuse the existing cutoff (`resolveSpoilerCutoff` / `allowedEpisodeIds`), don't bypass it.
-- v1 is **your** history only — no league-wide miss-rate leaderboard.
-- Skip "almost had it" / bottom-two nuance for v1.
-
-**Explicitly out of scope for this item:** implementing the feature from this note, spectator role, a separate Results tab.
+Out of scope (still): spectator role, league-wide miss-rate board, bottom-two / “almost had it”.
 
 ## Account deletion processing
 
