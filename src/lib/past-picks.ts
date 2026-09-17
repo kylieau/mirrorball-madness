@@ -79,20 +79,20 @@ export function selectPastPicksEpisode<E extends { id: string }>(
 
 export type CurtainCallMode = "picks" | "recap";
 
-export type CurtainCallSelection<E extends { id: string }> = {
-  episode: E | null;
+export type CurtainCallSelection<C extends { id: string }, L extends { id: string } = C> = {
+  episode: C | L | null;
   mode: CurtainCallMode | null;
 };
 
 // One Your Picks card: default is the live/upcoming week (the pick form).
 // A completed ?week= id shows the recap, including unwatched weeks so the
 // lock card can prompt. Unknown ids fall back to the live week, then recap.
-export function selectCurtainCallWeek<E extends { id: string }>(
-  completedEpisodesDesc: E[],
-  liveEpisode: E | null,
+export function selectCurtainCallWeek<C extends { id: string }, L extends { id: string }>(
+  completedEpisodesDesc: C[],
+  liveEpisode: L | null,
   allowedEpisodeIds: Set<string>,
   weekParam?: string | null
-): CurtainCallSelection<E> {
+): CurtainCallSelection<C, L> {
   if (weekParam) {
     if (liveEpisode && weekParam === liveEpisode.id) {
       return { episode: liveEpisode, mode: "picks" };
