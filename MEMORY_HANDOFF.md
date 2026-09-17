@@ -17,7 +17,7 @@ Your Picks after #11: section label **Curtain Call**; card title **This week's p
 
 Season Clock still uses `formatEpisodeLabel` — PR **#7** lock labeling is untouched.
 
-**Verification:** pending rebase wrap-up (lint / test / build). Live spoiler-free account still needs Vercel preview.
+**Verification:** Rebased onto `main` (#11). `npm test` 106/106, `npm run lint` clean, `npm run build` green. Your Picks: section **Curtain Call**, card title **This week's picks**, subtitle `Ep. N` / `Ep. N — theme` (+ lock line). Live spoiler-free account still needs Vercel preview.
 
 ## 3. Key Decisions & Lessons Learned
 
