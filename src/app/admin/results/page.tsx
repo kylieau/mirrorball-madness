@@ -50,14 +50,18 @@ export default async function AdminResultsPage() {
       .select(coupleFields)
       .eq("status", "active")
       .eq("season_id", activeSeasonId ?? ""),
-    supabase.from("couples").select(`${coupleFields}, status, elimination_week`),
-    supabase.from("people").select("id, name").eq("role", "judge").order("name"),
+    supabase
+      .from("couples")
+      .select(`${coupleFields}, status, elimination_week`)
+      .eq("season_id", activeSeasonId ?? ""),
+    supabase.from("people").select("id, name, archived_at").eq("role", "judge").order("name"),
     supabase.from("dance_styles").select("id, name").order("name"),
     supabase
       .from("episodes")
       .select(
         "id, week_number, airs_at, theme, status, is_finale, is_elimination_week, is_double_elimination_week, results_published_at, results_published_by"
       )
+      .eq("season_id", activeSeasonId ?? "")
       .order("week_number"),
     supabase
       .from("dance_scores")
@@ -123,7 +127,9 @@ export default async function AdminResultsPage() {
       allCouplesWithStatus={allCouplesWithStatus}
       activeCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(activeCouples))}
       allCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(allCouples))}
-      judges={sortJudgesForDisplay(judges ?? [])}
+      judges={sortJudgesForDisplay(
+        (judges ?? []).map((j) => ({ id: j.id, name: j.name, archivedAt: j.archived_at }))
+      )}
       danceStyles={danceStyles ?? []}
       episodes={episodes ?? []}
       danceScores={danceScores ?? []}

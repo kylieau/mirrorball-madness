@@ -18,6 +18,7 @@ import {
   type SaveDraftResultsInput,
   type SeasonSettingsInput,
 } from "@/lib/results-draft";
+import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
 
 // Returns userId alongside error so callers that need to stamp
 // updatedBy/createdBy/publishedBy don't need a second auth round trip.
@@ -113,16 +114,36 @@ export async function addJudge(name: string): Promise<{ error: string | null }> 
   const access = await requireResultsAccess();
   if (access.error) return access;
 
-  const trimmed = name.trim();
-  if (!trimmed) return { error: "Judge name is required" };
+  const result = await insertScoringJudge(createAdminClient(), name);
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
 
-  const { error } = await createAdminClient()
-    .from("people")
-    .insert({ name: trimmed, role: "judge" });
-  if (error) return { error: error.message };
+export async function archiveJudge(personId: string): Promise<{ error: string | null }> {
+  const access = await requireResultsAccess();
+  if (access.error) return access;
 
-  revalidatePath("/admin/results");
-  return { error: null };
+  const result = await setJudgeArchived(createAdminClient(), personId, true);
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function restoreJudge(personId: string): Promise<{ error: string | null }> {
+  const access = await requireResultsAccess();
+  if (access.error) return access;
+
+  const result = await setJudgeArchived(createAdminClient(), personId, false);
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function renameJudge(personId: string, name: string): Promise<{ error: string | null }> {
+  const access = await requireResultsAccess();
+  if (access.error) return access;
+
+  const result = await renameScoringJudge(createAdminClient(), personId, name);
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
 }
 
 export async function addDanceStyle(name: string): Promise<{ error: string | null }> {

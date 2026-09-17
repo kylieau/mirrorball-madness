@@ -40,7 +40,8 @@ import {
 import { useRelativeTimeAgo } from "@/lib/use-browser-time-zone";
 import type { DraftState } from "@/lib/results-draft";
 import { formatEpisodeLabel } from "@/lib/format-week";
-import { resolveEpisodeCoupleIds } from "@/lib/episode-participants";
+import { resultsEntryCoupleIds, selectableCast } from "@/lib/episode-cast";
+import { judgesForScoreInputs, type ScoringJudge } from "@/lib/scoring-judges";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type CoupleWithStatus = Couple & {
@@ -168,7 +169,7 @@ export function ResultsForm({
   allCouplesWithStatus: CoupleWithStatus[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
   allCoupleDisplayNames: Record<string, CoupleNameParts>;
-  judges: Named[];
+  judges: ScoringJudge[];
   danceStyles: Named[];
   episodes: ScheduledEpisode[];
   draftsByEpisode: Record<string, DraftState>;
@@ -191,18 +192,28 @@ export function ResultsForm({
   const selectedEpisode = sortedEpisodes.find((e) => e.id === selectedEpisodeId) ?? null;
   const isFinale = selectedEpisode?.is_finale ?? false;
 
-  // Narrows the couple list to whoever actually performed this episode (a
-  // split-broadcast premiere) — empty participants config means everyone,
-  // the ordinary case.
-  const episodeCouples = resolveEpisodeCoupleIds(
-    activeCouples.map((c) => c.id),
-    participantsByEpisode[selectedEpisode?.id ?? ""] ?? []
-  )
-    .map((id) => activeCouples.find((c) => c.id === id))
+  // Upcoming / unpublished: still-competing cast only, so an already-voted-off
+  // couple can't be scored again. Published weeks keep whoever was still in
+  // as of that week (and anyone already on the correction draft) so history
+  // stays editable.
+  const published = selectedEpisode?.results_published_at != null;
+  const selectable = selectedEpisode
+    ? selectableCast(allCouplesWithStatus, selectedEpisode.week_number, { published })
+    : [];
+  const episodeCoupleIds = resultsEntryCoupleIds({
+    selectableIds: selectable.map((c) => c.id),
+    participantIds: participantsByEpisode[selectedEpisode?.id ?? ""] ?? [],
+    draftCoupleIds: selectedEpisode
+      ? (draftsByEpisode[selectedEpisode.id]?.entries ?? []).map((e) => e.coupleId)
+      : [],
+    published,
+  });
+  const couplesById = new Map(allCouplesWithStatus.map((c) => [c.id, c]));
+  const episodeCouples = episodeCoupleIds
+    .map((id) => couplesById.get(id) ?? activeCouples.find((c) => c.id === id))
     .filter((c): c is Couple => !!c);
 
   const [expectedDanceCount, setExpectedDanceCount] = useState(1);
-  const [guestJudgeName, setGuestJudgeName] = useState("");
   const [judgesSaveAvailable, setJudgesSaveAvailable] = useState(false);
   const [rows, setRows] = useState<Record<string, CoupleRow>>({});
   const [customMoments, setCustomMoments] = useState<DraftState["customMoments"]>([]);
@@ -233,7 +244,18 @@ export function ResultsForm({
   const previousEpisodeId = useRef<string | null>(null);
 
   function coupleParts(c: Couple): CoupleNameParts {
-    return coupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name };
+    return (
+      allCoupleDisplayNames[c.id] ??
+      coupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name }
+    );
+  }
+
+  function namedCouple(coupleId: string): Couple | undefined {
+    return (
+      episodeCouples.find((c) => c.id === coupleId) ??
+      activeCouples.find((c) => c.id === coupleId) ??
+      allCouplesWithStatus.find((c) => c.id === coupleId)
+    );
   }
 
   // Rehydrate from the persisted draft whenever the selected episode
@@ -253,7 +275,6 @@ export function ResultsForm({
     justSavedEpisodeId.current = null;
     if (wasSelfTriggered) return;
     const draft = draftsByEpisode[selectedEpisode.id];
-    setGuestJudgeName(draft?.guestJudgeName ?? "");
     setJudgesSaveAvailable(draft?.judgesSaveAvailable ?? false);
     setRows(buildRowsFromDraft(draft, episodeCouples));
     setCustomMoments(draft?.customMoments ?? []);
@@ -278,7 +299,9 @@ export function ResultsForm({
   function buildDraftInput() {
     return {
       episodeId: selectedEpisode!.id,
-      guestJudgeName: guestJudgeName.trim() || null,
+      // Caption column is no longer editable here (it never drove scores or
+      // display). Pass through any stored value so a draft save doesn't wipe it.
+      guestJudgeName: draftsByEpisode[selectedEpisode!.id]?.guestJudgeName ?? null,
       judgesSaveAvailable,
       entries: episodeCouples.map((c) => {
         const row = rows[c.id] ?? emptyRow();
@@ -442,6 +465,12 @@ export function ResultsForm({
   }
 
   const judgeDisplayNames = buildPeopleDisplayNames(judges);
+  function judgesForDance(dance: RowDance) {
+    const scoredIds = Object.entries(dance.scores)
+      .filter(([, v]) => v !== "")
+      .map(([id]) => id);
+    return judgesForScoreInputs(judges, scoredIds);
+  }
   const episodeItems = Object.fromEntries(
     sortedEpisodes.map((e) => [
       e.id,
@@ -459,7 +488,7 @@ export function ResultsForm({
     if (!row) continue;
     if (row.savedByJudges) judgesSavePills.push(c.id);
     for (const d of row.dances) {
-      if (d.danceStyleId && isPerfectScore(d, judges.length)) {
+      if (d.danceStyleId && isPerfectScore(d, judgesForDance(d).length)) {
         perfectScorePills.push({ coupleId: c.id, danceStyleId: d.danceStyleId });
       }
     }
@@ -557,18 +586,6 @@ export function ResultsForm({
                 <p className="text-sm">{selectedEpisode.theme ?? "—"}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="guestJudge">Guest Judge</Label>
-                <Input
-                  id="guestJudge"
-                  placeholder="None this week"
-                  value={guestJudgeName}
-                  onChange={(e) => {
-                    setGuestJudgeName(e.target.value);
-                    scheduleAutosave();
-                  }}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
                 <Label htmlFor="danceCount">Dances (per couple)</Label>
                 <Input
                   id="danceCount"
@@ -596,7 +613,10 @@ export function ResultsForm({
               </div>
               <p className="text-xs text-muted-foreground sm:col-span-2">
                 Enter raw judges&apos; scores — each league&apos;s Judges&apos; Score Multiplier
-                applies automatically once results are published.
+                applies automatically once results are published. To add a score box
+                (including a one-off guest), use Settings. Archive them there when
+                they&apos;re done so they don&apos;t keep appearing as empty boxes. Leave a
+                box blank on weeks they didn&apos;t judge.
               </p>
             </CardContent>
           </Card>
@@ -611,7 +631,7 @@ export function ResultsForm({
                     couples={episodeCouples}
                     coupleParts={coupleParts}
                     danceStyles={danceStyles}
-                    judges={judges}
+                    judges={judgesForScoreInputs(judges)}
                     judgeDisplayNames={judgeDisplayNames}
                     danceCountFor={danceCountFor}
                     expectedDanceCount={expectedDanceCount}
@@ -686,7 +706,7 @@ export function ResultsForm({
                             />
                           </div>
                           <div className="flex flex-wrap items-end gap-2">
-                            {judges.map((j) => (
+                            {judgesForDance(d).map((j) => (
                               <div key={j.id} className="flex flex-col gap-1">
                                 <Label className="text-xs text-muted-foreground">
                                   {judgeDisplayNames.get(j.id) ?? j.name}
@@ -762,16 +782,22 @@ export function ResultsForm({
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2">
-                {perfectScorePills.map((p, i) => (
-                  <Badge key={i} variant="secondary">
-                    ⭐ Perfect Score — <CoupleName {...coupleParts(activeCouples.find((c) => c.id === p.coupleId)!)} />
-                  </Badge>
-                ))}
-                {judgesSavePills.map((coupleId) => (
-                  <Badge key={coupleId} variant="secondary">
-                    🛡️ Judges&apos; Save — <CoupleName {...coupleParts(activeCouples.find((c) => c.id === coupleId)!)} />
-                  </Badge>
-                ))}
+                {perfectScorePills.map((p, i) => {
+                  const couple = namedCouple(p.coupleId);
+                  return (
+                    <Badge key={i} variant="secondary">
+                      ⭐ Perfect Score — {couple ? <CoupleName {...coupleParts(couple)} /> : null}
+                    </Badge>
+                  );
+                })}
+                {judgesSavePills.map((coupleId) => {
+                  const couple = namedCouple(coupleId);
+                  return (
+                    <Badge key={coupleId} variant="secondary">
+                      🛡️ Judges&apos; Save — {couple ? <CoupleName {...coupleParts(couple)} /> : null}
+                    </Badge>
+                  );
+                })}
                 {customMoments.map((m) => (
                   <Badge key={m.id} variant="outline" className="gap-1.5">
                     {m.label}
@@ -779,7 +805,7 @@ export function ResultsForm({
                       <>
                         {" — "}
                         {(() => {
-                          const c = activeCouples.find((cc) => cc.id === m.coupleId);
+                          const c = namedCouple(m.coupleId);
                           return c ? <CoupleName {...coupleParts(c)} /> : null;
                         })()}
                       </>
