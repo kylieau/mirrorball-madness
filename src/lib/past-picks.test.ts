@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { findTopScorerCoupleIds } from "./scoring";
 import {
+  buildCurtainCallWeeks,
   buildPastPicksComparison,
   collapsePickRows,
   isPastPicksLocked,
   matchEliminationPicks,
   matchTopScorerPick,
+  selectCurtainCallWeek,
   selectPastPicksEpisode,
 } from "./past-picks";
 
@@ -60,6 +62,70 @@ describe("selectPastPicksEpisode", () => {
 
   it("falls back to the latest completed week when none are visible yet", () => {
     expect(selectPastPicksEpisode(completedDesc, new Set(), null)).toEqual(e03);
+  });
+});
+
+describe("selectCurtainCallWeek", () => {
+  const allowed = new Set(["ep-1", "ep-2"]);
+  const live = { id: "ep-4", week_number: 4 };
+
+  it("defaults to the live week so Your Picks opens on the pick form", () => {
+    expect(selectCurtainCallWeek(completedDesc, live, allowed, null)).toEqual({
+      episode: live,
+      mode: "picks",
+    });
+  });
+
+  it("honors a live week param", () => {
+    expect(selectCurtainCallWeek(completedDesc, live, allowed, "ep-4")).toEqual({
+      episode: live,
+      mode: "picks",
+    });
+  });
+
+  it("honors a completed week param, including an unwatched week", () => {
+    expect(selectCurtainCallWeek(completedDesc, live, allowed, "ep-1")).toEqual({
+      episode: e01,
+      mode: "recap",
+    });
+    expect(selectCurtainCallWeek(completedDesc, live, allowed, "ep-3")).toEqual({
+      episode: e03,
+      mode: "recap",
+    });
+  });
+
+  it("falls back to the live week when the param is unknown", () => {
+    expect(selectCurtainCallWeek(completedDesc, live, allowed, "nope")).toEqual({
+      episode: live,
+      mode: "picks",
+    });
+  });
+
+  it("falls back to the latest visible completed week when there is no live week", () => {
+    expect(selectCurtainCallWeek(completedDesc, null, allowed, null)).toEqual({
+      episode: e02,
+      mode: "recap",
+    });
+  });
+
+  it("is empty when the season has no live or completed weeks", () => {
+    expect(selectCurtainCallWeek([], null, allowed, null)).toEqual({ episode: null, mode: null });
+  });
+});
+
+describe("buildCurtainCallWeeks", () => {
+  it("appends the live week after completed weeks, sorted by week number", () => {
+    const completed = [
+      { id: "ep-2", weekNumber: 2 },
+      { id: "ep-1", weekNumber: 1 },
+    ];
+    const live = { id: "ep-3", weekNumber: 3 };
+    expect(buildCurtainCallWeeks(completed, live).map((w) => w.id)).toEqual(["ep-1", "ep-2", "ep-3"]);
+  });
+
+  it("does not duplicate a live week that is already in the completed list", () => {
+    const weeks = [{ id: "ep-1", weekNumber: 1 }];
+    expect(buildCurtainCallWeeks(weeks, weeks[0]).map((w) => w.id)).toEqual(["ep-1"]);
   });
 });
 
