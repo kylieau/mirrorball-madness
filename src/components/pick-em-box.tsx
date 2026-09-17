@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { submitPrediction } from "@/app/leagues/[id]/predictions/actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,13 +10,67 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Chip } from "@/components/chip";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { coupleNameNode } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
+
+const CHOOSE_COUPLE = "Choose a couple…";
+
+function CoupleSelect({
+  id,
+  label,
+  value,
+  onChange,
+  couples,
+  nameFor,
+  excludeId,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (coupleId: string) => void;
+  couples: Couple[];
+  nameFor: (coupleId: string) => ReactNode;
+  excludeId?: string;
+}) {
+  const options = couples.filter((c) => c.id !== excludeId);
+  const items: Record<string, ReactNode> = {
+    "": CHOOSE_COUPLE,
+    ...Object.fromEntries(options.map((c) => [c.id, nameFor(c.id)])),
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Select items={items} value={value} onValueChange={(v) => onChange(v ?? "")}>
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue placeholder={CHOOSE_COUPLE} />
+        </SelectTrigger>
+        {/* Default alignItemWithTrigger pins the selected row to the trigger,
+            which on a full-cast list covers the rest of the form on a phone. */}
+        <SelectContent align="start" alignItemWithTrigger={false}>
+          <SelectItem value="">{CHOOSE_COUPLE}</SelectItem>
+          {options.map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              {nameFor(c.id)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 export function PickEmBox({
   leagueId,
@@ -63,7 +117,7 @@ export function PickEmBox({
   const [error, setError] = useState<string | null>(null);
   // Starts in read-only "here's what you picked" mode whenever a pick
   // already exists (a fresh page load with a saved prediction) — editing
-  // reopens the chip pickers, saving successfully closes them again.
+  // reopens the dropdowns, saving successfully closes them again.
   const [editing, setEditing] = useState(
     !existingPrediction?.predicted_eliminated_couple_id && !existingPrediction?.predicted_top_scorer_couple_id
   );
@@ -87,24 +141,14 @@ export function PickEmBox({
     );
   }
 
-  function toggleEliminated(coupleId: string) {
-    if (!isDoubleElimination) {
-      setEliminatedId(eliminatedId === coupleId ? "" : coupleId);
+  function handleEliminatedChange(slot: 1 | 2, next: string) {
+    if (slot === 1) {
+      setEliminatedId(next);
+      if (next && next === eliminatedId2) setEliminatedId2("");
       return;
     }
-    if (eliminatedId === coupleId) {
-      setEliminatedId("");
-      return;
-    }
-    if (eliminatedId2 === coupleId) {
-      setEliminatedId2("");
-      return;
-    }
-    if (!eliminatedId) {
-      setEliminatedId(coupleId);
-    } else if (!eliminatedId2) {
-      setEliminatedId2(coupleId);
-    }
+    setEliminatedId2(next);
+    if (next && next === eliminatedId) setEliminatedId("");
   }
 
   // On a double-elimination week, submit_prediction enforces "both slots
@@ -155,36 +199,45 @@ export function PickEmBox({
         {!isLocked ? (
           editing ? (
             <>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium">
-                  Who Gets Eliminated?{isDoubleElimination ? " (pick both!)" : ""}
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {activeCouples.map((c) => (
-                    <Chip
-                      key={c.id}
-                      selected={eliminatedId === c.id || eliminatedId2 === c.id}
-                      onClick={() => toggleEliminated(c.id)}
-                    >
-                      {nameFor(c.id)}
-                    </Chip>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium">Who Scores Highest?</label>
-                <div className="flex flex-wrap gap-2">
-                  {activeCouples.map((c) => (
-                    <Chip
-                      key={c.id}
-                      selected={topScorerId === c.id}
-                      onClick={() => setTopScorerId(topScorerId === c.id ? "" : c.id)}
-                    >
-                      {nameFor(c.id)}
-                    </Chip>
-                  ))}
-                </div>
-              </div>
+              {isDoubleElimination ? (
+                <>
+                  <CoupleSelect
+                    id="eliminated-1"
+                    label="Eliminated (1 of 2)"
+                    value={eliminatedId}
+                    onChange={(v) => handleEliminatedChange(1, v)}
+                    couples={activeCouples}
+                    nameFor={nameFor}
+                    excludeId={eliminatedId2 || undefined}
+                  />
+                  <CoupleSelect
+                    id="eliminated-2"
+                    label="Eliminated (2 of 2)"
+                    value={eliminatedId2}
+                    onChange={(v) => handleEliminatedChange(2, v)}
+                    couples={activeCouples}
+                    nameFor={nameFor}
+                    excludeId={eliminatedId || undefined}
+                  />
+                </>
+              ) : (
+                <CoupleSelect
+                  id="eliminated"
+                  label="Who goes home?"
+                  value={eliminatedId}
+                  onChange={setEliminatedId}
+                  couples={activeCouples}
+                  nameFor={nameFor}
+                />
+              )}
+              <CoupleSelect
+                id="top-scorer"
+                label="Who scores highest?"
+                value={topScorerId}
+                onChange={setTopScorerId}
+                couples={activeCouples}
+                nameFor={nameFor}
+              />
               <div className="flex gap-2">
                 <Button onClick={handleSubmit} disabled={submitting || !eliminationPickValid}>
                   {submitting ? "Saving..." : "Save prediction"}
@@ -208,11 +261,15 @@ export function PickEmBox({
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Eliminated</span>
                   <span className="font-medium">
-                    {eliminatedId && eliminatedId2
-                      ? `${nameFor(eliminatedId)} & ${nameFor(eliminatedId2)}`
-                      : eliminatedId
-                        ? nameFor(eliminatedId)
-                        : "No pick"}
+                    {eliminatedId && eliminatedId2 ? (
+                      <>
+                        {nameFor(eliminatedId)} & {nameFor(eliminatedId2)}
+                      </>
+                    ) : eliminatedId ? (
+                      nameFor(eliminatedId)
+                    ) : (
+                      "No pick"
+                    )}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
