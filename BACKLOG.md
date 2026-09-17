@@ -4,21 +4,13 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Home season strip (`/today`)
 
-Owner-approved, not started — do not implement UI/code until this is picked up. Lives at the **top of Home** (`/today`), season-scoped via `active_season_id()`, **not** per-league. Do not add it onto each league card.
+Implemented at the **top of Home** (`/today`), season-scoped via `active_season_id()`, **not** per-league. Not on each league card.
 
-**Priority:** after Curtain Call couple dropdowns (PR #13) and the spoiler Mark-as-watched fix (PR #9 / live pain).
+- Small card/strip — **Just aired** (latest completed) and **Up next** (next non-completed, including `locked`). Fan labels: `formatEpisodeCasualWithTheme` (`Ep. N — {theme}`) plus `episodes.airs_at` as the show-night date (US Eastern). Not `formatEpisodeLabel`.
+- Whole strip taps to This Week (`/this-week`).
+- Spoiler-Free: theme and air date only. Results/scores/who went home stay on This Week behind `resolveSpoilerCutoff`. Pending reveal remains `SpoilerRevealCallout` — the strip does not duplicate it.
 
-**Shape:**
-
-- Small card/strip, not a schedule dump. Admin Schedule owns the full season list; Home only shows:
-  - **Just aired** — latest completed episode: casual `Ep. N — {theme}` + air date
-  - **Up next** — next upcoming episode: `Ep. N — {theme}` + air date
-- Use the fan helpers in `src/lib/format-week.ts` (`formatEpisodeCasualWithTheme` / `formatEpisodeCasualShort`) — not `formatEpisodeLabel` (`S35 E02`). Theme is `episodes.theme`; air date is `episodes.airs_at`.
-- Tap → This Week (`/this-week`) in v1. A light schedule-detail destination can come later; don't invent a third nav surface now.
-- Optional lock-time hint on **Up next** is later polish, not v1.
-- Spoiler-Free: same gate spirit as This Week (`resolveSpoilerCutoff` / `last_watched_week`). Do **not** leak results, scores, or who went home for weeks the viewer hasn't marked watched. Theme and air date are OK to show, **or** keep **Just aired** vague until marked watched (Home already has `SpoilerRevealCallout` for that pending-reveal state — don't fight it or duplicate a results leak). Reuse the existing cutoff; don't bypass it.
-
-**Explicitly out of scope for this item:** implementing the feature from this note, dumping the full season schedule on Home, a new schedule page, lock-time hint (later).
+Out of scope (still): full season schedule dump, a new schedule page, lock-time hint on **Up next**.
 
 ## Past picks vs results (Your Picks)
 
