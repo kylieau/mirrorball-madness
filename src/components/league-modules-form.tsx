@@ -27,6 +27,13 @@ import {
 } from "@/lib/use-browser-time-zone";
 import { explainGrandFinaleMethod } from "@/lib/grand-finale-explainer";
 import { formatEpisodeLabel } from "@/lib/format-week";
+import {
+  airsAtForWeek,
+  explainGrandFinaleDeadline,
+  explainSeasonClock,
+  formatLockWithEpisode,
+  previewLockWeek,
+} from "@/lib/season-clock";
 
 type ScoringMethod = "exact_position" | "distance_based" | "binary_tier";
 type WaiverMode = "locked" | "waivers";
@@ -65,7 +72,7 @@ type League = {
   draft_scheduled_at: string | null;
 };
 
-type SeasonEpisode = { week_number: number; theme: string | null };
+type SeasonEpisode = { week_number: number; theme: string | null; airs_at: string };
 
 const METHOD_ITEMS: Record<ScoringMethod, string> = {
   exact_position: "Exact position",
@@ -102,7 +109,7 @@ export function LeagueModulesForm({
   canEdit,
   seasonEpisodes,
   seasonNumber,
-  hardDeadlineAirsAt,
+  effectiveHardDeadlineWeek,
 }: {
   leagueId: string;
   league: League;
@@ -110,11 +117,11 @@ export function LeagueModulesForm({
   canEdit: boolean;
   seasonEpisodes: SeasonEpisode[];
   seasonNumber: number | null;
-  // The resolved Hard Deadline episode's air time (effective_grand_finale_
-  // deadline) — never commissioner-set, so there's nothing here for them to
-  // edit. Powers both the Season Clock card and Grand Finale's own Deadline
-  // row below.
-  hardDeadlineAirsAt: string | null;
+  // effective_hard_deadline_week — the episode Grand Finale actually locks
+  // at. May have auto-advanced past the commissioner's Anchor week while a
+  // Dance Card draft is still open; the Season Clock labels that episode
+  // next to its airs_at so the two can't look like a mismatched pair.
+  effectiveHardDeadlineWeek: number | null;
 }) {
   const browserTimeZone = useBrowserTimeZone();
 
@@ -181,7 +188,6 @@ export function LeagueModulesForm({
     league.prediction_lock_hours_before_air
   );
 
-  const formattedHardDeadlineAirsAt = useFormattedDeadline(hardDeadlineAirsAt);
   const [bonusMethod, setBonusMethod] = useState<ScoringMethod>(
     (scoringSettings?.bonus_picks_scoring_method as ScoringMethod) ?? "exact_position"
   );
@@ -196,6 +202,33 @@ export function LeagueModulesForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const lockWeek = previewLockWeek({
+    anchorWeek: judgesStartsWeek,
+    effectiveHardDeadlineWeek,
+    danceCardEnabled: judgesEnabled,
+    draftStatus: league.draft_status,
+  });
+  const lockAirsAt = airsAtForWeek(seasonEpisodes, lockWeek);
+  const formattedLockAirsAt = useFormattedDeadline(lockAirsAt);
+  const lockDisplay = formatLockWithEpisode(
+    lockWeek,
+    seasonNumber,
+    formattedLockAirsAt,
+    lockAirsAt != null
+  );
+  const seasonClockCopy = explainSeasonClock({
+    anchorWeek: judgesStartsWeek,
+    lockWeek,
+    seasonNumber,
+    danceCardEnabled: judgesEnabled,
+    draftStatus: league.draft_status,
+  });
+  const grandFinaleDeadlineCopy = explainGrandFinaleDeadline({
+    anchorWeek: judgesStartsWeek,
+    lockWeek,
+    seasonNumber,
+  });
 
   async function handleSave() {
     setError(null);
@@ -292,13 +325,11 @@ export function LeagueModulesForm({
           </CardHeader>
           <CardContent className="flex flex-col">
             <SettingRow label="Anchor week" value={formatEpisodeLabel(judgesStartsWeek, seasonNumber)} />
-            <SettingRow label="Currently locks" value={hardDeadlineAirsAt ? formattedHardDeadlineAirsAt : "—"} />
-            <p className="pt-2 text-sm text-muted-foreground">
-              Judges&apos; Score starts counting from this week (if Dance Card is on), and Grand
-              Finale locks the moment this episode airs. The draft is expected to finish by then
-              but isn&apos;t hard-blocked — if it&apos;s still open when this episode airs, the
-              deadline pushes to the next one automatically until the draft wraps.
-            </p>
+            <SettingRow
+              label="Currently locks"
+              value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}
+            />
+            <p className="pt-2 text-sm text-muted-foreground">{seasonClockCopy}</p>
           </CardContent>
         </Card>
 
@@ -362,7 +393,7 @@ export function LeagueModulesForm({
             <CardContent className="flex flex-col">
               <SettingRow
                 label="Deadline"
-                value={hardDeadlineAirsAt ? formattedHardDeadlineAirsAt : "—"}
+                value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}
               />
               <SettingRow label="Points per correctly-placed couple" value={bonusPicksPointsPerCorrect} />
               <SettingRow label="Scoring method" value={METHOD_ITEMS[bonusMethod]} />
@@ -452,17 +483,10 @@ export function LeagueModulesForm({
             </div>
             <div className="flex flex-col gap-2">
               <Label>Currently locks</Label>
-              <p className="flex h-8 items-center text-sm">
-                {hardDeadlineAirsAt ? formattedHardDeadlineAirsAt : "—"}
-              </p>
+              <p className="flex min-h-8 items-center text-sm">{lockDisplay}</p>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Judges&apos; Score starts counting from this week (if Dance Card is on), and Grand
-            Finale locks the moment this episode airs. The draft is expected to finish by then but
-            isn&apos;t hard-blocked — if it&apos;s still open when this episode airs, the deadline
-            pushes to the next one automatically until the draft wraps.
-          </p>
+          <p className="text-sm text-muted-foreground">{seasonClockCopy}</p>
         </CardContent>
       </Card>
 
@@ -727,13 +751,8 @@ export function LeagueModulesForm({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label>Deadline{browserTimeZone ? ` (${browserTimeZone})` : ""}</Label>
-                <p className="flex h-8 items-center text-sm">
-                  {hardDeadlineAirsAt ? formattedHardDeadlineAirsAt : "—"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Locks automatically at the Season Clock&apos;s anchor week (above) — nothing to
-                  set here.
-                </p>
+                <p className="flex min-h-8 items-center text-sm">{lockDisplay}</p>
+                <p className="text-xs text-muted-foreground">{grandFinaleDeadlineCopy}</p>
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="bonusPicksPointsPerCorrect">Points per correctly-placed couple</Label>
