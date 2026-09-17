@@ -22,7 +22,7 @@ Past picks vs results is on `cursor/past-picks-vs-results-c74f` (draft PR into `
 - Recast/waivers spoiler framing; `/notifications` `rankBadge` leak; roster-eliminated clamp; feature-announcement infra.
 - Spectator role, league-wide miss-rate board, bottom-two / “almost had it” — still out of scope for Past picks v1.
 
-## 5. Next Steps
+After this work: `npm run lint` clean, `npm test` **146**, `npm run build` passed. Live phone click-path was not exercised here (no Supabase credentials in this container).
 
-1. Coordinator: phone (~390px) click-path — Your Picks → Past picks → switch episodes; Spoiler-Free lock. Do not merge from the agent.
+## 5. Next Steps
 2. Otherwise wait.
