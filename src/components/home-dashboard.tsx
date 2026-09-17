@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { DeadlineStub } from "@/components/deadline-stub";
+import { SpoilerRevealCallout } from "@/components/spoiler-reveal-callout";
 import { formatCountdown } from "@/lib/format-countdown";
 import { SettingsIcon } from "lucide-react";
 
@@ -39,16 +40,7 @@ export function HomeDashboard({
         {needingPicks > 0 ? ` · ${needingPicks} need${needingPicks === 1 ? "s" : ""} picks` : " · all caught up"}
       </p>
 
-      {pendingReveal && (
-        <div className="mb-2.5">
-          <DeadlineStub
-            label="Spoiler-Free Mode"
-            headline={`Episode ${pendingReveal.weekNumber} results are in`}
-            ctaLabel="Mark as watched"
-            href="/this-week"
-          />
-        </div>
-      )}
+      {pendingReveal && <SpoilerRevealCallout weekNumber={pendingReveal.weekNumber} />}
 
       {deadlines.length > 0 && (
         <div className="flex flex-col gap-2.5">
