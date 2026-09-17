@@ -13,9 +13,21 @@ Out of scope (still): full season schedule dump, a new schedule page, lock-time 
 
 ## Bottom nav width + sticky desktop
 
-Implemented — fan and admin tab bars stay `fixed` to the viewport bottom on every width (same as phone) and span the `max-w-2xl` content column. Shared wrapper: `BottomNav` / `FanBottomNav` in `src/components/bottom-nav.tsx`. Surfaces: Home (`/today`), Results (`/this-week`), league tabs (`LeagueTabs`), admin (`AdminResultsTabs`).
+Implemented (PR #18) — fan and admin tab bars stay `fixed` to the viewport bottom on every width (same as phone) and span the `max-w-2xl` content column. Shared wrapper: `BottomNav` / `FanBottomNav` in `src/components/bottom-nav.tsx`. Surfaces: Home (`/today`), Results (`/this-week`), league tabs (`LeagueTabs`), admin (`AdminResultsTabs`).
 
-Out of scope (still): episode dropdown same-line layout; redesigning icons/labels.
+Out of scope (still): redesigning icons/labels.
+
+## View Results / layout polish
+
+### Episode dropdown on the title line
+
+**Superseded by EpisodeCarousel** (PR #17). Fan Results no longer uses `WeekSwitcher` above the theme — the slim ← `Ep. N — {theme}` → control sits under the Results title (`PageHeader` children on `/this-week`). The original nit (dropdown sitting *above* the episode title; wanted same-line, right-aligned) applied to that WeekSwitcher chrome and is gone. Picks uses the same carousel inside the Curtain Call card.
+
+Admin View Results is accordion-by-week and has no episode dropdown. Admin Enter Results' "Scheduled Episode" `Select` is form chrome under the card title, not the fan switcher — not parked.
+
+### DND / "—" display (live check still owed)
+
+Code already maps `episode_results.outcome = 'bye'` → badge **DND**, pts **—** on Admin View Results (by week and by couple) and public Results (`/this-week`). Still needs a real published Did Not Dance couple to confirm on those surfaces. Do not invent a fake production row.
 
 ## Past picks vs results (Picks)
 
