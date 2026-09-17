@@ -152,14 +152,14 @@ export function WeeklyResultsView({
 
       {eliminated.length > 0 && (
         <div className="mb-4 rounded-2xl border border-primary/40 bg-linear-to-br from-curtain to-curtain-light px-5 py-4 text-center">
-          <p className="text-xs text-accent">Eliminated this week</p>
+          <p className="text-xs text-accent">Eliminated</p>
           <p className="mt-1 font-heading text-lg font-semibold">
             {eliminated.map((r) => (r.parts ? `${r.parts.celebrity} & ${r.parts.pro}` : "Unknown")).join(", ")}
           </p>
         </div>
       )}
 
-      <div className="mb-2 text-sm font-semibold text-accent">This week&apos;s dances</div>
+      <div className="mb-2 text-sm font-semibold text-accent">Leaderboard</div>
       <div className="flex flex-col gap-2.5">
         {outcomes.map((r) => {
           const tag = outcomeTag(r);

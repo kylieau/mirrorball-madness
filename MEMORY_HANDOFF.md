@@ -9,6 +9,7 @@ Draft PR #17 (`cursor/home-season-strip-d84d`): fan tabs read **Home / Results /
 - Bottom nav + page titles: This Week → **Results**, Your picks → **Picks**. Home and Standings unchanged.
 - `CurtainCallCard` title is **Curtain Call** (not “This week's picks”, not “Picks”). Episode identity stays on the carousel.
 - Docs updated for the new tab names.
+- Results copy: banner kicker **Eliminated**; dance list heading **Leaderboard**.
 
 ## 3. Key Decisions & Lessons Learned
 
