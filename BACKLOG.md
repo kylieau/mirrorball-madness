@@ -41,6 +41,26 @@ Owner-approved, not started — do not implement UI/code until this is picked up
 
 **Explicitly out of scope for this item:** implementing the feature from this note, spectator role, a separate Results tab.
 
+## View Results / This Week layout polish
+
+Owner-noted, not started — do not implement UI/code until this is picked up. Fan This Week (`/this-week`) and Admin View Results. Grouped here so phone/iOS layout nits on those surfaces don't scatter.
+
+### Episode dropdown on the title line
+
+Kylie (via Chief Kimo): she doesn't like the episode dropdown selector sitting *above* the episode title. Move it to the **same line as the title, right-aligned**.
+
+**Symptom:** chevron/switcher sits above the episode theme line (e.g. "— Premiere: Night Two…"). On This Week, `WeekSwitcher` is `PageHeader` children — stacked under the "This Week" heading and gold rule — then `WeeklyResultsView` renders `formatEpisodeCasualWithTheme` as its own line.
+
+**Reference UX:** Curtain Call's **Past picks** card on the league Your Picks tab (`?tab=yourpicks`) — title left, `WeekSwitcher` in `CardAction` right. That layout is the model. Do not treat this item as implementing Past picks (that's the section above; still not started on `main` until that PR lands).
+
+Do not change `PageHeader`'s league-switcher slot on Your Picks / Standings as part of this.
+
+### DND / "—" display (live check still owed)
+
+Code already maps `episode_results.outcome = 'bye'` → badge **DND**, pts **—** on Admin View Results (by week and by couple) and public This Week. Still needs a real published Did Not Dance couple to confirm on those surfaces. Do not invent a fake production row.
+
+**Explicitly out of scope for this item:** implementing the dropdown layout from this note.
+
 ## Account deletion processing
 
 `request_account_deletion` records a request (`profiles.deletion_requested_at`) but nothing surfaces the list of pending requests anywhere. Needs at minimum a way to query it (a Supabase dashboard SQL query is fine for now, given the scale); eventually a small admin view if this ever needs to happen regularly.
