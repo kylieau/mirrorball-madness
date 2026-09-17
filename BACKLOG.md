@@ -2,21 +2,22 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
-## Home season strip (`/today`)
+## This Week episode carousel (`/this-week`)
 
-Implemented at the **top of Home** (`/today`), season-scoped via `active_season_id()`, **not** per-league. Not on each league card.
+Implemented on **This Week only** — not on Home, not on Past picks. Replaces the old `WeekSwitcher` sheet on this tab.
 
-- Horizontal episode carousel (left/right arrows). One slide per active-season episode: `formatEpisodeCasualWithTheme` (`Ep. N — {theme}`) plus `episodes.airs_at` as the show-night date (US Eastern). Kickers only on the season cursor: **This past week** / **Up next**.
-- Browse-only — no link to This Week. Default focused slide is the most recent completed episode; before premiere, the first upcoming.
-- Spoiler-Free: theme and air date only. Results/scores/who went home stay on This Week behind `resolveSpoilerCutoff`. Pending reveal remains `SpoilerRevealCallout` — the carousel does not duplicate it.
+- Slim ← `Ep. N — {theme}` → control (`formatEpisodeCasualWithTheme`). Prev/next are `/this-week?week=` links so flipping re-renders that week's body.
+- Carousel weeks: spoiler-visible completed episodes **plus** upcoming/locked for a theme peek. Unwatched completed weeks are omitted so `?week=` cannot leak results.
+- Completed + visible → results (dances / scores / who went home). Upcoming or locked → theme peek, no scores. Default is the latest visible completed week; before premiere, the first peek week.
+- Pending reveal stays `WeeklyResultsView`'s mark-as-watched card. Home has no season strip/carousel.
 
-Out of scope (still): full season schedule dump, a new schedule page, lock-time hint, deep-link from a slide.
+Out of scope (still): full season schedule dump, a new schedule page, lock-time hint, Home timeline.
 
 ## Past picks vs results (Your Picks)
 
 Implemented on the league **Your Picks** tab (`?tab=yourpicks`), below the current-week Curtain Call form. Not a new Results tab.
 
-- Episode switcher reuses This Week's `WeekSwitcher` (`?tab=yourpicks&week=`). Fan labels: `formatEpisodeCasualShort` / `formatEpisodeCasualWithTheme` (`Ep. N`), not `formatEpisodeLabel`.
+- Episode switcher stays the Ep. N `WeekSwitcher` chip (`?tab=yourpicks&week=`). Do not replace it with This Week's carousel. Fan labels: `formatEpisodeCasualShort` / `formatEpisodeCasualWithTheme` (`Ep. N`), not `formatEpisodeLabel`.
 - Per completed episode: your elim pick(s) vs actual, top-scorer pick vs highest `dance_scores.total_score` sum (same helper scoring uses), Curtain Call points from `weekly_manager_scores.prediction_points`.
 - Spoiler-Free: outcomes only for weeks in `resolveSpoilerCutoff` / `allowedEpisodeIds`. Unwatched completed weeks are selectable but locked (“Mark as watched to see how you did”) — no results leak.
 - v1 is **your** history only. Hidden when Curtain Call is off.

@@ -3,7 +3,7 @@ import { CoupleName } from "@/components/couple-name";
 import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
 import { cn } from "cn";
 import type { CoupleNameParts } from "@/lib/couple-display";
-import { formatEpisodeCasual, formatEpisodeCasualWithTheme } from "@/lib/format-week";
+import { formatEpisodeCasual } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -149,9 +149,6 @@ export function WeeklyResultsView({
   return (
     <div>
       {pendingCard && <div className="mb-4">{pendingCard}</div>}
-      <p className="mb-4 text-sm text-muted-foreground">
-        {formatEpisodeCasualWithTheme(episode.week_number, episode.theme)}, the actual results
-      </p>
 
       {eliminated.length > 0 && (
         <div className="mb-4 rounded-2xl border border-primary/40 bg-linear-to-br from-curtain to-curtain-light px-5 py-4 text-center">

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 // The shared title + gold rule every tab opens with, so Home/This Week/Your
 // Picks/Standings all read as the same kind of screen. `children`, when
 // given, is the tab-specific "switcher" slot directly under the rule — the
-// league switcher on Your Picks/Standings, the week switcher on This Week,
+// league switcher on Your Picks/Standings, the episode carousel on This Week,
 // nothing on Home.
 export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
   return (

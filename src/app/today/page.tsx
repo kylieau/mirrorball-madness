@@ -7,7 +7,6 @@ import { TopBar } from "@/components/top-bar";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
-import { sortSeasonEpisodes } from "@/lib/season-strip";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { HomeIcon, ListChecksIcon, PencilLineIcon, TrophyIcon } from "lucide-react";
 
@@ -24,14 +23,13 @@ export default async function TodayPage() {
     redirect("/login");
   }
 
-  const [{ data: memberships }, accountSettingsData, { data: activeSeasonId }] = await Promise.all([
+  const [{ data: memberships }, accountSettingsData] = await Promise.all([
     supabase
       .from("league_members")
       .select("joined_at, leagues(id, name)")
       .eq("user_id", user.id)
       .order("joined_at", { ascending: true }),
     getAccountSettingsData(supabase, user.id),
-    supabase.rpc("active_season_id"),
   ]);
 
   const leagueRefs = (memberships ?? []).map((m) => m.leagues!).filter(Boolean);
@@ -42,37 +40,31 @@ export default async function TodayPage() {
 
   const firstLeagueId = leagueRefs[0].id;
 
-  const { data: seasonEpisodeRows } = await supabase
+  const { data: upcomingEpisode } = await supabase
     .from("episodes")
-    .select("id, week_number, status, theme, airs_at, results_published_at")
-    .eq("season_id", activeSeasonId ?? "")
-    .order("week_number", { ascending: false });
+    .select("id, week_number")
+    .eq("status", "upcoming")
+    .order("week_number", { ascending: true })
+    .limit(1)
+    .maybeSingle();
 
-  const episodes = seasonEpisodeRows ?? [];
-  const completedEpisodes = episodes.filter((e) => e.status === "completed");
-  const upcomingEpisode =
-    [...episodes]
-      .filter((e) => e.status === "upcoming")
-      .sort((a, b) => a.week_number - b.week_number)[0] ?? null;
-  const seasonEpisodes = sortSeasonEpisodes(
-    episodes.map((e) => ({
-      id: e.id,
-      week_number: e.week_number,
-      status: e.status,
-      theme: e.theme,
-      airs_at: e.airs_at,
-    }))
-  );
+  const { data: activeSeasonId } = await supabase.rpc("active_season_id");
+  const { data: completedEpisodes } = await supabase
+    .from("episodes")
+    .select("id, week_number, results_published_at")
+    .eq("season_id", activeSeasonId ?? "")
+    .eq("status", "completed")
+    .order("week_number", { ascending: false });
 
   const cutoff = await resolveSpoilerCutoff(
     supabase,
     user.id,
     activeSeasonId ?? null,
     accountSettingsData.spoilerFreeMode,
-    completedEpisodes
+    completedEpisodes ?? []
   );
 
-  const trueLatestCompletedEpisode = completedEpisodes[0] ?? null;
+  const trueLatestCompletedEpisode = completedEpisodes?.[0] ?? null;
   const latestCompletedEpisodeId = cutoff.effectiveLatestEpisode?.id ?? null;
   const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
   // Same season-wide figure on every league card (episodes aren't scoped
@@ -169,7 +161,6 @@ export default async function TodayPage() {
           deadlines={deadlines}
           recentActivity={recentActivity}
           pendingReveal={pendingReveal}
-          seasonEpisodes={seasonEpisodes}
         />
       </div>
 

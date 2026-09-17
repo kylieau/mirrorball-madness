@@ -22,9 +22,10 @@ function weekHref(week: SwitcherWeek): string {
   return week.href ?? `/this-week?week=${week.id}`;
 }
 
-// Lives in This Week's switcher slot — and Past picks on Your Picks, via
-// per-week href strings — the analog of the league switcher: browse past
-// weeks instead of just the latest. Nothing to switch to with only one
+// Past picks on Your Picks — the analog of the league switcher: browse past
+// weeks instead of just the latest. Per-week href strings, because this is
+// a Client Component rendered from a Server Component. This Week uses the
+// slim episode carousel instead. Nothing to switch to with only one
 // completed week, so it renders nothing rather than a dead chip.
 export function WeekSwitcher({
   currentEpisodeId,
