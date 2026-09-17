@@ -2,29 +2,27 @@
 
 ## 1. Current State
 
-Home season strip is on `cursor/home-season-strip-d84d` (draft PR into `main`, after Past picks #15). Owner-approved item from BACKLOG.md. Season-scoped on `/today` only — not per-league. Do not merge from the agent.
+Home season strip redesign is on `cursor/home-season-strip-d84d` (draft PR #17 into `main`). Owner asked to replace the Just aired / Up next This Week link with a browse-only episode carousel. Do not merge from the agent.
 
 ## 2. Changes Made
 
-- Top of Home: compact Just aired / Up next card. Latest `completed` episode and the next non-completed (`upcoming` or `locked`) from the active season.
-- Fan labels via `formatEpisodeCasualWithTheme` (`Ep. N — {theme}`). Air date is `episodes.airs_at` formatted as the show-night calendar date in `America/New_York` (a Tuesday 8pm ET episode still reads Tuesday, including in time zones where that instant is Wednesday).
-- Whole strip is one tap target → `/this-week`. No lock-time hint, no schedule dump.
-- Spoiler-Free: strip shows theme + air date only. Does not list results, scores, or who went home. `SpoilerRevealCallout` still owns the pending-reveal interrupt; Home still feeds league cards through `resolveSpoilerCutoff`.
+- Top of Home: horizontal episode carousel for the active season. Left/right arrows (40px tap targets). One slide per episode — `Ep. N — {theme}` + show-night air date (US Eastern).
+- Browse-only: no whole-card (or any) link to `/this-week`. Swipe on the slide also moves when the gesture is more horizontal than vertical.
+- Kickers only on the season cursor: **This past week** (latest completed) and **Up next** (next non-completed, including `locked`). Earlier/later slides are unlabeled so this is not a schedule dump.
+- **Default slide:** most recent completed episode. Before premiere, index 0 (first upcoming). After finale, the finale. Mid-week stays on "this past week"; the right arrow is the peek at next theme.
+- Spoiler-Free: theme + air date only. `SpoilerRevealCallout` still owns pending reveal.
 
 ## 3. Key Decisions & Lessons Learned
 
-- Theme and air date are schedule facts, not results — keeping Just aired vague would fight the existing “Episode N results are in” callout, which already names the week.
-- Up next includes `locked` so the week that just locked (or is airing) does not disappear between pick-lock and results publish.
-- Fixed Eastern air-date formatting is SSR-safe (no viewer-TZ hydration guard). Viewer-local lock time is still later polish.
-
-After this work: `npm run lint` clean, `npm test` **160**, `npm run build` passed. Live Home click-path was not exercised here (no Supabase credentials in this container). Phone (~390px) visual pass is for the coordinator.
+- Defaulting to Up next mid-week would skip the week people are talking about (and that the spoiler callout may already be naming). Completed-as-cursor + arrow-to-upcoming is the split.
+- Transform carousel (not a This Week link, not scroll-snap-to-a-new-page). Deep-link from a slide is still out of scope.
 
 ## 4. Backlog & Deferred Items
 
-- Full season schedule dump / a schedule-detail page / Up next lock-time hint — still out of scope.
+- Full season schedule dump / a schedule-detail page / lock-time hint / slide deep-link — still out of scope.
 - Recast/waivers spoiler framing; `/notifications` `rankBadge` leak; roster-eliminated clamp; feature-announcement infra.
 
 ## 5. Next Steps
 
-1. Coordinator: phone (~390px) Home — strip at top, tap → This Week; Spoiler-Free still uses the existing Mark-as-watched callout (no results on the strip). Do not merge from the agent.
+1. Coordinator: phone (~390px) Home — arrows usable, long themes truncate, default is this past week; carousel does not fight the Mark-as-watched callout. Do not merge from the agent.
 2. Otherwise wait.

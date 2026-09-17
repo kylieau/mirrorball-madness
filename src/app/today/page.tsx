@@ -7,7 +7,7 @@ import { TopBar } from "@/components/top-bar";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
-import { pickSeasonStripSlots } from "@/lib/season-strip";
+import { sortSeasonEpisodes } from "@/lib/season-strip";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { HomeIcon, ListChecksIcon, PencilLineIcon, TrophyIcon } from "lucide-react";
 
@@ -54,7 +54,7 @@ export default async function TodayPage() {
     [...episodes]
       .filter((e) => e.status === "upcoming")
       .sort((a, b) => a.week_number - b.week_number)[0] ?? null;
-  const seasonStrip = pickSeasonStripSlots(
+  const seasonEpisodes = sortSeasonEpisodes(
     episodes.map((e) => ({
       id: e.id,
       week_number: e.week_number,
@@ -169,7 +169,7 @@ export default async function TodayPage() {
           deadlines={deadlines}
           recentActivity={recentActivity}
           pendingReveal={pendingReveal}
-          seasonStrip={seasonStrip}
+          seasonEpisodes={seasonEpisodes}
         />
       </div>
 

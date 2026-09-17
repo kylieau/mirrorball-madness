@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  defaultSeasonStripIndex,
   formatAirDate,
-  pickSeasonStripSlots,
-  seasonStripAriaLabel,
+  seasonStripKicker,
+  sortSeasonEpisodes,
   type SeasonStripEpisode,
 } from "./season-strip";
 
@@ -21,33 +22,57 @@ function ep(
   };
 }
 
-describe("pickSeasonStripSlots", () => {
-  it("returns empty slots when the season has no episodes", () => {
-    expect(pickSeasonStripSlots([])).toEqual({ justAired: null, upNext: null });
-  });
-
-  it("uses the latest completed week as Just aired, ignoring input order", () => {
+describe("sortSeasonEpisodes", () => {
+  it("orders by week_number ascending without mutating the input", () => {
     const e01 = ep(1, "completed");
+    const e03 = ep(3, "upcoming");
     const e02 = ep(2, "completed");
-    const e03 = ep(3, "upcoming");
-    expect(pickSeasonStripSlots([e01, e03, e02])).toEqual({ justAired: e02, upNext: e03 });
+    const input = [e03, e01, e02];
+    expect(sortSeasonEpisodes(input).map((e) => e.week_number)).toEqual([1, 2, 3]);
+    expect(input.map((e) => e.week_number)).toEqual([3, 1, 2]);
+  });
+});
+
+describe("defaultSeasonStripIndex", () => {
+  it("is 0 when the season has no episodes", () => {
+    expect(defaultSeasonStripIndex([])).toBe(0);
   });
 
-  it("treats a locked episode as Up next so lock-to-publish does not skip a week", () => {
-    const e01 = ep(1, "completed");
-    const e02 = ep(2, "locked");
-    const e03 = ep(3, "upcoming");
-    expect(pickSeasonStripSlots([e03, e02, e01])).toEqual({ justAired: e01, upNext: e02 });
+  it("lands on the most recent completed week, ignoring input order", () => {
+    expect(defaultSeasonStripIndex([ep(1, "completed"), ep(3, "upcoming"), ep(2, "completed")])).toBe(1);
   });
 
-  it("shows only Up next before anything has completed", () => {
-    const e01 = ep(1, "upcoming");
-    expect(pickSeasonStripSlots([e01])).toEqual({ justAired: null, upNext: e01 });
+  it("falls back to the first episode before anything has completed", () => {
+    expect(defaultSeasonStripIndex([ep(2, "upcoming"), ep(1, "upcoming")])).toBe(0);
   });
 
-  it("shows only Just aired after the finale is completed", () => {
-    const e11 = ep(11, "completed");
-    expect(pickSeasonStripSlots([e11])).toEqual({ justAired: e11, upNext: null });
+  it("stays on the finale after the season is fully completed", () => {
+    expect(defaultSeasonStripIndex([ep(1, "completed"), ep(2, "completed")])).toBe(1);
+  });
+
+  it("does not skip forward to a locked or upcoming week when a completed week exists", () => {
+    expect(defaultSeasonStripIndex([ep(1, "completed"), ep(2, "locked"), ep(3, "upcoming")])).toBe(0);
+  });
+});
+
+describe("seasonStripKicker", () => {
+  const e01 = ep(1, "completed");
+  const e02 = ep(2, "completed");
+  const e03 = ep(3, "upcoming");
+  const season = [e01, e02, e03];
+
+  it("labels the latest completed week as This past week", () => {
+    expect(seasonStripKicker(e02, season)).toBe("This past week");
+    expect(seasonStripKicker(e01, season)).toBeNull();
+  });
+
+  it("labels the next non-completed week as Up next, including locked", () => {
+    expect(seasonStripKicker(e03, season)).toBe("Up next");
+    expect(seasonStripKicker(ep(2, "locked"), [e01, ep(2, "locked"), e03])).toBe("Up next");
+  });
+
+  it("is Up next on the premiere before anything has completed", () => {
+    expect(seasonStripKicker(e01, [ep(1, "upcoming"), ep(2, "upcoming")])).toBe("Up next");
   });
 });
 
@@ -59,22 +84,5 @@ describe("formatAirDate", () => {
 
   it("keeps an Eastern-midnight instant on that same calendar day", () => {
     expect(formatAirDate("2026-09-15T04:00:00.000Z")).toBe("Tue, Sep 15");
-  });
-});
-
-describe("seasonStripAriaLabel", () => {
-  it("names both slots and the This Week destination", () => {
-    expect(
-      seasonStripAriaLabel({
-        justAired: ep(2, "completed", { theme: "Latin Night" }),
-        upNext: ep(3, "upcoming", { theme: "Disney" }),
-      })
-    ).toBe("Just aired Ep. 2 — Latin Night. Up next Ep. 3 — Disney. Open This Week");
-  });
-
-  it("omits a missing slot", () => {
-    expect(seasonStripAriaLabel({ justAired: ep(1, "completed", { theme: null }), upNext: null })).toBe(
-      "Just aired Ep. 1. Open This Week"
-    );
   });
 });

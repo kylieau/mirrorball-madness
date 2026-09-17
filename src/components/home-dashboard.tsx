@@ -6,7 +6,7 @@ import { DeadlineStub } from "@/components/deadline-stub";
 import { SeasonStrip } from "@/components/season-strip";
 import { SpoilerRevealCallout } from "@/components/spoiler-reveal-callout";
 import { formatCountdown } from "@/lib/format-countdown";
-import type { SeasonStripSlots } from "@/lib/season-strip";
+import type { SeasonStripEpisode } from "@/lib/season-strip";
 import { SettingsIcon } from "lucide-react";
 
 type HomeLeague = {
@@ -27,19 +27,19 @@ export function HomeDashboard({
   deadlines,
   recentActivity,
   pendingReveal,
-  seasonStrip,
+  seasonEpisodes,
 }: {
   leagues: HomeLeague[];
   deadlines: { leagueId: string; leagueName: string; moduleLabel: string; iso: string }[];
   recentActivity: string[];
   pendingReveal: { weekNumber: number } | null;
-  seasonStrip: SeasonStripSlots;
+  seasonEpisodes: SeasonStripEpisode[];
 }) {
   const needingPicks = leagues.filter((l) => l.picksDue).length;
 
   return (
     <div>
-      <SeasonStrip justAired={seasonStrip.justAired} upNext={seasonStrip.upNext} />
+      <SeasonStrip episodes={seasonEpisodes} />
 
       <p className="mb-4 text-sm text-muted-foreground">
         {leagues.length} league{leagues.length === 1 ? "" : "s"}

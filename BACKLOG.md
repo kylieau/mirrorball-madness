@@ -6,11 +6,11 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 Implemented at the **top of Home** (`/today`), season-scoped via `active_season_id()`, **not** per-league. Not on each league card.
 
-- Small card/strip — **Just aired** (latest completed) and **Up next** (next non-completed, including `locked`). Fan labels: `formatEpisodeCasualWithTheme` (`Ep. N — {theme}`) plus `episodes.airs_at` as the show-night date (US Eastern). Not `formatEpisodeLabel`.
-- Whole strip taps to This Week (`/this-week`).
-- Spoiler-Free: theme and air date only. Results/scores/who went home stay on This Week behind `resolveSpoilerCutoff`. Pending reveal remains `SpoilerRevealCallout` — the strip does not duplicate it.
+- Horizontal episode carousel (left/right arrows). One slide per active-season episode: `formatEpisodeCasualWithTheme` (`Ep. N — {theme}`) plus `episodes.airs_at` as the show-night date (US Eastern). Kickers only on the season cursor: **This past week** / **Up next**.
+- Browse-only — no link to This Week. Default focused slide is the most recent completed episode; before premiere, the first upcoming.
+- Spoiler-Free: theme and air date only. Results/scores/who went home stay on This Week behind `resolveSpoilerCutoff`. Pending reveal remains `SpoilerRevealCallout` — the carousel does not duplicate it.
 
-Out of scope (still): full season schedule dump, a new schedule page, lock-time hint on **Up next**.
+Out of scope (still): full season schedule dump, a new schedule page, lock-time hint, deep-link from a slide.
 
 ## Past picks vs results (Your Picks)
 
