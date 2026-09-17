@@ -4,7 +4,7 @@
 // schedule. Published weeks keep whoever was still in as of that week so
 // correcting history doesn't drop the couple who went home that night.
 
-import { resolveEpisodeCoupleIds } from "@/lib/episode-participants";
+import { resolveEpisodeCoupleIds } from "./episode-participants";
 
 export type CastStatus = {
   status: string;
