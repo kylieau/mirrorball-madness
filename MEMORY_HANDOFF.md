@@ -28,6 +28,8 @@ Carried forward (untouched):
 - Manual browser verification still owed for Season Clock + Grand Finale deadline caption.
 - View Results / This Week "DND" / "—" display still needs a real published Did Not Dance couple.
 
+Lint / `npm test` (95) / `npm run build` passed in this environment.
+
 Phone (~390px) visual pass on Admin → Schedule is for the coordinator (owner has a dedicated test login). Do not put credentials in the PR, commits, docs, or screenshots.
 
 ## 5. Next Steps
