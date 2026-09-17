@@ -22,6 +22,7 @@ import { ChevronRightIcon } from "lucide-react";
 import { ProfileForm } from "@/components/profile-form";
 import { AccountDataForm } from "@/components/account-data-form";
 import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
+import { ADD_TO_HOME_SCREEN_COPY } from "@/lib/add-to-home-screen";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 import { cn } from "cn";
 
@@ -34,8 +35,9 @@ const ROW_CLASSES =
 // navigates away: Profile and Account & data are nested Dialogs sharing the
 // same form components those fallback pages use, so a save just updates
 // this sheet in place. Notifications stays a plain Link (a scrollable
-// content list, not a settings form — see BACKLOG.md) and Admin stays a
-// Link to the separate /admin/results surface.
+// content list, not a settings form — see BACKLOG.md). Add to Home Screen
+// is its own page (`/settings/add-to-home-screen`), not nested under
+// Notifications. Admin stays a Link to the separate /admin/results surface.
 export function AccountSettingsSheet({
   displayName,
   isSuperAdmin,
@@ -75,6 +77,16 @@ export function AccountSettingsSheet({
 
             <Link href="/notifications" className={ROW_CLASSES}>
               <span>Notifications</span>
+              <ChevronRightIcon className="size-4 text-muted-foreground" />
+            </Link>
+
+            <Link href="/settings/add-to-home-screen" className={ROW_CLASSES}>
+              <span>
+                <span className="block">{ADD_TO_HOME_SCREEN_COPY.title}</span>
+                <span className="block text-xs font-normal text-muted-foreground">
+                  {ADD_TO_HOME_SCREEN_COPY.detail}
+                </span>
+              </span>
               <ChevronRightIcon className="size-4 text-muted-foreground" />
             </Link>
 

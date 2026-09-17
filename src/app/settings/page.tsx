@@ -7,10 +7,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ChevronRightIcon, XIcon } from "lucide-react";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
+import { ADD_TO_HOME_SCREEN_COPY } from "@/lib/add-to-home-screen";
 
-const LINKED_ROWS = [
+const LINKED_ROWS: { label: string; href: string; hint?: string }[] = [
   { label: "Profile", href: "/settings/profile" },
   { label: "Notifications", href: "/notifications" },
+  {
+    label: ADD_TO_HOME_SCREEN_COPY.title,
+    href: "/settings/add-to-home-screen",
+    hint: ADD_TO_HOME_SCREEN_COPY.detail,
+  },
   { label: "Account & data", href: "/settings/account" },
 ];
 
@@ -22,8 +28,8 @@ export default async function SettingsPage({
   const { error, message, from } = await searchParams;
   // Every tab's avatar button links here with ?from=<its own path>, so Back
   // returns to whichever tab the user actually came from instead of always
-  // landing on /leagues. Sub-pages (Profile, Notifications, Account & data)
-  // forward this same value on their own "Back to Settings" link so it
+  // landing on /leagues. Sub-pages (Profile, Add to Home Screen, Account &
+  // data) forward this same value on their own "Back to Settings" link so it
   // survives going one level deeper.
   const backHref = safeRelativePath(from, "/leagues");
   const fromParam = `?from=${encodeURIComponent(backHref)}`;
@@ -65,7 +71,12 @@ export default async function SettingsPage({
                 href={`${row.href}${fromParam}`}
                 className="flex items-center justify-between border-b border-border px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-muted"
               >
-                <span>{row.label}</span>
+                <span>
+                  <span className="block">{row.label}</span>
+                  {row.hint && (
+                    <span className="block text-xs font-normal text-muted-foreground">{row.hint}</span>
+                  )}
+                </span>
                 <ChevronRightIcon className="size-4 text-muted-foreground" />
               </Link>
             ))}
