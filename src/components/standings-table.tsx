@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RankBadge } from "@/components/rank-badge";
+import { formatEpisodeCasualShort } from "@/lib/format-week";
 
 type StandingsRow = {
   managerId: string;
@@ -64,7 +65,7 @@ export function StandingsTable({
         <span>Leaderboard</span>
         <span className="font-normal text-muted-foreground">
           {latestCompletedWeek !== null
-            ? `through wk ${latestCompletedWeek}`
+            ? `through ${formatEpisodeCasualShort(latestCompletedWeek)}`
             : "Results appear once you mark an episode as watched"}
         </span>
       </div>

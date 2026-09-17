@@ -13,7 +13,7 @@ import {
 import { coupleNameNode } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
-import { formatEpisodeLabel } from "@/lib/format-week";
+import { formatEpisodeCasualShort } from "@/lib/format-week";
 
 type Couple = {
   id: string;
@@ -23,7 +23,7 @@ type Couple = {
   elimination_week: number | null;
 };
 
-function statusLabel(couple: Couple, seasonNumber: number | null): string {
+function statusLabel(couple: Couple): string {
   switch (couple.status) {
     case "winner":
       return "Won the season";
@@ -32,9 +32,9 @@ function statusLabel(couple: Couple, seasonNumber: number | null): string {
     case "third_place":
       return "Third place";
     case "eliminated":
-      return `Eliminated — ${formatEpisodeLabel(couple.elimination_week!, seasonNumber)}`;
+      return `Eliminated — ${formatEpisodeCasualShort(couple.elimination_week!)}`;
     case "withdrawn":
-      return `Withdrew — ${formatEpisodeLabel(couple.elimination_week!, seasonNumber)}`;
+      return `Withdrew — ${formatEpisodeCasualShort(couple.elimination_week!)}`;
     default:
       return "Still competing";
   }
@@ -47,7 +47,6 @@ export function GrandFinaleBox({
   existingOrder,
   deadline,
   isLocked,
-  seasonNumber,
 }: {
   leagueId: string;
   couples: Couple[];
@@ -55,7 +54,6 @@ export function GrandFinaleBox({
   existingOrder: string[] | null;
   deadline: string | null;
   isLocked: boolean;
-  seasonNumber: number | null;
 }) {
   const alphabeticalCouples = [...couples].sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
 
@@ -144,7 +142,7 @@ export function GrandFinaleBox({
                 {i + 1}. {nameFor(coupleId)}
               </span>
               <span className="text-muted-foreground">
-                {coupleById.get(coupleId) ? statusLabel(coupleById.get(coupleId)!, seasonNumber) : "Unknown"}
+                {coupleById.get(coupleId) ? statusLabel(coupleById.get(coupleId)!) : "Unknown"}
               </span>
             </div>
           ))}
