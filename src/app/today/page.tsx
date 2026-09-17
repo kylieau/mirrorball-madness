@@ -117,14 +117,9 @@ export default async function TodayPage() {
       .map((parts) => formatCoupleName(parts));
   }
 
-  // Only set once the true latest completed episode isn't itself visible —
-  // an older visible week the viewer just hasn't scrolled to isn't a "reveal
-  // pending" state, only "nothing new published yet vs. something published
-  // but not yet marked watched" is.
-  const pendingReveal =
-    trueLatestCompletedEpisode && trueLatestCompletedEpisode.id !== latestCompletedEpisodeId
-      ? { weekNumber: trueLatestCompletedEpisode.week_number }
-      : null;
+  const pendingReveal = cutoff.pendingRevealEpisode
+    ? { weekNumber: cutoff.pendingRevealEpisode.week_number }
+    : null;
 
   const leagues = summaries.map((s) => ({
     id: s.id,

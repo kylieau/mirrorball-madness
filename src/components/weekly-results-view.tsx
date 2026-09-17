@@ -66,33 +66,35 @@ export function WeeklyResultsView({
   scoresByEpisode?: Record<string, ManagerWeekScore[]>;
   currentUserId?: string;
   leaguesByCouple?: Record<string, string[]>;
-  // Set only when a completed episode exists but nothing is visible yet
-  // under the viewer's spoiler cutoff — replaces the generic empty state
-  // with a "go mark it as watched" teaser instead of pretending nothing's
-  // aired.
+  // Set when a completed episode sits past last_watched_week. Shown as the
+  // empty-state teaser when nothing is visible yet, or as a catch-up card
+  // above older results so the viewer isn't stranded without a mark control.
   pendingReveal?: { weekNumber: number; theme: string | null } | null;
 }) {
   const episode = episodes[0];
+  const pendingCard = pendingReveal ? (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          {formatEpisodeCasual(pendingReveal.weekNumber)}&apos;s results are ready
+        </CardTitle>
+        <CardDescription>
+          {pendingReveal.theme ? `${pendingReveal.theme}. ` : ""}Mark it as watched once you&apos;ve caught up
+          to see dances, scores, and who went home.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <MarkWeekWatchedButton weekNumber={pendingReveal.weekNumber} />
+      </CardContent>
+    </Card>
+  ) : null;
 
   if (!episode) {
     if (pendingReveal) {
       return (
         <div>
           <p className="mb-4 text-sm text-muted-foreground">Spoiler-Free Mode is on</p>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {formatEpisodeCasual(pendingReveal.weekNumber)}&apos;s results are ready
-              </CardTitle>
-              <CardDescription>
-                {pendingReveal.theme ? `${pendingReveal.theme}. ` : ""}Mark it as watched once you&apos;ve caught up
-                to see dances, scores, and who went home.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MarkWeekWatchedButton weekNumber={pendingReveal.weekNumber} />
-            </CardContent>
-          </Card>
+          {pendingCard}
         </div>
       );
     }
@@ -146,6 +148,7 @@ export function WeeklyResultsView({
 
   return (
     <div>
+      {pendingCard && <div className="mb-4">{pendingCard}</div>}
       <p className="mb-4 text-sm text-muted-foreground">
         {formatEpisodeCasualWithTheme(episode.week_number, episode.theme)}, the actual results
       </p>

@@ -3,12 +3,15 @@
 // Pending reveal used to be a DeadlineStub on Home, which disappeared into
 // the ticket/league-card stack. Auto-opening a modal is the interrupt; the
 // in-flow gold banner stays after dismiss so Home still has a CTA that
-// isn't another stub.
+// isn't another stub. Both "Mark as watched" actions actually advance
+// last_watched_week, then land on This Week so the newly revealed episode
+// is the one on screen. "Not yet" only closes the modal.
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { EyeOffIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { markEpisodesWatchedThrough } from "@/app/this-week/actions";
 import {
   Dialog,
   DialogClose,
@@ -21,14 +24,33 @@ import {
 import { formatEpisodeCasual } from "@/lib/format-week";
 
 export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
+  const router = useRouter();
   const [open, setOpen] = useState(true);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const episodeLabel = formatEpisodeCasual(weekNumber);
+
+  async function handleMark() {
+    setError(null);
+    setPending(true);
+    const result = await markEpisodesWatchedThrough(weekNumber);
+    if (result.error) {
+      setError(result.error);
+      setPending(false);
+      return;
+    }
+    setOpen(false);
+    router.push("/this-week");
+    router.refresh();
+  }
 
   return (
     <>
-      <Link
-        href="/this-week"
-        className="mb-4 flex items-start gap-3 rounded-2xl bg-card px-4 py-3 shadow-[0_0_0_1px_rgba(201,162,75,0.55),0_16px_48px_rgba(201,162,75,0.22)]"
+      <button
+        type="button"
+        onClick={handleMark}
+        disabled={pending}
+        className="mb-4 flex w-full items-start gap-3 rounded-2xl bg-card px-4 py-3 text-left shadow-[0_0_0_1px_rgba(201,162,75,0.55),0_16px_48px_rgba(201,162,75,0.22)] disabled:opacity-50"
       >
         <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
           <EyeOffIcon className="size-4" />
@@ -45,9 +67,10 @@ export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
           </span>
         </span>
         <span className="mt-1 shrink-0 rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-primary-foreground">
-          View
+          {pending ? "Marking..." : "Mark as watched"}
         </span>
-      </Link>
+      </button>
+      {error && !open && <p className="mb-4 -mt-2 text-sm text-destructive">{error}</p>}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
@@ -70,17 +93,13 @@ export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
                 watched.
               </DialogDescription>
             </DialogHeader>
+            {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter className="-mx-0 -mb-0 flex flex-col gap-2 border-primary/25 bg-black/25 sm:flex-col">
-            <Button
-              render={<Link href="/this-week" />}
-              nativeButton={false}
-              size="lg"
-              className="w-full"
-            >
-              Mark as watched
+            <Button onClick={handleMark} disabled={pending} size="lg" className="w-full">
+              {pending ? "Marking as watched..." : "Mark as watched"}
             </Button>
-            <DialogClose render={<Button variant="ghost" className="w-full" />}>
+            <DialogClose render={<Button variant="ghost" className="w-full" disabled={pending} />}>
               Not yet
             </DialogClose>
           </DialogFooter>

@@ -7,7 +7,23 @@ export type SpoilerCutoff<E extends { id: string; week_number: number }> = {
   allowedEpisodeIds: Set<string>;
   visibleEpisodes: E[];
   effectiveLatestEpisode: E | null;
+  pendingRevealEpisode: E | null;
 };
+
+// Latest completed episode the viewer hasn't marked watched yet. Null when
+// spoiler-free is off (or they're already caught up) so Home/This Week can
+// share one rule: a newer completed week is still pending even if older
+// weeks are already visible.
+export function findPendingRevealEpisode<E extends { id: string; week_number: number }>(
+  spoilerFreeMode: boolean,
+  lastWatchedWeek: number | null,
+  completedEpisodesDesc: E[]
+): E | null {
+  if (!spoilerFreeMode) return null;
+  const latest = completedEpisodesDesc[0] ?? null;
+  if (!latest || latest.week_number <= (lastWatchedWeek ?? 0)) return null;
+  return latest;
+}
 
 // Degenerates to "everything visible" when spoiler-free mode is off (or
 // there's no active season) so every caller can unconditionally filter
@@ -29,6 +45,7 @@ export async function resolveSpoilerCutoff<E extends { id: string; week_number: 
       allowedEpisodeIds: new Set(completedEpisodesDesc.map((e) => e.id)),
       visibleEpisodes: completedEpisodesDesc,
       effectiveLatestEpisode: completedEpisodesDesc[0] ?? null,
+      pendingRevealEpisode: null,
     };
   }
 
@@ -48,5 +65,6 @@ export async function resolveSpoilerCutoff<E extends { id: string; week_number: 
     allowedEpisodeIds: new Set(visibleEpisodes.map((e) => e.id)),
     visibleEpisodes,
     effectiveLatestEpisode: visibleEpisodes[0] ?? null,
+    pendingRevealEpisode: findPendingRevealEpisode(true, lastWatchedWeek, completedEpisodesDesc),
   };
 }
