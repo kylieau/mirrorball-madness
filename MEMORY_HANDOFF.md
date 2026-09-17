@@ -23,7 +23,9 @@ Draft PR for sticky bottom nav on web (`cursor/sticky-bottom-nav-web-6539`). Sta
 - Home season strip — owner-approved, still not started.
 - Recast/waivers spoiler framing; `/notifications` `rankBadge` leak; roster-eliminated clamp; feature-announcement infra.
 
+After this pass: `npm run lint` clean, `npm test` **173**, `npm run build` passed. Vercel preview is login-walled from this container (no session). Local layout check of the real `BottomNav` / `FanBottomNav` at 390×844 (Chrome device mode) and wide desktop: bar stays viewport-bottom and matches the `max-w-2xl` column. Live signed-in click-path on Home / Results / Picks / Standings / Admin was not exercised here.
+
 ## 5. Next Steps
 
-1. Coordinator: phone (~390px) and desktop — Home / Results / Picks / Standings / Admin tab bars stay bottom-aligned and match the content column width. Do not merge from the agent.
-2. Otherwise wait.
+1. Coordinator: signed-in phone (~390px) and desktop on the preview — Home / Results / Picks / Standings / Admin stay bottom-aligned and match the content column. Preview: https://mirrorball-madness-git-cursor-sticky-bottom-nav-web-6539-kylie8.vercel.app
+2. Do not merge from the agent.
