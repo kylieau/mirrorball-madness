@@ -3,7 +3,7 @@ import { CoupleName } from "@/components/couple-name";
 import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
 import { cn } from "cn";
 import type { CoupleNameParts } from "@/lib/couple-display";
-import { formatEpisodeLabel } from "@/lib/format-week";
+import { formatEpisodeCasual, formatEpisodeCasualWithTheme } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -49,7 +49,6 @@ export function WeeklyResultsView({
   scoresByEpisode,
   currentUserId,
   leaguesByCouple,
-  seasonNumber,
   pendingReveal,
 }: {
   episodes: Episode[];
@@ -67,7 +66,6 @@ export function WeeklyResultsView({
   scoresByEpisode?: Record<string, ManagerWeekScore[]>;
   currentUserId?: string;
   leaguesByCouple?: Record<string, string[]>;
-  seasonNumber: number | null;
   // Set only when a completed episode exists but nothing is visible yet
   // under the viewer's spoiler cutoff — replaces the generic empty state
   // with a "go mark it as watched" teaser instead of pretending nothing's
@@ -84,7 +82,7 @@ export function WeeklyResultsView({
           <Card>
             <CardHeader>
               <CardTitle>
-                {formatEpisodeLabel(pendingReveal.weekNumber, seasonNumber)}&apos;s results are ready
+                {formatEpisodeCasual(pendingReveal.weekNumber)}&apos;s results are ready
               </CardTitle>
               <CardDescription>
                 {pendingReveal.theme ? `${pendingReveal.theme}. ` : ""}Mark it as watched once you&apos;ve caught up
@@ -149,8 +147,7 @@ export function WeeklyResultsView({
   return (
     <div>
       <p className="mb-4 text-sm text-muted-foreground">
-        {formatEpisodeLabel(episode.week_number, seasonNumber)}
-        {episode.theme ? ` — ${episode.theme}` : ""}, the actual results
+        {formatEpisodeCasualWithTheme(episode.week_number, episode.theme)}, the actual results
       </p>
 
       {eliminated.length > 0 && (

@@ -14,7 +14,7 @@ import { Chip } from "@/components/chip";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { coupleNameNode } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
-import { formatEpisodeLabel } from "@/lib/format-week";
+import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 
@@ -28,10 +28,9 @@ export function PickEmBox({
   isLocked,
   isDoubleElimination,
   revealedPredictions,
-  seasonNumber,
 }: {
   leagueId: string;
-  episode: { id: string; week_number: number } | null;
+  episode: { id: string; week_number: number; theme: string | null } | null;
   lockAt: string | null;
   activeCouples: Couple[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
@@ -48,7 +47,6 @@ export function PickEmBox({
     eliminatedLabel2: string | null;
     topScorerLabel: string | null;
   }[];
-  seasonNumber: number | null;
 }) {
   const [eliminatedId, setEliminatedId] = useState(
     existingPrediction?.predicted_eliminated_couple_id ?? ""
@@ -131,7 +129,7 @@ export function PickEmBox({
   }
 
   const hasSavedPick = !!eliminatedId || !!eliminatedId2 || !!topScorerId;
-  const episodeLabel = formatEpisodeLabel(episode.week_number, seasonNumber);
+  const episodeLabel = formatEpisodeCasualWithTheme(episode.week_number, episode.theme);
   const lockLine = isLocked
     ? "predictions are locked for this episode."
     : lockAt

@@ -2,40 +2,34 @@
 
 ## 1. Current State
 
-Draft PR **#11** (`cursor/your-picks-module-labels-bb32` → `main`): **Your Picks section labels are the modular product titles**; cards use task phrases. Do not merge from this session — owner asked for previews first.
+Draft PR **#12** (`cursor/unify-episode-labels-7d68` → `main`): **two-tier episode labels**, rebased onto #11. Admin stays on `formatEpisodeLabel` (`S35 E02`). Fan tabs use casual `Episode N` / `Ep. N` / `Ep. N — {theme}`. Do not merge from this session.
 
 ## 2. Changes Made
 
-### Your Picks labeling (this session)
+Owner reversed the all-`S35 E02` fan approach. Helpers in `src/lib/format-week.ts`:
 
-When ≥2 scoring modules are on, section labels are now:
+- **Admin / site-ops:** `formatEpisodeLabel` → `S35 E02` (Schedule, Enter Results, Correct, All Results, Season Clock).
+- **Fan roomy:** `formatEpisodeCasual` → `Episode 2` (Home spoiler, Mark as watched, This Week pending-reveal teaser).
+- **Fan tight:** `formatEpisodeCasualShort` → `Ep. 2` (week switcher chip, Standings `through Ep. 2`, Grand Finale status).
+- **Fan + theme:** `formatEpisodeCasualWithTheme` → `Ep. 2 — Latin Night` (This Week header, switcher list, Your Picks **subtitle**).
 
-- 🔮 Curtain Call
-- 🪩 Dance Card
-- 🏆 Grand Finale
+Your Picks after #11: section label **Curtain Call**; card title **This week's picks**; casual `Ep. N` (or `Ep. N — theme`) lives in the description with the lock line. Do not put episode in a `Curtain Call — …` card title.
 
-Card titles are the task/state, not a second copy of the product name:
+Season Clock still uses `formatEpisodeLabel` — PR **#7** lock labeling is untouched.
 
-- `PickEmBox` → **This week's picks**; episode + lock live in the description (`S35 E03 — locks at …`)
-- `RosterCard` → **Your roster** (was “Your Dance Card Roster”)
-- `DraftStatusCard` unchanged (`Draft hasn't started` / `Draft is live`)
-- `GrandFinaleBox` → **Your season ranking** while ranking / empty-locked; saved/locked-with-picks still leads with **Your predicted winner** + Locked/Saved
-
-`showSectionLabels` (≥2 modules) is unchanged. Standings / settings module names were left as Dance Card / Curtain Call / Grand Finale.
-
-**Verification:** `npm run lint` clean, `npm test` 99/99, `npx tsc --noEmit` + `npm run build` green. Phone-width pass at **390×844** against a local unauthenticated fixture that mounts the real PickEmBox / RosterCard / GrandFinaleBox / LeagueTabs (no live league — this container has no Supabase credentials). Fixture route was not committed. **Not exercised:** a real signed-in league on the Vercel preview — that’s the click-path in PR #11.
+**Verification:** Rebased onto `main` (#11). `npm test` 106/106, `npm run lint` clean, `npm run build` green. Your Picks: section **Curtain Call**, card title **This week's picks**, subtitle `Ep. N` / `Ep. N — theme` (+ lock line). Live spoiler-free account still needs Vercel preview.
 
 ## 3. Key Decisions & Lessons Learned
 
-- Picked **Your season ranking** (not “Podium picks”) for Grand Finale’s editing/empty-locked title — the module is a full-order prediction, not a top-3. Saved/locked-with-picks keeps **Your predicted winner** because that state already had a descriptive phrase and a Locked/Saved badge.
-- Don’t put API keys in the handoff; this container still has no live `.env.local` for the real project.
+- Season number is ops-only on fan tabs; don’t thread `seasonNumber` into Home / This Week / Your Picks / Standings just to format a label.
+- Relative copy (`This week` tab, `N wk behind`) stays relative. Product module names stay on section labels (#11).
 
 ## 4. Backlog & Deferred Items
 
-- Carry-forward: Recast/waivers spoiler framing; `/notifications` `rankBadge` unfiltered-sum leak; roster-eliminated-couple clamp once Season 35 has a real elimination; feature-announcement mechanism.
-- Live spoiler-free account pass on PR #8’s Vercel preview still owed if that PR is still open.
+- Season Clock lock labeling lives in PR #7.
+- Carry-forward: Recast/waivers spoiler framing; `/notifications` `rankBadge` leak; roster-eliminated-couple clamp; feature-announcement mechanism; live spoiler-free Vercel preview.
 
 ## 5. Next Steps
 
-1. Review draft PR #11 on a phone-width Vercel preview: league with ≥2 modules → Your Picks. Merge only after that visual check.
-2. Concurrent `main` activity is still a thing — `git fetch origin main` before assuming this branch’s base is current.
+1. Phone-width Vercel preview: Home spoiler `Episode N results are in`; This Week `Ep. N` / `Ep. N — theme`; Mark `Episode N`; Standings `through Ep. N`; Your Picks title **This week's picks** with `Ep. N` in the subtitle.
+2. Review/merge #7 for Season Clock locks (still official `S35 E0x`).

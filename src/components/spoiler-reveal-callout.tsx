@@ -18,9 +18,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatEpisodeCasual } from "@/lib/format-week";
 
 export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
   const [open, setOpen] = useState(true);
+  const episodeLabel = formatEpisodeCasual(weekNumber);
 
   return (
     <>
@@ -36,7 +38,7 @@ export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
             Spoiler-Free Mode
           </span>
           <span className="mt-0.5 block font-heading text-sm font-semibold">
-            Episode {weekNumber} results are in
+            {episodeLabel} results are in
           </span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
             Mark as watched once you&apos;ve caught up
@@ -61,7 +63,7 @@ export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
                 Spoiler-Free Mode
               </p>
               <DialogTitle className="mt-2 font-heading text-xl font-semibold">
-                Episode {weekNumber} results are in
+                {episodeLabel} results are in
               </DialogTitle>
               <DialogDescription className="mt-2 text-pretty">
                 Scores, dances, and who went home stay hidden until you mark it

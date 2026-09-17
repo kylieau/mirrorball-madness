@@ -68,7 +68,7 @@ export default async function TodayPage() {
   const latestCompletedEpisodeId = cutoff.effectiveLatestEpisode?.id ?? null;
   const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
   // Same season-wide figure on every league card (episodes aren't scoped
-  // per-league) — mirrors Standings' own "through wk N" label so Home and
+  // per-league) — mirrors Standings' own through-episode label so Home and
   // Standings never disagree about how caught-up the viewer is.
   const weeksBehind =
     trueLatestCompletedEpisode && trueLatestCompletedEpisode.id !== latestCompletedEpisodeId
