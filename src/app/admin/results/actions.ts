@@ -18,7 +18,7 @@ import {
   type SaveDraftResultsInput,
   type SeasonSettingsInput,
 } from "@/lib/results-draft";
-import { insertScoringJudge, setJudgeArchived } from "@/lib/admin-people";
+import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
 
 // Returns userId alongside error so callers that need to stamp
 // updatedBy/createdBy/publishedBy don't need a second auth round trip.
@@ -133,6 +133,15 @@ export async function restoreJudge(personId: string): Promise<{ error: string | 
   if (access.error) return access;
 
   const result = await setJudgeArchived(createAdminClient(), personId, false);
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function renameJudge(personId: string, name: string): Promise<{ error: string | null }> {
+  const access = await requireResultsAccess();
+  if (access.error) return access;
+
+  const result = await renameScoringJudge(createAdminClient(), personId, name);
   if (!result.error) revalidatePath("/admin/results");
   return result;
 }

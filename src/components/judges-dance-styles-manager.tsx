@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { addJudge, addDanceStyle, archiveJudge, restoreJudge } from "@/app/admin/results/actions";
+import { addJudge, addDanceStyle, archiveJudge, restoreJudge, renameJudge } from "@/app/admin/results/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -79,9 +79,12 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
   const active = judges.filter((j) => !isJudgeArchived(j));
   const archived = judges.filter((j) => isJudgeArchived(j));
+  const rowLocked = pendingId !== null || editingId !== null;
 
   async function handleAdd() {
     setError(null);
@@ -108,6 +111,113 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
     setPendingId(null);
   }
 
+  function startEdit(judge: ScoringJudge) {
+    setError(null);
+    setEditingId(judge.id);
+    setEditName(judge.name);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditName("");
+  }
+
+  async function handleRename(id: string) {
+    setError(null);
+    setPendingId(id);
+    const result = await renameJudge(id, editName);
+    if (result.error) {
+      setError(result.error);
+      setPendingId(null);
+      return;
+    }
+    setEditingId(null);
+    setEditName("");
+    setPendingId(null);
+  }
+
+  function renderJudgeRow(judge: ScoringJudge, archivedRow: boolean) {
+    const isEditing = editingId === judge.id;
+    const isPending = pendingId === judge.id;
+
+    if (isEditing) {
+      return (
+        <li key={judge.id}>
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleRename(judge.id);
+            }}
+          >
+            <Input
+              aria-label="Judge name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancelEdit();
+                }
+              }}
+              autoFocus
+              disabled={isPending}
+            />
+            <Button type="submit" size="sm" disabled={isPending || !editName.trim()}>
+              {isPending ? "Saving..." : "Save"}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" disabled={isPending} onClick={cancelEdit}>
+              Cancel
+            </Button>
+          </form>
+        </li>
+      );
+    }
+
+    return (
+      <li key={judge.id} className="flex items-center justify-between gap-3">
+        <span
+          className={
+            archivedRow
+              ? "min-w-0 truncate text-sm text-muted-foreground"
+              : "min-w-0 truncate text-sm font-medium"
+          }
+        >
+          {judge.name}
+        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={rowLocked}
+            onClick={() => startEdit(judge)}
+          >
+            Edit
+          </Button>
+          {archivedRow ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={rowLocked}
+              onClick={() => handleRestore(judge.id)}
+            >
+              {isPending ? "Restoring..." : "Restore"}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={rowLocked}
+              onClick={() => handleArchive(judge.id)}
+            >
+              {isPending ? "Archiving..." : "Archive"}
+            </Button>
+          )}
+        </div>
+      </li>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -115,26 +225,15 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
         <CardDescription>
           The standing panel plus anyone who can give a score. Adding a name adds
           a score box on every dance. Archive a guest when they&apos;re done —
-          history stays, they just drop off later weeks.
+          history stays, they just drop off later weeks. Edit fixes a typo
+          without creating a new judge.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {error && <p className="text-sm text-destructive">{error}</p>}
         {active.length > 0 ? (
           <ul className="flex flex-col gap-2">
-            {active.map((judge) => (
-              <li key={judge.id} className="flex items-center justify-between gap-3">
-                <span className="min-w-0 text-sm font-medium">{judge.name}</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={pendingId === judge.id}
-                  onClick={() => handleArchive(judge.id)}
-                >
-                  {pendingId === judge.id ? "Archiving..." : "Archive"}
-                </Button>
-              </li>
-            ))}
+            {active.map((judge) => renderJudgeRow(judge, false))}
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground">No standing judges yet.</p>
@@ -144,8 +243,9 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
             placeholder="Judge name"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
+            disabled={rowLocked}
           />
-          <Button onClick={handleAdd} disabled={busy || !newName.trim()}>
+          <Button onClick={handleAdd} disabled={busy || rowLocked || !newName.trim()}>
             <PlusIcon className="size-4" />
             Add judge
           </Button>
@@ -160,19 +260,7 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
               </p>
             </div>
             <ul className="flex flex-col gap-2">
-              {archived.map((judge) => (
-                <li key={judge.id} className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 text-sm text-muted-foreground">{judge.name}</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={pendingId === judge.id}
-                    onClick={() => handleRestore(judge.id)}
-                  >
-                    {pendingId === judge.id ? "Restoring..." : "Restore"}
-                  </Button>
-                </li>
-              ))}
+              {archived.map((judge) => renderJudgeRow(judge, true))}
             </ul>
           </div>
         )}
