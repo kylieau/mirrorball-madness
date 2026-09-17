@@ -2,28 +2,28 @@
 
 ## 1. Current State
 
-Draft PR #17 (`cursor/home-season-strip-d84d`): fan tabs read **Home / Results / Picks / Standings**. Curtain Call card titled **Curtain Call**. Slim carousel still switches pick form vs recap. Routes unchanged (`/this-week`, `?tab=yourpicks`). Do not merge from the agent.
+Draft PR for sticky bottom nav on web (`cursor/sticky-bottom-nav-web-6539`). Starts from latest `main` (PR #17 merged). Do not merge from the agent.
 
 ## 2. Changes Made
 
-- Bottom nav + page titles: This Week → **Results**, Your picks → **Picks**. Home and Standings unchanged.
-- `CurtainCallCard` title is **Curtain Call** (not “This week's picks”, not “Picks”). Episode identity stays on the carousel.
-- Docs updated for the new tab names.
-- Results copy: banner kicker **Eliminated**; dance list heading **Leaderboard**.
+- Fan and admin tab bars stay pinned to the viewport bottom on every width (removed `sm:static`, which flipped Admin under the header and Home/Results after the content).
+- Tab bars span the `max-w-2xl` content column (removed `sm:w-fit sm:justify-start` so gold rules line up with the column, not the label cluster).
+- Shared wrapper: `BottomNav` / `FanBottomNav` in `src/components/bottom-nav.tsx`. Surfaces: Home (`/today`), Results (`/this-week`), `LeagueTabs`, `AdminResultsTabs`.
+- Admin Save/Publish sits above the tab bar (`BOTTOM_NAV_STACK_ABOVE`) so the two sticky bars don’t overlap.
+- BACKLOG.md marks sticky/width implemented. Episode dropdown same-line layout and icon/label redesign stay out of scope.
 
 ## 3. Key Decisions & Lessons Learned
 
-- Label-only rename — do not retarget `/this-week` or `?tab=yourpicks`.
-
-After this pass: `npm run lint` clean, `npm test` **173**, `npm run build` passed. Results copy tweaks only. Live click-path was not exercised here (no Supabase credentials). Phone (~390px) pass is for the coordinator.
+- One shared wrapper for both the sticky-bottom and width fixes — they want the same chrome.
+- League Picks/Standings are Links into `FanBottomNav` (URL is already the source of truth); no `TabsTrigger` needed for those two.
 
 ## 4. Backlog & Deferred Items
 
-- Bottom nav width/alignment (desktop `sm:w-fit` inset vs content column) and sticky-bottom-on-desktop — parked; do not implement on this PR.
-- Full season schedule dump / a schedule-detail page / lock-time hint / Home timeline — still out of scope.
+- Episode dropdown same-line layout — still parked.
+- Home season strip — owner-approved, still not started.
 - Recast/waivers spoiler framing; `/notifications` `rankBadge` leak; roster-eliminated clamp; feature-announcement infra.
 
 ## 5. Next Steps
 
-1. Coordinator: phone nav reads Home / Results / Picks / Standings; Results page title; Picks page title; Curtain Call card title. Preview: https://mirrorball-madness-git-cursor-home-season-strip-d84d-kylie8.vercel.app
-2. Do not merge from the agent.
+1. Coordinator: phone (~390px) and desktop — Home / Results / Picks / Standings / Admin tab bars stay bottom-aligned and match the content column width. Do not merge from the agent.
+2. Otherwise wait.

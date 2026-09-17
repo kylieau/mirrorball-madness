@@ -13,10 +13,9 @@ Out of scope (still): full season schedule dump, a new schedule page, lock-time 
 
 ## Bottom nav width + sticky desktop
 
-Parked — do not implement on the carousel / Curtain Call / Results–Picks-labels PR.
+Implemented — fan and admin tab bars stay `fixed` to the viewport bottom on every width (same as phone) and span the `max-w-2xl` content column. Shared wrapper: `BottomNav` / `FanBottomNav` in `src/components/bottom-nav.tsx`. Surfaces: Home (`/today`), Results (`/this-week`), league tabs (`LeagueTabs`), admin (`AdminResultsTabs`).
 
-- **Width / alignment:** on `sm+`, the fan tab bar is `sm:w-fit sm:justify-start`, so it sits narrower and more inset than the `max-w-2xl` content column above it (gold content corner / bottom rule don’t line up with the nav’s left edge). Surfaces: Home (`/today`), Results (`/this-week`), league tabs (`LeagueTabs`). Phone full-bleed bar is fine; this is the desktop/web inset.
-- **Sticky bottom on desktop:** separately parked — keep the bar at the bottom on large screens too. Not the same as the width fix; don’t couple them unless the implementation happens to share a wrapper.
+Out of scope (still): episode dropdown same-line layout; redesigning icons/labels.
 
 ## Past picks vs results (Picks)
 

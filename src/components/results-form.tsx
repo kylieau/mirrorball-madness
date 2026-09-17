@@ -29,6 +29,7 @@ import {
   SheetDescription,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { BOTTOM_NAV_STACK_ABOVE } from "@/components/bottom-nav";
 import { buildPeopleDisplayNames, type CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName, coupleNameNode } from "@/components/couple-name";
 import {
@@ -888,22 +889,24 @@ export function ResultsForm({
             </Card>
           )}
 
-          <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 border-t border-border bg-background px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between">
-            <p className="hidden text-xs text-muted-foreground sm:block">
-              Publishing updates Results &amp; Standings across every league immediately.
-            </p>
-            <div className="flex gap-2 sm:w-auto">
-              <Button
-                variant="outline"
-                className="flex-1 sm:flex-none"
-                onClick={() => void flushDraft()}
-                disabled={savingDraft || publishing}
-              >
-                {savingDraft ? "Saving..." : "Save Draft"}
-              </Button>
-              <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing}>
-                {publishing ? "Publishing..." : "Publish Results"}
-              </Button>
+          <div className={`fixed inset-x-0 z-30 ${BOTTOM_NAV_STACK_ABOVE}`}>
+            <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="hidden text-xs text-muted-foreground sm:block">
+                Publishing updates Results &amp; Standings across every league immediately.
+              </p>
+              <div className="flex gap-2 sm:w-auto">
+                <Button
+                  variant="outline"
+                  className="flex-1 sm:flex-none"
+                  onClick={() => void flushDraft()}
+                  disabled={savingDraft || publishing}
+                >
+                  {savingDraft ? "Saving..." : "Save Draft"}
+                </Button>
+                <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing}>
+                  {publishing ? "Publishing..." : "Publish Results"}
+                </Button>
+              </div>
             </div>
           </div>
         </>

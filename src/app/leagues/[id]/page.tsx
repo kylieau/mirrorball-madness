@@ -37,10 +37,11 @@ export default async function LeaguePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; message?: string; justCreated?: string; week?: string }>;
+  searchParams: Promise<{ error?: string; message?: string; justCreated?: string; week?: string; tab?: string }>;
 }) {
   const { id } = await params;
-  const { error, message, justCreated, week: weekParam } = await searchParams;
+  const { error, message, justCreated, week: weekParam, tab } = await searchParams;
+  const activeTab = tab === "standings" ? "standings" : "picks";
   const supabase = await createClient();
 
   const {
@@ -591,6 +592,8 @@ export default async function LeaguePage({
       />
 
       <LeagueTabs
+        leagueId={id}
+        activeTab={activeTab}
         yourPicks={
           <div className="flex flex-col gap-6">
             {curtainCallOn && (
