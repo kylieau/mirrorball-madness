@@ -41,6 +41,7 @@ import { useRelativeTimeAgo } from "@/lib/use-browser-time-zone";
 import type { DraftState } from "@/lib/results-draft";
 import { formatEpisodeLabel } from "@/lib/format-week";
 import { resolveEpisodeCoupleIds } from "@/lib/episode-participants";
+import { judgesForScoreInputs, type ScoringJudge } from "@/lib/scoring-judges";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type CoupleWithStatus = Couple & {
@@ -168,7 +169,7 @@ export function ResultsForm({
   allCouplesWithStatus: CoupleWithStatus[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
   allCoupleDisplayNames: Record<string, CoupleNameParts>;
-  judges: Named[];
+  judges: ScoringJudge[];
   danceStyles: Named[];
   episodes: ScheduledEpisode[];
   draftsByEpisode: Record<string, DraftState>;
@@ -442,6 +443,12 @@ export function ResultsForm({
   }
 
   const judgeDisplayNames = buildPeopleDisplayNames(judges);
+  function judgesForDance(dance: RowDance) {
+    const scoredIds = Object.entries(dance.scores)
+      .filter(([, v]) => v !== "")
+      .map(([id]) => id);
+    return judgesForScoreInputs(judges, scoredIds);
+  }
   const episodeItems = Object.fromEntries(
     sortedEpisodes.map((e) => [
       e.id,
@@ -459,7 +466,7 @@ export function ResultsForm({
     if (!row) continue;
     if (row.savedByJudges) judgesSavePills.push(c.id);
     for (const d of row.dances) {
-      if (d.danceStyleId && isPerfectScore(d, judges.length)) {
+      if (d.danceStyleId && isPerfectScore(d, judgesForDance(d).length)) {
         perfectScorePills.push({ coupleId: c.id, danceStyleId: d.danceStyleId });
       }
     }
@@ -585,8 +592,9 @@ export function ResultsForm({
               <p className="text-xs text-muted-foreground sm:col-span-2">
                 Enter raw judges&apos; scores — each league&apos;s Judges&apos; Score Multiplier
                 applies automatically once results are published. To add a score box
-                (including a one-off guest), use Settings; leave the box blank on
-                weeks they didn&apos;t judge.
+                (including a one-off guest), use Settings. Archive them there when
+                they&apos;re done so they don&apos;t keep appearing as empty boxes. Leave a
+                box blank on weeks they didn&apos;t judge.
               </p>
             </CardContent>
           </Card>
@@ -601,7 +609,7 @@ export function ResultsForm({
                     couples={episodeCouples}
                     coupleParts={coupleParts}
                     danceStyles={danceStyles}
-                    judges={judges}
+                    judges={judgesForScoreInputs(judges)}
                     judgeDisplayNames={judgeDisplayNames}
                     danceCountFor={danceCountFor}
                     expectedDanceCount={expectedDanceCount}
@@ -676,7 +684,7 @@ export function ResultsForm({
                             />
                           </div>
                           <div className="flex flex-wrap items-end gap-2">
-                            {judges.map((j) => (
+                            {judgesForDance(d).map((j) => (
                               <div key={j.id} className="flex flex-col gap-1">
                                 <Label className="text-xs text-muted-foreground">
                                   {judgeDisplayNames.get(j.id) ?? j.name}

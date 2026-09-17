@@ -811,6 +811,7 @@ export type Database = {
       }
       people: {
         Row: {
+          archived_at: string | null
           created_at: string
           id: string
           name: string
@@ -818,6 +819,7 @@ export type Database = {
           role: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           id?: string
           name: string
@@ -825,6 +827,7 @@ export type Database = {
           role: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           id?: string
           name?: string
