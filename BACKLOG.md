@@ -43,7 +43,7 @@ Owner-approved, not started — do not implement UI/code until this is picked up
 
 ## View Results / This Week layout polish
 
-Owner-noted, not started — do not implement UI/code until this is picked up. Fan This Week (`/this-week`) and Admin View Results. Grouped here so phone/iOS layout nits on those surfaces don't scatter.
+Owner-noted, not started — do not implement UI/code until this is picked up. Fan This Week (`/this-week`), Admin View Results, and shared chrome those pages share with Home / Your Picks. Grouped here so phone/iOS and web/desktop-width layout nits don't scatter.
 
 ### Episode dropdown on the title line
 
@@ -55,11 +55,19 @@ Kylie (via Chief Kimo): she doesn't like the episode dropdown selector sitting *
 
 Do not change `PageHeader`'s league-switcher slot on Your Picks / Standings as part of this.
 
+### Sticky bottom nav (web)
+
+Kylie (via Chief Kimo): on Mirrorball Madness **web/desktop-width**, the bottom nav should **stick to the bottom consistently across pages**, regardless of window size — like the iOS/phone view (always bottom). She doesn't like it flipping top/bottom on different pages.
+
+Owner-noted, not started — do not implement from this note.
+
+Today the tab bars use `fixed … bottom-0` on small viewports and `sm:static` from the `sm` breakpoint up (`today/page.tsx`, `this-week/page.tsx`, `league-tabs.tsx`, `admin-results-tabs.tsx`). Static placement follows DOM order, so Admin's bar sits under the header (top) while Home / This Week's sit after the page content (bottom).
+
 ### DND / "—" display (live check still owed)
 
 Code already maps `episode_results.outcome = 'bye'` → badge **DND**, pts **—** on Admin View Results (by week and by couple) and public This Week. Still needs a real published Did Not Dance couple to confirm on those surfaces. Do not invent a fake production row.
 
-**Explicitly out of scope for this item:** implementing the dropdown layout from this note.
+**Explicitly out of scope for this item:** implementing the dropdown layout or sticky-nav change from this note.
 
 ## Account deletion processing
 
