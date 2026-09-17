@@ -42,13 +42,13 @@ export default async function TodayPage() {
 
   const firstLeagueId = leagueRefs[0].id;
 
-  const { data: seasonEpisodes } = await supabase
+  const { data: seasonEpisodeRows } = await supabase
     .from("episodes")
     .select("id, week_number, status, theme, airs_at, results_published_at")
     .eq("season_id", activeSeasonId ?? "")
     .order("week_number", { ascending: false });
 
-  const episodes = seasonEpisodes ?? [];
+  const episodes = seasonEpisodeRows ?? [];
   const completedEpisodes = episodes.filter((e) => e.status === "completed");
   const upcomingEpisode =
     [...episodes]
