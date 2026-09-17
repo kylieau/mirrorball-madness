@@ -17,6 +17,8 @@ Home season strip is on `cursor/home-season-strip-d84d` (draft PR into `main`, a
 - Up next includes `locked` so the week that just locked (or is airing) does not disappear between pick-lock and results publish.
 - Fixed Eastern air-date formatting is SSR-safe (no viewer-TZ hydration guard). Viewer-local lock time is still later polish.
 
+After this work: `npm run lint` clean, `npm test` **160**, `npm run build` passed. Live Home click-path was not exercised here (no Supabase credentials in this container). Phone (~390px) visual pass is for the coordinator.
+
 ## 4. Backlog & Deferred Items
 
 - Full season schedule dump / a schedule-detail page / Up next lock-time hint — still out of scope.
