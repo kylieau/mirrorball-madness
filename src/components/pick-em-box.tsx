@@ -82,7 +82,7 @@ export function PickEmBox({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Curtain Call</CardTitle>
+          <CardTitle>This week&apos;s picks</CardTitle>
           <CardDescription>No upcoming episode scheduled yet.</CardDescription>
         </CardHeader>
       </Card>
@@ -131,17 +131,19 @@ export function PickEmBox({
   }
 
   const hasSavedPick = !!eliminatedId || !!eliminatedId2 || !!topScorerId;
+  const episodeLabel = formatEpisodeLabel(episode.week_number, seasonNumber);
+  const lockLine = isLocked
+    ? "predictions are locked for this episode."
+    : lockAt
+      ? `locks at ${formattedLockAt}`
+      : null;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Curtain Call — {formatEpisodeLabel(episode.week_number, seasonNumber)}</CardTitle>
+        <CardTitle>This week&apos;s picks</CardTitle>
         <CardDescription>
-          {isLocked
-            ? "Predictions are locked for this episode."
-            : lockAt
-              ? `Locks at ${formattedLockAt}`
-              : ""}
+          {lockLine ? `${episodeLabel} — ${lockLine}` : episodeLabel}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
