@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { computeGrandFinalePoints, computeWeeklyScores, type GrandFinaleMethod, type Outcome } from "@/lib/scoring";
+import { participantIdsToPersist, selectableCast } from "@/lib/episode-cast";
 
 const RESOLVING_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn", "winner", "runner_up", "third_place"]);
 
@@ -50,6 +51,56 @@ async function getActiveSeasonId(
   return { seasonId: season?.id ?? null, error: error?.message ?? (season ? null : "No active season") };
 }
 
+async function pruneDepartedCouplesFromFutureEpisodes(
+  admin: SupabaseClient<Database>,
+  seasonId: string,
+  afterWeekNumber: number,
+  coupleIds: string[]
+): Promise<string | null> {
+  if (coupleIds.length === 0) return null;
+
+  const { data: futureEpisodes, error } = await admin
+    .from("episodes")
+    .select("id")
+    .eq("season_id", seasonId)
+    .gt("week_number", afterWeekNumber)
+    .is("results_published_at", null);
+  if (error) return error.message;
+
+  const futureIds = (futureEpisodes ?? []).map((e) => e.id);
+  if (futureIds.length === 0) return null;
+
+  const { error: participantsErr } = await admin
+    .from("episode_participants")
+    .delete()
+    .in("episode_id", futureIds)
+    .in("couple_id", coupleIds);
+  if (participantsErr) return participantsErr.message;
+
+  const { error: draftResultsErr } = await admin
+    .from("draft_episode_results")
+    .delete()
+    .in("episode_id", futureIds)
+    .in("couple_id", coupleIds);
+  if (draftResultsErr) return draftResultsErr.message;
+
+  const { error: draftDancesErr } = await admin
+    .from("draft_dance_scores")
+    .delete()
+    .in("episode_id", futureIds)
+    .in("couple_id", coupleIds);
+  if (draftDancesErr) return draftDancesErr.message;
+
+  const { error: draftMomentsErr } = await admin
+    .from("draft_episode_custom_moments")
+    .delete()
+    .in("episode_id", futureIds)
+    .in("couple_id", coupleIds);
+  if (draftMomentsErr) return draftMomentsErr.message;
+
+  return null;
+}
+
 export type ScheduleEpisodeInput = {
   weekNumber: number;
   airsAt: string;
@@ -91,11 +142,22 @@ export async function applyEpisodeSchedule(
     .single();
   if (error) return { error: error.message };
 
+  const { data: seasonCouples, error: couplesErr } = await admin
+    .from("couples")
+    .select("id, status, elimination_week")
+    .eq("season_id", seasonId);
+  if (couplesErr) return { error: couplesErr.message };
+
+  const selectableIds = selectableCast(seasonCouples ?? [], episode.week_number, {
+    published: episode.results_published_at != null,
+  }).map((c) => c.id);
+  const toWrite = participantIdsToPersist(input.participantCoupleIds, selectableIds);
+
   // Full replace, same convention as dance_scores/episode_results below.
   await admin.from("episode_participants").delete().eq("episode_id", episode.id);
-  if (input.participantCoupleIds.length > 0) {
+  if (toWrite.length > 0) {
     const { error: participantsErr } = await admin.from("episode_participants").insert(
-      input.participantCoupleIds.map((coupleId) => ({ episode_id: episode.id, couple_id: coupleId }))
+      toWrite.map((coupleId) => ({ episode_id: episode.id, couple_id: coupleId }))
     );
     if (participantsErr) return { error: participantsErr.message };
   }
@@ -227,6 +289,17 @@ export async function applyEpisodeResults(
       await admin.from("couples").update({ status: e.outcome, elimination_week: null }).eq("id", e.coupleId);
     }
   }
+
+  const departedIds = input.entries
+    .filter((e) => RESOLVING_OUTCOMES.has(e.outcome))
+    .map((e) => e.coupleId);
+  const pruneErr = await pruneDepartedCouplesFromFutureEpisodes(
+    admin,
+    seasonId,
+    input.weekNumber,
+    departedIds
+  );
+  if (pruneErr) return { error: pruneErr };
 
   const { data: leagues, error: leaguesErr } = await admin.from("leagues").select("id");
   if (leaguesErr) return { error: leaguesErr.message };

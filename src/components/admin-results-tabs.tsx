@@ -175,7 +175,7 @@ export function AdminResultsTabs({
             episodeResults={episodeResults}
             draftsByEpisode={draftsByEpisode}
             season={season}
-            activeCouples={activeCouples}
+            seasonCouples={allCouplesWithStatus}
             participantsByEpisode={participantsByEpisode}
           />
         </TabsContent>

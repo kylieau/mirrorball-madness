@@ -21,6 +21,12 @@ import {
 } from "@/lib/results-status";
 import type { DraftState } from "@/lib/results-draft";
 import { formatEpisodeLabel } from "@/lib/format-week";
+import {
+  defaultCheckedParticipantIds,
+  isFullSelectableCast,
+  participantIdsToPersist,
+  selectableCast,
+} from "@/lib/episode-cast";
 import { ChevronRightIcon, PlusIcon } from "lucide-react";
 
 type Episode = {
@@ -34,7 +40,13 @@ type Episode = {
   results_published_at: string | null;
 };
 type EpisodeResult = { episode_id: string; couple_id: string };
-type Couple = { id: string; celebrity_name: string; pro_name: string };
+type Couple = {
+  id: string;
+  celebrity_name: string;
+  pro_name: string;
+  status: string;
+  elimination_week: number | null;
+};
 type Season = {
   id: string;
   premiere_date: string | null;
@@ -130,22 +142,22 @@ export function ScheduleManager({
   episodeResults,
   draftsByEpisode,
   season,
-  activeCouples,
+  seasonCouples,
   participantsByEpisode,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
   draftsByEpisode: Record<string, DraftState>;
   season: Season;
-  activeCouples: Couple[];
+  seasonCouples: Couple[];
   participantsByEpisode: Record<string, string[]>;
 }) {
   const sortedEpisodes = [...episodes].sort((a, b) => a.week_number - b.week_number);
   const browserTimeZone = useBrowserTimeZone();
-  const allActiveCoupleIds = new Set(activeCouples.map((c) => c.id));
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingPublished, setEditingPublished] = useState(false);
   const [weekNumber, setWeekNumber] = useState(
     sortedEpisodes.length > 0 ? sortedEpisodes[sortedEpisodes.length - 1].week_number + 1 : 1
   );
@@ -154,7 +166,14 @@ export function ScheduleManager({
   const [isEliminationWeek, setIsEliminationWeek] = useState(true);
   const [isFinale, setIsFinale] = useState(false);
   const [isDoubleEliminationWeek, setIsDoubleEliminationWeek] = useState(false);
-  const [participantCoupleIds, setParticipantCoupleIds] = useState<Set<string>>(allActiveCoupleIds);
+  const [participantCoupleIds, setParticipantCoupleIds] = useState<Set<string>>(new Set());
+
+  const selectableCouples = selectableCast(seasonCouples, weekNumber, { published: editingPublished });
+  const selectableIds = selectableCouples.map((c) => c.id);
+  const allSelectableChecked = isFullSelectableCast(
+    selectableIds.filter((id) => participantCoupleIds.has(id)),
+    selectableIds
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,28 +205,33 @@ export function ScheduleManager({
   function openEditEpisode(e: Episode) {
     setError(null);
     setEditingId(e.id);
+    const published = e.results_published_at != null;
+    setEditingPublished(published);
     setWeekNumber(e.week_number);
     setAirsAt(utcIsoToLocalInput(e.airs_at));
     setTheme(e.theme ?? "");
     setIsEliminationWeek(e.is_elimination_week);
     setIsFinale(e.is_finale);
     setIsDoubleEliminationWeek(e.is_double_elimination_week);
-    const configured = participantsByEpisode[e.id];
-    setParticipantCoupleIds(configured && configured.length > 0 ? new Set(configured) : allActiveCoupleIds);
+    const selectable = selectableCast(seasonCouples, e.week_number, { published }).map((c) => c.id);
+    setParticipantCoupleIds(new Set(defaultCheckedParticipantIds(participantsByEpisode[e.id], selectable)));
     setSheetOpen(true);
   }
 
   function resetForm() {
     setEditingId(null);
-    setWeekNumber(
-      sortedEpisodes.length > 0 ? sortedEpisodes[sortedEpisodes.length - 1].week_number + 1 : 1
-    );
+    setEditingPublished(false);
+    const nextWeek =
+      sortedEpisodes.length > 0 ? sortedEpisodes[sortedEpisodes.length - 1].week_number + 1 : 1;
+    setWeekNumber(nextWeek);
     setAirsAt(defaultAirDate());
     setTheme("");
     setIsEliminationWeek(true);
     setIsFinale(false);
     setIsDoubleEliminationWeek(false);
-    setParticipantCoupleIds(allActiveCoupleIds);
+    setParticipantCoupleIds(
+      new Set(selectableCast(seasonCouples, nextWeek, { published: false }).map((c) => c.id))
+    );
   }
 
   function toggleParticipant(coupleId: string) {
@@ -228,13 +252,10 @@ export function ScheduleManager({
     }
 
     setSubmitting(true);
-    // Sending every active couple back as "participants" is functionally
-    // identical to sending none (resolveEpisodeCoupleIds treats an empty
-    // list as unrestricted) — but sending [] keeps ordinary weeks writing
-    // zero episode_participants rows and needing zero admin attention.
-    const isFullCast =
-      participantCoupleIds.size === allActiveCoupleIds.size &&
-      [...allActiveCoupleIds].every((id) => participantCoupleIds.has(id));
+    // Sending every selectable couple back as "participants" is
+    // functionally identical to sending none (resolveEpisodeCoupleIds
+    // treats an empty list as unrestricted) — but sending [] keeps
+    // ordinary weeks writing zero episode_participants rows.
     const result = await scheduleEpisode({
       weekNumber,
       airsAt: airsAtUtc,
@@ -242,7 +263,7 @@ export function ScheduleManager({
       isEliminationWeek,
       isFinale,
       isDoubleEliminationWeek,
-      participantCoupleIds: isFullCast ? [] : [...participantCoupleIds],
+      participantCoupleIds: participantIdsToPersist(participantCoupleIds, selectableIds),
     });
     if (result.error) {
       setError(result.error);
@@ -379,32 +400,32 @@ export function ScheduleManager({
                   type="button"
                   className="text-xs text-muted-foreground hover:text-foreground"
                   onClick={() =>
-                    setParticipantCoupleIds(
-                      participantCoupleIds.size === allActiveCoupleIds.size
-                        ? new Set()
-                        : new Set(allActiveCoupleIds)
-                    )
+                    setParticipantCoupleIds(allSelectableChecked ? new Set() : new Set(selectableIds))
                   }
                 >
-                  {participantCoupleIds.size === allActiveCoupleIds.size ? "Clear all" : "Select all"}
+                  {allSelectableChecked ? "Clear all" : "Select all"}
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Leave everyone checked for an ordinary week. Uncheck couples who aren&apos;t performing this
-                episode (e.g. a split-broadcast premiere) — Enter Results and Curtain Call will only show
-                who&apos;s checked here.
+                Leave everyone checked for an ordinary week. Couples already eliminated in an earlier
+                week are omitted so they can&apos;t be re-included. Uncheck anyone sitting out this
+                broadcast (e.g. a split premiere) — Enter Results and Curtain Call follow this list.
               </p>
               <div className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-lg border border-border p-2">
-                {activeCouples.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 py-1 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={participantCoupleIds.has(c.id)}
-                      onChange={() => toggleParticipant(c.id)}
-                    />
-                    {c.celebrity_name} &amp; {c.pro_name}
-                  </label>
-                ))}
+                {selectableCouples.length === 0 ? (
+                  <p className="py-1 text-sm text-muted-foreground">No couples still in the cast.</p>
+                ) : (
+                  selectableCouples.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 py-1 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={participantCoupleIds.has(c.id)}
+                        onChange={() => toggleParticipant(c.id)}
+                      />
+                      {c.celebrity_name} &amp; {c.pro_name}
+                    </label>
+                  ))
+                )}
               </div>
             </div>
             <div className="flex gap-2">
