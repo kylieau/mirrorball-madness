@@ -8,18 +8,18 @@ import { HomeIcon, PencilLineIcon, ListChecksIcon, TrophyIcon } from "lucide-rea
 
 // Overrides TabsTrigger's default "boxed pill" active state (bg/border/
 // shadow) so the active tab matches the plain color-only treatment the
-// Home/This Week tabs use (a Link, not a TabsTrigger, so they never had
+// Home/Results tabs use (a Link, not a TabsTrigger, so they never had
 // that default styling to begin with).
 const TAB_ITEM_CLASSES =
   "h-auto flex-1 flex-col gap-0.5 rounded-md px-2 py-1.5 text-muted-foreground hover:text-foreground data-active:bg-transparent data-active:text-accent group-data-[variant=default]/tabs-list:data-active:shadow-none dark:data-active:bg-transparent dark:data-active:border-transparent dark:data-active:text-accent sm:flex-row sm:gap-1.5 sm:px-3";
 
 const LINK_ITEMS = [
   { href: "/today", label: "Home", icon: HomeIcon },
-  { href: "/this-week", label: "This week", icon: ListChecksIcon },
+  { href: "/this-week", label: "Results", icon: ListChecksIcon },
 ] as const;
 
 const TABS = [
-  { value: "yourpicks", label: "Your picks", icon: PencilLineIcon },
+  { value: "yourpicks", label: "Picks", icon: PencilLineIcon },
   { value: "standings", label: "Standings", icon: TrophyIcon },
 ] as const;
 

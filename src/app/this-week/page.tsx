@@ -180,7 +180,7 @@ export default async function ThisWeekPage({
       <TopBar {...accountSettingsData} email={user.email ?? ""} />
 
       <div className="pb-20 sm:pb-0">
-        <PageHeader title="This Week">
+        <PageHeader title="Results">
           {selectedEpisode && (
             <EpisodeCarousel
               weekNumber={selectedEpisode.week_number}
@@ -229,11 +229,11 @@ export default async function ThisWeekPage({
           </Link>
           <span className={`${TAB_ITEM_CLASSES} text-accent`}>
             <ListChecksIcon className="size-5 sm:size-4" />
-            <span className="text-[10px] sm:text-sm">This Week</span>
+            <span className="text-[10px] sm:text-sm">Results</span>
           </span>
           <Link href={`/leagues/${firstLeagueId}?tab=yourpicks`} className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
             <PencilLineIcon className="size-5 sm:size-4" />
-            <span className="text-[10px] sm:text-sm">Your picks</span>
+            <span className="text-[10px] sm:text-sm">Picks</span>
           </Link>
           <Link href={`/leagues/${firstLeagueId}?tab=standings`} className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
             <TrophyIcon className="size-5 sm:size-4" />

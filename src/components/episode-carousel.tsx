@@ -36,7 +36,7 @@ function ArrowSlot({
   );
 }
 
-// Slim ← Ep. N — theme → control shared by This Week and Past picks.
+// Slim ← Ep. N — theme → control shared by Results and Picks.
 // Prev/next are real links so flipping re-renders that week's body.
 export function EpisodeCarousel({
   weekNumber,

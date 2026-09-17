@@ -159,7 +159,7 @@ export function WeeklyResultsView({
         </div>
       )}
 
-      <div className="mb-2 text-sm font-semibold text-accent">This Week&apos;s dances</div>
+      <div className="mb-2 text-sm font-semibold text-accent">This week&apos;s dances</div>
       <div className="flex flex-col gap-2.5">
         {outcomes.map((r) => {
           const tag = outcomeTag(r);

@@ -512,7 +512,7 @@ export function ResultsForm({
       {justPublished && selectedEpisode && (
         <div className="rounded-xl border border-emerald/40 bg-emerald/10 px-4 py-3 text-sm text-emerald-text">
           <p className="font-medium">✅ {formatEpisodeLabel(selectedEpisode.week_number, seasonNumber)} results published</p>
-          <p className="mt-0.5 text-emerald-text/90">Now live on This Week &amp; Standings across every league.</p>
+          <p className="mt-0.5 text-emerald-text/90">Now live on Results &amp; Standings across every league.</p>
         </div>
       )}
 
@@ -890,7 +890,7 @@ export function ResultsForm({
 
           <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2 border-t border-border bg-background px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between">
             <p className="hidden text-xs text-muted-foreground sm:block">
-              Publishing updates This Week &amp; Standings across every league immediately.
+              Publishing updates Results &amp; Standings across every league immediately.
             </p>
             <div className="flex gap-2 sm:w-auto">
               <Button

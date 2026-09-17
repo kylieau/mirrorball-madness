@@ -84,7 +84,7 @@ export type CurtainCallSelection<C extends { id: string }, L extends { id: strin
   mode: CurtainCallMode | null;
 };
 
-// One Your Picks card: default is the live/upcoming week (the pick form).
+// One Picks / Curtain Call card: default is the live/upcoming week (the pick form).
 // A completed ?week= id shows the recap, including unwatched weeks so the
 // lock card can prompt. Unknown ids fall back to the live week, then recap.
 export function selectCurtainCallWeek<C extends { id: string }, L extends { id: string }>(

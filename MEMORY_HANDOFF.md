@@ -2,20 +2,17 @@
 
 ## 1. Current State
 
-Draft PR #17 (`cursor/home-season-strip-d84d`): Your Picks Curtain Call is **one card**. Slim `EpisodeCarousel` switches pick form vs past recap. This Week carousel unchanged. Home has no season strip. Do not merge from the agent.
+Draft PR #17 (`cursor/home-season-strip-d84d`): fan tabs read **Home / Results / Picks / Standings**. Curtain Call card titled **Curtain Call**. Slim carousel still switches pick form vs recap. Routes unchanged (`/this-week`, `?tab=yourpicks`). Do not merge from the agent.
 
 ## 2. Changes Made
 
-- `CurtainCallCard` wraps **This week's picks** + shared carousel + either `PickEmBox` or `PastPicksRecap`.
-- Default `?tab=yourpicks` lands on the live/upcoming week (dropdowns / lock state). A completed `?week=` shows Nailed it / strike→actual / points. Spoiler lock unchanged.
-- No second Past picks card. `PickEmBox` is form-only (no nested card).
-- This Week and Home unchanged from the prior reshape.
+- Bottom nav + page titles: This Week → **Results**, Your picks → **Picks**. Home and Standings unchanged.
+- `CurtainCallCard` title is **Curtain Call** (not “This week's picks”, not “Picks”). Episode identity stays on the carousel.
+- Docs updated for the new tab names.
 
 ## 3. Key Decisions & Lessons Learned
 
-- One card title stays **This week's picks** (existing task phrase). The carousel is the week identity — do not add a second “Past picks” heading.
-
-After this pass: `npm run lint` clean, `npm test` **173**, `npm run build` passed. Live Your Picks click-path was not exercised here (no Supabase credentials). Phone (~390px) pass is for the coordinator.
+- Label-only rename — do not retarget `/this-week` or `?tab=yourpicks`.
 
 ## 4. Backlog & Deferred Items
 
@@ -24,5 +21,5 @@ After this pass: `npm run lint` clean, `npm test` **173**, `npm run build` passe
 
 ## 5. Next Steps
 
-1. Coordinator: phone Your Picks — one Curtain Call card; arrows switch form vs recap; no chip; no second card. Preview: https://mirrorball-madness-git-cursor-home-season-strip-d84d-kylie8.vercel.app
+1. Coordinator: phone nav reads Home / Results / Picks / Standings; Results page title; Picks page title; Curtain Call card title. Preview: https://mirrorball-madness-git-cursor-home-season-strip-d84d-kylie8.vercel.app
 2. Do not merge from the agent.

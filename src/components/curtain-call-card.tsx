@@ -26,7 +26,7 @@ export function CurtainCallCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>This week&apos;s picks</CardTitle>
+        <CardTitle>Curtain Call</CardTitle>
         {episode ? (
           <EpisodeCarousel
             weekNumber={episode.weekNumber}
