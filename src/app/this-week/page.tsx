@@ -71,14 +71,12 @@ export default async function ThisWeekPage({
     (weekParam ? cutoff.visibleEpisodes.find((e) => e.id === weekParam) : null) ?? cutoff.effectiveLatestEpisode ?? null;
   const selectedEpisodeId = selectedEpisode?.id ?? null;
 
-  // Only fires when nothing at all is visible yet (fresh account, or
-  // spoiler-free mode on with nothing marked watched) — an older visible
-  // week the viewer is browsing isn't itself a "reveal pending" state.
-  const trueLatestCompletedEpisode = completedEpisodes?.[0] ?? null;
-  const pendingReveal =
-    !selectedEpisode && trueLatestCompletedEpisode
-      ? { weekNumber: trueLatestCompletedEpisode.week_number, theme: trueLatestCompletedEpisode.theme }
-      : null;
+  // Fires whenever a completed episode sits past last_watched_week — even
+  // if an older week is already on screen. Otherwise a viewer who marked
+  // E01 gets stranded on those results with no way to reveal E02.
+  const pendingReveal = cutoff.pendingRevealEpisode
+    ? { weekNumber: cutoff.pendingRevealEpisode.week_number, theme: cutoff.pendingRevealEpisode.theme }
+    : null;
 
   const [{ data: danceScores }, { data: episodeResults }, { data: danceStyles }, { data: allCouples }] =
     await Promise.all([
