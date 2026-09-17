@@ -59,9 +59,11 @@ Do not change `PageHeader`'s league-switcher slot on Your Picks / Standings as p
 
 Kylie (via Chief Kimo): on Mirrorball Madness **web/desktop-width**, the bottom nav should **stick to the bottom consistently across pages**, regardless of window size — like the iOS/phone view (always bottom). She doesn't like it flipping top/bottom on different pages.
 
+Same note: on web she doesn't like the bottom tab bar looking sloppy when it's **narrower / more inset** than the content column above (gold borders don't align). When sticky-bottom-nav is implemented, nav should match the **same width as the rest of the content** as well as always sitting at the bottom.
+
 Owner-noted, not started — do not implement from this note.
 
-Today the tab bars use `fixed … bottom-0` on small viewports and `sm:static` from the `sm` breakpoint up (`today/page.tsx`, `this-week/page.tsx`, `league-tabs.tsx`, `admin-results-tabs.tsx`). Static placement follows DOM order, so Admin's bar sits under the header (top) while Home / This Week's sit after the page content (bottom).
+Today the tab bars use `fixed … bottom-0` on small viewports and `sm:static` from the `sm` breakpoint up (`today/page.tsx`, `this-week/page.tsx`, `league-tabs.tsx`, `admin-results-tabs.tsx`). Static placement follows DOM order, so Admin's bar sits under the header (top) while Home / This Week's sit after the page content (bottom). From `sm` up the inner cluster is `sm:w-fit` (tabs hug their labels) against a `max-w-2xl` content column, so the gold rule/border reads shorter and more inset than the page above.
 
 ### DND / "—" display (live check still owed)
 
