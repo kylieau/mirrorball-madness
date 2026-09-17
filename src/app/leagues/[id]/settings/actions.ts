@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { syncSeasonClockAnchor as writeSeasonClockAnchor } from "@/lib/season-clock-sync";
 
 export async function renameLeague(
   leagueId: string,
@@ -169,4 +170,17 @@ export async function updateScoringCategories(
   revalidatePath(`/leagues/${leagueId}`);
   revalidatePath("/today");
   return { error: null };
+}
+
+export async function syncSeasonClockAnchor(
+  leagueId: string
+): Promise<{ error: string | null; anchorWeek: number | null }> {
+  const supabase = await createClient();
+  const result = await writeSeasonClockAnchor(supabase, leagueId);
+  if (!result.error) {
+    revalidatePath(`/leagues/${leagueId}/settings`);
+    revalidatePath(`/leagues/${leagueId}`);
+    revalidatePath("/today");
+  }
+  return result;
 }

@@ -51,15 +51,16 @@ export default async function LeagueSettingsPage({
   const isCommissioner = viewerMembership.role === "commissioner";
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [{ data: seasonEpisodes }, { data: activeSeason }, { data: hardDeadlineAirsAt }] = await Promise.all([
-    supabase
-      .from("episodes")
-      .select("week_number, theme")
-      .eq("season_id", activeSeasonId ?? "")
-      .order("week_number"),
-    supabase.from("seasons").select("season_number").eq("id", activeSeasonId ?? "").maybeSingle(),
-    supabase.rpc("effective_grand_finale_deadline", { p_league_id: id }),
-  ]);
+  const [{ data: seasonEpisodes }, { data: activeSeason }, { data: effectiveHardDeadlineWeek }] =
+    await Promise.all([
+      supabase
+        .from("episodes")
+        .select("week_number, theme, airs_at")
+        .eq("season_id", activeSeasonId ?? "")
+        .order("week_number"),
+      supabase.from("seasons").select("season_number").eq("id", activeSeasonId ?? "").maybeSingle(),
+      supabase.rpc("effective_hard_deadline_week", { p_league_id: id }),
+    ]);
   const seasonNumber = activeSeason?.season_number ?? null;
 
   const closeHref = safeRelativePath(from, `/leagues/${id}?tab=yourpicks`);
@@ -98,7 +99,7 @@ export default async function LeagueSettingsPage({
           canEdit={isCommissioner}
           seasonEpisodes={seasonEpisodes ?? []}
           seasonNumber={seasonNumber}
-          hardDeadlineAirsAt={hardDeadlineAirsAt ?? null}
+          effectiveHardDeadlineWeek={effectiveHardDeadlineWeek ?? null}
         />
       </div>
     </div>
