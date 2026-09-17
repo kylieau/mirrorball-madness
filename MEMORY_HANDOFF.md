@@ -24,6 +24,8 @@ Rebase onto `main` after #11/#12/#14: fan copy uses `formatEpisodeCasual` (`Epis
 
 Spoiler-free off path is unchanged (`pendingRevealEpisode` is null when the mode is off).
 
+**Verification:** Pre-rebase: `npm test` 105/105, lint/tsc/build green; 390px fixture click-through. Rebase onto `main` (#11/#12/#14) keeps mark behavior and casual `Episode N` labels — re-run lint/tests after the rebase. Live spoiler-free account still belongs on the Vercel preview.
+
 **Left alone on purpose:** Settings spoiler toggle, `setSpoilerFreeMode` seed behavior, `spoilerSafeCoupleStatus`, week-switcher still limited to visible episodes.
 
 ## 3. Key Decisions & Lessons Learned
