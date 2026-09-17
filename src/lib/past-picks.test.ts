@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { findTopScorerCoupleIds } from "./scoring";
 import {
   buildPastPicksComparison,
+  collapsePickRows,
   isPastPicksLocked,
   matchEliminationPicks,
   matchTopScorerPick,
@@ -129,6 +130,77 @@ describe("matchTopScorerPick", () => {
     expect(matchTopScorerPick("a", ["a", "b"])).toEqual({ pickId: "a", correct: true });
     expect(matchTopScorerPick("c", ["a", "b"])).toEqual({ pickId: "c", correct: false });
     expect(matchTopScorerPick(null, ["a"])).toEqual({ pickId: null, correct: false });
+  });
+});
+
+describe("collapsePickRows", () => {
+  it("collapses a hit into a single Nailed it row, without a duplicate Actual", () => {
+    expect(collapsePickRows([{ pickId: "a", correct: true }], ["a"])).toEqual([
+      { kind: "nailed", coupleIds: ["a"] },
+    ]);
+  });
+
+  it("keeps You vs Actual on a miss or empty pick", () => {
+    expect(collapsePickRows([{ pickId: "b", correct: false }], ["a"])).toEqual([
+      { kind: "you", coupleIds: ["b"] },
+      { kind: "actual", coupleIds: ["a"] },
+    ]);
+    expect(collapsePickRows([{ pickId: null, correct: false }], ["a"])).toEqual([
+      { kind: "you", coupleIds: [] },
+      { kind: "actual", coupleIds: ["a"] },
+    ]);
+  });
+
+  it("collapses each double-elim slot independently, in slot order", () => {
+    expect(
+      collapsePickRows(
+        [
+          { pickId: "a", correct: true },
+          { pickId: "b", correct: true },
+        ],
+        ["a", "b"]
+      )
+    ).toEqual([
+      { kind: "nailed", coupleIds: ["a"] },
+      { kind: "nailed", coupleIds: ["b"] },
+    ]);
+
+    expect(
+      collapsePickRows(
+        [
+          { pickId: "a", correct: true },
+          { pickId: "c", correct: false },
+        ],
+        ["a", "b"]
+      )
+    ).toEqual([
+      { kind: "nailed", coupleIds: ["a"] },
+      { kind: "you", coupleIds: ["c"] },
+      { kind: "actual", coupleIds: ["b"] },
+    ]);
+
+    expect(
+      collapsePickRows(
+        [
+          { pickId: "a", correct: true },
+          { pickId: "a", correct: true },
+        ],
+        ["a", "b"]
+      )
+    ).toEqual([{ kind: "nailed", coupleIds: ["a"] }]);
+  });
+
+  it("on a top-scorer hit, does not also list tied partners as Actual", () => {
+    expect(collapsePickRows([{ pickId: "a", correct: true }], ["a", "b"])).toEqual([
+      { kind: "nailed", coupleIds: ["a"] },
+    ]);
+  });
+
+  it("on a miss, lists every actual including ties", () => {
+    expect(collapsePickRows([{ pickId: "c", correct: false }], ["a", "b"])).toEqual([
+      { kind: "you", coupleIds: ["c"] },
+      { kind: "actual", coupleIds: ["a", "b"] },
+    ]);
   });
 });
 

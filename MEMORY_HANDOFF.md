@@ -8,7 +8,7 @@ Past picks vs results is on `cursor/past-picks-vs-results-c74f` (draft PR #15 in
 
 - Current week's Curtain Call form (`PickEmBox`) stays on top; **Past picks** card sits below it when Curtain Call is on and at least one episode is completed.
 - Episode switcher reuses `WeekSwitcher` (`?tab=yourpicks&week=`). Fan labels: `Ep. N` / `Ep. N — {theme}`.
-- Per selected completed episode: elim pick(s) vs actual (✓/✗), top-scorer pick vs highest summed `dance_scores.total_score` (shared `findTopScorerCoupleIds` with scoring), points from `weekly_manager_scores.prediction_points` (not recomputed).
+- Per selected completed episode: elim pick(s) vs actual (✓/✗), top-scorer pick vs highest summed `dance_scores.total_score` (shared `findTopScorerCoupleIds` with scoring), points from `weekly_manager_scores.prediction_points` (not recomputed). Hits collapse to a single **Nailed it** line (layout A); misses keep You vs Actual.
 - Spoiler-Free: outcomes only when the episode is in `allowedEpisodeIds`. Unwatched completed weeks are in the switcher (lock icon) but the card stays locked — “Mark as watched to see how you did” — no results/points leak. Hidden when Curtain Call is off.
 
 ## 3. Key Decisions & Lessons Learned

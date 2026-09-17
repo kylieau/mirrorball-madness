@@ -13,6 +13,41 @@ export type PastPicksComparison = {
   predictionPoints: number;
 };
 
+export type PastPicksDisplayKind = "nailed" | "you" | "actual";
+
+export type PastPicksDisplayRow = {
+  kind: PastPicksDisplayKind;
+  coupleIds: string[];
+};
+
+// Layout A: a hit collapses You+Actual into one "Nailed it" line so the
+// couple isn't printed twice. Misses / empty picks keep You vs Actual.
+// Double-elim slots collapse independently, in slot order.
+export function collapsePickRows(picks: PickMatch[], actualIds: string[]): PastPicksDisplayRow[] {
+  const rows: PastPicksDisplayRow[] = [];
+  const hitIds: string[] = [];
+  let hasMiss = false;
+
+  for (const pick of picks) {
+    if (pick.correct && pick.pickId) {
+      if (!hitIds.includes(pick.pickId)) {
+        rows.push({ kind: "nailed", coupleIds: [pick.pickId] });
+        hitIds.push(pick.pickId);
+      }
+      continue;
+    }
+    hasMiss = true;
+    rows.push({ kind: "you", coupleIds: pick.pickId ? [pick.pickId] : [] });
+  }
+
+  const remainingActuals = actualIds.filter((id) => !hitIds.includes(id));
+  if (hasMiss) {
+    rows.push({ kind: "actual", coupleIds: remainingActuals });
+  }
+
+  return rows;
+}
+
 // Latest visible completed week when the URL has no (or an unknown) week
 // id; an unwatched completed week is still selectable so the lock card can
 // prompt "Mark as watched" instead of leaking results. completedEpisodesDesc

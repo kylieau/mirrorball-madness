@@ -11,7 +11,11 @@ import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
 import { WeekSwitcher, type SwitcherWeek } from "@/components/week-switcher";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
-import type { PastPicksComparison, PickMatch } from "@/lib/past-picks";
+import {
+  collapsePickRows,
+  type PastPicksComparison,
+  type PastPicksDisplayRow,
+} from "@/lib/past-picks";
 
 function CoupleNames({
   ids,
@@ -22,7 +26,7 @@ function CoupleNames({
   names: Record<string, CoupleNameParts>;
   fallback: string;
 }) {
-  if (ids.length === 0) return <>{fallback}</>;
+  if (ids.length === 0) return <span className="font-normal text-muted-foreground">{fallback}</span>;
   return (
     <>
       {ids.map((id, i) => (
@@ -35,29 +39,40 @@ function CoupleNames({
   );
 }
 
-function PickLine({
-  match,
+function Mark({ hit }: { hit: boolean }) {
+  return (
+    <span className={hit ? "text-emerald-text" : "text-muted-foreground"} aria-label={hit ? "Correct" : "Miss"}>
+      {hit ? "✓" : "✗"}
+    </span>
+  );
+}
+
+function ResultRows({
+  rows,
   names,
+  actualFallback,
 }: {
-  match: PickMatch;
+  rows: PastPicksDisplayRow[];
   names: Record<string, CoupleNameParts>;
+  actualFallback: string;
 }) {
   return (
-    <span className="inline-flex items-center justify-end gap-1.5 text-right font-medium">
-      {match.pickId ? (
-        <CoupleName {...(names[match.pickId] ?? { celebrity: "Unknown", pro: "Unknown" })} />
-      ) : (
-        <span className="font-normal text-muted-foreground">No pick</span>
-      )}
-      {match.pickId && (
-        <span
-          className={match.correct ? "text-emerald-text" : "text-muted-foreground"}
-          aria-label={match.correct ? "Correct" : "Miss"}
-        >
-          {match.correct ? "✓" : "✗"}
-        </span>
-      )}
-    </span>
+    <>
+      {rows.map((row, i) => {
+        const label = row.kind === "nailed" ? "Nailed it" : row.kind === "you" ? "You" : "Actual";
+        const fallback = row.kind === "you" ? "No pick" : actualFallback;
+        const showMark = row.kind === "nailed" || (row.kind === "you" && row.coupleIds.length > 0);
+        return (
+          <div key={`${row.kind}-${row.coupleIds.join("-") || i}`} className="flex items-start justify-between gap-3">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="inline-flex items-center justify-end gap-1.5 text-right font-medium">
+              <CoupleNames ids={row.coupleIds} names={names} fallback={fallback} />
+              {showMark && <Mark hit={row.kind === "nailed"} />}
+            </span>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -105,43 +120,21 @@ export function PastPicksCard({
           <div className="flex flex-col gap-3 text-sm">
             <div className="flex flex-col gap-1.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who went home</p>
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-muted-foreground">You</span>
-                <span className="flex flex-col items-end gap-1">
-                  {comparison.eliminationPicks.map((match, i) => (
-                    <PickLine key={match.pickId ?? `elim-${i}`} match={match} names={coupleDisplayNames} />
-                  ))}
-                </span>
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-muted-foreground">Actual</span>
-                <span className="text-right font-medium">
-                  <CoupleNames
-                    ids={comparison.actualEliminatedIds}
-                    names={coupleDisplayNames}
-                    fallback="Nobody"
-                  />
-                </span>
-              </div>
+              <ResultRows
+                rows={collapsePickRows(comparison.eliminationPicks, comparison.actualEliminatedIds)}
+                names={coupleDisplayNames}
+                actualFallback="Nobody"
+              />
             </div>
             <div className="flex flex-col gap-1.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Who scored highest
               </p>
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-muted-foreground">You</span>
-                <PickLine match={comparison.topScorer} names={coupleDisplayNames} />
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-muted-foreground">Actual</span>
-                <span className="text-right font-medium">
-                  <CoupleNames
-                    ids={comparison.actualTopScorerIds}
-                    names={coupleDisplayNames}
-                    fallback="—"
-                  />
-                </span>
-              </div>
+              <ResultRows
+                rows={collapsePickRows([comparison.topScorer], comparison.actualTopScorerIds)}
+                names={coupleDisplayNames}
+                actualFallback="—"
+              />
             </div>
             <div className="flex items-center justify-between border-t border-border pt-3">
               <span className="text-muted-foreground">Curtain Call</span>
