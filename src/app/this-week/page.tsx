@@ -2,12 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
-import { WeekSwitcher } from "@/components/week-switcher";
+import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
 import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import {
+  adjacentThisWeekWeeks,
+  buildThisWeekCarouselWeeks,
+  selectThisWeekEpisode,
+  thisWeekHref,
+} from "@/lib/this-week-carousel";
 import { HomeIcon, ListChecksIcon, PencilLineIcon, TrophyIcon } from "lucide-react";
 
 const TAB_ITEM_CLASSES =
@@ -48,28 +54,31 @@ export default async function ThisWeekPage({
   const leagueNameById = new Map(leagueRefs.map((l) => [l.id, l.name]));
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const { data: completedEpisodes } = await supabase
+  const { data: seasonEpisodeRows } = await supabase
     .from("episodes")
-    .select("id, week_number, airs_at, theme, is_finale")
+    .select("id, week_number, airs_at, theme, is_finale, status")
     .eq("season_id", activeSeasonId ?? "")
-    .eq("status", "completed")
     .order("week_number", { ascending: false });
+
+  const seasonEpisodes = seasonEpisodeRows ?? [];
+  const completedEpisodes = seasonEpisodes.filter((e) => e.status === "completed");
 
   const cutoff = await resolveSpoilerCutoff(
     supabase,
     user.id,
     activeSeasonId ?? null,
     accountSettingsData.spoilerFreeMode,
-    completedEpisodes ?? []
+    completedEpisodes
   );
 
-  // Defaults to the latest visible week; ?week=<episode id> (from the
-  // switcher) picks an older one. An unrecognized id, OR one the viewer
-  // hasn't watched yet under their spoiler cutoff, falls back to the latest
-  // visible week rather than leaking it via a direct URL.
-  const selectedEpisode =
-    (weekParam ? cutoff.visibleEpisodes.find((e) => e.id === weekParam) : null) ?? cutoff.effectiveLatestEpisode ?? null;
+  // Carousel = spoiler-visible completed weeks + upcoming/locked for a
+  // theme peek. ?week= honors that list; an unrecognized or unwatched
+  // completed id falls back instead of leaking results.
+  const carouselWeeks = buildThisWeekCarouselWeeks(seasonEpisodes, cutoff.allowedEpisodeIds);
+  const { episode: selectedEpisode, mode: selectedMode } = selectThisWeekEpisode(carouselWeeks, weekParam);
   const selectedEpisodeId = selectedEpisode?.id ?? null;
+  const neighbors = selectedEpisodeId ? adjacentThisWeekWeeks(carouselWeeks, selectedEpisodeId) : { prev: null, next: null };
+  const showResults = selectedMode === "results";
 
   // Fires whenever a completed episode sits past last_watched_week — even
   // if an older week is already on screen. Otherwise a viewer who marked
@@ -80,10 +89,10 @@ export default async function ThisWeekPage({
 
   const [{ data: danceScores }, { data: episodeResults }, { data: danceStyles }, { data: allCouples }] =
     await Promise.all([
-      selectedEpisodeId
+      showResults && selectedEpisodeId
         ? supabase.from("dance_scores").select("id, episode_id, couple_id, dance_style_id, total_score").eq("episode_id", selectedEpisodeId)
         : Promise.resolve({ data: [] }),
-      selectedEpisodeId
+      showResults && selectedEpisodeId
         ? supabase
             .from("episode_results")
             .select("episode_id, couple_id, outcome")
@@ -116,7 +125,7 @@ export default async function ThisWeekPage({
       .eq("manager_id", user.id)
       .in("league_id", leagueIds)
       .is("end_week", null),
-    selectedEpisodeId
+    showResults && selectedEpisodeId
       ? supabase
           .from("predictions")
           .select("league_id, predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
@@ -171,28 +180,45 @@ export default async function ThisWeekPage({
       <TopBar {...accountSettingsData} email={user.email ?? ""} />
 
       <div className="pb-20 sm:pb-0">
-        <PageHeader title="This Week">
-          {selectedEpisodeId && (
-            <WeekSwitcher
-              currentEpisodeId={selectedEpisodeId}
-              weeks={cutoff.visibleEpisodes.map((e) => ({
-                id: e.id,
-                weekNumber: e.week_number,
-                theme: e.theme,
-              }))}
+        <PageHeader title="Results">
+          {selectedEpisode && (
+            <EpisodeCarousel
+              weekNumber={selectedEpisode.week_number}
+              theme={selectedEpisode.theme}
+              prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
+              nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
             />
           )}
         </PageHeader>
-        <WeeklyResultsView
-          episodes={selectedEpisode ? [selectedEpisode] : []}
-          episodeResults={episodeResults ?? []}
-          danceScores={danceScores ?? []}
-          danceStyles={danceStyles ?? []}
-          couples={flatCouples}
-          coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
-          leaguesByCouple={leaguesByCouple}
-          pendingReveal={pendingReveal}
-        />
+        {selectedMode === "peek" && selectedEpisode ? (
+          <div>
+            {pendingReveal && (
+              <div className="mb-4">
+                <WeeklyResultsView
+                  episodes={[]}
+                  episodeResults={[]}
+                  danceScores={[]}
+                  danceStyles={danceStyles ?? []}
+                  couples={flatCouples}
+                  coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
+                  pendingReveal={pendingReveal}
+                />
+              </div>
+            )}
+            <ThisWeekThemePeek theme={selectedEpisode.theme} />
+          </div>
+        ) : (
+          <WeeklyResultsView
+            episodes={showResults && selectedEpisode ? [selectedEpisode] : []}
+            episodeResults={episodeResults ?? []}
+            danceScores={danceScores ?? []}
+            danceStyles={danceStyles ?? []}
+            couples={flatCouples}
+            coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
+            leaguesByCouple={leaguesByCouple}
+            pendingReveal={pendingReveal}
+          />
+        )}
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] sm:static sm:border-t-0 sm:border-b sm:pb-0">
@@ -203,11 +229,11 @@ export default async function ThisWeekPage({
           </Link>
           <span className={`${TAB_ITEM_CLASSES} text-accent`}>
             <ListChecksIcon className="size-5 sm:size-4" />
-            <span className="text-[10px] sm:text-sm">This Week</span>
+            <span className="text-[10px] sm:text-sm">Results</span>
           </span>
           <Link href={`/leagues/${firstLeagueId}?tab=yourpicks`} className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
             <PencilLineIcon className="size-5 sm:size-4" />
-            <span className="text-[10px] sm:text-sm">Your picks</span>
+            <span className="text-[10px] sm:text-sm">Picks</span>
           </Link>
           <Link href={`/leagues/${firstLeagueId}?tab=standings`} className={`${TAB_ITEM_CLASSES} text-muted-foreground hover:text-foreground`}>
             <TrophyIcon className="size-5 sm:size-4" />

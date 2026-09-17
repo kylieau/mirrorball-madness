@@ -35,7 +35,7 @@ export function LeagueHeader({
 }) {
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") ?? "yourpicks";
-  const title = activeTab === "standings" ? "Standings" : "Your Picks";
+  const title = activeTab === "standings" ? "Standings" : "Picks";
   const currentPath = `/leagues/${leagueId}?tab=${activeTab}`;
   const leagueSettingsHref = `/leagues/${leagueId}/settings?from=${encodeURIComponent(currentPath)}`;
 

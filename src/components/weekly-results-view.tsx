@@ -3,7 +3,7 @@ import { CoupleName } from "@/components/couple-name";
 import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
 import { cn } from "cn";
 import type { CoupleNameParts } from "@/lib/couple-display";
-import { formatEpisodeCasual, formatEpisodeCasualWithTheme } from "@/lib/format-week";
+import { formatEpisodeCasual } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -149,20 +149,17 @@ export function WeeklyResultsView({
   return (
     <div>
       {pendingCard && <div className="mb-4">{pendingCard}</div>}
-      <p className="mb-4 text-sm text-muted-foreground">
-        {formatEpisodeCasualWithTheme(episode.week_number, episode.theme)}, the actual results
-      </p>
 
       {eliminated.length > 0 && (
         <div className="mb-4 rounded-2xl border border-primary/40 bg-linear-to-br from-curtain to-curtain-light px-5 py-4 text-center">
-          <p className="text-xs text-accent">Eliminated this week</p>
+          <p className="text-xs text-accent">Eliminated</p>
           <p className="mt-1 font-heading text-lg font-semibold">
             {eliminated.map((r) => (r.parts ? `${r.parts.celebrity} & ${r.parts.pro}` : "Unknown")).join(", ")}
           </p>
         </div>
       )}
 
-      <div className="mb-2 text-sm font-semibold text-accent">This Week&apos;s dances</div>
+      <div className="mb-2 text-sm font-semibold text-accent">Leaderboard</div>
       <div className="flex flex-col gap-2.5">
         {outcomes.map((r) => {
           const tag = outcomeTag(r);

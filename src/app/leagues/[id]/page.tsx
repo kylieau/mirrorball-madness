@@ -9,8 +9,9 @@ import {
 import { StandingsTable } from "@/components/standings-table";
 import { StandingsModuleBreakdown } from "@/components/standings-module-breakdown";
 import { RosterCard } from "@/components/roster-card";
+import { CurtainCallCard } from "@/components/curtain-call-card";
 import { PickEmBox } from "@/components/pick-em-box";
-import { PastPicksCard } from "@/components/past-picks-card";
+import { PastPicksRecap } from "@/components/past-picks-card";
 import { GrandFinaleBox } from "@/components/grand-finale-box";
 import { DraftStatusCard } from "@/components/draft-status-card";
 import { RecastNudgeCard } from "@/components/recast-nudge-card";
@@ -25,9 +26,10 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import {
+  buildCurtainCallWeeks,
   buildPastPicksComparison,
   isPastPicksLocked,
-  selectPastPicksEpisode,
+  selectCurtainCallWeek,
 } from "@/lib/past-picks";
 
 export default async function LeaguePage({
@@ -521,39 +523,46 @@ export default async function LeaguePage({
     })),
   ];
 
-  const pastPicksEpisode = curtainCallOn
-    ? selectPastPicksEpisode(completedEpisodes ?? [], cutoff.allowedEpisodeIds, weekParam)
-    : null;
-  const pastPicksLocked = pastPicksEpisode
-    ? isPastPicksLocked(pastPicksEpisode.id, cutoff.allowedEpisodeIds)
-    : false;
-  const pastPicksWeeks = (completedEpisodes ?? []).map((e) => ({
-    id: e.id,
-    weekNumber: e.week_number,
-    theme: e.theme,
-    locked: isPastPicksLocked(e.id, cutoff.allowedEpisodeIds),
-  }));
+  const curtainCallSelection = curtainCallOn
+    ? selectCurtainCallWeek(completedEpisodes ?? [], upcomingEpisode ?? null, cutoff.allowedEpisodeIds, weekParam)
+    : { episode: null, mode: null };
+  const curtainCallEpisode = curtainCallSelection.episode;
+  const curtainCallMode = curtainCallSelection.mode;
+  const pastPicksLocked =
+    curtainCallMode === "recap" && curtainCallEpisode
+      ? isPastPicksLocked(curtainCallEpisode.id, cutoff.allowedEpisodeIds)
+      : false;
+  const curtainCallWeeks = buildCurtainCallWeeks(
+    (completedEpisodes ?? []).map((e) => ({
+      id: e.id,
+      weekNumber: e.week_number,
+      theme: e.theme,
+    })),
+    upcomingEpisode
+      ? { id: upcomingEpisode.id, weekNumber: upcomingEpisode.week_number, theme: upcomingEpisode.theme }
+      : null
+  );
 
   let pastPicksComparison = null;
-  if (pastPicksEpisode && !pastPicksLocked) {
+  if (curtainCallMode === "recap" && curtainCallEpisode && !pastPicksLocked) {
     const [{ data: pastPrediction }, { data: pastResults }, { data: pastDanceScores }] = await Promise.all([
       supabase
         .from("predictions")
         .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
         .eq("league_id", id)
-        .eq("episode_id", pastPicksEpisode.id)
+        .eq("episode_id", curtainCallEpisode.id)
         .eq("manager_id", user.id)
         .maybeSingle(),
-      supabase.from("episode_results").select("couple_id, outcome").eq("episode_id", pastPicksEpisode.id),
-      supabase.from("dance_scores").select("couple_id, total_score").eq("episode_id", pastPicksEpisode.id),
+      supabase.from("episode_results").select("couple_id, outcome").eq("episode_id", curtainCallEpisode.id),
+      supabase.from("dance_scores").select("couple_id, total_score").eq("episode_id", curtainCallEpisode.id),
     ]);
 
     const predictionPoints =
-      (allScores ?? []).find((row) => row.episode_id === pastPicksEpisode.id && row.manager_id === user.id)
+      (allScores ?? []).find((row) => row.episode_id === curtainCallEpisode.id && row.manager_id === user.id)
         ?.prediction_points ?? 0;
 
     pastPicksComparison = buildPastPicksComparison({
-      isDoubleElimination: pastPicksEpisode.is_double_elimination_week,
+      isDoubleElimination: curtainCallEpisode.is_double_elimination_week,
       predictedEliminatedCoupleId: pastPrediction?.predicted_eliminated_couple_id ?? null,
       predictedEliminatedCoupleId2: pastPrediction?.predicted_eliminated_couple_id_2 ?? null,
       predictedTopScorerCoupleId: pastPrediction?.predicted_top_scorer_couple_id ?? null,
@@ -587,31 +596,40 @@ export default async function LeaguePage({
             {curtainCallOn && (
               <div className="flex flex-col gap-3">
                 {showSectionLabels && <SectionLabel icon="🔮" label="Curtain Call" first />}
-                <PickEmBox
+                <CurtainCallCard
                   leagueId={id}
-                  episode={upcomingEpisode ?? null}
-                  lockAt={lockAt}
-                  activeCouples={activeCouples}
-                  coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
-                  existingPrediction={ownPrediction}
-                  isLocked={isLocked}
-                  isDoubleElimination={upcomingEpisode?.is_double_elimination_week ?? false}
-                  revealedPredictions={revealedPredictions}
-                />
-                {pastPicksEpisode && (
-                  <PastPicksCard
-                    leagueId={id}
-                    episode={{
-                      id: pastPicksEpisode.id,
-                      weekNumber: pastPicksEpisode.week_number,
-                      theme: pastPicksEpisode.theme,
-                    }}
-                    weeks={pastPicksWeeks}
-                    locked={pastPicksLocked}
-                    comparison={pastPicksComparison}
-                    coupleDisplayNames={Object.fromEntries(allDisplayNames)}
-                  />
-                )}
+                  episode={
+                    curtainCallEpisode
+                      ? {
+                          id: curtainCallEpisode.id,
+                          weekNumber: curtainCallEpisode.week_number,
+                          theme: curtainCallEpisode.theme,
+                        }
+                      : null
+                  }
+                  weeks={curtainCallWeeks}
+                >
+                  {curtainCallMode === "picks" && upcomingEpisode ? (
+                    <PickEmBox
+                      leagueId={id}
+                      episode={upcomingEpisode}
+                      lockAt={lockAt}
+                      activeCouples={activeCouples}
+                      coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
+                      existingPrediction={ownPrediction}
+                      isLocked={isLocked}
+                      isDoubleElimination={upcomingEpisode.is_double_elimination_week}
+                      revealedPredictions={revealedPredictions}
+                    />
+                  ) : curtainCallMode === "recap" && curtainCallEpisode ? (
+                    <PastPicksRecap
+                      episodeWeekNumber={curtainCallEpisode.week_number}
+                      locked={pastPicksLocked}
+                      comparison={pastPicksComparison}
+                      coupleDisplayNames={Object.fromEntries(allDisplayNames)}
+                    />
+                  ) : null}
+                </CurtainCallCard>
               </div>
             )}
             {danceCardOn && (

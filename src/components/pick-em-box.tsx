@@ -3,13 +3,6 @@
 import { useState, type ReactNode } from "react";
 import { submitPrediction } from "@/app/leagues/[id]/predictions/actions";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -21,7 +14,6 @@ import {
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { coupleNameNode } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
-import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 
@@ -84,7 +76,7 @@ export function PickEmBox({
   revealedPredictions,
 }: {
   leagueId: string;
-  episode: { id: string; week_number: number; theme: string | null } | null;
+  episode: { id: string; week_number: number; theme: string | null };
   lockAt: string | null;
   activeCouples: Couple[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
@@ -130,17 +122,6 @@ export function PickEmBox({
     );
   }
 
-  if (!episode) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>This week&apos;s picks</CardTitle>
-          <CardDescription>No upcoming episode scheduled yet.</CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
   function handleEliminatedChange(slot: 1 | 2, next: string) {
     if (slot === 1) {
       setEliminatedId(next);
@@ -162,7 +143,7 @@ export function PickEmBox({
     setSubmitting(true);
     const result = await submitPrediction(
       leagueId,
-      episode!.id,
+      episode.id,
       eliminatedId || null,
       isDoubleElimination ? eliminatedId2 || null : null,
       topScorerId || null
@@ -173,22 +154,15 @@ export function PickEmBox({
   }
 
   const hasSavedPick = !!eliminatedId || !!eliminatedId2 || !!topScorerId;
-  const episodeLabel = formatEpisodeCasualWithTheme(episode.week_number, episode.theme);
   const lockLine = isLocked
-    ? "predictions are locked for this episode."
-    : lockAt
-      ? `locks at ${formattedLockAt}`
+    ? "Predictions are locked for this episode."
+    : lockAt && formattedLockAt
+      ? `Locks at ${formattedLockAt}`
       : null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>This week&apos;s picks</CardTitle>
-        <CardDescription>
-          {lockLine ? `${episodeLabel} — ${lockLine}` : episodeLabel}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
+        {lockLine && <p className="text-sm text-muted-foreground">{lockLine}</p>}
         {isDoubleElimination && !isLocked && (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             ⚡ Double Elimination — two couples go home tonight, call &apos;em both.
@@ -296,7 +270,6 @@ export function PickEmBox({
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 }

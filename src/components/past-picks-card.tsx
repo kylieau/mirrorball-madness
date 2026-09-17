@@ -1,16 +1,6 @@
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { CoupleName } from "@/components/couple-name";
 import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
-import { WeekSwitcher, type SwitcherWeek } from "@/components/week-switcher";
 import type { CoupleNameParts } from "@/lib/couple-display";
-import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
 import {
   collapsePickRows,
   type PastPicksComparison,
@@ -103,77 +93,52 @@ function ResultRows({
   );
 }
 
-export function PastPicksCard({
-  leagueId,
-  episode,
-  weeks,
+export function PastPicksRecap({
+  episodeWeekNumber,
   locked,
   comparison,
   coupleDisplayNames,
 }: {
-  leagueId: string;
-  episode: { id: string; weekNumber: number; theme: string | null };
-  weeks: SwitcherWeek[];
+  episodeWeekNumber: number;
   locked: boolean;
   comparison: PastPicksComparison | null;
   coupleDisplayNames: Record<string, CoupleNameParts>;
 }) {
-  const episodeLabel = formatEpisodeCasualWithTheme(episode.weekNumber, episode.theme);
+  if (locked || !comparison) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">Mark as watched to see how you did</p>
+        <MarkWeekWatchedButton weekNumber={episodeWeekNumber} />
+      </div>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Past picks</CardTitle>
-        <CardDescription>{episodeLabel}</CardDescription>
-        {weeks.length > 1 && (
-          <CardAction>
-            <WeekSwitcher
-              currentEpisodeId={episode.id}
-              weeks={weeks.map((w) => ({
-                ...w,
-                href: `/leagues/${leagueId}?tab=yourpicks&week=${w.id}`,
-              }))}
-            />
-          </CardAction>
-        )}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {locked || !comparison ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">Mark as watched to see how you did</p>
-            <MarkWeekWatchedButton weekNumber={episode.weekNumber} />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3 text-sm">
-            <div className="flex flex-col gap-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who went home</p>
-              <ResultRows
-                rows={collapsePickRows(comparison.eliminationPicks, comparison.actualEliminatedIds)}
-                names={coupleDisplayNames}
-                actualFallback="Nobody"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Who scored highest
-              </p>
-              <ResultRows
-                rows={collapsePickRows([comparison.topScorer], comparison.actualTopScorerIds)}
-                names={coupleDisplayNames}
-                actualFallback="—"
-              />
-            </div>
-            <div className="flex items-center justify-between border-t border-border pt-3">
-              <span className="text-muted-foreground">Curtain Call</span>
-              <span className="font-heading text-base font-semibold">
-                {comparison.predictionPoints >= 0 ? "+" : ""}
-                {comparison.predictionPoints}
-                <span className="ml-1 text-xs font-normal text-muted-foreground">this wk</span>
-              </span>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-3 text-sm">
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who went home</p>
+        <ResultRows
+          rows={collapsePickRows(comparison.eliminationPicks, comparison.actualEliminatedIds)}
+          names={coupleDisplayNames}
+          actualFallback="Nobody"
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who scored highest</p>
+        <ResultRows
+          rows={collapsePickRows([comparison.topScorer], comparison.actualTopScorerIds)}
+          names={coupleDisplayNames}
+          actualFallback="—"
+        />
+      </div>
+      <div className="flex items-center justify-between border-t border-border pt-3">
+        <span className="text-muted-foreground">Curtain Call</span>
+        <span className="font-heading text-base font-semibold">
+          {comparison.predictionPoints >= 0 ? "+" : ""}
+          {comparison.predictionPoints}
+          <span className="ml-1 text-xs font-normal text-muted-foreground">this wk</span>
+        </span>
+      </div>
+    </div>
   );
 }
