@@ -76,6 +76,8 @@ export function AccountSettingsSheet({
               </DialogContent>
             </Dialog>
 
+            <SpoilerModeToggle initialEnabled={spoilerFreeMode} />
+
             <Link href="/notifications" className={ROW_CLASSES}>
               <span>Notifications</span>
               <ChevronRightIcon className="size-4 text-muted-foreground" />
@@ -95,8 +97,6 @@ export function AccountSettingsSheet({
               <span>Appearance</span>
               <span className="text-xs">Coming soon</span>
             </div>
-
-            <SpoilerModeToggle initialEnabled={spoilerFreeMode} />
 
             <Dialog>
               <DialogTrigger className={ROW_CLASSES}>
