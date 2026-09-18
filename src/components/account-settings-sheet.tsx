@@ -38,7 +38,7 @@ const ROW_CLASSES =
 // this sheet in place. Notifications stays a plain Link (a scrollable
 // content list, not a settings form — see BACKLOG.md). Add to Home Screen
 // is its own page (`/settings/add-to-home-screen`), not nested under
-// Notifications. Super-admin Site Admin is Results + Account deletions.
+// Notifications. Super-admin Site Admin is Results + Accounts.
 export function AccountSettingsSheet({
   displayName,
   isSuperAdmin,

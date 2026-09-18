@@ -27,7 +27,7 @@ export default async function AdminAccountsPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-8 pb-8">
       <TopBar {...accountSettingsData} email={user.email ?? ""} />
-      <PageHeader title="Account deletions" />
+      <PageHeader title="Accounts" />
       <p className="text-sm text-muted-foreground">
         Queue only — clearing a request does not delete the auth user or league
         history. There is still no safe automatic wipe.

@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 const LINKS = [
   { href: "/admin/results", label: "Results" },
-  { href: "/admin/accounts", label: "Account deletions" },
+  { href: "/admin/accounts", label: "Accounts" },
 ] as const;
 
 export function SiteAdminNav() {
