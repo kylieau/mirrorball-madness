@@ -144,11 +144,11 @@ create table league_members (
 -- multiplied by their category's weight, not a flat total. At least one
 -- category must stay on (see at_least_one_category_enabled below).
 --
--- judges_score_starts_week: the number of the first episode that counts
--- toward Judges' Scores — if the draft is deferred until after Week 1 airs,
--- Week 1 doesn't count (no roster existed yet). Points to any scheduled
--- episode, not capped at week 1 vs 2, so a late draft several weeks in
--- works the same way — the commissioner picks a real episode off the
+-- judges_score_starts_week: the number of the first competition week that
+-- counts toward Judges' Scores — if the draft is deferred until after Week 1
+-- airs, Week 1 doesn't count (no roster existed yet). Points to any scheduled
+-- week, not capped at week 1 vs 2, so a late draft several weeks in
+-- works the same way — the commissioner picks a real week off the
 -- schedule rather than typing a raw number.
 --
 -- bonus_picks_*: the season-long full-elimination-order prediction (made
@@ -287,23 +287,46 @@ create table waiver_claims (
 );
 
 -- ============================================================
--- Episodes / weekly results
+-- Competition weeks (fantasy rounds) vs TV episodes
+-- A Week is the fan-facing unit (Results, Curtain Call, elim outcome,
+-- spoiler mark, standings "through Week N"). An Episode is one TV airing
+-- (schedule row, that night's cast, dances / judge scores). Premiere
+-- Night One + Night Two are two episode rows under Week 1. Exhibition /
+-- interview nights have week_id null and never appear on Results/Picks.
+-- Do not reintroduce week_part; do not fold two airings into one episode.
 -- ============================================================
 
-create table episodes (
+create table competition_weeks (
   id uuid primary key default gen_random_uuid(),
   season_id uuid not null references seasons(id),
-  week_number int not null, -- resets to 1 each season, so unique per-season below, not globally
-  airs_at timestamptz not null, -- actual real-world air date/time; set per episode, not assumed weekly-regular
-  theme text, -- e.g. "Villains Night" — free text, not a managed list; themes rarely repeat
-  expected_dance_count int not null default 1, -- informational only, doesn't gate how many dances a couple can actually submit
+  week_number int not null check (week_number > 0), -- 1..N per season; unique below
+  theme text, -- optional week-level label ("Premiere"); fan carousel prefers this
   is_elimination_week boolean not null default true,
   is_finale boolean not null default false,
   -- Set ahead of air time on the Schedule tab. Gates Curtain Call's Pick 'Em
   -- to collecting two elimination guesses instead of one (submit_prediction
   -- enforces "0 or 2, never 1" filled slots) — results entry itself already
-  -- supports any number of eliminations per episode with no flag needed.
+  -- supports any number of eliminations per week with no flag needed.
   is_double_elimination_week boolean not null default false,
+  unique (season_id, week_number)
+);
+
+grant select on public.competition_weeks to authenticated;
+create policy "competition weeks are viewable by all authenticated users"
+on public.competition_weeks for select
+using (true);
+
+create table episodes (
+  id uuid primary key default gen_random_uuid(),
+  season_id uuid not null references seasons(id),
+  -- TV airing sequence for admin/ops labels (S35 E01). Independent of
+  -- competition_weeks.week_number so two premiere nights can be E01 + E02
+  -- under Week 1, and an interview can be E03 with no week assignment.
+  episode_number int not null check (episode_number > 0),
+  week_id uuid references competition_weeks(id) on delete restrict,
+  airs_at timestamptz not null, -- actual real-world air date/time; set per episode, not assumed weekly-regular
+  theme text, -- e.g. "Night One", "Villains Night" — free text, not a managed list
+  expected_dance_count int not null default 1, -- informational only, doesn't gate how many dances a couple can actually submit
   status text not null default 'upcoming' check (status in ('upcoming', 'locked', 'completed')),
   -- guest_judge_name is a leftover caption, not a people(role='judge') row.
   -- It is not shown anywhere and is no longer editable in Enter Results —
@@ -318,8 +341,10 @@ create table episodes (
   judges_save_available boolean not null default false,
   results_published_at timestamptz,
   results_published_by uuid references profiles(id) on delete set null,
-  unique (season_id, week_number)
+  unique (season_id, episode_number)
 );
+
+create index idx_episodes_week on episodes(week_id);
 
 -- Admin-managed, extensible by the "add a dance style" admin form rather than
 -- a code change (unlike Status/Note, a new dance style is pure labeling with
@@ -360,8 +385,8 @@ create table judge_scores (
 
 -- Per-couple outcome per episode. Supports double-elimination weeks (just
 -- insert two 'eliminated' rows that week — no special flag needed) and
--- no-elimination weeks (insert zero 'eliminated' rows — see episodes.is_elimination_week
--- for the episode-level version of this). was_bottom_two/was_bottom_three/
+-- no-elimination weeks (insert zero 'eliminated' rows — see competition_weeks.is_elimination_week
+-- for the week-level version of this). was_bottom_two/was_bottom_three/
 -- saved_by_judges/was_team_dance/had_immunity are independent flags, not
 -- mutually exclusive with each other or with outcome — a couple can be Safe,
 -- in the Bottom 2, and saved by judges all in the same week.
@@ -396,15 +421,15 @@ create table predictions (
   id uuid primary key default gen_random_uuid(),
   league_id uuid not null references leagues(id) on delete cascade,
   manager_id uuid not null references profiles(id),
-  episode_id uuid not null references episodes(id),
+  week_id uuid not null references competition_weeks(id),
   predicted_eliminated_couple_id uuid references couples(id),
-  -- Only ever set on an episodes.is_double_elimination_week episode — both
+  -- Only ever set on a competition_weeks.is_double_elimination_week round — both
   -- slots filled or both null, enforced in submit_prediction (a cross-table
   -- check isn't possible here). A normal week's predictions never touch it.
   predicted_eliminated_couple_id_2 uuid references couples(id),
   predicted_top_scorer_couple_id uuid references couples(id),
   submitted_at timestamptz not null default now(),
-  unique (league_id, manager_id, episode_id),
+  unique (league_id, manager_id, week_id),
   constraint predictions_distinct_eliminated_picks check (
     predicted_eliminated_couple_id_2 is null
     or predicted_eliminated_couple_id_2 <> predicted_eliminated_couple_id
@@ -438,19 +463,19 @@ create table weekly_manager_scores (
   id uuid primary key default gen_random_uuid(),
   league_id uuid not null references leagues(id) on delete cascade,
   manager_id uuid not null references profiles(id),
-  episode_id uuid not null references episodes(id),
+  week_id uuid not null references competition_weeks(id),
   roster_points numeric not null default 0,
   prediction_points numeric not null default 0,
-  -- This episode's incremental Grand Finale contribution only (couples whose
-  -- fate first became known this episode), not a running cumulative total —
-  -- summed across episodes the same way roster/prediction points already are.
+  -- This week's incremental Grand Finale contribution only (couples whose
+  -- fate first became known this round), not a running cumulative total —
+  -- summed across weeks the same way roster/prediction points already are.
   grand_finale_points numeric not null default 0,
   -- The only one of these four that's actually weighted (judges_score/
   -- eliminations/bonus_picks_category_weight applied in computeWeeklyScores);
   -- the others stay raw so their un-weighted values are still visible.
   total_points numeric not null default 0,
   computed_at timestamptz not null default now(),
-  unique (league_id, manager_id, episode_id)
+  unique (league_id, manager_id, week_id)
 );
 
 -- ============================================================
@@ -461,8 +486,8 @@ create index idx_league_members_user on league_members(user_id);
 create index idx_roster_slots_league_manager on roster_slots(league_id, manager_id);
 create index idx_roster_slots_open on roster_slots(league_id) where couple_id is null;
 create index idx_dance_scores_episode_couple on dance_scores(episode_id, couple_id);
-create index idx_predictions_league_episode on predictions(league_id, episode_id);
-create index idx_weekly_scores_league_episode on weekly_manager_scores(league_id, episode_id);
+create index idx_predictions_league_week on predictions(league_id, week_id);
+create index idx_weekly_scores_league_week on weekly_manager_scores(league_id, week_id);
 
 -- ============================================================
 -- Auth: auto-create a profile row for every new auth.users row
@@ -585,9 +610,10 @@ begin
   -- effective_grand_finale_deadline below), which resolves to nothing until
   -- a real episode exists — so enabling it before a season's Week 1 is
   -- scheduled would leave it permanently locked with no honest deadline.
-  select airs_at into v_premiere_airs_at
-  from public.episodes
-  where season_id = public.active_season_id() and week_number = 1;
+  select min(e.airs_at) into v_premiere_airs_at
+  from public.episodes e
+  join public.competition_weeks w on w.id = e.week_id
+  where w.season_id = public.active_season_id() and w.week_number = 1;
   v_grand_finale_enabled := p_grand_finale_enabled and v_premiere_airs_at is not null;
 
   if not (p_dance_card_enabled or p_curtain_call_enabled or v_grand_finale_enabled) then
@@ -1289,8 +1315,10 @@ begin
     set judges_score_starts_week = greatest(
       judges_score_starts_week,
       coalesce(
-        (select min(week_number) from public.episodes
-         where season_id = public.active_season_id() and airs_at > now()),
+        (select min(w.week_number)
+         from public.competition_weeks w
+         where w.season_id = public.active_season_id()
+           and (select min(e.airs_at) from public.episodes e where e.week_id = w.id) > now()),
         judges_score_starts_week
       )
     )
@@ -1675,20 +1703,28 @@ using (public.is_league_member(league_id));
 
 grant select on public.predictions to authenticated;
 
--- Each league locks relative to the same real airs_at, just with its own
--- configurable lead time (leagues.prediction_lock_hours_before_air) — so the
--- lock moment isn't a single column anywhere, it's computed. Shared by the
--- RLS policy below and submit_prediction so the two can't drift apart.
-create function public.prediction_lock_at(p_league_id uuid, p_episode_id uuid)
+-- Each league locks relative to the same real first-airs_at of the
+-- competition week, just with its own configurable lead time
+-- (leagues.prediction_lock_hours_before_air) — so the lock moment isn't a
+-- single column anywhere, it's computed. Shared by the RLS policy below and
+-- submit_prediction so the two can't drift apart. Multi-night weeks lock
+-- before Night One.
+-- Lock hours must be a scalar subquery: min(airs_at) minus a joined
+-- leagues.prediction_lock_hours_before_air is 42803 (must GROUP BY).
+create function public.prediction_lock_at(p_league_id uuid, p_week_id uuid)
 returns timestamptz
 language sql
 security definer
 set search_path = ''
 stable
 as $$
-  select e.airs_at - (l.prediction_lock_hours_before_air * interval '1 hour')
-  from public.episodes e, public.leagues l
-  where e.id = p_episode_id and l.id = p_league_id;
+  select min(e.airs_at) - (
+    (select l.prediction_lock_hours_before_air
+     from public.leagues l
+     where l.id = p_league_id) * interval '1 hour'
+  )
+  from public.episodes e
+  where e.week_id = p_week_id;
 $$;
 
 revoke execute on function public.prediction_lock_at(uuid, uuid) from public;
@@ -1718,8 +1754,10 @@ as $$
     else greatest(
       ss.judges_score_starts_week,
       coalesce(
-        (select min(e.week_number) from public.episodes e
-         where e.season_id = public.active_season_id() and e.airs_at > now()),
+        (select min(w.week_number)
+         from public.competition_weeks w
+         where w.season_id = public.active_season_id()
+           and (select min(e.airs_at) from public.episodes e where e.week_id = w.id) > now()),
         ss.judges_score_starts_week
       )
     )
@@ -1744,10 +1782,11 @@ security definer
 set search_path = ''
 stable
 as $$
-  select e.airs_at
+  select min(e.airs_at)
   from public.episodes e
-  where e.season_id = public.active_season_id()
-    and e.week_number = public.effective_hard_deadline_week(p_league_id);
+  join public.competition_weeks w on w.id = e.week_id
+  where w.season_id = public.active_season_id()
+    and w.week_number = public.effective_hard_deadline_week(p_league_id);
 $$;
 
 revoke execute on function public.effective_grand_finale_deadline(uuid) from public;
@@ -1759,13 +1798,13 @@ using (
   public.is_league_member(league_id)
   and (
     auth.uid() = manager_id
-    or now() >= public.prediction_lock_at(league_id, episode_id)
+    or now() >= public.prediction_lock_at(league_id, week_id)
   )
 );
 
 create function public.submit_prediction(
   p_league_id uuid,
-  p_episode_id uuid,
+  p_week_id uuid,
   p_predicted_eliminated_couple_id uuid,
   p_predicted_eliminated_couple_id_2 uuid,
   p_predicted_top_scorer_couple_id uuid
@@ -1791,10 +1830,10 @@ begin
   end if;
 
   select is_double_elimination_week into v_is_double_elim
-  from public.episodes where id = p_episode_id;
+  from public.competition_weeks where id = p_week_id;
 
   if v_is_double_elim is null then
-    raise exception 'Episode not found';
+    raise exception 'Week not found';
   end if;
 
   if v_is_double_elim then
@@ -1806,26 +1845,26 @@ begin
       raise exception 'Pick two different couples for your double elimination guesses';
     end if;
   elsif p_predicted_eliminated_couple_id_2 is not null then
-    raise exception 'This episode is not a double elimination week';
+    raise exception 'This week is not a double elimination week';
   end if;
 
-  v_lock_at := public.prediction_lock_at(p_league_id, p_episode_id);
+  v_lock_at := public.prediction_lock_at(p_league_id, p_week_id);
 
   if now() >= v_lock_at then
-    raise exception 'Predictions are locked for this episode';
+    raise exception 'Predictions are locked for this week';
   end if;
 
   insert into public.predictions (
-    league_id, manager_id, episode_id,
+    league_id, manager_id, week_id,
     predicted_eliminated_couple_id, predicted_eliminated_couple_id_2,
     predicted_top_scorer_couple_id
   )
   values (
-    p_league_id, auth.uid(), p_episode_id,
+    p_league_id, auth.uid(), p_week_id,
     p_predicted_eliminated_couple_id, p_predicted_eliminated_couple_id_2,
     p_predicted_top_scorer_couple_id
   )
-  on conflict (league_id, manager_id, episode_id) do update set
+  on conflict (league_id, manager_id, week_id) do update set
     predicted_eliminated_couple_id = excluded.predicted_eliminated_couple_id,
     predicted_eliminated_couple_id_2 = excluded.predicted_eliminated_couple_id_2,
     predicted_top_scorer_couple_id = excluded.predicted_top_scorer_couple_id,
@@ -2050,7 +2089,18 @@ begin
     raise exception 'That couple is already on a roster in this league';
   end if;
 
-  v_current_week := coalesce((select max(week_number) from public.episodes where status = 'completed'), 0);
+  v_current_week := coalesce((
+    select max(w.week_number)
+    from public.competition_weeks w
+    where w.season_id = public.active_season_id()
+      and not exists (
+        select 1 from public.episodes e
+        where e.week_id = w.id and e.status <> 'completed'
+      )
+      and exists (
+        select 1 from public.episodes e where e.week_id = w.id
+      )
+  ), 0);
 
   insert into public.waiver_claims (league_id, couple_id, manager_id, slot_number, week_number, status)
   values (p_league_id, p_couple_id, auth.uid(), p_slot_number, v_current_week, 'pending')

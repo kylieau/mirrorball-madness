@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LeagueMembersSection } from "@/components/league-members-section";
 import { LeagueInfoSection } from "@/components/league-info-section";
 import { LeagueModulesForm } from "@/components/league-modules-form";
+import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { XIcon } from "lucide-react";
 
@@ -51,17 +52,27 @@ export default async function LeagueSettingsPage({
   const isCommissioner = viewerMembership.role === "commissioner";
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [{ data: seasonEpisodes }, { data: activeSeason }, { data: effectiveHardDeadlineWeek }] =
+  const [{ data: weekRows }, { data: episodeRows }, { data: activeSeason }, { data: effectiveHardDeadlineWeek }] =
     await Promise.all([
       supabase
-        .from("episodes")
-        .select("week_number, theme, airs_at")
+        .from("competition_weeks")
+        .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
         .eq("season_id", activeSeasonId ?? "")
         .order("week_number"),
+      supabase
+        .from("episodes")
+        .select("id, episode_number, week_id, airs_at, theme, status")
+        .eq("season_id", activeSeasonId ?? ""),
       supabase.from("seasons").select("season_number").eq("id", activeSeasonId ?? "").maybeSingle(),
       supabase.rpc("effective_hard_deadline_week", { p_league_id: id }),
     ]);
   const seasonNumber = activeSeason?.season_number ?? null;
+  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const seasonEpisodes = groupedWeeks.map((week) => ({
+    week_number: week.week_number,
+    theme: week.theme,
+    airs_at: week.earliestAirsAt ?? "",
+  }));
 
   const closeHref = safeRelativePath(from, `/leagues/${id}?tab=yourpicks`);
 

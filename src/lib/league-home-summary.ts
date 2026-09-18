@@ -25,13 +25,13 @@ export async function computeLeagueHomeSummary(
   userId: string,
   league: { id: string; name: string },
   upcomingEpisode: { id: string; week_number: number } | null,
-  latestCompletedEpisodeId: string | null,
+  latestCompletedWeekId: string | null,
   latestCompletedResultsPublishedAt: string | null,
   joinCutoffMs: number,
   // null = unrestricted (current behavior). Callers pass the viewer's
-  // spoiler cutoff so rank/points here never account for an episode the
+  // spoiler cutoff so rank/points here never account for a week the
   // viewer hasn't marked as watched yet.
-  allowedEpisodeIds: Set<string> | null = null
+  allowedWeekIds: Set<string> | null = null
 ): Promise<LeagueHomeSummary> {
   const [{ data: scoringSettings }, { data: members }, { data: scores }] = await Promise.all([
     supabase
@@ -40,15 +40,15 @@ export async function computeLeagueHomeSummary(
       .eq("league_id", league.id)
       .single(),
     supabase.from("league_members").select("user_id, joined_at, profiles(display_name)").eq("league_id", league.id),
-    supabase.from("weekly_manager_scores").select("episode_id, manager_id, total_points").eq("league_id", league.id),
+    supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points").eq("league_id", league.id),
   ]);
 
   const pointsByManager = new Map<string, number>();
   const previousPointsByManager = new Map<string, number>();
   for (const row of scores ?? []) {
-    if (allowedEpisodeIds && !allowedEpisodeIds.has(row.episode_id)) continue;
+    if (allowedWeekIds && !allowedWeekIds.has(row.week_id)) continue;
     pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
-    if (row.episode_id !== latestCompletedEpisodeId) {
+    if (row.week_id !== latestCompletedWeekId) {
       previousPointsByManager.set(row.manager_id, (previousPointsByManager.get(row.manager_id) ?? 0) + row.total_points);
     }
   }
@@ -61,7 +61,7 @@ export async function computeLeagueHomeSummary(
     1,
     [...standings].sort((a, b) => b.points - a.points).findIndex((s) => s.managerId === userId) + 1
   );
-  const previousRank = latestCompletedEpisodeId
+  const previousRank = latestCompletedWeekId
     ? Math.max(
         1,
         [...standings].sort((a, b) => b.previousPoints - a.previousPoints).findIndex((s) => s.managerId === userId) + 1
@@ -81,20 +81,20 @@ export async function computeLeagueHomeSummary(
   if (curtainCallOn && upcomingEpisode) {
     const { data } = await supabase.rpc("prediction_lock_at", {
       p_league_id: league.id,
-      p_episode_id: upcomingEpisode.id,
+      p_week_id: upcomingEpisode.id,
     });
     lockAt = data;
     const isLocked = !!lockAt && new Date() >= new Date(lockAt);
-    // Don't nag about the next episode's pick until the previous episode's
-    // results are actually published — a league on its first episode (no
-    // previous episode at all) is unaffected.
-    const previousResultsPublished = !latestCompletedEpisodeId || !!latestCompletedResultsPublishedAt;
+    // Don't nag about the next week's pick until the previous week's
+    // results are actually published — a league on its first week (no
+    // previous week at all) is unaffected.
+    const previousResultsPublished = !latestCompletedWeekId || !!latestCompletedResultsPublishedAt;
     if (!isLocked && previousResultsPublished) {
       const { data: ownPrediction } = await supabase
         .from("predictions")
         .select("manager_id")
         .eq("league_id", league.id)
-        .eq("episode_id", upcomingEpisode.id)
+        .eq("week_id", upcomingEpisode.id)
         .eq("manager_id", userId)
         .maybeSingle();
       curtainCallPicksDue = !ownPrediction;

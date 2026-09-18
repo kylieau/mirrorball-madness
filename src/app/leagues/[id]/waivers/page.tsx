@@ -6,6 +6,7 @@ import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display"
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { partitionRecastSlots } from "@/lib/recast-framing";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { isSpoilerSafeActive } from "@/lib/spoiler-safe-couple-status";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { XIcon } from "lucide-react";
@@ -96,8 +97,8 @@ export default async function WaiversPage({
     { data: allCouplesRaw },
     { data: rosteredSlots },
     { data: claims },
-    { data: completedEpisodes },
-    { data: finaleEpisode },
+    { data: weekRows },
+    { data: episodeRows },
   ] = await Promise.all([
     supabase
       .from("roster_slots")
@@ -113,28 +114,30 @@ export default async function WaiversPage({
       .eq("league_id", id)
       .order("created_at", { ascending: false }),
     supabase
-      .from("episodes")
-      .select("id, week_number")
-      .eq("season_id", activeSeasonId ?? "")
-      .eq("status", "completed")
-      .order("week_number", { ascending: false }),
+      .from("competition_weeks")
+      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
+      .eq("season_id", activeSeasonId ?? ""),
     supabase
       .from("episodes")
-      .select("week_number")
-      .eq("season_id", activeSeasonId ?? "")
-      .eq("is_finale", true)
-      .maybeSingle(),
+      .select("id, episode_number, week_id, airs_at, theme, status")
+      .eq("season_id", activeSeasonId ?? ""),
   ]);
+
+  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const completedWeeks = groupedWeeks
+    .filter((week) => week.status === "completed")
+    .sort((a, b) => b.week_number - a.week_number)
+    .map((week) => ({ id: week.id, week_number: week.week_number }));
 
   const cutoff = await resolveSpoilerCutoff(
     supabase,
     user.id,
     activeSeasonId ?? null,
     accountSettingsData.spoilerFreeMode,
-    completedEpisodes ?? []
+    completedWeeks
   );
   const cutoffWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;
-  const finaleWeekNumber = finaleEpisode?.week_number ?? null;
+  const finaleWeekNumber = groupedWeeks.find((week) => week.is_finale)?.week_number ?? null;
 
   const allCouples = (allCouplesRaw ?? []).map((c) => ({
     id: c.id,

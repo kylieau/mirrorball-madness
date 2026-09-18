@@ -7,7 +7,7 @@ export function RecastCatchUpCard({ pendingRevealWeek }: { pendingRevealWeek: nu
       <CardHeader>
         <CardTitle>You may have an open spot</CardTitle>
         <CardDescription>
-          Catch up and mark the latest episode as watched to see if you need to recast. We
+          Catch up and mark the latest week as watched to see if you need to recast. We
           won&apos;t name anyone until then.
         </CardDescription>
       </CardHeader>

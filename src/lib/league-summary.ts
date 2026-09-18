@@ -36,7 +36,7 @@ export async function computeLeagueSummary(
   if (curtainCallOn && upcomingEpisode) {
     const { data: lockAt } = await supabase.rpc("prediction_lock_at", {
       p_league_id: league.id,
-      p_episode_id: upcomingEpisode.id,
+      p_week_id: upcomingEpisode.id,
     });
     curtainCallLockAt = lockAt;
     const isLocked = !!lockAt && new Date() >= new Date(lockAt);
@@ -45,7 +45,7 @@ export async function computeLeagueSummary(
         .from("predictions")
         .select("manager_id")
         .eq("league_id", league.id)
-        .eq("episode_id", upcomingEpisode.id)
+        .eq("week_id", upcomingEpisode.id)
         .eq("manager_id", userId)
         .maybeSingle();
       curtainCallPending = !ownPrediction;

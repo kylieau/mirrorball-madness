@@ -3,6 +3,7 @@ export type ThisWeekCarouselEpisode = {
   week_number: number;
   theme: string | null;
   status: string;
+  nightsLabel?: string | null;
 };
 
 export type ThisWeekSelectionMode = "results" | "peek";

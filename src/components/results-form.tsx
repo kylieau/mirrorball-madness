@@ -40,7 +40,7 @@ import {
 } from "@/lib/results-status";
 import { useRelativeTimeAgo } from "@/lib/use-browser-time-zone";
 import type { DraftState } from "@/lib/results-draft";
-import { formatEpisodeLabel } from "@/lib/format-week";
+import { formatEpisodeCasual, formatEpisodeCasualWithTheme, formatEnterResultsOption } from "@/lib/format-week";
 import { resultsEntryCoupleIds, selectableCast } from "@/lib/episode-cast";
 import { judgesForScoreInputs, type ScoringJudge } from "@/lib/scoring-judges";
 
@@ -52,13 +52,19 @@ type CoupleWithStatus = Couple & {
 type Named = { id: string; name: string };
 type ScheduledEpisode = {
   id: string;
-  week_number: number;
+  episode_number: number;
+  week_id: string | null;
   airs_at: string;
+  theme: string | null;
+  results_published_at: string | null;
+};
+type CompetitionWeek = {
+  id: string;
+  week_number: number;
   theme: string | null;
   is_elimination_week: boolean;
   is_finale: boolean;
   is_double_elimination_week: boolean;
-  results_published_at: string | null;
 };
 type Outcome = "safe" | "eliminated" | "withdrawn" | "bye" | "winner" | "runner_up" | "third_place";
 type StatusValue = Outcome;
@@ -161,10 +167,10 @@ export function ResultsForm({
   judges,
   danceStyles,
   episodes,
+  weeks,
   draftsByEpisode,
   forceSelectEpisodeId,
   participantsByEpisode,
-  seasonNumber,
 }: {
   activeCouples: Couple[];
   allCouplesWithStatus: CoupleWithStatus[];
@@ -173,15 +179,26 @@ export function ResultsForm({
   judges: ScoringJudge[];
   danceStyles: Named[];
   episodes: ScheduledEpisode[];
+  weeks: CompetitionWeek[];
   draftsByEpisode: Record<string, DraftState>;
-  seasonNumber: number | null;
   // Set by AllResultsView's "Correct Results" button (lifted up into
   // AdminResultsTabs) to jump here already pointed at that episode, once
   // startEpisodeCorrection has seeded a fresh draft for it.
   forceSelectEpisodeId?: string | null;
   participantsByEpisode: Record<string, string[]>;
 }) {
-  const sortedEpisodes = [...episodes].sort((a, b) => a.week_number - b.week_number);
+  const weekById = new Map(weeks.map((week) => [week.id, week]));
+  const nightsCountByWeek = new Map<string, number>();
+  for (const episode of episodes) {
+    if (!episode.week_id) continue;
+    nightsCountByWeek.set(episode.week_id, (nightsCountByWeek.get(episode.week_id) ?? 0) + 1);
+  }
+  const sortedEpisodes = [...episodes].sort((a, b) => {
+    const weekA = a.week_id ? (weekById.get(a.week_id)?.week_number ?? 9999) : 9999;
+    const weekB = b.week_id ? (weekById.get(b.week_id)?.week_number ?? 9999) : 9999;
+    if (weekA !== weekB) return weekA - weekB;
+    return a.episode_number - b.episode_number;
+  });
   const router = useRouter();
 
   const [selectedEpisodeId, setSelectedEpisodeId] = useState("");
@@ -191,7 +208,9 @@ export function ResultsForm({
   }, [forceSelectEpisodeId]);
 
   const selectedEpisode = sortedEpisodes.find((e) => e.id === selectedEpisodeId) ?? null;
-  const isFinale = selectedEpisode?.is_finale ?? false;
+  const selectedWeek = selectedEpisode?.week_id ? (weekById.get(selectedEpisode.week_id) ?? null) : null;
+  const isFinale = selectedWeek?.is_finale ?? false;
+  const nightsCount = selectedEpisode?.week_id ? (nightsCountByWeek.get(selectedEpisode.week_id) ?? 1) : 1;
 
   // Upcoming / unpublished: still-competing cast only, so an already-voted-off
   // couple can't be scored again. Published weeks keep whoever was still in
@@ -199,7 +218,9 @@ export function ResultsForm({
   // stays editable.
   const published = selectedEpisode?.results_published_at != null;
   const selectable = selectedEpisode
-    ? selectableCast(allCouplesWithStatus, selectedEpisode.week_number, { published })
+    ? selectableCast(allCouplesWithStatus, selectedWeek?.week_number ?? selectedEpisode.episode_number, {
+        published,
+      })
     : [];
   const episodeCoupleIds = resultsEntryCoupleIds({
     selectableIds: selectable.map((c) => c.id),
@@ -473,10 +494,18 @@ export function ResultsForm({
     return judgesForScoreInputs(judges, scoredIds);
   }
   const episodeItems = Object.fromEntries(
-    sortedEpisodes.map((e) => [
-      e.id,
-      `${formatEpisodeLabel(e.week_number, seasonNumber)}${e.theme ? ` — ${e.theme}` : ""} — ${new Date(e.airs_at).toLocaleDateString()}`,
-    ])
+    sortedEpisodes.map((e) => {
+      const week = e.week_id ? weekById.get(e.week_id) : undefined;
+      return [
+        e.id,
+        formatEnterResultsOption({
+          weekNumber: week?.week_number ?? null,
+          nightsCount: e.week_id ? (nightsCountByWeek.get(e.week_id) ?? 1) : 1,
+          episodeTheme: e.theme,
+          airsAt: e.airs_at,
+        }),
+      ];
+    })
   );
   const danceStyleItems = Object.fromEntries(danceStyles.map((d) => [d.id, d.name]));
 
@@ -512,7 +541,15 @@ export function ResultsForm({
 
       {justPublished && selectedEpisode && (
         <div className="rounded-xl border border-emerald/40 bg-emerald/10 px-4 py-3 text-sm text-emerald-text">
-          <p className="font-medium">✅ {formatEpisodeLabel(selectedEpisode.week_number, seasonNumber)} results published</p>
+          <p className="font-medium">
+            ✅{" "}
+            {selectedWeek
+              ? nightsCount >= 2 && selectedEpisode.theme?.trim()
+                ? `${formatEpisodeCasual(selectedWeek.week_number)} · ${selectedEpisode.theme.trim()}`
+                : formatEpisodeCasualWithTheme(selectedWeek.week_number, selectedWeek.theme ?? selectedEpisode.theme)
+              : selectedEpisode.theme?.trim() || "Exhibition"}{" "}
+            results published
+          </p>
           <p className="mt-0.5 text-emerald-text/90">Now live on Results &amp; Standings across every league.</p>
         </div>
       )}
@@ -536,7 +573,7 @@ export function ResultsForm({
           )}
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
-          <Label>Scheduled Episode</Label>
+          <Label>Week</Label>
           {sortedEpisodes.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No episodes scheduled yet — add one under the Schedule tab first.
@@ -564,7 +601,7 @@ export function ResultsForm({
 
       {selectedEpisode && (
         <>
-          {selectedEpisode.is_double_elimination_week && (
+          {selectedWeek?.is_double_elimination_week && (
             <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
               <p className="font-medium">⚡ Double Elimination Week</p>
               <p className="mt-0.5 text-amber-800/90 dark:text-amber-300/90">
@@ -881,7 +918,7 @@ export function ResultsForm({
                     <span className="text-muted-foreground">
                       {c.status === "winner" || c.status === "runner_up" || c.status === "third_place"
                         ? STATUS_LABELS[c.status as StatusValue]
-                        : formatEpisodeLabel(c.elimination_week!, seasonNumber)}
+                        : formatEpisodeCasual(c.elimination_week!)}
                     </span>
                   </div>
                 ))}

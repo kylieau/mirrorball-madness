@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      competition_weeks: {
+        Row: {
+          id: string
+          is_double_elimination_week: boolean
+          is_elimination_week: boolean
+          is_finale: boolean
+          season_id: string
+          theme: string | null
+          week_number: number
+        }
+        Insert: {
+          id?: string
+          is_double_elimination_week?: boolean
+          is_elimination_week?: boolean
+          is_finale?: boolean
+          season_id: string
+          theme?: string | null
+          week_number: number
+        }
+        Update: {
+          id?: string
+          is_double_elimination_week?: boolean
+          is_elimination_week?: boolean
+          is_finale?: boolean
+          season_id?: string
+          theme?: string | null
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competition_weeks_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       couples: {
         Row: {
           celebrity_id: string
@@ -566,51 +604,45 @@ export type Database = {
       episodes: {
         Row: {
           airs_at: string
+          episode_number: number
           expected_dance_count: number
           guest_judge_name: string | null
           id: string
-          is_double_elimination_week: boolean
-          is_elimination_week: boolean
-          is_finale: boolean
           judges_save_available: boolean
           results_published_at: string | null
           results_published_by: string | null
           season_id: string
           status: string
           theme: string | null
-          week_number: number
+          week_id: string | null
         }
         Insert: {
           airs_at: string
+          episode_number: number
           expected_dance_count?: number
           guest_judge_name?: string | null
           id?: string
-          is_double_elimination_week?: boolean
-          is_elimination_week?: boolean
-          is_finale?: boolean
           judges_save_available?: boolean
           results_published_at?: string | null
           results_published_by?: string | null
           season_id: string
           status?: string
           theme?: string | null
-          week_number: number
+          week_id?: string | null
         }
         Update: {
           airs_at?: string
+          episode_number?: number
           expected_dance_count?: number
           guest_judge_name?: string | null
           id?: string
-          is_double_elimination_week?: boolean
-          is_elimination_week?: boolean
-          is_finale?: boolean
           judges_save_available?: boolean
           results_published_at?: string | null
           results_published_by?: string | null
           season_id?: string
           status?: string
           theme?: string | null
-          week_number?: number
+          week_id?: string | null
         }
         Relationships: [
           {
@@ -625,6 +657,13 @@ export type Database = {
             columns: ["season_id"]
             isOneToOne: false
             referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episodes_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "competition_weeks"
             referencedColumns: ["id"]
           },
         ]
@@ -847,7 +886,6 @@ export type Database = {
       }
       predictions: {
         Row: {
-          episode_id: string
           id: string
           league_id: string
           manager_id: string
@@ -855,9 +893,9 @@ export type Database = {
           predicted_eliminated_couple_id_2: string | null
           predicted_top_scorer_couple_id: string | null
           submitted_at: string
+          week_id: string
         }
         Insert: {
-          episode_id: string
           id?: string
           league_id: string
           manager_id: string
@@ -865,9 +903,9 @@ export type Database = {
           predicted_eliminated_couple_id_2?: string | null
           predicted_top_scorer_couple_id?: string | null
           submitted_at?: string
+          week_id: string
         }
         Update: {
-          episode_id?: string
           id?: string
           league_id?: string
           manager_id?: string
@@ -875,15 +913,9 @@ export type Database = {
           predicted_eliminated_couple_id_2?: string | null
           predicted_top_scorer_couple_id?: string | null
           submitted_at?: string
+          week_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "predictions_episode_id_fkey"
-            columns: ["episode_id"]
-            isOneToOne: false
-            referencedRelation: "episodes"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "predictions_league_id_fkey"
             columns: ["league_id"]
@@ -896,6 +928,13 @@ export type Database = {
             columns: ["manager_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "predictions_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "competition_weeks"
             referencedColumns: ["id"]
           },
           {
@@ -1216,7 +1255,6 @@ export type Database = {
       weekly_manager_scores: {
         Row: {
           computed_at: string
-          episode_id: string
           grand_finale_points: number
           id: string
           league_id: string
@@ -1224,10 +1262,10 @@ export type Database = {
           prediction_points: number
           roster_points: number
           total_points: number
+          week_id: string
         }
         Insert: {
           computed_at?: string
-          episode_id: string
           grand_finale_points?: number
           id?: string
           league_id: string
@@ -1235,10 +1273,10 @@ export type Database = {
           prediction_points?: number
           roster_points?: number
           total_points?: number
+          week_id: string
         }
         Update: {
           computed_at?: string
-          episode_id?: string
           grand_finale_points?: number
           id?: string
           league_id?: string
@@ -1246,15 +1284,9 @@ export type Database = {
           prediction_points?: number
           roster_points?: number
           total_points?: number
+          week_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "weekly_manager_scores_episode_id_fkey"
-            columns: ["episode_id"]
-            isOneToOne: false
-            referencedRelation: "episodes"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "weekly_manager_scores_league_id_fkey"
             columns: ["league_id"]
@@ -1267,6 +1299,13 @@ export type Database = {
             columns: ["manager_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_manager_scores_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "competition_weeks"
             referencedColumns: ["id"]
           },
         ]
@@ -1437,7 +1476,7 @@ export type Database = {
         Returns: undefined
       }
       prediction_lock_at: {
-        Args: { p_episode_id: string; p_league_id: string }
+        Args: { p_league_id: string; p_week_id: string }
         Returns: string
       }
       process_reverse_standings_waivers: {
@@ -1575,14 +1614,13 @@ export type Database = {
       }
       submit_prediction: {
         Args: {
-          p_episode_id: string
           p_league_id: string
           p_predicted_eliminated_couple_id: string
           p_predicted_eliminated_couple_id_2: string
           p_predicted_top_scorer_couple_id: string
+          p_week_id: string
         }
         Returns: {
-          episode_id: string
           id: string
           league_id: string
           manager_id: string
@@ -1590,6 +1628,7 @@ export type Database = {
           predicted_eliminated_couple_id_2: string | null
           predicted_top_scorer_couple_id: string | null
           submitted_at: string
+          week_id: string
         }
         SetofOptions: {
           from: "*"

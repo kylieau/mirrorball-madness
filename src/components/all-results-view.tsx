@@ -22,9 +22,10 @@ import {
   deriveResultsStatus,
   RESULTS_STATUS_BADGE_VARIANT,
   RESULTS_STATUS_BADGE_LABEL,
+  type EpisodeResultsStatus,
 } from "@/lib/results-status";
 import type { DraftState } from "@/lib/results-draft";
-import { formatEpisodeLabel } from "@/lib/format-week";
+import { formatEpisodeCasual, formatEpisodeCasualWithTheme, formatEpisodeLabel } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -48,17 +49,27 @@ type EpisodeResult = {
 };
 type Episode = {
   id: string;
-  week_number: number;
+  episode_number: number;
+  week_id: string | null;
   airs_at: string;
   theme: string | null;
   status: string;
-  is_finale: boolean;
   results_published_at: string | null;
   results_published_by: string | null;
 };
+type CompetitionWeek = {
+  id: string;
+  week_number: number;
+  theme: string | null;
+  is_finale: boolean;
+  is_double_elimination_week: boolean;
+};
+
+type EpisodeWithStatus = Episode & { resultsStatus: EpisodeResultsStatus };
 
 export function AllResultsView({
   episodes,
+  weeks,
   danceScores,
   judgeScores,
   episodeResults,
@@ -72,6 +83,7 @@ export function AllResultsView({
   seasonNumber,
 }: {
   episodes: Episode[];
+  weeks: CompetitionWeek[];
   danceScores: DanceScore[];
   judgeScores: JudgeScore[];
   episodeResults: EpisodeResult[];
@@ -91,6 +103,7 @@ export function AllResultsView({
   const danceStyleById = new Map(danceStyles.map((d) => [d.id, d.name]));
   const judgeById = buildPeopleDisplayNames(judges);
   const couplesById = new Map(couples.map((c) => [c.id, c]));
+  const weekById = new Map(weeks.map((week) => [week.id, week]));
 
   function coupleParts(coupleId: string): CoupleNameParts | null {
     if (coupleDisplayNames[coupleId]) return coupleDisplayNames[coupleId];
@@ -160,7 +173,7 @@ export function AllResultsView({
     );
   }
 
-  const relevantEpisodes = episodes
+  const relevantEpisodes: EpisodeWithStatus[] = episodes
     .map((e) => ({
       ...e,
       resultsStatus: deriveResultsStatus(
@@ -168,13 +181,28 @@ export function AllResultsView({
         !!draftsByEpisode[e.id]?.hasDraft
       ),
     }))
-    .filter((e) => e.resultsStatus !== "not_started")
-    .sort((a, b) => b.week_number - a.week_number);
+    .filter((e) => e.resultsStatus !== "not_started");
 
-  const mostRecentPublishedEpisode = episodes
-    .filter((e) => e.results_published_at)
-    .sort((a, b) => b.week_number - a.week_number)[0];
-  const mostRecentPublishedWeekNumber = mostRecentPublishedEpisode?.week_number ?? 0;
+  const weekGroups = [...weeks]
+    .sort((a, b) => b.week_number - a.week_number)
+    .map((week) => ({
+      week,
+      episodes: relevantEpisodes
+        .filter((e) => e.week_id === week.id)
+        .sort((a, b) => a.episode_number - b.episode_number),
+    }))
+    .filter((group) => group.episodes.length > 0);
+
+  const exhibitionEpisodes = relevantEpisodes
+    .filter((e) => e.week_id == null)
+    .sort((a, b) => b.episode_number - a.episode_number);
+
+  const mostRecentPublishedWeekNumber = Math.max(
+    0,
+    ...episodes
+      .filter((e) => e.results_published_at)
+      .map((e) => (e.week_id ? (weekById.get(e.week_id)?.week_number ?? 0) : 0))
+  );
 
   async function handleCorrect(episodeId: string) {
     setError(null);
@@ -187,6 +215,163 @@ export function AllResultsView({
     }
     onNavigateToEpisode(episodeId);
     setCorrectingId(null);
+  }
+
+  function episodeResultsRows(ep: EpisodeWithStatus) {
+    return episodeResults
+      .filter((r) => r.episode_id === ep.id)
+      .map((r) => ({
+        ...r,
+        parts: coupleParts(r.couple_id),
+        dances: danceScoresByEpisodeCouple.get(`${ep.id}:${r.couple_id}`) ?? [],
+        total: (danceScoresByEpisodeCouple.get(`${ep.id}:${r.couple_id}`) ?? []).reduce(
+          (sum, d) => sum + d.total_score,
+          0
+        ),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }
+
+  function EpisodeResultsBlock({
+    ep,
+    weekNumber,
+    showTvLabel,
+  }: {
+    ep: EpisodeWithStatus;
+    weekNumber: number | null;
+    showTvLabel: boolean;
+  }) {
+    const results = episodeResultsRows(ep);
+    const coupleCount = results.length > 0 ? results.length : (draftsByEpisode[ep.id]?.entries.length ?? 0);
+    const publishedByName = ep.results_published_by ? publishedByNames[ep.results_published_by] : null;
+    const isCorrectingOlderWeek =
+      ep.resultsStatus === "published" && weekNumber != null && weekNumber !== mostRecentPublishedWeekNumber;
+
+    return (
+      <div className="flex flex-col gap-3">
+        {showTvLabel && (
+          <p className="text-xs font-medium text-muted-foreground">
+            {formatEpisodeLabel(ep.episode_number, seasonNumber)}
+            {ep.theme ? ` — ${ep.theme}` : ""}
+          </p>
+        )}
+        {ep.resultsStatus === "published" ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="p-2 font-medium">Couple</th>
+                    <th className="p-2 font-medium">Pts</th>
+                    <th className="p-2 font-medium">Outcome</th>
+                    <th className="p-2 font-medium">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((r) => (
+                    <Fragment key={r.couple_id}>
+                      <tr
+                        className={
+                          r.dances.length === 0 ? "border-b border-border last:border-b-0" : undefined
+                        }
+                      >
+                        <td className="whitespace-nowrap p-2">
+                          {r.parts ? <CoupleName {...r.parts} /> : "Unknown"}
+                        </td>
+                        <td className="p-2">{r.outcome === "bye" ? "—" : r.total}</td>
+                        <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(r.outcome)}</td>
+                        <td className="p-2 text-muted-foreground">{noteLabel(r) || "—"}</td>
+                      </tr>
+                      {r.dances.map((d, i) => (
+                        <DanceBreakdownRow
+                          key={d.id}
+                          dance={d}
+                          colSpan={4}
+                          isLast={i === r.dances.length - 1}
+                        />
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {ep.results_published_at && (
+              <p className="text-xs text-muted-foreground">
+                {coupleCount} couple{coupleCount === 1 ? "" : "s"} scored · published{" "}
+                {new Date(ep.results_published_at).toLocaleDateString()},{" "}
+                {new Date(ep.results_published_at).toLocaleTimeString()}
+                {publishedByName ? ` by ${publishedByName}` : ""}
+              </p>
+            )}
+
+            <Dialog>
+              <DialogTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="self-start"
+                    disabled={correctingId === ep.id}
+                  />
+                }
+              >
+                {correctingId === ep.id ? "Starting..." : "Correct Results"}
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    Correct{" "}
+                    {weekNumber != null
+                      ? formatEpisodeCasual(weekNumber)
+                      : formatEpisodeLabel(ep.episode_number, seasonNumber)}
+                    ?
+                  </DialogTitle>
+                  <DialogDescription>
+                    This discards any unsaved draft edits for this episode and starts a fresh
+                    correction from what&apos;s currently published. Nothing changes for players
+                    until you publish again.
+                    {isCorrectingOlderWeek && (
+                      <span className="mt-2 block text-amber-700 dark:text-amber-400">
+                        {formatEpisodeCasual(mostRecentPublishedWeekNumber)} has already been
+                        published after this week — correcting an elimination here won&apos;t
+                        recompute that later week automatically. Double-check it still makes sense
+                        afterward.
+                      </span>
+                    )}
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+                  <Button onClick={() => handleCorrect(ep.id)}>Start correction</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Unpublished draft — {coupleCount} couple
+              {coupleCount === 1 ? "" : "s"} entered so far.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-start"
+              onClick={() => onNavigateToEpisode(ep.id)}
+            >
+              Continue in Enter Results
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  function groupStatus(groupEpisodes: EpisodeWithStatus[]): EpisodeResultsStatus {
+    if (groupEpisodes.some((e) => e.resultsStatus === "draft_correcting")) return "draft_correcting";
+    if (groupEpisodes.some((e) => e.resultsStatus === "draft")) return "draft";
+    if (groupEpisodes.every((e) => e.resultsStatus === "published")) return "published";
+    return groupEpisodes[0]?.resultsStatus ?? "draft";
   }
 
   const coupleIdsWithResults = new Set(episodeResults.map((r) => r.couple_id));
@@ -208,143 +393,70 @@ export function AllResultsView({
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {view === "week" ? (
-        relevantEpisodes.length === 0 ? (
+        weekGroups.length === 0 && exhibitionEpisodes.length === 0 ? (
           <p className="text-sm text-muted-foreground">No results entered yet.</p>
         ) : (
           <Accordion>
-            {relevantEpisodes.map((ep) => {
-              const results = episodeResults
-                .filter((r) => r.episode_id === ep.id)
-                .map((r) => ({
-                  ...r,
-                  parts: coupleParts(r.couple_id),
-                  dances: danceScoresByEpisodeCouple.get(`${ep.id}:${r.couple_id}`) ?? [],
-                  total: (danceScoresByEpisodeCouple.get(`${ep.id}:${r.couple_id}`) ?? []).reduce(
-                    (sum, d) => sum + d.total_score,
-                    0
-                  ),
-                }))
-                .sort((a, b) => b.total - a.total);
-
-              const coupleCount = results.length > 0 ? results.length : draftsByEpisode[ep.id]?.entries.length ?? 0;
-              const publishedByName = ep.results_published_by ? publishedByNames[ep.results_published_by] : null;
-              const isCorrectingOlderWeek =
-                ep.resultsStatus === "published" && ep.week_number !== mostRecentPublishedWeekNumber;
-
+            {weekGroups.map(({ week, episodes: weekEpisodes }) => {
+              const status = groupStatus(weekEpisodes);
+              const coupleCount = weekEpisodes.reduce((sum, ep) => {
+                const published = episodeResults.filter((r) => r.episode_id === ep.id).length;
+                return sum + (published > 0 ? published : (draftsByEpisode[ep.id]?.entries.length ?? 0));
+              }, 0);
               return (
-                <AccordionItem key={ep.id} value={ep.id}>
+                <AccordionItem key={week.id} value={week.id}>
                   <AccordionTrigger>
                     <div className="flex w-full items-center justify-between gap-3 pr-2">
                       <div>
                         <p className="font-medium">
-                          {formatEpisodeLabel(ep.week_number, seasonNumber)}
-                          {ep.theme ? ` — ${ep.theme}` : ""}
+                          {formatEpisodeCasualWithTheme(week.week_number, week.theme)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {coupleCount} couple{coupleCount === 1 ? "" : "s"} scored
-                          {ep.resultsStatus === "published" && ep.results_published_at && (
-                            <>
-                              {" · published "}
-                              {new Date(ep.results_published_at).toLocaleDateString()}
-                              {", "}
-                              {new Date(ep.results_published_at).toLocaleTimeString()}
-                              {publishedByName ? ` by ${publishedByName}` : ""}
-                            </>
-                          )}
+                          {weekEpisodes.length > 1 &&
+                            ` · ${weekEpisodes.length} nights`}
                         </p>
                       </div>
-                      <Badge variant={RESULTS_STATUS_BADGE_VARIANT[ep.resultsStatus]}>
-                        {RESULTS_STATUS_BADGE_LABEL[ep.resultsStatus]}
+                      <Badge variant={RESULTS_STATUS_BADGE_VARIANT[status]}>
+                        {RESULTS_STATUS_BADGE_LABEL[status]}
                       </Badge>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    {ep.resultsStatus === "published" ? (
-                      <div className="flex flex-col gap-3">
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                                <th className="p-2 font-medium">Couple</th>
-                                <th className="p-2 font-medium">Pts</th>
-                                <th className="p-2 font-medium">Outcome</th>
-                                <th className="p-2 font-medium">Notes</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {results.map((r) => (
-                                <Fragment key={r.couple_id}>
-                                  <tr
-                                    className={
-                                      r.dances.length === 0 ? "border-b border-border last:border-b-0" : undefined
-                                    }
-                                  >
-                                    <td className="whitespace-nowrap p-2">
-                                      {r.parts ? <CoupleName {...r.parts} /> : "Unknown"}
-                                    </td>
-                                    <td className="p-2">{r.outcome === "bye" ? "—" : r.total}</td>
-                                    <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(r.outcome)}</td>
-                                    <td className="p-2 text-muted-foreground">{noteLabel(r) || "—"}</td>
-                                  </tr>
-                                  {r.dances.map((d, i) => (
-                                    <DanceBreakdownRow
-                                      key={d.id}
-                                      dance={d}
-                                      colSpan={4}
-                                      isLast={i === r.dances.length - 1}
-                                    />
-                                  ))}
-                                </Fragment>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-
-                        <Dialog>
-                          <DialogTrigger
-                            render={<Button variant="outline" size="sm" className="self-start" disabled={correctingId === ep.id} />}
-                          >
-                            {correctingId === ep.id ? "Starting..." : "Correct Results"}
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Correct {formatEpisodeLabel(ep.week_number, seasonNumber)}?</DialogTitle>
-                              <DialogDescription>
-                                This discards any unsaved draft edits for this week and starts a fresh
-                                correction from what&apos;s currently published. Nothing changes for players
-                                until you publish again.
-                                {isCorrectingOlderWeek && mostRecentPublishedEpisode && (
-                                  <span className="mt-2 block text-amber-700 dark:text-amber-400">
-                                    {formatEpisodeLabel(mostRecentPublishedEpisode.week_number, seasonNumber)}{" "}
-                                    has already been published after this week — correcting an elimination
-                                    here won&apos;t recompute that later week automatically. Double-check it
-                                    still makes sense afterward.
-                                  </span>
-                                )}
-                              </DialogDescription>
-                            </DialogHeader>
-                            <DialogFooter>
-                              <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-                              <Button onClick={() => handleCorrect(ep.id)}>Start correction</Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-2">
-                        <p className="text-sm text-muted-foreground">
-                          This week has an unpublished draft — {coupleCount} couple
-                          {coupleCount === 1 ? "" : "s"} entered so far.
-                        </p>
-                        <Button size="sm" variant="outline" className="self-start" onClick={() => onNavigateToEpisode(ep.id)}>
-                          Continue in Enter Results
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex flex-col gap-6">
+                      {weekEpisodes.map((ep) => (
+                        <EpisodeResultsBlock
+                          key={ep.id}
+                          ep={ep}
+                          weekNumber={week.week_number}
+                          showTvLabel={weekEpisodes.length > 1}
+                        />
+                      ))}
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               );
             })}
+            {exhibitionEpisodes.map((ep) => (
+              <AccordionItem key={ep.id} value={ep.id}>
+                <AccordionTrigger>
+                  <div className="flex w-full items-center justify-between gap-3 pr-2">
+                    <div>
+                      <p className="font-medium">
+                        {formatEpisodeLabel(ep.episode_number, seasonNumber)}
+                        {ep.theme ? ` — ${ep.theme}` : " — Exhibition"}
+                      </p>
+                    </div>
+                    <Badge variant={RESULTS_STATUS_BADGE_VARIANT[ep.resultsStatus]}>
+                      {RESULTS_STATUS_BADGE_LABEL[ep.resultsStatus]}
+                    </Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <EpisodeResultsBlock ep={ep} weekNumber={null} showTvLabel={false} />
+                </AccordionContent>
+              </AccordionItem>
+            ))}
           </Accordion>
         )
       ) : couplesWithHistory.length === 0 ? (
@@ -355,14 +467,22 @@ export function AllResultsView({
             .filter((r) => r.couple_id === c.id)
             .map((r) => {
               const dances = danceScoresByEpisodeCouple.get(`${r.episode_id}:${c.id}`) ?? [];
+              const episode = episodes.find((e) => e.id === r.episode_id);
+              const week = episode?.week_id ? weekById.get(episode.week_id) : undefined;
               return {
                 ...r,
-                episode: episodes.find((e) => e.id === r.episode_id),
+                episode,
+                week,
                 dances,
                 total: dances.reduce((sum, d) => sum + d.total_score, 0),
               };
             })
-            .sort((a, b) => (a.episode?.week_number ?? 0) - (b.episode?.week_number ?? 0));
+            .sort((a, b) => {
+              const weekA = a.week?.week_number ?? 9999;
+              const weekB = b.week?.week_number ?? 9999;
+              if (weekA !== weekB) return weekA - weekB;
+              return (a.episode?.episode_number ?? 0) - (b.episode?.episode_number ?? 0);
+            });
 
           return (
             <Card key={c.id}>
@@ -382,22 +502,30 @@ export function AllResultsView({
                     </tr>
                   </thead>
                   <tbody>
-                    {history.map((h, i) => (
-                      <Fragment key={i}>
-                        <tr className={h.dances.length === 0 ? "border-b border-border last:border-b-0" : undefined}>
-                          <td className="whitespace-nowrap p-2">
-                            {h.episode ? formatEpisodeLabel(h.episode.week_number, seasonNumber) : "Episode ?"}
-                            {h.episode?.theme ? ` — ${h.episode.theme}` : ""}
-                          </td>
-                          <td className="p-2">{h.outcome === "bye" ? "—" : h.total}</td>
-                          <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(h.outcome)}</td>
-                          <td className="p-2 text-muted-foreground">{noteLabel(h) || "—"}</td>
-                        </tr>
-                        {h.dances.map((d, j) => (
-                          <DanceBreakdownRow key={d.id} dance={d} colSpan={4} isLast={j === h.dances.length - 1} />
-                        ))}
-                      </Fragment>
-                    ))}
+                    {history.map((h, i) => {
+                      const multiNight =
+                        h.week != null && episodes.filter((e) => e.week_id === h.week!.id).length > 1;
+                      const weekLabel = h.week
+                        ? multiNight
+                          ? `${formatEpisodeCasual(h.week.week_number)} · ${h.episode?.theme?.trim() || formatEpisodeLabel(h.episode?.episode_number ?? 0, seasonNumber)}`
+                          : formatEpisodeCasualWithTheme(h.week.week_number, h.week.theme ?? h.episode?.theme)
+                        : h.episode
+                          ? `${formatEpisodeLabel(h.episode.episode_number, seasonNumber)} (exhibition)`
+                          : "Episode ?";
+                      return (
+                        <Fragment key={i}>
+                          <tr className={h.dances.length === 0 ? "border-b border-border last:border-b-0" : undefined}>
+                            <td className="whitespace-nowrap p-2">{weekLabel}</td>
+                            <td className="p-2">{h.outcome === "bye" ? "—" : h.total}</td>
+                            <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(h.outcome)}</td>
+                            <td className="p-2 text-muted-foreground">{noteLabel(h) || "—"}</td>
+                          </tr>
+                          {h.dances.map((d, j) => (
+                            <DanceBreakdownRow key={d.id} dance={d} colSpan={4} isLast={j === h.dances.length - 1} />
+                          ))}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </CardContent>

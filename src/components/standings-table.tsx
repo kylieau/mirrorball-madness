@@ -66,7 +66,7 @@ export function StandingsTable({
         <span className="font-normal text-muted-foreground">
           {latestCompletedWeek !== null
             ? `through ${formatEpisodeCasualShort(latestCompletedWeek)}`
-            : "Results appear once you mark an episode as watched"}
+            : "Results appear once you mark a week as watched"}
         </span>
       </div>
 

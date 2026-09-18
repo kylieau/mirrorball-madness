@@ -40,6 +40,7 @@ export default async function AdminResultsPage() {
     { data: judges },
     { data: danceStyles },
     { data: episodes },
+    { data: weeks },
     { data: danceScores },
     { data: judgeScores },
     { data: episodeResults },
@@ -59,8 +60,13 @@ export default async function AdminResultsPage() {
     supabase
       .from("episodes")
       .select(
-        "id, week_number, airs_at, theme, status, is_finale, is_elimination_week, is_double_elimination_week, results_published_at, results_published_by"
+        "id, episode_number, week_id, airs_at, theme, status, results_published_at, results_published_by"
       )
+      .eq("season_id", activeSeasonId ?? "")
+      .order("episode_number"),
+    supabase
+      .from("competition_weeks")
+      .select("id, week_number, theme, is_elimination_week, is_finale, is_double_elimination_week")
       .eq("season_id", activeSeasonId ?? "")
       .order("week_number"),
     supabase
@@ -132,6 +138,7 @@ export default async function AdminResultsPage() {
       )}
       danceStyles={danceStyles ?? []}
       episodes={episodes ?? []}
+      weeks={weeks ?? []}
       danceScores={danceScores ?? []}
       judgeScores={judgeScores ?? []}
       episodeResults={episodeResults ?? []}

@@ -4,6 +4,7 @@ import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
 import { cn } from "cn";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasual } from "@/lib/format-week";
+import { mergeCoupleOutcomes } from "@/lib/competition-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -122,16 +123,16 @@ export function WeeklyResultsView({
     return c ? { celebrity: c.celebrity_name, pro: c.pro_name } : null;
   }
 
+  const episodeIds = new Set(episodes.map((e) => e.id));
   const danceScoresByCouple = new Map<string, DanceScore[]>();
   for (const ds of danceScores) {
-    if (ds.episode_id !== episode.id) continue;
+    if (!episodeIds.has(ds.episode_id)) continue;
     const list = danceScoresByCouple.get(ds.couple_id) ?? [];
     list.push(ds);
     danceScoresByCouple.set(ds.couple_id, list);
   }
 
-  const outcomes = episodeResults
-    .filter((r) => r.episode_id === episode.id)
+  const outcomes = mergeCoupleOutcomes(episodeResults.filter((r) => episodeIds.has(r.episode_id)))
     .map((r) => {
       const dances = danceScoresByCouple.get(r.couple_id) ?? [];
       return {
@@ -153,9 +154,11 @@ export function WeeklyResultsView({
       {eliminated.length > 0 && (
         <div className="mb-4 rounded-2xl border border-primary/40 bg-linear-to-br from-curtain to-curtain-light px-5 py-4 text-center">
           <p className="text-xs text-accent">Eliminated</p>
-          <p className="mt-1 font-heading text-lg font-semibold">
-            {eliminated.map((r) => (r.parts ? `${r.parts.celebrity} & ${r.parts.pro}` : "Unknown")).join(", ")}
-          </p>
+          <div className="mt-1 font-heading text-lg font-semibold">
+            {eliminated.map((r) => (
+              <p key={r.couple_id}>{r.parts ? `${r.parts.celebrity} & ${r.parts.pro}` : "Unknown"}</p>
+            ))}
+          </div>
         </div>
       )}
 

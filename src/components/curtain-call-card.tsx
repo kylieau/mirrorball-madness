@@ -16,7 +16,7 @@ export function CurtainCallCard({
   children,
 }: {
   leagueId: string;
-  episode: { id: string; weekNumber: number; theme: string | null } | null;
+  episode: { id: string; weekNumber: number; theme: string | null; nightsLabel?: string | null } | null;
   weeks: { id: string; weekNumber: number; theme: string | null }[];
   children?: ReactNode;
 }) {
@@ -31,11 +31,12 @@ export function CurtainCallCard({
           <EpisodeCarousel
             weekNumber={episode.weekNumber}
             theme={episode.theme}
+            nightsLabel={episode.nightsLabel}
             prevHref={neighbors.prev ? pastPicksHref(leagueId, neighbors.prev.id) : null}
             nextHref={neighbors.next ? pastPicksHref(leagueId, neighbors.next.id) : null}
           />
         ) : (
-          <CardDescription>No upcoming episode scheduled yet.</CardDescription>
+          <CardDescription>No upcoming week scheduled yet.</CardDescription>
         )}
       </CardHeader>
       {episode && children ? <CardContent>{children}</CardContent> : null}

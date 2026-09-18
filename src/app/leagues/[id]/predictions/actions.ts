@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function submitPrediction(
   leagueId: string,
-  episodeId: string,
+  weekId: string,
   predictedEliminatedCoupleId: string | null,
   predictedEliminatedCoupleId2: string | null,
   predictedTopScorerCoupleId: string | null
@@ -13,7 +13,7 @@ export async function submitPrediction(
   const supabase = await createClient();
   const { error } = await supabase.rpc("submit_prediction", {
     p_league_id: leagueId,
-    p_episode_id: episodeId,
+    p_week_id: weekId,
     // The generated RPC arg types don't model that these Postgres params
     // accept NULL (a manager can predict just one of the two categories,
     // and the second elimination slot only applies on a double-elimination

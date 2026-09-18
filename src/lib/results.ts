@@ -24,14 +24,6 @@ export type EntrySubmission = {
   bonusNote: string | null;
 };
 
-export type EpisodeResultsInput = {
-  weekNumber: number;
-  airsAt: string;
-  theme: string | null;
-  expectedDanceCount: number;
-  entries: EntrySubmission[];
-};
-
 // While the league is small, results entry is opened to every signed-in user
 // (RESULTS_ENTRY_OPEN_TO_ALL=true) rather than gated behind is_super_admin, so
 // no single person is stuck updating scores every week. Flip the env var off
@@ -55,19 +47,33 @@ async function pruneDepartedCouplesFromFutureEpisodes(
   admin: SupabaseClient<Database>,
   seasonId: string,
   afterWeekNumber: number,
+  current: { id: string; episodeNumber: number; weekId: string | null },
   coupleIds: string[]
 ): Promise<string | null> {
   if (coupleIds.length === 0) return null;
 
-  const { data: futureEpisodes, error } = await admin
-    .from("episodes")
-    .select("id")
-    .eq("season_id", seasonId)
-    .gt("week_number", afterWeekNumber)
-    .is("results_published_at", null);
+  const [{ data: weeks, error: weeksErr }, { data: unpublished, error }] = await Promise.all([
+    admin.from("competition_weeks").select("id, week_number").eq("season_id", seasonId),
+    admin
+      .from("episodes")
+      .select("id, week_id, episode_number")
+      .eq("season_id", seasonId)
+      .is("results_published_at", null),
+  ]);
+  if (weeksErr) return weeksErr.message;
   if (error) return error.message;
 
-  const futureIds = (futureEpisodes ?? []).map((e) => e.id);
+  const weekNumberById = new Map((weeks ?? []).map((week) => [week.id, week.week_number]));
+  const futureIds = (unpublished ?? [])
+    .filter((episode) => {
+      if (episode.id === current.id) return false;
+      if (episode.week_id && weekNumberById.get(episode.week_id)! > afterWeekNumber) return true;
+      if (episode.week_id && episode.week_id === current.weekId && episode.episode_number > current.episodeNumber) {
+        return true;
+      }
+      return episode.week_id == null && episode.episode_number > current.episodeNumber;
+    })
+    .map((episode) => episode.id);
   if (futureIds.length === 0) return null;
 
   const { error: participantsErr } = await admin
@@ -102,7 +108,12 @@ async function pruneDepartedCouplesFromFutureEpisodes(
 }
 
 export type ScheduleEpisodeInput = {
-  weekNumber: number;
+  episodeId: string | null;
+  episodeNumber: number;
+  // Null = exhibition / not on Results-Picks. Otherwise find-or-create that
+  // competition week and attach this TV airing to it.
+  competitionWeekNumber: number | null;
+  weekTheme: string | null;
   airsAt: string;
   theme: string | null;
   isEliminationWeek: boolean;
@@ -114,7 +125,19 @@ export type ScheduleEpisodeInput = {
   participantCoupleIds: string[];
 };
 
-// Sets week/date/theme/elimination-week/finale/participants — everything
+async function deleteWeekIfEmpty(
+  admin: SupabaseClient<Database>,
+  weekId: string | null
+): Promise<string | null> {
+  if (!weekId) return null;
+  const { data: remaining, error } = await admin.from("episodes").select("id").eq("week_id", weekId).limit(1);
+  if (error) return error.message;
+  if ((remaining ?? []).length > 0) return null;
+  const { error: deleteErr } = await admin.from("competition_weeks").delete().eq("id", weekId);
+  return deleteErr?.message ?? null;
+}
+
+// Sets episode number/date/theme/week assignment/participants — everything
 // known ahead of air — leaving expected_dance_count and status untouched on
 // an existing episode, since those are owned by the results-entry flow below.
 export async function applyEpisodeSchedule(
@@ -124,23 +147,63 @@ export async function applyEpisodeSchedule(
   const { seasonId, error: seasonErr } = await getActiveSeasonId(admin);
   if (seasonErr || !seasonId) return { error: seasonErr };
 
-  const { data: episode, error } = await admin
-    .from("episodes")
-    .upsert(
-      {
-        season_id: seasonId,
-        week_number: input.weekNumber,
-        airs_at: input.airsAt,
-        theme: input.theme,
-        is_elimination_week: input.isEliminationWeek,
-        is_finale: input.isFinale,
-        is_double_elimination_week: input.isDoubleEliminationWeek,
-      },
-      { onConflict: "season_id,week_number" }
-    )
-    .select()
-    .single();
+  if (!Number.isInteger(input.episodeNumber) || input.episodeNumber < 1) {
+    return { error: "Episode number must be a positive integer." };
+  }
+  if (input.competitionWeekNumber != null && (input.competitionWeekNumber < 1 || !Number.isInteger(input.competitionWeekNumber))) {
+    return { error: "Competition week must be a positive integer, or blank for exhibition." };
+  }
+
+  let weekId: string | null = null;
+  if (input.competitionWeekNumber != null) {
+    const { data: existingWeek } = await admin
+      .from("competition_weeks")
+      .select("id, theme")
+      .eq("season_id", seasonId)
+      .eq("week_number", input.competitionWeekNumber)
+      .maybeSingle();
+
+    const weekTheme = input.weekTheme?.trim() || existingWeek?.theme || input.theme;
+    const { data: week, error: weekErr } = await admin
+      .from("competition_weeks")
+      .upsert(
+        {
+          season_id: seasonId,
+          week_number: input.competitionWeekNumber,
+          theme: weekTheme,
+          is_elimination_week: input.isEliminationWeek,
+          is_finale: input.isFinale,
+          is_double_elimination_week: input.isDoubleEliminationWeek,
+        },
+        { onConflict: "season_id,week_number" }
+      )
+      .select("id")
+      .single();
+    if (weekErr) return { error: weekErr.message };
+    weekId = week.id;
+  }
+
+  const previousWeekId = input.episodeId
+    ? ((await admin.from("episodes").select("week_id").eq("id", input.episodeId).maybeSingle()).data?.week_id ?? null)
+    : null;
+
+  const episodeFields = {
+    season_id: seasonId,
+    episode_number: input.episodeNumber,
+    week_id: weekId,
+    airs_at: input.airsAt,
+    theme: input.theme,
+  };
+
+  const { data: episode, error } = input.episodeId
+    ? await admin.from("episodes").update(episodeFields).eq("id", input.episodeId).select().single()
+    : await admin.from("episodes").insert(episodeFields).select().single();
   if (error) return { error: error.message };
+
+  if (previousWeekId && previousWeekId !== weekId) {
+    const emptyErr = await deleteWeekIfEmpty(admin, previousWeekId);
+    if (emptyErr) return { error: emptyErr };
+  }
 
   const { data: seasonCouples, error: couplesErr } = await admin
     .from("couples")
@@ -148,12 +211,12 @@ export async function applyEpisodeSchedule(
     .eq("season_id", seasonId);
   if (couplesErr) return { error: couplesErr.message };
 
-  const selectableIds = selectableCast(seasonCouples ?? [], episode.week_number, {
+  const castWeek = input.competitionWeekNumber ?? input.episodeNumber;
+  const selectableIds = selectableCast(seasonCouples ?? [], castWeek, {
     published: episode.results_published_at != null,
   }).map((c) => c.id);
   const toWrite = participantIdsToPersist(input.participantCoupleIds, selectableIds);
 
-  // Full replace, same convention as dance_scores/episode_results below.
   await admin.from("episode_participants").delete().eq("episode_id", episode.id);
   if (toWrite.length > 0) {
     const { error: participantsErr } = await admin.from("episode_participants").insert(
@@ -163,6 +226,190 @@ export async function applyEpisodeSchedule(
   }
 
   return { error: null };
+}
+
+export type EpisodeResultsInput = {
+  episodeId: string;
+  expectedDanceCount: number;
+  entries: EntrySubmission[];
+};
+
+async function recomputeWeekScores(
+  admin: SupabaseClient<Database>,
+  seasonId: string,
+  week: {
+    id: string;
+    week_number: number;
+    is_finale: boolean;
+    is_double_elimination_week: boolean;
+  },
+  episodeIds: string[],
+  thisEpisodeOutcomeRows: { couple_id: string; outcome: string; bonus_points: number }[],
+  thisEpisodeId: string
+): Promise<string | null> {
+  const [{ data: allDances, error: dancesErr }, { data: allOutcomes, error: outcomesErr }] = await Promise.all([
+    admin.from("dance_scores").select("couple_id, total_score").in("episode_id", episodeIds),
+    admin.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
+  ]);
+  if (dancesErr) return dancesErr.message;
+  if (outcomesErr) return outcomesErr.message;
+
+  const danceScoreInputs = (allDances ?? []).map((row) => ({
+    coupleId: row.couple_id,
+    totalScore: Number(row.total_score),
+  }));
+  const otherOutcomes = (allOutcomes ?? []).filter((row) => row.episode_id !== thisEpisodeId);
+  const episodeOutcomeInputs: { coupleId: string; outcome: Outcome; bonusPoints: number }[] = [
+    ...otherOutcomes.map((row) => ({
+      coupleId: row.couple_id,
+      outcome: row.outcome as Outcome,
+      bonusPoints: Number(row.bonus_points),
+    })),
+    ...thisEpisodeOutcomeRows.map((row) => ({
+      coupleId: row.couple_id,
+      outcome: row.outcome as Outcome,
+      bonusPoints: row.bonus_points,
+    })),
+  ];
+
+  const { data: leagues, error: leaguesErr } = await admin.from("leagues").select("id");
+  if (leaguesErr) return leaguesErr.message;
+
+  const newlyResolvedCoupleIds = thisEpisodeOutcomeRows
+    .filter((r) => RESOLVING_OUTCOMES.has(r.outcome as Outcome))
+    .map((r) => r.couple_id);
+
+  const actualPositionByCouple = new Map<string, number>();
+  let totalCouples = 0;
+  if (newlyResolvedCoupleIds.length > 0) {
+    const { data: seasonCouples, error: seasonCouplesErr } = await admin
+      .from("couples")
+      .select("id, status, elimination_week")
+      .eq("season_id", seasonId);
+    if (seasonCouplesErr) return seasonCouplesErr.message;
+
+    totalCouples = (seasonCouples ?? []).length;
+    const eliminationWeeks = [
+      ...new Set(
+        (seasonCouples ?? [])
+          .filter((c) => c.status === "eliminated" || c.status === "withdrawn")
+          .map((c) => c.elimination_week!)
+      ),
+    ].sort((a, b) => a - b);
+    const rankByWeek = new Map(eliminationWeeks.map((weekNumber, i) => [weekNumber, i + 1]));
+
+    for (const couple of seasonCouples ?? []) {
+      if (couple.status === "winner") actualPositionByCouple.set(couple.id, totalCouples);
+      else if (couple.status === "runner_up") actualPositionByCouple.set(couple.id, totalCouples - 1);
+      else if (couple.status === "third_place") actualPositionByCouple.set(couple.id, totalCouples - 2);
+      else if (
+        (couple.status === "eliminated" || couple.status === "withdrawn") &&
+        couple.elimination_week !== null
+      ) {
+        actualPositionByCouple.set(couple.id, rankByWeek.get(couple.elimination_week)!);
+      }
+    }
+  }
+
+  for (const league of leagues ?? []) {
+    const [{ data: scoringSettings }, { data: rosterSlots }, { data: predictions }] = await Promise.all([
+      admin.from("scoring_settings").select("*").eq("league_id", league.id).single(),
+      admin
+        .from("roster_slots")
+        .select("manager_id, couple_id")
+        .eq("league_id", league.id)
+        .lte("start_week", week.week_number)
+        .or(`end_week.is.null,end_week.gte.${week.week_number}`),
+      admin
+        .from("predictions")
+        .select("manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
+        .eq("league_id", league.id)
+        .eq("week_id", week.id),
+    ]);
+
+    if (!scoringSettings || !rosterSlots) continue;
+
+    let grandFinalePointsByManager: Record<string, number> = {};
+    if (newlyResolvedCoupleIds.length > 0) {
+      const { data: grandFinalePredictions, error: gfpErr } = await admin
+        .from("grand_finale_predictions")
+        .select("manager_id, couple_id, predicted_position")
+        .eq("league_id", league.id)
+        .in("couple_id", newlyResolvedCoupleIds);
+      if (gfpErr) return gfpErr.message;
+
+      grandFinalePointsByManager = computeGrandFinalePoints({
+        predictions: (grandFinalePredictions ?? []).map((p) => ({
+          managerId: p.manager_id,
+          coupleId: p.couple_id,
+          predictedPosition: p.predicted_position,
+        })),
+        resolvedCouples: newlyResolvedCoupleIds
+          .filter((id) => actualPositionByCouple.has(id))
+          .map((id) => ({ coupleId: id, actualPosition: actualPositionByCouple.get(id)! })),
+        totalCouples,
+        method: (scoringSettings.bonus_picks_scoring_method as GrandFinaleMethod) ?? "exact_position",
+        distancePenalty: scoringSettings.bonus_picks_distance_penalty,
+        tierSize: scoringSettings.bonus_picks_tier_size,
+        pointsPerCorrect: scoringSettings.bonus_picks_points_per_correct,
+      });
+    }
+
+    const judgesScoreStarted = week.week_number >= scoringSettings.judges_score_starts_week;
+
+    const scores = computeWeeklyScores({
+      scoringSettings: {
+        judgesScoreMultiplier: scoringSettings.judges_score_multiplier,
+        survivalPoints: scoringSettings.survival_points,
+        eliminationPredictionPoints: scoringSettings.elimination_prediction_points,
+        topScorerPredictionPoints: scoringSettings.top_scorer_prediction_points,
+        firstPlacePoints: scoringSettings.first_place_points,
+        secondPlacePoints: scoringSettings.second_place_points,
+        thirdPlacePoints: scoringSettings.third_place_points,
+      },
+      rosterSlots: judgesScoreStarted
+        ? rosterSlots
+            .filter((r): r is { manager_id: string; couple_id: string } => r.couple_id !== null)
+            .map((r) => ({ managerId: r.manager_id, coupleId: r.couple_id }))
+        : [],
+      danceScores: danceScoreInputs,
+      episodeOutcomes: episodeOutcomeInputs,
+      predictions: (predictions ?? []).map((p) => ({
+        managerId: p.manager_id,
+        predictedEliminatedCoupleId: p.predicted_eliminated_couple_id,
+        predictedEliminatedCoupleId2: p.predicted_eliminated_couple_id_2,
+        predictedTopScorerCoupleId: p.predicted_top_scorer_couple_id,
+      })),
+      isFinale: week.is_finale,
+      isDoubleElimination: week.is_double_elimination_week,
+      categoryWeights: {
+        judges: scoringSettings.judges_score_category_weight,
+        eliminations: scoringSettings.eliminations_category_weight,
+        bonus: scoringSettings.bonus_picks_category_weight,
+      },
+      grandFinalePointsByManager,
+    });
+
+    await admin.from("weekly_manager_scores").delete().eq("league_id", league.id).eq("week_id", week.id);
+
+    if (scores.length === 0) continue;
+
+    const { error: upsertErr } = await admin.from("weekly_manager_scores").upsert(
+      scores.map((s) => ({
+        league_id: league.id,
+        manager_id: s.managerId,
+        week_id: week.id,
+        roster_points: s.rosterPoints,
+        prediction_points: s.predictionPoints,
+        grand_finale_points: s.grandFinalePoints,
+        total_points: s.totalPoints,
+      })),
+      { onConflict: "league_id,manager_id,week_id" }
+    );
+    if (upsertErr) return upsertErr.message;
+  }
+
+  return null;
 }
 
 // Takes an already-authorized admin (service-role) client — the caller is
@@ -178,32 +425,27 @@ export async function applyEpisodeResults(
 
   const { data: episode, error: episodeErr } = await admin
     .from("episodes")
-    .upsert(
-      {
-        season_id: seasonId,
-        week_number: input.weekNumber,
-        airs_at: input.airsAt,
-        theme: input.theme,
-        expected_dance_count: input.expectedDanceCount,
-        // Submitting with no couple entries just schedules the episode (sets
-        // its air/lock time) ahead of air — that's how a manager gets
-        // something to predict against before results exist. Adding entries
-        // later flips it to completed.
-        status: input.entries.length > 0 ? "completed" : "upcoming",
-        results_published_at: input.entries.length > 0 ? new Date().toISOString() : null,
-      },
-      { onConflict: "season_id,week_number" }
-    )
+    .update({
+      expected_dance_count: input.expectedDanceCount,
+      status: input.entries.length > 0 ? "completed" : "upcoming",
+      results_published_at: input.entries.length > 0 ? new Date().toISOString() : null,
+    })
+    .eq("id", input.episodeId)
     .select()
     .single();
 
   if (episodeErr) return { error: episodeErr.message };
 
-  // Correcting a published week can un-resolve a couple (e.g. an
-  // elimination gets reversed) — read the old outcomes before they're
-  // wiped below so any couple that's no longer resolving this time around
-  // can be reverted to active, instead of being left permanently stuck on
-  // a stale eliminated/withdrawn/winner/runner_up/third_place status.
+  const week = episode.week_id
+    ? (
+        await admin
+          .from("competition_weeks")
+          .select("id, week_number, is_finale, is_double_elimination_week")
+          .eq("id", episode.week_id)
+          .single()
+      ).data
+    : null;
+
   const { data: previousOutcomes } = await admin
     .from("episode_results")
     .select("couple_id, outcome")
@@ -219,17 +461,35 @@ export async function applyEpisodeResults(
   );
   const revertedIds = [...previouslyResolvedIds].filter((id) => !nowResolvedIds.has(id));
   if (revertedIds.length > 0) {
-    await admin.from("couples").update({ status: "active", elimination_week: null }).in("id", revertedIds);
+    let stillResolved = new Set<string>();
+    if (week) {
+      const { data: siblingEpisodes } = await admin
+        .from("episodes")
+        .select("id")
+        .eq("week_id", week.id)
+        .neq("id", episode.id);
+      const siblingIds = (siblingEpisodes ?? []).map((row) => row.id);
+      if (siblingIds.length > 0) {
+        const { data: siblingOutcomes } = await admin
+          .from("episode_results")
+          .select("couple_id, outcome")
+          .in("episode_id", siblingIds);
+        stillResolved = new Set(
+          (siblingOutcomes ?? [])
+            .filter((row) => RESOLVING_OUTCOMES.has(row.outcome as Outcome))
+            .map((row) => row.couple_id)
+        );
+      }
+    }
+    const toRevert = revertedIds.filter((id) => !stillResolved.has(id));
+    if (toRevert.length > 0) {
+      await admin.from("couples").update({ status: "active", elimination_week: null }).in("id", toRevert);
+    }
   }
 
-  // judge_scores cascades from dance_scores, so clearing dance_scores is enough.
   await admin.from("dance_scores").delete().eq("episode_id", episode.id);
   await admin.from("episode_results").delete().eq("episode_id", episode.id);
 
-  // Inserted one dance at a time (not a bulk insert) so each dance_scores row's
-  // real id is known before inserting its judge_scores — no reliance on
-  // multi-row insert order lining up with the input array.
-  const danceScoreInputs: { coupleId: string; totalScore: number }[] = [];
   for (const e of input.entries) {
     for (const dance of e.dances) {
       const totalScore = dance.judgeScores.reduce((sum, js) => sum + js.score, 0);
@@ -256,8 +516,6 @@ export async function applyEpisodeResults(
         );
         if (judgeErr) return { error: judgeErr.message };
       }
-
-      danceScoreInputs.push({ coupleId: e.coupleId, totalScore });
     }
   }
 
@@ -276,195 +534,45 @@ export async function applyEpisodeResults(
     if (error) return { error: error.message };
   }
 
-  for (const e of input.entries) {
-    // eliminated/withdrawn open the roster slot for waivers; winner/runner_up/
-    // third_place record the finale placement. safe and bye leave
-    // couples.status untouched — a bye couple is still actively competing.
-    if (e.outcome === "eliminated" || e.outcome === "withdrawn") {
-      await admin
-        .from("couples")
-        .update({ status: e.outcome, elimination_week: input.weekNumber })
-        .eq("id", e.coupleId);
-    } else if (e.outcome === "winner" || e.outcome === "runner_up" || e.outcome === "third_place") {
-      await admin.from("couples").update({ status: e.outcome, elimination_week: null }).eq("id", e.coupleId);
-    }
-  }
-
-  const departedIds = input.entries
-    .filter((e) => RESOLVING_OUTCOMES.has(e.outcome))
-    .map((e) => e.coupleId);
-  const pruneErr = await pruneDepartedCouplesFromFutureEpisodes(
-    admin,
-    seasonId,
-    input.weekNumber,
-    departedIds
-  );
-  if (pruneErr) return { error: pruneErr };
-
-  const { data: leagues, error: leaguesErr } = await admin.from("leagues").select("id");
-  if (leaguesErr) return { error: leaguesErr.message };
-
-  const episodeOutcomeInputs = outcomeRows.map((r) => ({
-    coupleId: r.couple_id,
-    outcome: r.outcome,
-    bonusPoints: r.bonus_points,
-  }));
-
-  // Grand Finale resolves incrementally: the moment a couple's real fate is
-  // known (this episode's eliminations/withdrawals/podium placements), that
-  // couple's predicted-vs-actual position is scored once and never again —
-  // this is season-wide, not per-league, since "actual position" depends on
-  // the full elimination order across every league's shared couples.
-  const newlyResolvedCoupleIds = outcomeRows
-    .filter((r) => RESOLVING_OUTCOMES.has(r.outcome as Outcome))
-    .map((r) => r.couple_id);
-
-  const actualPositionByCouple = new Map<string, number>();
-  let totalCouples = 0;
-  if (newlyResolvedCoupleIds.length > 0) {
-    const { data: seasonCouples, error: seasonCouplesErr } = await admin
-      .from("couples")
-      .select("id, status, elimination_week")
-      .eq("season_id", seasonId);
-    if (seasonCouplesErr) return { error: seasonCouplesErr.message };
-
-    totalCouples = (seasonCouples ?? []).length;
-
-    // Dense rank by elimination_week: couples eliminated the same week (a
-    // double-elimination) share a position, both scored against it.
-    const eliminationWeeks = [
-      ...new Set(
-        (seasonCouples ?? [])
-          .filter((c) => c.status === "eliminated" || c.status === "withdrawn")
-          .map((c) => c.elimination_week!)
-      ),
-    ].sort((a, b) => a - b);
-    const rankByWeek = new Map(eliminationWeeks.map((week, i) => [week, i + 1]));
-
-    for (const couple of seasonCouples ?? []) {
-      if (couple.status === "winner") actualPositionByCouple.set(couple.id, totalCouples);
-      else if (couple.status === "runner_up") actualPositionByCouple.set(couple.id, totalCouples - 1);
-      else if (couple.status === "third_place") actualPositionByCouple.set(couple.id, totalCouples - 2);
-      else if (
-        (couple.status === "eliminated" || couple.status === "withdrawn") &&
-        couple.elimination_week !== null
-      ) {
-        actualPositionByCouple.set(couple.id, rankByWeek.get(couple.elimination_week)!);
+  if (week) {
+    for (const e of input.entries) {
+      if (e.outcome === "eliminated" || e.outcome === "withdrawn") {
+        await admin
+          .from("couples")
+          .update({ status: e.outcome, elimination_week: week.week_number })
+          .eq("id", e.coupleId);
+      } else if (e.outcome === "winner" || e.outcome === "runner_up" || e.outcome === "third_place") {
+        await admin.from("couples").update({ status: e.outcome, elimination_week: null }).eq("id", e.coupleId);
       }
     }
-  }
 
-  for (const league of leagues ?? []) {
-    const [{ data: scoringSettings }, { data: rosterSlots }, { data: predictions }] = await Promise.all([
-      admin.from("scoring_settings").select("*").eq("league_id", league.id).single(),
-      admin
-        .from("roster_slots")
-        .select("manager_id, couple_id")
-        .eq("league_id", league.id)
-        .lte("start_week", input.weekNumber)
-        .or(`end_week.is.null,end_week.gte.${input.weekNumber}`),
-      admin
-        .from("predictions")
-        .select("manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
-        .eq("league_id", league.id)
-        .eq("episode_id", episode.id),
-    ]);
-
-    if (!scoringSettings || !rosterSlots) continue;
-
-    let grandFinalePointsByManager: Record<string, number> = {};
-    if (newlyResolvedCoupleIds.length > 0) {
-      const { data: grandFinalePredictions, error: gfpErr } = await admin
-        .from("grand_finale_predictions")
-        .select("manager_id, couple_id, predicted_position")
-        .eq("league_id", league.id)
-        .in("couple_id", newlyResolvedCoupleIds);
-      if (gfpErr) return { error: gfpErr.message };
-
-      grandFinalePointsByManager = computeGrandFinalePoints({
-        predictions: (grandFinalePredictions ?? []).map((p) => ({
-          managerId: p.manager_id,
-          coupleId: p.couple_id,
-          predictedPosition: p.predicted_position,
-        })),
-        resolvedCouples: newlyResolvedCoupleIds
-          .filter((id) => actualPositionByCouple.has(id))
-          .map((id) => ({ coupleId: id, actualPosition: actualPositionByCouple.get(id)! })),
-        totalCouples,
-        method: (scoringSettings.bonus_picks_scoring_method as GrandFinaleMethod) ?? "exact_position",
-        distancePenalty: scoringSettings.bonus_picks_distance_penalty,
-        tierSize: scoringSettings.bonus_picks_tier_size,
-        pointsPerCorrect: scoringSettings.bonus_picks_points_per_correct,
-      });
-    }
-
-    // A league's roster (and so its whole "Judges' Scores" category — dance
-    // score, survival, podium, and bonus points all bundled into
-    // rosterPoints below) doesn't start counting until the commissioner's
-    // chosen starting week: before that, nobody had actually drafted yet, so
-    // attributing any of it to a manager would be attributing it to a
-    // roster that didn't exist. Pick 'Em predictions and Grand Finale points
-    // are unaffected — those aren't roster-dependent.
-    const judgesScoreStarted = input.weekNumber >= scoringSettings.judges_score_starts_week;
-
-    const scores = computeWeeklyScores({
-      scoringSettings: {
-        judgesScoreMultiplier: scoringSettings.judges_score_multiplier,
-        survivalPoints: scoringSettings.survival_points,
-        eliminationPredictionPoints: scoringSettings.elimination_prediction_points,
-        topScorerPredictionPoints: scoringSettings.top_scorer_prediction_points,
-        firstPlacePoints: scoringSettings.first_place_points,
-        secondPlacePoints: scoringSettings.second_place_points,
-        thirdPlacePoints: scoringSettings.third_place_points,
-      },
-      rosterSlots: judgesScoreStarted
-        ? rosterSlots
-            .filter((r): r is { manager_id: string; couple_id: string } => r.couple_id !== null)
-            .map((r) => ({ managerId: r.manager_id, coupleId: r.couple_id }))
-        : [],
-      danceScores: danceScoreInputs.map((d) => ({ coupleId: d.coupleId, totalScore: d.totalScore })),
-      episodeOutcomes: episodeOutcomeInputs,
-      predictions: (predictions ?? []).map((p) => ({
-        managerId: p.manager_id,
-        predictedEliminatedCoupleId: p.predicted_eliminated_couple_id,
-        predictedEliminatedCoupleId2: p.predicted_eliminated_couple_id_2,
-        predictedTopScorerCoupleId: p.predicted_top_scorer_couple_id,
-      })),
-      isFinale: episode.is_finale,
-      isDoubleElimination: episode.is_double_elimination_week,
-      categoryWeights: {
-        judges: scoringSettings.judges_score_category_weight,
-        eliminations: scoringSettings.eliminations_category_weight,
-        bonus: scoringSettings.bonus_picks_category_weight,
-      },
-      grandFinalePointsByManager,
-    });
-
-    // Full replace, not partial upsert: a correction can drop a manager's
-    // points for this episode to nothing (computeWeeklyScores then returns
-    // no row for them at all), and an upsert would leave their prior-call
-    // row stale forever. Deleting first — before the scores.length === 0
-    // check below — makes that exact case (corrected results zeroing out a
-    // league's scores) actually clear, instead of skipping the delete
-    // whenever there's nothing left to upsert. Harmless no-op on a
-    // first-time publish, since there's nothing to delete yet.
-    await admin.from("weekly_manager_scores").delete().eq("league_id", league.id).eq("episode_id", episode.id);
-
-    if (scores.length === 0) continue;
-
-    const { error: upsertErr } = await admin.from("weekly_manager_scores").upsert(
-      scores.map((s) => ({
-        league_id: league.id,
-        manager_id: s.managerId,
-        episode_id: episode.id,
-        roster_points: s.rosterPoints,
-        prediction_points: s.predictionPoints,
-        grand_finale_points: s.grandFinalePoints,
-        total_points: s.totalPoints,
-      })),
-      { onConflict: "league_id,manager_id,episode_id" }
+    const departedIds = input.entries
+      .filter((e) => RESOLVING_OUTCOMES.has(e.outcome))
+      .map((e) => e.coupleId);
+    const pruneErr = await pruneDepartedCouplesFromFutureEpisodes(
+      admin,
+      seasonId,
+      week.week_number,
+      { id: episode.id, episodeNumber: episode.episode_number, weekId: week.id },
+      departedIds
     );
-    if (upsertErr) return { error: upsertErr.message };
+    if (pruneErr) return { error: pruneErr };
+
+    const { data: weekEpisodes, error: weekEpisodesErr } = await admin
+      .from("episodes")
+      .select("id")
+      .eq("week_id", week.id);
+    if (weekEpisodesErr) return { error: weekEpisodesErr.message };
+
+    const scoreErr = await recomputeWeekScores(
+      admin,
+      seasonId,
+      week,
+      (weekEpisodes ?? []).map((row) => row.id),
+      outcomeRows.map((r) => ({ couple_id: r.couple_id, outcome: r.outcome, bonus_points: r.bonus_points })),
+      episode.id
+    );
+    if (scoreErr) return { error: scoreErr };
   }
 
   return { error: null };
