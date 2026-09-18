@@ -21,10 +21,11 @@ import { LeagueTabs } from "@/components/league-tabs";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { getStandingMessage } from "@/lib/standings-message";
 import { getPickAssignment } from "@/lib/draft";
-import { computeCoupleWeeklyPoints, deriveCoupleWeeklyTag } from "@/lib/roster-weekly-points";
+import { clampRosterCoupleForWeek, computeCoupleWeeklyPoints } from "@/lib/roster-weekly-points";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
-import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
+import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
+import { partitionRecastSlots } from "@/lib/recast-framing";
 import {
   buildCurtainCallWeeks,
   buildPastPicksComparison,
@@ -176,6 +177,7 @@ export default async function LeaguePage({
   // per episode.
   const latestCompletedEpisodeId = cutoff.effectiveLatestEpisode?.id ?? null;
   const latestCompletedWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;
+  const finaleWeekNumber = finaleEpisode?.week_number ?? null;
   const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
 
   const previousPointsByManager = new Map<string, number>();
@@ -265,19 +267,24 @@ export default async function LeaguePage({
   }));
 
   const activeCouples = flatCouples.filter(
-    (c) => c.status === "active" && c.season_id === activeSeasonId
+    (c) =>
+      c.season_id === activeSeasonId &&
+      isSpoilerSafeActive(
+        { status: c.status, eliminationWeek: c.elimination_week },
+        latestCompletedWeek,
+        finaleWeekNumber
+      )
   );
   const seasonCouples = flatCouples.filter((c) => c.season_id === activeSeasonId);
-  // Grand Finale predictions show every season couple's current status
-  // (winner/eliminated/still competing) — this spoiler-clamped copy is what
-  // gets rendered there instead of seasonCouples itself, which stays true
-  // everywhere else it's used (draft, waivers, display-name building).
+  // Grand Finale needs every season couple (to rank them), with status
+  // spoiler-clamped. Pick 'Em / Recast availability use isSpoilerSafeActive
+  // so a revealed elim is gone and an unrevealed one still looks competing.
   const seasonCouplesSpoilerSafe = seasonCouples.map((c) => ({
     ...c,
     status: spoilerSafeCoupleStatus(
       { status: c.status, eliminationWeek: c.elimination_week },
-      cutoff.effectiveLatestEpisode?.week_number ?? null,
-      finaleEpisode?.week_number ?? null
+      latestCompletedWeek,
+      finaleWeekNumber
     ),
   }));
   // Historical lookups (roster, revealed predictions) span every couple this
@@ -407,49 +414,47 @@ export default async function LeaguePage({
 
   const rosterCouples = (rosterSlots ?? [])
     .filter((r) => r.couples)
-    .map((r) => ({
-      ...(allDisplayNames.get(r.couple_id!) ?? {
+    .map((r) => {
+      const names = allDisplayNames.get(r.couple_id!) ?? {
         celebrity: r.couples!.celebrity?.name ?? "Unknown",
         pro: r.couples!.pro?.name ?? "Unknown",
-      }),
-      coupleId: r.couple_id!,
-      // Deliberately the true status, not spoiler-clamped — this feeds
-      // openSlotCount/Recast below, which needs the real occupancy state to
-      // function (Recast framing is explicitly out of scope for v1 spoiler
-      // filtering). Only the displayed `tag` is clamped.
-      status: r.couples!.status,
-      weeklyPoints: computeCoupleWeeklyPoints(
-        weeklyScoreByCouple.get(r.couple_id!) ?? 0,
-        scoringSettings?.judges_score_multiplier ?? 1,
-        scoringSettings?.judges_score_category_weight ?? 1
-      ),
-      tag: deriveCoupleWeeklyTag(
-        spoilerSafeCoupleStatus(
-          { status: r.couples!.status, eliminationWeek: r.couples!.elimination_week },
-          cutoff.effectiveLatestEpisode?.week_number ?? null,
-          finaleEpisode?.week_number ?? null
-        )
-      ),
-    }));
+      };
+      const clamped = clampRosterCoupleForWeek(
+        { status: r.couples!.status, eliminationWeek: r.couples!.elimination_week },
+        {
+          cutoffWeek: latestCompletedWeek,
+          finaleWeekNumber,
+          weekNumber: latestCompletedWeek,
+          rawWeeklyPoints: computeCoupleWeeklyPoints(
+            weeklyScoreByCouple.get(r.couple_id!) ?? 0,
+            scoringSettings?.judges_score_multiplier ?? 1,
+            scoringSettings?.judges_score_category_weight ?? 1
+          ),
+        }
+      );
+      return { ...names, coupleId: r.couple_id!, ...clamped };
+    });
 
-  const openSlotCount = rosterCouples.filter(
-    (c) => c.status === "eliminated" || c.status === "withdrawn"
-  ).length;
+  const recastSlotSource = (rosterSlots ?? [])
+    .filter((s) => s.couples)
+    .map((s) => ({
+      slotNumber: s.slot_number,
+      coupleId: s.couple_id!,
+      celebrity: s.couples!.celebrity?.name ?? "Unknown",
+      pro: s.couples!.pro?.name ?? "Unknown",
+      status: s.couples!.status,
+      eliminationWeek: s.couples!.elimination_week,
+    }));
+  const { revealedOpen: revealedRecastSlots, hiddenOpenCount: hiddenRecastOpenCount } =
+    partitionRecastSlots(recastSlotSource, latestCompletedWeek, finaleWeekNumber);
 
   let recastOpenSlots: { slotNumber: number; formerCoupleName: string }[] = [];
   let recastAvailableCouples: { id: string; celebrity_name: string; pro_name: string }[] = [];
-  if (danceCardOn && waiversOn && openSlotCount > 0) {
-    recastOpenSlots = (rosterSlots ?? [])
-      .filter((s) => s.couples?.status === "eliminated" || s.couples?.status === "withdrawn")
-      .map((s) => ({
-        slotNumber: s.slot_number,
-        formerCoupleName: formatCoupleName(
-          allDisplayNames.get(s.couple_id!) ?? {
-            celebrity: s.couples!.celebrity?.name ?? "Unknown",
-            pro: s.couples!.pro?.name ?? "Unknown",
-          }
-        ),
-      }));
+  if (danceCardOn && waiversOn && revealedRecastSlots.length > 0) {
+    recastOpenSlots = revealedRecastSlots.map((s) => ({
+      slotNumber: s.slotNumber,
+      formerCoupleName: formatCoupleName(allDisplayNames.get(s.coupleId) ?? { celebrity: s.celebrity, pro: s.pro }),
+    }));
 
     const { data: leagueRosteredSlots } = await supabase
       .from("roster_slots")
@@ -655,6 +660,8 @@ export default async function LeaguePage({
                   <RecastNudgeCard
                     leagueId={id}
                     openSlots={recastOpenSlots}
+                    hiddenOpenSlotCount={hiddenRecastOpenCount}
+                    pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
                     availableCouples={recastAvailableCouples}
                     coupleDisplayNames={Object.fromEntries(allDisplayNames)}
                     claimMethod={league.waiver_claim_method}

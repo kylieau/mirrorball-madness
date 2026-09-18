@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName, coupleNameNode } from "@/components/couple-name";
+import { RecastCatchUpCard } from "@/components/recast-catch-up-card";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type OpenSlot = { slotNumber: number; formerCoupleName: string };
@@ -44,6 +45,8 @@ export function WaiversPanel({
   claimMethod,
   isCommissioner,
   openSlots,
+  hiddenOpenSlotCount = 0,
+  pendingRevealWeek = null,
   availableCouples,
   coupleDisplayNames,
   claims,
@@ -53,6 +56,8 @@ export function WaiversPanel({
   claimMethod: string;
   isCommissioner: boolean;
   openSlots: OpenSlot[];
+  hiddenOpenSlotCount?: number;
+  pendingRevealWeek?: number | null;
   availableCouples: Couple[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
   claims: Claim[];
@@ -120,6 +125,10 @@ export function WaiversPanel({
         {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
         {message && <p className="mt-2 text-sm text-muted-foreground">{message}</p>}
       </div>
+
+      {hiddenOpenSlotCount > 0 && openSlots.length === 0 && (
+        <RecastCatchUpCard pendingRevealWeek={pendingRevealWeek} />
+      )}
 
       {openSlots.length > 0 && (
         <Card>

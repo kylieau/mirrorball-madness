@@ -3,6 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { WaiversPanel } from "@/components/waivers-panel";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
+import { getAccountSettingsData } from "@/lib/account-settings-data";
+import { partitionRecastSlots } from "@/lib/recast-framing";
+import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { isSpoilerSafeActive } from "@/lib/spoiler-safe-couple-status";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { XIcon } from "lucide-react";
 
@@ -82,51 +86,98 @@ export default async function WaiversPage({
   }
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
+  const accountSettingsData = await getAccountSettingsData(supabase, user.id);
 
   const coupleFields =
-    "id, status, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)";
+    "id, status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)";
 
-  const [{ data: myRosterSlots }, { data: allCouplesRaw }, { data: rosteredSlots }, { data: claims }] =
-    await Promise.all([
-      supabase
-        .from("roster_slots")
-        .select(`slot_number, couples(${coupleFields})`)
-        .eq("league_id", id)
-        .eq("manager_id", user.id)
-        .is("end_week", null),
-      supabase.from("couples").select(coupleFields).eq("season_id", activeSeasonId ?? ""),
-      supabase.from("roster_slots").select("couple_id").eq("league_id", id).is("end_week", null),
-      supabase
-        .from("waiver_claims")
-        .select(`*, profiles(display_name), couples(${coupleFields})`)
-        .eq("league_id", id)
-        .order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: myRosterSlots },
+    { data: allCouplesRaw },
+    { data: rosteredSlots },
+    { data: claims },
+    { data: completedEpisodes },
+    { data: finaleEpisode },
+  ] = await Promise.all([
+    supabase
+      .from("roster_slots")
+      .select(`slot_number, couples(${coupleFields})`)
+      .eq("league_id", id)
+      .eq("manager_id", user.id)
+      .is("end_week", null),
+    supabase.from("couples").select(coupleFields).eq("season_id", activeSeasonId ?? ""),
+    supabase.from("roster_slots").select("couple_id").eq("league_id", id).is("end_week", null),
+    supabase
+      .from("waiver_claims")
+      .select(`*, profiles(display_name), couples(${coupleFields})`)
+      .eq("league_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("episodes")
+      .select("id, week_number")
+      .eq("season_id", activeSeasonId ?? "")
+      .eq("status", "completed")
+      .order("week_number", { ascending: false }),
+    supabase
+      .from("episodes")
+      .select("week_number")
+      .eq("season_id", activeSeasonId ?? "")
+      .eq("is_finale", true)
+      .maybeSingle(),
+  ]);
+
+  const cutoff = await resolveSpoilerCutoff(
+    supabase,
+    user.id,
+    activeSeasonId ?? null,
+    accountSettingsData.spoilerFreeMode,
+    completedEpisodes ?? []
+  );
+  const cutoffWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;
+  const finaleWeekNumber = finaleEpisode?.week_number ?? null;
 
   const allCouples = (allCouplesRaw ?? []).map((c) => ({
     id: c.id,
     status: c.status,
+    elimination_week: c.elimination_week,
     celebrity_name: c.celebrity?.name ?? "Unknown",
     pro_name: c.pro?.name ?? "Unknown",
   }));
 
   const displayNames = buildCoupleDisplayNames(allCouples);
 
-  const openSlots = (myRosterSlots ?? [])
-    .filter((s) => s.couples?.status === "eliminated" || s.couples?.status === "withdrawn")
-    .map((s) => ({
-      slotNumber: s.slot_number,
-      formerCoupleName: formatCoupleName(
-        displayNames.get(s.couples!.id) ?? {
-          celebrity: s.couples!.celebrity?.name ?? "Unknown",
-          pro: s.couples!.pro?.name ?? "Unknown",
-        }
-      ),
-    }));
+  const { revealedOpen, hiddenOpenCount } = partitionRecastSlots(
+    (myRosterSlots ?? [])
+      .filter((s) => s.couples)
+      .map((s) => ({
+        slotNumber: s.slot_number,
+        status: s.couples!.status,
+        eliminationWeek: s.couples!.elimination_week,
+        celebrity: s.couples!.celebrity?.name ?? "Unknown",
+        pro: s.couples!.pro?.name ?? "Unknown",
+        coupleId: s.couples!.id,
+      })),
+    cutoffWeek,
+    finaleWeekNumber
+  );
+
+  const openSlots = revealedOpen.map((s) => ({
+    slotNumber: s.slotNumber,
+    formerCoupleName: formatCoupleName(
+      displayNames.get(s.coupleId) ?? { celebrity: s.celebrity, pro: s.pro }
+    ),
+  }));
 
   const rosteredCoupleIds = new Set((rosteredSlots ?? []).map((s) => s.couple_id));
   const availableCouples = allCouples
-    .filter((c) => c.status === "active" && !rosteredCoupleIds.has(c.id))
+    .filter(
+      (c) =>
+        isSpoilerSafeActive(
+          { status: c.status, eliminationWeek: c.elimination_week },
+          cutoffWeek,
+          finaleWeekNumber
+        ) && !rosteredCoupleIds.has(c.id)
+    )
     .sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
 
   return (
@@ -136,6 +187,8 @@ export default async function WaiversPage({
       claimMethod={league.waiver_claim_method!}
       isCommissioner={membership?.role === "commissioner"}
       openSlots={openSlots}
+      hiddenOpenSlotCount={hiddenOpenCount}
+      pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
       availableCouples={availableCouples}
       coupleDisplayNames={Object.fromEntries(displayNames)}
       claims={(claims ?? []).map((c) => ({

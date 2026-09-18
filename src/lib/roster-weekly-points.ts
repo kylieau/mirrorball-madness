@@ -1,3 +1,7 @@
+import { wasInCastForWeek } from "./episode-cast";
+import { isOpenRosterStatus } from "./recast-framing";
+import { spoilerSafeCoupleStatus } from "./spoiler-safe-couple-status";
+
 export type RosterWeeklyTag = "eliminated" | "safe";
 
 // Mirrors how a couple's raw judges' score becomes "points" everywhere else
@@ -21,4 +25,33 @@ export function computeCoupleWeeklyPoints(
 export function deriveCoupleWeeklyTag(coupleStatus: string): RosterWeeklyTag {
   if (coupleStatus === "eliminated" || coupleStatus === "withdrawn") return "eliminated";
   return "safe";
+}
+
+// Fan roster "this wk" line: spoiler-clamp the tag first, then week-aware
+// points once the elim is revealed — same rule as admin episode-cast so a
+// couple gone before this week cannot keep scoring as if they danced.
+export function clampRosterCoupleForWeek(
+  couple: { status: string; eliminationWeek: number | null },
+  opts: {
+    cutoffWeek: number | null;
+    finaleWeekNumber: number | null;
+    weekNumber: number | null;
+    rawWeeklyPoints: number;
+  }
+): { tag: RosterWeeklyTag; weeklyPoints: number } {
+  const displayStatus = spoilerSafeCoupleStatus(couple, opts.cutoffWeek, opts.finaleWeekNumber);
+  const tag = deriveCoupleWeeklyTag(displayStatus);
+
+  if (
+    isOpenRosterStatus(displayStatus) &&
+    opts.weekNumber != null &&
+    !wasInCastForWeek(
+      { status: couple.status, elimination_week: couple.eliminationWeek },
+      opts.weekNumber
+    )
+  ) {
+    return { tag, weeklyPoints: 0 };
+  }
+
+  return { tag, weeklyPoints: opts.rawWeeklyPoints };
 }
