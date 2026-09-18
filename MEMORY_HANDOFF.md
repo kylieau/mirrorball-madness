@@ -10,7 +10,7 @@ Owner must paste-run `supabase/apply-s35-premiere-fold.sql` in the Supabase SQL 
 
 - Fan labels: `formatEpisodeCasual` / `Short` / `WithTheme` now say `Week N` / `Week N — {theme}`. Admin `formatEpisodeLabel` stays `S35 E02`.
 - `episodes.is_scoring` (default true) = competition week. Exhibition/interview nights are omitted from Results and Picks carousels. Admin Schedule has a Competition week checkbox.
-- S35 one-shot SQL folds premiere night 1+2 into week 1 with theme `Premiere: Nights One & Two`, deletes unused interview night (or parks at week_number 0), remaps week ints, RAISE NOTICE before/after.
+- S35 one-shot SQL folds premiere night 1+2 into week 1 (does not rewrite theme — owner sets that in admin), deletes unused interview night (or parks at week_number 0), remaps week ints, RAISE NOTICE before/after.
 - Fan Results Eliminated banner stacks each couple on its own line when a week has 2+ elims.
 
 ## 3. Key Decisions & Lessons Learned
@@ -18,7 +18,7 @@ Owner must paste-run `supabase/apply-s35-premiere-fold.sql` in the Supabase SQL 
 - Did not reintroduce `week_part`. Split broadcasts fold into one `week_number`.
 - No product flag for “scoring starts at week 2”.
 - Interview night: delete if unused (no dances/results); otherwise `is_scoring=false` and `week_number=0` so it does not consume 1..N.
-- Folded premiere `airs_at` = earlier night; theme = `Premiere: Nights One & Two`; `episode_participants` cleared (full cast).
+- Folded premiere `airs_at` = earlier night; theme is left as-is for the owner to set in admin; `episode_participants` cleared (full cast).
 - Finale (document only): two true fantasy rounds in one calendar week → two week_numbers; two elims in one round → one week + existing double-elim flags.
 
 ## 4. Backlog & Deferred Items

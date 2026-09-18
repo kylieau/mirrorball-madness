@@ -12,7 +12,7 @@
 --   Scores for deleted episode ids only are reassigned or removed as needed.
 --
 -- Choices:
---   Theme on the folded premiere: 'Premiere: Nights One & Two'.
+--   Theme: this script does not rewrite it — owner sets week-1 copy in admin.
 --   airs_at: the earlier night (night 1).
 --   episode_participants: cleared after merge (full cast = unrestricted).
 --
@@ -195,7 +195,6 @@ begin
 
       update public.episodes
       set
-        theme = 'Premiere: Nights One & Two',
         airs_at = least(v_night1.airs_at, v_night2.airs_at),
         expected_dance_count = greatest(v_night1.expected_dance_count, v_night2.expected_dance_count, 1),
         is_elimination_week = v_night1.is_elimination_week or v_night2.is_elimination_week,
