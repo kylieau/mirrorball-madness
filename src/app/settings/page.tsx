@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ChevronRightIcon, XIcon } from "lucide-react";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
+import { SiteAdminNav } from "@/components/site-admin-nav";
 import { ADD_TO_HOME_SCREEN_COPY } from "@/lib/add-to-home-screen";
 
 const LINKED_ROWS: { label: string; href: string; hint?: string }[] = [
@@ -88,16 +89,7 @@ export default async function SettingsPage({
           </CardContent>
         </Card>
 
-        {profile?.is_super_admin && (
-          <Link href="/admin/results">
-            <Card className="transition-colors hover:bg-muted">
-              <CardContent className="flex items-center justify-between py-4">
-                <span className="text-sm font-medium">Site Admin</span>
-                <ChevronRightIcon className="size-4 text-muted-foreground" />
-              </CardContent>
-            </Card>
-          </Link>
-        )}
+        {profile?.is_super_admin && <SiteAdminNav />}
 
         <form action={signOut}>
           <Button type="submit" variant="outline" className="w-full">

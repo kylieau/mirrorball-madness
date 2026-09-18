@@ -29,7 +29,9 @@ create table profiles (
   -- since they're woven into other members' shared league history — so there's
   -- no safe automatic cascade to actually erase auth.users/profiles today.
   -- This column is just the in-app "yes, I asked to be deleted" record Apple's
-  -- App Store review requires (5.1.1(v)); an operator processes it by hand.
+  -- App Store review requires (5.1.1(v)). Super-admins review the queue at
+  -- /admin/accounts (or supabase/queries/pending-account-deletions.sql).
+  -- There is still no safe automatic cascade to erase auth.users/profiles.
   deletion_requested_at timestamptz,
   -- Spoiler-Free Mode: hides episode results app-wide until the viewer marks
   -- that episode as watched (see spoiler_watch_progress below). Same trust
