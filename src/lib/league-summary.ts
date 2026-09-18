@@ -1,14 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { formatCountdown } from "@/lib/format-countdown";
-import { getRankBadge, NEUTRAL_BADGE } from "@/lib/rank-badge";
 
 export type LeagueSummary = {
   id: string;
   name: string;
   needsAttention: boolean;
   statusText: string;
-  rankBadge: string;
 };
 
 // Used by /notifications for its "needs attention" signal. /today has its
@@ -20,15 +18,11 @@ export async function computeLeagueSummary(
   league: { id: string; name: string },
   upcomingEpisode: { id: string; week_number: number } | null
 ): Promise<LeagueSummary> {
-  const [{ data: scoringSettings }, { data: members }, { data: scores }] = await Promise.all([
-    supabase
-      .from("scoring_settings")
-      .select("eliminations_category_enabled, bonus_picks_category_enabled")
-      .eq("league_id", league.id)
-      .single(),
-    supabase.from("league_members").select("user_id").eq("league_id", league.id),
-    supabase.from("weekly_manager_scores").select("manager_id, total_points").eq("league_id", league.id),
-  ]);
+  const { data: scoringSettings } = await supabase
+    .from("scoring_settings")
+    .select("eliminations_category_enabled, bonus_picks_category_enabled")
+    .eq("league_id", league.id)
+    .single();
 
   const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
   const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
@@ -89,13 +83,5 @@ export async function computeLeagueSummary(
     statusText = `${needed.join(" & ")} picks needed`;
   }
 
-  const pointsByManager = new Map<string, number>();
-  for (const row of scores ?? []) {
-    pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
-  }
-  const allPoints = (members ?? []).map((m) => pointsByManager.get(m.user_id) ?? 0);
-  const userPoints = pointsByManager.get(userId) ?? 0;
-  const rankBadge = (scores ?? []).length === 0 ? NEUTRAL_BADGE : getRankBadge(userPoints, allPoints);
-
-  return { id: league.id, name: league.name, needsAttention, statusText, rankBadge };
+  return { id: league.id, name: league.name, needsAttention, statusText };
 }
