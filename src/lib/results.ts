@@ -259,15 +259,15 @@ async function recomputeWeekScores(
     totalScore: Number(row.total_score),
   }));
   const otherOutcomes = (allOutcomes ?? []).filter((row) => row.episode_id !== thisEpisodeId);
-  const episodeOutcomeInputs = [
+  const episodeOutcomeInputs: { coupleId: string; outcome: Outcome; bonusPoints: number }[] = [
     ...otherOutcomes.map((row) => ({
       coupleId: row.couple_id,
-      outcome: row.outcome,
+      outcome: row.outcome as Outcome,
       bonusPoints: Number(row.bonus_points),
     })),
     ...thisEpisodeOutcomeRows.map((row) => ({
       coupleId: row.couple_id,
-      outcome: row.outcome,
+      outcome: row.outcome as Outcome,
       bonusPoints: row.bonus_points,
     })),
   ];

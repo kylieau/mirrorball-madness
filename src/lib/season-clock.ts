@@ -41,7 +41,7 @@ export function shouldShowAnchorSyncControl(
 
 export function formatLockWithEpisode(
   weekNumber: number,
-  seasonNumber: number | null,
+  _seasonNumber: number | null,
   formattedDeadline: string,
   hasAirsAt: boolean
 ): string {
@@ -54,7 +54,6 @@ export function formatLockWithEpisode(
 export function explainSeasonClock({
   anchorWeek,
   lockWeek,
-  seasonNumber,
   danceCardEnabled,
   draftStatus,
 }: {
@@ -85,7 +84,6 @@ export function explainSeasonClock({
 export function explainGrandFinaleDeadline({
   anchorWeek,
   lockWeek,
-  seasonNumber,
 }: {
   anchorWeek: number;
   lockWeek: number;

@@ -334,7 +334,9 @@ export function ScheduleManager({
     return draftsByEpisode[episodeId]?.entries.length ?? 0;
   }
 
-  function EpisodeRow({ e }: { e: Episode }) {
+  function EpisodeRow({ episodeId }: { episodeId: string }) {
+    const e = episodes.find((episode) => episode.id === episodeId);
+    if (!e) return null;
     const status = deriveResultsStatus(
       { results_published_at: e.results_published_at },
       !!draftsByEpisode[e.id]?.hasDraft
@@ -393,7 +395,7 @@ export function ScheduleManager({
                     {week.nightsLabel ? ` · ${week.nightsLabel}` : ""}
                   </div>
                   {week.episodes.map((e) => (
-                    <EpisodeRow key={e.id} e={e} />
+                    <EpisodeRow key={e.id} episodeId={e.id} />
                   ))}
                 </div>
               ))}
@@ -403,7 +405,7 @@ export function ScheduleManager({
                     Exhibition
                   </div>
                   {exhibition.map((e) => (
-                    <EpisodeRow key={e.id} e={e} />
+                    <EpisodeRow key={e.id} episodeId={e.id} />
                   ))}
                 </div>
               )}
