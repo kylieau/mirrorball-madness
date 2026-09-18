@@ -38,7 +38,8 @@ Implemented on the league **Picks** tab (`?tab=yourpicks`), inside the single Cu
 - Spoiler-Free: outcomes only for weeks in `resolveSpoilerCutoff` / `allowedEpisodeIds`. Unwatched completed weeks are selectable but locked (“Mark as watched to see how you did”) — no results leak.
 - v1 is **your** history only. Hidden when Curtain Call is off.
 
-Out of scope (still): spectator role, league-wide miss-rate board, bottom-two / “almost had it”.
+Out of scope (still): league-wide miss-rate board, bottom-two / “almost had it”.
+Spectator role: won’t do / no longer needed.
 
 ## Account deletion processing
 
