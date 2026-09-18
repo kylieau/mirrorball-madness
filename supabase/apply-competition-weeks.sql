@@ -24,6 +24,14 @@
 
 begin;
 
+-- CREATE OR REPLACE cannot rename p_episode_id → p_week_id (42P13). The
+-- predictions RLS policy depends on prediction_lock_at (2BP01), so drop
+-- the policy first. Single-line so a statement splitter cannot run the
+-- DROP FUNCTION while the policy still exists.
+drop policy if exists "predictions visible to owner pre-lock, league post-lock" on public.predictions;
+drop function if exists public.prediction_lock_at(uuid, uuid);
+drop function if exists public.submit_prediction(uuid, uuid, uuid, uuid, uuid);
+
 -- ---------------------------------------------------------------------------
 -- 1. Schema
 -- ---------------------------------------------------------------------------
@@ -461,15 +469,12 @@ begin
   end if;
 end $$;
 
--- CREATE OR REPLACE cannot rename input args (42P13). Drop the episode-id
--- overloads first. The RLS policy references prediction_lock_at, so drop
--- that policy before the function.
-drop policy if exists "predictions visible to owner pre-lock, league post-lock"
-  on public.predictions;
+-- Same trio as after BEGIN (IF EXISTS). Policy drop stays on one line.
+drop policy if exists "predictions visible to owner pre-lock, league post-lock" on public.predictions;
 drop function if exists public.prediction_lock_at(uuid, uuid);
 drop function if exists public.submit_prediction(uuid, uuid, uuid, uuid, uuid);
 
-create function public.prediction_lock_at(p_league_id uuid, p_week_id uuid)
+create or replace function public.prediction_lock_at(p_league_id uuid, p_week_id uuid)
 returns timestamptz
 language sql
 security definer
