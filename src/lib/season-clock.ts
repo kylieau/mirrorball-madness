@@ -1,4 +1,4 @@
-import { formatEpisodeLabel } from "./format-week";
+import { formatEpisodeCasual } from "./format-week";
 
 export type SeasonClockEpisode = {
   week_number: number;
@@ -45,7 +45,7 @@ export function formatLockWithEpisode(
   formattedDeadline: string,
   hasAirsAt: boolean
 ): string {
-  const label = formatEpisodeLabel(weekNumber, seasonNumber);
+  const label = formatEpisodeCasual(weekNumber);
   if (!hasAirsAt) return `${label} (not yet scheduled)`;
   if (!formattedDeadline) return label;
   return `${label} · ${formattedDeadline}`;
@@ -64,11 +64,11 @@ export function explainSeasonClock({
   danceCardEnabled: boolean;
   draftStatus: string;
 }): string {
-  const anchor = formatEpisodeLabel(anchorWeek, seasonNumber);
-  const lock = formatEpisodeLabel(lockWeek, seasonNumber);
+  const anchor = formatEpisodeCasual(anchorWeek);
+  const lock = formatEpisodeCasual(lockWeek);
 
   if (lockWeek !== anchorWeek) {
-    return `The draft is still open, so the lock has moved from ${anchor} to ${lock} — the next unaired episode. It freezes there once the draft wraps. Judges' Score still starts counting from ${anchor} until then.`;
+    return `The draft is still open, so the lock has moved from ${anchor} to ${lock} — the next unaired week. It freezes there once the draft wraps. Judges' Score still starts counting from ${anchor} until then.`;
   }
 
   if (!danceCardEnabled) {
@@ -78,8 +78,8 @@ export function explainSeasonClock({
   const draftNote =
     draftStatus === "completed"
       ? ""
-      : " The draft is expected to finish by then but isn't hard-blocked — if it's still open when this episode airs, the deadline pushes to the next one automatically until the draft wraps.";
-  return `Judges' Score starts counting from ${anchor}, and Grand Finale locks the moment this episode airs.${draftNote}`;
+      : " The draft is expected to finish by then but isn't hard-blocked — if it's still open when this week airs, the deadline pushes to the next one automatically until the draft wraps.";
+  return `Judges' Score starts counting from ${anchor}, and Grand Finale locks the moment this week airs.${draftNote}`;
 }
 
 export function explainGrandFinaleDeadline({
@@ -91,7 +91,7 @@ export function explainGrandFinaleDeadline({
   lockWeek: number;
   seasonNumber: number | null;
 }): string {
-  const lock = formatEpisodeLabel(lockWeek, seasonNumber);
+  const lock = formatEpisodeCasual(lockWeek);
   if (lockWeek !== anchorWeek) {
     return `Locks at ${lock} (the draft is still open, so this has pushed past the Season Clock anchor) — nothing to set here.`;
   }

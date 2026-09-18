@@ -20,24 +20,32 @@ import {
   RESULTS_STATUS_BADGE_LABEL,
 } from "@/lib/results-status";
 import type { DraftState } from "@/lib/results-draft";
-import { formatEpisodeLabel } from "@/lib/format-week";
+import { formatEpisodeCasualWithTheme, formatEpisodeLabel } from "@/lib/format-week";
 import {
   defaultCheckedParticipantIds,
   isFullSelectableCast,
   participantIdsToPersist,
   selectableCast,
 } from "@/lib/episode-cast";
+import { exhibitionEpisodes, groupEpisodesByWeek } from "@/lib/competition-week";
 import { ChevronRightIcon, PlusIcon } from "lucide-react";
 
 type Episode = {
   id: string;
-  week_number: number;
+  episode_number: number;
+  week_id: string | null;
   airs_at: string;
+  theme: string | null;
+  results_published_at: string | null;
+  status: string;
+};
+type CompetitionWeek = {
+  id: string;
+  week_number: number;
   theme: string | null;
   is_elimination_week: boolean;
   is_finale: boolean;
   is_double_elimination_week: boolean;
-  results_published_at: string | null;
 };
 type EpisodeResult = { episode_id: string; couple_id: string };
 type Couple = {
@@ -139,6 +147,7 @@ function SeasonSettingsCard({ season }: { season: Season }) {
 
 export function ScheduleManager({
   episodes,
+  weeks,
   episodeResults,
   draftsByEpisode,
   season,
@@ -146,21 +155,31 @@ export function ScheduleManager({
   participantsByEpisode,
 }: {
   episodes: Episode[];
+  weeks: CompetitionWeek[];
   episodeResults: EpisodeResult[];
   draftsByEpisode: Record<string, DraftState>;
   season: Season;
   seasonCouples: Couple[];
   participantsByEpisode: Record<string, string[]>;
 }) {
-  const sortedEpisodes = [...episodes].sort((a, b) => a.week_number - b.week_number);
+  const sortedEpisodes = [...episodes].sort(
+    (a, b) => a.episode_number - b.episode_number || a.airs_at.localeCompare(b.airs_at)
+  );
+  const groupedWeeks = groupEpisodesByWeek(weeks, episodes);
+  const exhibition = exhibitionEpisodes(episodes);
+  const weekById = new Map(weeks.map((week) => [week.id, week]));
   const browserTimeZone = useBrowserTimeZone();
+
+  const nextEpisodeNumber =
+    sortedEpisodes.length > 0 ? Math.max(...sortedEpisodes.map((e) => e.episode_number)) + 1 : 1;
+  const nextWeekNumber = weeks.length > 0 ? Math.max(...weeks.map((week) => week.week_number)) + 1 : 1;
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingPublished, setEditingPublished] = useState(false);
-  const [weekNumber, setWeekNumber] = useState(
-    sortedEpisodes.length > 0 ? sortedEpisodes[sortedEpisodes.length - 1].week_number + 1 : 1
-  );
+  const [episodeNumber, setEpisodeNumber] = useState(nextEpisodeNumber);
+  const [competitionWeek, setCompetitionWeek] = useState(String(nextWeekNumber));
+  const [weekTheme, setWeekTheme] = useState("");
   const [airsAt, setAirsAt] = useState("");
   const [theme, setTheme] = useState("");
   const [isEliminationWeek, setIsEliminationWeek] = useState(true);
@@ -168,7 +187,13 @@ export function ScheduleManager({
   const [isDoubleEliminationWeek, setIsDoubleEliminationWeek] = useState(false);
   const [participantCoupleIds, setParticipantCoupleIds] = useState<Set<string>>(new Set());
 
-  const selectableCouples = selectableCast(seasonCouples, weekNumber, { published: editingPublished });
+  const parsedWeekNumber = competitionWeek.trim() === "" ? null : Number(competitionWeek);
+  const assignedWeek =
+    parsedWeekNumber != null && Number.isInteger(parsedWeekNumber)
+      ? (weeks.find((week) => week.week_number === parsedWeekNumber) ?? null)
+      : null;
+  const castWeek = parsedWeekNumber ?? episodeNumber;
+  const selectableCouples = selectableCast(seasonCouples, castWeek, { published: editingPublished });
   const selectableIds = selectableCouples.map((c) => c.id);
   const allSelectableChecked = isFullSelectableCast(
     selectableIds.filter((id) => participantCoupleIds.has(id)),
@@ -196,6 +221,16 @@ export function ScheduleManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function applyExistingWeekFlags(weekNumber: number | null) {
+    if (weekNumber == null) return;
+    const existing = weeks.find((week) => week.week_number === weekNumber);
+    if (!existing) return;
+    setWeekTheme(existing.theme ?? "");
+    setIsEliminationWeek(existing.is_elimination_week);
+    setIsFinale(existing.is_finale);
+    setIsDoubleEliminationWeek(existing.is_double_elimination_week);
+  }
+
   function openAddEpisode() {
     setError(null);
     resetForm();
@@ -207,13 +242,18 @@ export function ScheduleManager({
     setEditingId(e.id);
     const published = e.results_published_at != null;
     setEditingPublished(published);
-    setWeekNumber(e.week_number);
+    setEpisodeNumber(e.episode_number);
+    const week = e.week_id ? weekById.get(e.week_id) : undefined;
+    setCompetitionWeek(week ? String(week.week_number) : "");
+    setWeekTheme(week?.theme ?? "");
     setAirsAt(utcIsoToLocalInput(e.airs_at));
     setTheme(e.theme ?? "");
-    setIsEliminationWeek(e.is_elimination_week);
-    setIsFinale(e.is_finale);
-    setIsDoubleEliminationWeek(e.is_double_elimination_week);
-    const selectable = selectableCast(seasonCouples, e.week_number, { published }).map((c) => c.id);
+    setIsEliminationWeek(week?.is_elimination_week ?? true);
+    setIsFinale(week?.is_finale ?? false);
+    setIsDoubleEliminationWeek(week?.is_double_elimination_week ?? false);
+    const selectable = selectableCast(seasonCouples, week?.week_number ?? e.episode_number, {
+      published,
+    }).map((c) => c.id);
     setParticipantCoupleIds(new Set(defaultCheckedParticipantIds(participantsByEpisode[e.id], selectable)));
     setSheetOpen(true);
   }
@@ -221,16 +261,16 @@ export function ScheduleManager({
   function resetForm() {
     setEditingId(null);
     setEditingPublished(false);
-    const nextWeek =
-      sortedEpisodes.length > 0 ? sortedEpisodes[sortedEpisodes.length - 1].week_number + 1 : 1;
-    setWeekNumber(nextWeek);
+    setEpisodeNumber(nextEpisodeNumber);
+    setCompetitionWeek(String(nextWeekNumber));
+    setWeekTheme("");
     setAirsAt(defaultAirDate());
     setTheme("");
     setIsEliminationWeek(true);
     setIsFinale(false);
     setIsDoubleEliminationWeek(false);
     setParticipantCoupleIds(
-      new Set(selectableCast(seasonCouples, nextWeek, { published: false }).map((c) => c.id))
+      new Set(selectableCast(seasonCouples, nextWeekNumber, { published: false }).map((c) => c.id))
     );
   }
 
@@ -250,6 +290,17 @@ export function ScheduleManager({
       setError("Enter a valid air date.");
       return;
     }
+    if (!Number.isInteger(episodeNumber) || episodeNumber < 1) {
+      setError("Episode number must be a positive integer.");
+      return;
+    }
+    if (
+      competitionWeek.trim() !== "" &&
+      (!Number.isInteger(parsedWeekNumber) || (parsedWeekNumber ?? 0) < 1)
+    ) {
+      setError("Competition week must be a positive integer, or blank for exhibition.");
+      return;
+    }
 
     setSubmitting(true);
     // Sending every selectable couple back as "participants" is
@@ -257,12 +308,15 @@ export function ScheduleManager({
     // treats an empty list as unrestricted) — but sending [] keeps
     // ordinary weeks writing zero episode_participants rows.
     const result = await scheduleEpisode({
-      weekNumber,
+      episodeId: editingId,
+      episodeNumber,
+      competitionWeekNumber: parsedWeekNumber,
+      weekTheme: weekTheme.trim() || null,
       airsAt: airsAtUtc,
       theme: theme.trim() || null,
-      isEliminationWeek,
-      isFinale,
-      isDoubleEliminationWeek,
+      isEliminationWeek: parsedWeekNumber != null ? isEliminationWeek : false,
+      isFinale: parsedWeekNumber != null ? isFinale : false,
+      isDoubleEliminationWeek: parsedWeekNumber != null ? isDoubleEliminationWeek : false,
       participantCoupleIds: participantIdsToPersist(participantCoupleIds, selectableIds),
     });
     if (result.error) {
@@ -280,13 +334,48 @@ export function ScheduleManager({
     return draftsByEpisode[episodeId]?.entries.length ?? 0;
   }
 
+  function EpisodeRow({ e }: { e: Episode }) {
+    const status = deriveResultsStatus(
+      { results_published_at: e.results_published_at },
+      !!draftsByEpisode[e.id]?.hasDraft
+    );
+    const count = coupleCount(e.id);
+    return (
+      <button
+        onClick={() => openEditEpisode(e)}
+        className="flex w-full items-center justify-between gap-3 border-b border-border p-4 text-left last:border-b-0 hover:bg-accent/50"
+      >
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <p className="font-medium">
+              {formatEpisodeLabel(e.episode_number, season?.season_number ?? null)}
+              {e.theme ? ` — ${e.theme}` : ""}
+            </p>
+            <Badge variant={RESULTS_STATUS_BADGE_VARIANT[status]}>
+              {RESULTS_STATUS_BADGE_LABEL[status]}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {new Date(e.airs_at).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+            {count > 0 && ` · ${count} couple${count === 1 ? "" : "s"} scored`}
+          </p>
+        </div>
+        <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <SeasonSettingsCard season={season} />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Scheduled Episodes</CardTitle>
+          <CardTitle>Schedule</CardTitle>
           <Button size="sm" onClick={openAddEpisode}>
             <PlusIcon className="size-4" />
             Add Episode
@@ -296,41 +385,29 @@ export function ScheduleManager({
           {sortedEpisodes.length === 0 ? (
             <p className="p-4 text-sm text-muted-foreground">Nothing scheduled yet.</p>
           ) : (
-            sortedEpisodes.map((e) => {
-              const status = deriveResultsStatus(
-                { results_published_at: e.results_published_at },
-                !!draftsByEpisode[e.id]?.hasDraft
-              );
-              const count = coupleCount(e.id);
-              return (
-                <button
-                  key={e.id}
-                  onClick={() => openEditEpisode(e)}
-                  className="flex w-full items-center justify-between gap-3 border-b border-border p-4 text-left last:border-b-0 hover:bg-accent/50"
-                >
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">
-                        {formatEpisodeLabel(e.week_number, season?.season_number ?? null)}
-                        {e.theme ? ` — ${e.theme}` : ""}
-                      </p>
-                      <Badge variant={RESULTS_STATUS_BADGE_VARIANT[status]}>
-                        {RESULTS_STATUS_BADGE_LABEL[status]}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(e.airs_at).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                      {count > 0 && ` · ${count} couple${count === 1 ? "" : "s"} scored`}
-                    </p>
+            <>
+              {groupedWeeks.map((week) => (
+                <div key={week.id}>
+                  <div className="border-b border-border bg-muted/40 px-4 py-2 text-xs font-semibold tracking-wide text-muted-foreground">
+                    {formatEpisodeCasualWithTheme(week.week_number, week.theme)}
+                    {week.nightsLabel ? ` · ${week.nightsLabel}` : ""}
                   </div>
-                  <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-                </button>
-              );
-            })
+                  {week.episodes.map((e) => (
+                    <EpisodeRow key={e.id} e={e} />
+                  ))}
+                </div>
+              ))}
+              {exhibition.length > 0 && (
+                <div>
+                  <div className="border-b border-border bg-muted/40 px-4 py-2 text-xs font-semibold tracking-wide text-muted-foreground">
+                    Exhibition
+                  </div>
+                  {exhibition.map((e) => (
+                    <EpisodeRow key={e.id} e={e} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -340,8 +417,8 @@ export function ScheduleManager({
           <SheetHeader>
             <SheetTitle>{editingId ? "Edit Scheduled Episode" : "Schedule a New Episode"}</SheetTitle>
             <SheetDescription>
-              Air date/theme here are informational scheduling only — actual results are entered on the
-              Enter Results tab.
+              Each row is one TV airing. Assign it to a competition week to put it on Results and
+              Picks, or leave the week blank for exhibition / interview nights.
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-4 px-4 pb-4">
@@ -351,10 +428,43 @@ export function ScheduleManager({
               <Input
                 type="number"
                 min={1}
-                value={weekNumber}
-                onChange={(e) => setWeekNumber(Number(e.target.value))}
+                value={episodeNumber}
+                onChange={(e) => setEpisodeNumber(Number(e.target.value))}
               />
+              <p className="text-xs text-muted-foreground">
+                TV sequence for admin labels ({formatEpisodeLabel(episodeNumber, season?.season_number ?? null)}
+                ). Independent of the competition week.
+              </p>
             </div>
+            <div className="flex flex-col gap-2">
+              <Label>Competition week</Label>
+              <Input
+                type="number"
+                min={1}
+                value={competitionWeek}
+                placeholder="Blank = exhibition"
+                onChange={(e) => {
+                  setCompetitionWeek(e.target.value);
+                  const next = e.target.value.trim() === "" ? null : Number(e.target.value);
+                  if (next != null && Number.isInteger(next)) applyExistingWeekFlags(next);
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to omit this airing from Results and Picks. Use the same week number
+                for Night One and Night Two of a premiere.
+                {assignedWeek ? " This week already exists — flags below match it." : ""}
+              </p>
+            </div>
+            {parsedWeekNumber != null && (
+              <div className="flex flex-col gap-2">
+                <Label>Week label (optional)</Label>
+                <Input
+                  placeholder="e.g. Premiere"
+                  value={weekTheme}
+                  onChange={(e) => setWeekTheme(e.target.value)}
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               <Label>Air Date{browserTimeZone ? ` (${browserTimeZone})` : ""}</Label>
               <Input type="datetime-local" value={airsAt} onChange={(e) => setAirsAt(e.target.value)} />
@@ -362,37 +472,39 @@ export function ScheduleManager({
             <div className="flex flex-col gap-2">
               <Label>Theme Night</Label>
               <Input
-                placeholder="e.g. Villains Night"
+                placeholder="e.g. Night One, Villains Night"
                 value={theme}
                 onChange={(e) => setTheme(e.target.value)}
               />
             </div>
-            <div className="flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={isEliminationWeek}
-                  onChange={(e) => {
-                    setIsEliminationWeek(e.target.checked);
-                    if (!e.target.checked) setIsDoubleEliminationWeek(false);
-                  }}
-                />
-                Elimination Week
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={isFinale} onChange={(e) => setIsFinale(e.target.checked)} />
-                Finale
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={isDoubleEliminationWeek}
-                  disabled={!isEliminationWeek}
-                  onChange={(e) => setIsDoubleEliminationWeek(e.target.checked)}
-                />
-                Double Elimination
-              </label>
-            </div>
+            {parsedWeekNumber != null && (
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={isEliminationWeek}
+                    onChange={(e) => {
+                      setIsEliminationWeek(e.target.checked);
+                      if (!e.target.checked) setIsDoubleEliminationWeek(false);
+                    }}
+                  />
+                  Elimination Week
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={isFinale} onChange={(e) => setIsFinale(e.target.checked)} />
+                  Finale
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={isDoubleEliminationWeek}
+                    disabled={!isEliminationWeek}
+                    onChange={(e) => setIsDoubleEliminationWeek(e.target.checked)}
+                  />
+                  Double Elimination
+                </label>
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <Label>Who&apos;s Performing?</Label>

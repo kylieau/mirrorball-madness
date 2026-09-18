@@ -8,6 +8,7 @@ import { TopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { groupEpisodesByWeek } from "@/lib/competition-week";
 import {
   adjacentThisWeekWeeks,
   buildThisWeekCarouselWeeks,
@@ -50,49 +51,67 @@ export default async function ThisWeekPage({
   const leagueNameById = new Map(leagueRefs.map((l) => [l.id, l.name]));
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const { data: seasonEpisodeRows } = await supabase
-    .from("episodes")
-    .select("id, week_number, airs_at, theme, is_finale, status")
-    .eq("season_id", activeSeasonId ?? "")
-    .order("week_number", { ascending: false });
+  const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
+    supabase
+      .from("competition_weeks")
+      .select("id, week_number, theme, is_finale, is_elimination_week, is_double_elimination_week")
+      .eq("season_id", activeSeasonId ?? "")
+      .order("week_number", { ascending: false }),
+    supabase
+      .from("episodes")
+      .select("id, episode_number, week_id, airs_at, theme, status")
+      .eq("season_id", activeSeasonId ?? ""),
+  ]);
 
-  const seasonEpisodes = seasonEpisodeRows ?? [];
-  const completedEpisodes = seasonEpisodes.filter((e) => e.status === "completed");
+  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const seasonWeeks = groupedWeeks.map((week) => ({
+    id: week.id,
+    week_number: week.week_number,
+    theme: week.theme,
+    status: week.status,
+    nightsLabel: week.nightsLabel,
+    is_finale: week.is_finale,
+    episodes: week.episodes,
+  }));
+  const completedWeeks = [...seasonWeeks]
+    .filter((week) => week.status === "completed")
+    .sort((a, b) => b.week_number - a.week_number);
 
   const cutoff = await resolveSpoilerCutoff(
     supabase,
     user.id,
     activeSeasonId ?? null,
     accountSettingsData.spoilerFreeMode,
-    completedEpisodes
+    completedWeeks
   );
 
   // Carousel = spoiler-visible completed weeks + upcoming/locked for a
   // theme peek. ?week= honors that list; an unrecognized or unwatched
   // completed id falls back instead of leaking results.
-  const carouselWeeks = buildThisWeekCarouselWeeks(seasonEpisodes, cutoff.allowedEpisodeIds);
-  const { episode: selectedEpisode, mode: selectedMode } = selectThisWeekEpisode(carouselWeeks, weekParam);
-  const selectedEpisodeId = selectedEpisode?.id ?? null;
-  const neighbors = selectedEpisodeId ? adjacentThisWeekWeeks(carouselWeeks, selectedEpisodeId) : { prev: null, next: null };
+  const carouselWeeks = buildThisWeekCarouselWeeks(seasonWeeks, cutoff.allowedEpisodeIds);
+  const { episode: selectedWeek, mode: selectedMode } = selectThisWeekEpisode(carouselWeeks, weekParam);
+  const selectedWeekId = selectedWeek?.id ?? null;
+  const neighbors = selectedWeekId ? adjacentThisWeekWeeks(carouselWeeks, selectedWeekId) : { prev: null, next: null };
   const showResults = selectedMode === "results";
+  const selectedEpisodeIds = selectedWeek?.episodes.map((episode) => episode.id) ?? [];
 
-  // Fires whenever a completed episode sits past last_watched_week — even
-  // if an older week is already on screen. Otherwise a viewer who marked
-  // E01 gets stranded on those results with no way to reveal E02.
   const pendingReveal = cutoff.pendingRevealEpisode
     ? { weekNumber: cutoff.pendingRevealEpisode.week_number, theme: cutoff.pendingRevealEpisode.theme }
     : null;
 
   const [{ data: danceScores }, { data: episodeResults }, { data: danceStyles }, { data: allCouples }] =
     await Promise.all([
-      showResults && selectedEpisodeId
-        ? supabase.from("dance_scores").select("id, episode_id, couple_id, dance_style_id, total_score").eq("episode_id", selectedEpisodeId)
+      showResults && selectedEpisodeIds.length > 0
+        ? supabase
+            .from("dance_scores")
+            .select("id, episode_id, couple_id, dance_style_id, total_score")
+            .in("episode_id", selectedEpisodeIds)
         : Promise.resolve({ data: [] }),
-      showResults && selectedEpisodeId
+      showResults && selectedEpisodeIds.length > 0
         ? supabase
             .from("episode_results")
             .select("episode_id, couple_id, outcome")
-            .eq("episode_id", selectedEpisodeId)
+            .in("episode_id", selectedEpisodeIds)
         : Promise.resolve({ data: [] }),
       supabase.from("dance_styles").select("id, name").order("name"),
       supabase
@@ -121,12 +140,12 @@ export default async function ThisWeekPage({
       .eq("manager_id", user.id)
       .in("league_id", leagueIds)
       .is("end_week", null),
-    showResults && selectedEpisodeId
+    showResults && selectedWeekId
       ? supabase
           .from("predictions")
           .select("league_id, predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
           .eq("manager_id", user.id)
-          .eq("episode_id", selectedEpisodeId)
+          .eq("week_id", selectedWeekId)
           .in("league_id", leagueIds)
       : Promise.resolve({ data: [] }),
   ]);
@@ -177,16 +196,17 @@ export default async function ThisWeekPage({
 
       <div className={BOTTOM_NAV_CLEARANCE}>
         <PageHeader title="Results">
-          {selectedEpisode && (
+          {selectedWeek && (
             <EpisodeCarousel
-              weekNumber={selectedEpisode.week_number}
-              theme={selectedEpisode.theme}
+              weekNumber={selectedWeek.week_number}
+              theme={selectedWeek.theme}
+              nightsLabel={selectedWeek.nightsLabel}
               prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
               nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
             />
           )}
         </PageHeader>
-        {selectedMode === "peek" && selectedEpisode ? (
+        {selectedMode === "peek" && selectedWeek ? (
           <div>
             {pendingReveal && (
               <div className="mb-4">
@@ -201,11 +221,21 @@ export default async function ThisWeekPage({
                 />
               </div>
             )}
-            <ThisWeekThemePeek theme={selectedEpisode.theme} />
+            <ThisWeekThemePeek theme={selectedWeek.theme} />
           </div>
         ) : (
           <WeeklyResultsView
-            episodes={showResults && selectedEpisode ? [selectedEpisode] : []}
+            episodes={
+              showResults && selectedWeek
+                ? selectedWeek.episodes.map((episode) => ({
+                    id: episode.id,
+                    week_number: selectedWeek.week_number,
+                    airs_at: episode.airs_at,
+                    theme: episode.theme,
+                    is_finale: selectedWeek.is_finale,
+                  }))
+                : []
+            }
             episodeResults={episodeResults ?? []}
             danceScores={danceScores ?? []}
             danceStyles={danceStyles ?? []}

@@ -41,15 +41,21 @@ type EpisodeResult = {
 };
 type Episode = {
   id: string;
-  week_number: number;
+  episode_number: number;
+  week_id: string | null;
   airs_at: string;
   theme: string | null;
   status: string;
-  is_finale: boolean;
-  is_elimination_week: boolean;
-  is_double_elimination_week: boolean;
   results_published_at: string | null;
   results_published_by: string | null;
+};
+type CompetitionWeek = {
+  id: string;
+  week_number: number;
+  theme: string | null;
+  is_elimination_week: boolean;
+  is_finale: boolean;
+  is_double_elimination_week: boolean;
 };
 type Season = {
   id: string;
@@ -77,6 +83,7 @@ export function AdminResultsTabs({
   judges,
   danceStyles,
   episodes,
+  weeks,
   danceScores,
   judgeScores,
   episodeResults,
@@ -95,6 +102,7 @@ export function AdminResultsTabs({
   judges: ScoringJudge[];
   danceStyles: Named[];
   episodes: Episode[];
+  weeks: CompetitionWeek[];
   danceScores: DanceScore[];
   judgeScores: JudgeScore[];
   episodeResults: EpisodeResult[];
@@ -146,15 +154,16 @@ export function AdminResultsTabs({
             judges={judges}
             danceStyles={danceStyles}
             episodes={episodes}
+            weeks={weeks}
             draftsByEpisode={draftsByEpisode}
             forceSelectEpisodeId={forceSelectEpisodeId}
             participantsByEpisode={participantsByEpisode}
-            seasonNumber={season?.season_number ?? null}
           />
         </TabsContent>
         <TabsContent value="view">
           <AllResultsView
             episodes={episodes}
+            weeks={weeks}
             danceScores={danceScores}
             judgeScores={judgeScores}
             episodeResults={episodeResults}
@@ -171,6 +180,7 @@ export function AdminResultsTabs({
         <TabsContent value="schedule">
           <ScheduleManager
             episodes={episodes}
+            weeks={weeks}
             episodeResults={episodeResults}
             draftsByEpisode={draftsByEpisode}
             season={season}

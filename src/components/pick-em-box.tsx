@@ -155,7 +155,7 @@ export function PickEmBox({
 
   const hasSavedPick = !!eliminatedId || !!eliminatedId2 || !!topScorerId;
   const lockLine = isLocked
-    ? "Predictions are locked for this episode."
+    ? "Predictions are locked for this week."
     : lockAt && formattedLockAt
       ? `Locks at ${formattedLockAt}`
       : null;

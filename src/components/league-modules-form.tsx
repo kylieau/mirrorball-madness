@@ -28,7 +28,7 @@ import {
   utcIsoToLocalInput,
 } from "@/lib/use-browser-time-zone";
 import { explainGrandFinaleMethod } from "@/lib/grand-finale-explainer";
-import { formatEpisodeLabel } from "@/lib/format-week";
+import { formatEpisodeCasual } from "@/lib/format-week";
 import {
   airsAtForWeek,
   explainGrandFinaleDeadline,
@@ -152,8 +152,8 @@ export function LeagueModulesForm({
   const [judgesStartsWeek, setJudgesStartsWeek] = useState(scoringSettings?.judges_score_starts_week ?? 1);
   const startsWeekItems = Object.fromEntries(
     seasonEpisodes.length > 0
-      ? seasonEpisodes.map((e) => [String(e.week_number), formatEpisodeLabel(e.week_number, seasonNumber)])
-      : [[String(judgesStartsWeek), formatEpisodeLabel(judgesStartsWeek, seasonNumber)]]
+      ? seasonEpisodes.map((e) => [String(e.week_number), formatEpisodeCasual(e.week_number)])
+      : [[String(judgesStartsWeek), formatEpisodeCasual(judgesStartsWeek)]]
   );
   const [judgesScoreMultiplier, setJudgesScoreMultiplier] = useState(
     scoringSettings?.judges_score_multiplier ?? 1
@@ -347,7 +347,7 @@ export function LeagueModulesForm({
             <CardDescription>Your league&apos;s Hard Deadline — the one week everything else locks around.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col">
-            <SettingRow label="Anchor week" value={formatEpisodeLabel(judgesStartsWeek, seasonNumber)} />
+            <SettingRow label="Anchor week" value={formatEpisodeCasual(judgesStartsWeek)} />
             <SettingRow
               label="Currently locks"
               value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}

@@ -7,6 +7,7 @@ import { TopBar } from "@/components/top-bar";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 
 export default async function TodayPage() {
@@ -36,39 +37,49 @@ export default async function TodayPage() {
 
   const firstLeagueId = leagueRefs[0].id;
 
-  const { data: upcomingEpisode } = await supabase
-    .from("episodes")
-    .select("id, week_number")
-    .eq("status", "upcoming")
-    .order("week_number", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const { data: completedEpisodes } = await supabase
-    .from("episodes")
-    .select("id, week_number, results_published_at")
-    .eq("season_id", activeSeasonId ?? "")
-    .eq("status", "completed")
-    .order("week_number", { ascending: false });
+  const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
+    supabase
+      .from("competition_weeks")
+      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
+      .eq("season_id", activeSeasonId ?? ""),
+    supabase
+      .from("episodes")
+      .select("id, episode_number, week_id, airs_at, theme, status, results_published_at")
+      .eq("season_id", activeSeasonId ?? ""),
+  ]);
+  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const liveWeek = liveCompetitionWeek(groupedWeeks);
+  const upcomingEpisode = liveWeek ? { id: liveWeek.id, week_number: liveWeek.week_number } : null;
+  const completedWeeks = groupedWeeks
+    .filter((week) => week.status === "completed")
+    .sort((a, b) => b.week_number - a.week_number)
+    .map((week) => ({
+      id: week.id,
+      week_number: week.week_number,
+      results_published_at:
+        week.episodes
+          .map((episode) => episode.results_published_at)
+          .filter((value): value is string => !!value)
+          .sort()
+          .at(-1) ?? null,
+      episodeIds: week.episodes.map((episode) => episode.id),
+    }));
 
   const cutoff = await resolveSpoilerCutoff(
     supabase,
     user.id,
     activeSeasonId ?? null,
     accountSettingsData.spoilerFreeMode,
-    completedEpisodes ?? []
+    completedWeeks
   );
 
-  const trueLatestCompletedEpisode = completedEpisodes?.[0] ?? null;
-  const latestCompletedEpisodeId = cutoff.effectiveLatestEpisode?.id ?? null;
+  const trueLatestCompletedWeek = completedWeeks[0] ?? null;
+  const latestCompletedWeekId = cutoff.effectiveLatestEpisode?.id ?? null;
   const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
-  // Same season-wide figure on every league card (episodes aren't scoped
-  // per-league) — mirrors Standings' own through-episode label so Home and
-  // Standings never disagree about how caught-up the viewer is.
   const weeksBehind =
-    trueLatestCompletedEpisode && trueLatestCompletedEpisode.id !== latestCompletedEpisodeId
-      ? trueLatestCompletedEpisode.week_number - (cutoff.effectiveLatestEpisode?.week_number ?? 0)
+    trueLatestCompletedWeek && trueLatestCompletedWeek.id !== latestCompletedWeekId
+      ? trueLatestCompletedWeek.week_number - (cutoff.effectiveLatestEpisode?.week_number ?? 0)
       : 0;
 
   const RECENT_JOIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -81,7 +92,7 @@ export default async function TodayPage() {
         user.id,
         league,
         upcomingEpisode ?? null,
-        latestCompletedEpisodeId,
+        latestCompletedWeekId,
         latestCompletedResultsPublishedAt,
         joinCutoffMs,
         cutoff.allowedEpisodeIds
@@ -92,9 +103,12 @@ export default async function TodayPage() {
   // Eliminations are season-global, so this only needs fetching once and
   // applies the same to every Dance-Card league the couple's manager is in.
   let latestEliminatedNames: string[] = [];
-  if (latestCompletedEpisodeId) {
+  if ((cutoff.effectiveLatestEpisode?.episodeIds.length ?? 0) > 0) {
     const [{ data: episodeResults }, { data: couples }] = await Promise.all([
-      supabase.from("episode_results").select("couple_id, outcome").eq("episode_id", latestCompletedEpisodeId),
+      supabase
+        .from("episode_results")
+        .select("couple_id, outcome")
+        .in("episode_id", cutoff.effectiveLatestEpisode!.episodeIds),
       supabase
         .from("couples")
         .select("id, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"),

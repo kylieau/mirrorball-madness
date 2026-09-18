@@ -77,18 +77,18 @@ describe("airsAtForWeek", () => {
 });
 
 describe("formatLockWithEpisode", () => {
-  it("ties the lock datetime to the episode label", () => {
+  it("ties the lock datetime to the week label", () => {
     expect(formatLockWithEpisode(3, 35, "9/29/2026, 8 PM EDT", true)).toBe(
-      "S35 E03 · 9/29/2026, 8 PM EDT"
+      "Week 3 · 9/29/2026, 8 PM EDT"
     );
   });
 
   it("says when that week has no scheduled episode yet", () => {
-    expect(formatLockWithEpisode(1, 35, "", false)).toBe("S35 E01 (not yet scheduled)");
+    expect(formatLockWithEpisode(1, 35, "", false)).toBe("Week 1 (not yet scheduled)");
   });
 
   it("shows just the label while the local datetime is still hydrating", () => {
-    expect(formatLockWithEpisode(1, 35, "", true)).toBe("S35 E01");
+    expect(formatLockWithEpisode(1, 35, "", true)).toBe("Week 1");
   });
 });
 
@@ -102,7 +102,7 @@ describe("explainSeasonClock", () => {
         danceCardEnabled: true,
         draftStatus: "not_started",
       })
-    ).toContain("moved from S35 E01 to S35 E03");
+    ).toContain("moved from Week 1 to Week 3");
   });
 
   it("does not mention draft auto-advance when Dance Card is off", () => {
@@ -113,7 +113,7 @@ describe("explainSeasonClock", () => {
       danceCardEnabled: false,
       draftStatus: "not_started",
     });
-    expect(copy).toBe("Grand Finale locks the moment S35 E01 airs.");
+    expect(copy).toBe("Grand Finale locks the moment Week 1 airs.");
     expect(copy).not.toContain("pushes");
   });
 });
@@ -134,6 +134,6 @@ describe("explainGrandFinaleDeadline", () => {
         lockWeek: 3,
         seasonNumber: 35,
       })
-    ).toContain("Locks at S35 E03");
+    ).toContain("Locks at Week 3");
   });
 });

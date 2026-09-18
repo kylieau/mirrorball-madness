@@ -24,6 +24,7 @@ import { getPickAssignment } from "@/lib/draft";
 import { clampRosterCoupleForWeek, computeCoupleWeeklyPoints } from "@/lib/roster-weekly-points";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { partitionRecastSlots } from "@/lib/recast-framing";
 import {
@@ -78,7 +79,7 @@ export default async function LeaguePage({
   // apart — a single-module league goes straight to its content.
   const showSectionLabels = [curtainCallOn, danceCardOn, grandFinaleOn].filter(Boolean).length >= 2;
 
-  const [{ data: members }, { data: allScores }, { data: rosterSlots }, { data: allCouples }, { data: upcomingEpisode }] =
+  const [{ data: members }, { data: allScores }, { data: rosterSlots }, { data: allCouples }] =
     await Promise.all([
       supabase
         .from("league_members")
@@ -87,7 +88,7 @@ export default async function LeaguePage({
         .order("joined_at"),
       supabase
         .from("weekly_manager_scores")
-        .select("episode_id, manager_id, roster_points, prediction_points, grand_finale_points, total_points")
+        .select("week_id, manager_id, roster_points, prediction_points, grand_finale_points, total_points")
         .eq("league_id", id),
       supabase
         .from("roster_slots")
@@ -102,31 +103,53 @@ export default async function LeaguePage({
         .select(
           "id, status, season_id, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
         ),
-      supabase
-        .from("episodes")
-        .select("id, week_number, airs_at, theme, is_double_elimination_week")
-        .eq("status", "upcoming")
-        .order("week_number", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
     ]);
 
   const isCommissioner = (members ?? []).some((m) => m.user_id === user.id && m.role === "commissioner");
   const accountSettingsData = await getAccountSettingsData(supabase, user.id);
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const { data: completedEpisodes } = await supabase
-    .from("episodes")
-    .select("id, week_number, theme, is_double_elimination_week, results_published_at")
-    .eq("season_id", activeSeasonId ?? "")
-    .eq("status", "completed")
-    .order("week_number", { ascending: false });
-  const { data: finaleEpisode } = await supabase
-    .from("episodes")
-    .select("week_number")
-    .eq("season_id", activeSeasonId ?? "")
-    .eq("is_finale", true)
-    .maybeSingle();
+  const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
+    supabase
+      .from("competition_weeks")
+      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
+      .eq("season_id", activeSeasonId ?? "")
+      .order("week_number", { ascending: true }),
+    supabase
+      .from("episodes")
+      .select("id, episode_number, week_id, airs_at, theme, status, results_published_at")
+      .eq("season_id", activeSeasonId ?? ""),
+  ]);
+  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const liveWeek = liveCompetitionWeek(groupedWeeks);
+  const upcomingEpisode = liveWeek
+    ? {
+        id: liveWeek.id,
+        week_number: liveWeek.week_number,
+        theme: liveWeek.theme,
+        is_double_elimination_week: liveWeek.is_double_elimination_week,
+        nightsLabel: liveWeek.nightsLabel,
+        episodeIds: liveWeek.episodes.map((episode) => episode.id),
+      }
+    : null;
+  const completedEpisodes = groupedWeeks
+    .filter((week) => week.status === "completed")
+    .sort((a, b) => b.week_number - a.week_number)
+    .map((week) => ({
+      id: week.id,
+      week_number: week.week_number,
+      theme: week.theme,
+      is_double_elimination_week: week.is_double_elimination_week,
+      nightsLabel: week.nightsLabel,
+      results_published_at:
+        week.episodes
+          .map((episode) => episode.results_published_at)
+          .filter((value): value is string => !!value)
+          .sort()
+          .at(-1) ?? null,
+      episodeIds: week.episodes.map((episode) => episode.id),
+    }));
+  const finaleWeekNumber = groupedWeeks.find((week) => week.is_finale)?.week_number ?? null;
 
   const cutoff = await resolveSpoilerCutoff(
     supabase,
@@ -145,7 +168,7 @@ export default async function LeaguePage({
     { managerId: string; rosterPoints: number; predictionPoints: number; grandFinalePoints: number; totalPoints: number }[]
   > = {};
   for (const row of allScores ?? []) {
-    if (!cutoff.allowedEpisodeIds.has(row.episode_id)) continue;
+    if (!cutoff.allowedEpisodeIds.has(row.week_id)) continue;
     pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
     rosterPointsByManager.set(row.manager_id, (rosterPointsByManager.get(row.manager_id) ?? 0) + row.roster_points);
     predictionPointsByManager.set(
@@ -156,7 +179,7 @@ export default async function LeaguePage({
       row.manager_id,
       (grandFinalePointsByManager.get(row.manager_id) ?? 0) + row.grand_finale_points
     );
-    (scoresByEpisode[row.episode_id] ??= []).push({
+    (scoresByEpisode[row.week_id] ??= []).push({
       managerId: row.manager_id,
       rosterPoints: row.roster_points,
       predictionPoints: row.prediction_points,
@@ -172,19 +195,18 @@ export default async function LeaguePage({
   }));
 
   // Rank-change arrows compare current standings to what they'd have been
-  // without the most recently completed episode's scores — no historical
+  // without the most recently completed week's scores — no historical
   // snapshot table needed, since weekly_manager_scores already carries points
-  // per episode.
-  const latestCompletedEpisodeId = cutoff.effectiveLatestEpisode?.id ?? null;
+  // per competition week.
+  const latestCompletedWeekId = cutoff.effectiveLatestEpisode?.id ?? null;
   const latestCompletedWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;
-  const finaleWeekNumber = finaleEpisode?.week_number ?? null;
   const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
 
   const previousPointsByManager = new Map<string, number>();
-  if (latestCompletedEpisodeId) {
+  if (latestCompletedWeekId) {
     for (const row of allScores ?? []) {
-      if (!cutoff.allowedEpisodeIds.has(row.episode_id)) continue;
-      if (row.episode_id === latestCompletedEpisodeId) continue;
+      if (!cutoff.allowedEpisodeIds.has(row.week_id)) continue;
+      if (row.week_id === latestCompletedWeekId) continue;
       previousPointsByManager.set(
         row.manager_id,
         (previousPointsByManager.get(row.manager_id) ?? 0) + row.total_points
@@ -200,7 +222,7 @@ export default async function LeaguePage({
   }
 
   const currentRanks = ranksFromPoints(pointsByManager);
-  const previousRanks = latestCompletedEpisodeId ? ranksFromPoints(previousPointsByManager) : null;
+  const previousRanks = latestCompletedWeekId ? ranksFromPoints(previousPointsByManager) : null;
 
   const standingsWithChange = standings.map((s) => {
     if (!previousRanks) return { ...s, change: null as "up" | "down" | null };
@@ -308,7 +330,7 @@ export default async function LeaguePage({
   if (upcomingEpisode && curtainCallOn) {
     const { data: computedLockAt } = await supabase.rpc("prediction_lock_at", {
       p_league_id: id,
-      p_episode_id: upcomingEpisode.id,
+      p_week_id: upcomingEpisode.id,
     });
     lockAt = computedLockAt;
     isLocked = !!lockAt && new Date() >= new Date(lockAt);
@@ -317,7 +339,7 @@ export default async function LeaguePage({
       .from("predictions")
       .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
       .eq("league_id", id)
-      .eq("episode_id", upcomingEpisode.id)
+      .eq("week_id", upcomingEpisode.id)
       .eq("manager_id", user.id)
       .maybeSingle();
     ownPrediction = data;
@@ -329,7 +351,7 @@ export default async function LeaguePage({
           "manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
         )
         .eq("league_id", id)
-        .eq("episode_id", upcomingEpisode.id);
+        .eq("week_id", upcomingEpisode.id);
 
       revealedPredictions = (allPredictions ?? []).map((p) => {
         const eliminatedParts = p.predicted_eliminated_couple_id
@@ -396,11 +418,11 @@ export default async function LeaguePage({
     .filter((cid): cid is string => !!cid);
 
   const { data: rosterDanceScores } =
-    latestCompletedEpisodeId && rosterCoupleIds.length > 0
+    (cutoff.effectiveLatestEpisode?.episodeIds.length ?? 0) > 0 && rosterCoupleIds.length > 0
       ? await supabase
           .from("dance_scores")
           .select("couple_id, total_score")
-          .eq("episode_id", latestCompletedEpisodeId)
+          .in("episode_id", cutoff.effectiveLatestEpisode!.episodeIds)
           .in("couple_id", rosterCoupleIds)
       : { data: [] as { couple_id: string; total_score: number }[] };
 
@@ -512,7 +534,7 @@ export default async function LeaguePage({
           user.id,
           otherLeague,
           upcomingEpisode ?? null,
-          latestCompletedEpisodeId,
+          latestCompletedWeekId,
           latestCompletedResultsPublishedAt,
           joinCutoffMs,
           cutoff.allowedEpisodeIds
@@ -553,20 +575,25 @@ export default async function LeaguePage({
 
   let pastPicksComparison = null;
   if (curtainCallMode === "recap" && curtainCallEpisode && !pastPicksLocked) {
+    const recapEpisodeIds = curtainCallEpisode.episodeIds;
     const [{ data: pastPrediction }, { data: pastResults }, { data: pastDanceScores }] = await Promise.all([
       supabase
         .from("predictions")
         .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
         .eq("league_id", id)
-        .eq("episode_id", curtainCallEpisode.id)
+        .eq("week_id", curtainCallEpisode.id)
         .eq("manager_id", user.id)
         .maybeSingle(),
-      supabase.from("episode_results").select("couple_id, outcome").eq("episode_id", curtainCallEpisode.id),
-      supabase.from("dance_scores").select("couple_id, total_score").eq("episode_id", curtainCallEpisode.id),
+      recapEpisodeIds.length > 0
+        ? supabase.from("episode_results").select("couple_id, outcome").in("episode_id", recapEpisodeIds)
+        : Promise.resolve({ data: [] }),
+      recapEpisodeIds.length > 0
+        ? supabase.from("dance_scores").select("couple_id, total_score").in("episode_id", recapEpisodeIds)
+        : Promise.resolve({ data: [] }),
     ]);
 
     const predictionPoints =
-      (allScores ?? []).find((row) => row.episode_id === curtainCallEpisode.id && row.manager_id === user.id)
+      (allScores ?? []).find((row) => row.week_id === curtainCallEpisode.id && row.manager_id === user.id)
         ?.prediction_points ?? 0;
 
     pastPicksComparison = buildPastPicksComparison({
@@ -614,6 +641,7 @@ export default async function LeaguePage({
                           id: curtainCallEpisode.id,
                           weekNumber: curtainCallEpisode.week_number,
                           theme: curtainCallEpisode.theme,
+                          nightsLabel: curtainCallEpisode.nightsLabel,
                         }
                       : null
                   }

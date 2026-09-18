@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TopBar } from "@/components/top-bar";
 import { computeLeagueSummary } from "@/lib/league-summary";
+import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 
 export default async function NotificationsPage() {
@@ -27,13 +28,19 @@ export default async function NotificationsPage() {
 
   const leagues = (memberships ?? []).map((m) => m.leagues!).filter(Boolean);
 
-  const { data: upcomingEpisode } = await supabase
-    .from("episodes")
-    .select("id, week_number")
-    .eq("status", "upcoming")
-    .order("week_number", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const { data: activeSeasonId } = await supabase.rpc("active_season_id");
+  const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
+    supabase
+      .from("competition_weeks")
+      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
+      .eq("season_id", activeSeasonId ?? ""),
+    supabase
+      .from("episodes")
+      .select("id, episode_number, week_id, airs_at, theme, status")
+      .eq("season_id", activeSeasonId ?? ""),
+  ]);
+  const liveWeek = liveCompetitionWeek(groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []));
+  const upcomingEpisode = liveWeek ? { id: liveWeek.id, week_number: liveWeek.week_number } : null;
 
   const summaries = await Promise.all(
     leagues.map((league) => computeLeagueSummary(supabase, user.id, league, upcomingEpisode ?? null))
