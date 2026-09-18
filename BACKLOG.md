@@ -51,7 +51,27 @@ Out of scope (still): feature-announcement infra; DND live-data invent.
 
 **Owner-noted, not started** (Kylie via Chief Kimo). Parked as a note only — do not implement from this item.
 
-When a draft starts and a manager isn’t participating, need a way to handle that (e.g. auto-draft). Constraint: **randomized only** — not skill-based, not informed by rankings or any other data. More thoughts may land later.
+When a draft starts and a manager isn’t participating, need a way to handle that (e.g. auto-draft). Design notes below stay with this item.
+
+**Constraint: random-only.** Not skill-based. No ADP, rankings, or team-needs. Absentees should not get a free edge or a scapegoat — random among *eligible remaining* players only.
+
+**Triggers (split these):**
+1. Never joined before the pick clock — need a path so the draft can still move.
+2. Timed out on their turn — auto-pick on timeout.
+
+Optional “sit out / autopilot” toggle for someone who intends to miss the whole draft and take random picks throughout.
+
+**UX:**
+- Label auto-picks clearly in the draft log (`auto · random`).
+- Commissioner undo of a single auto-pick is a nice-to-have.
+- Don’t snowball silently (one timeout should not quietly drain the rest of the board without anyone seeing it).
+
+**Do not auto-start the draft** just because people are missing, unless the league voted that. Starting the draft and auto-picking once it’s running are separate decisions.
+
+**Later niceties** (not the first cut of this item):
+- Countdown + nudge before the first auto-pick
+- Pause if half the league ghosts
+- Seed RNG per league+draft so picks are auditable
 
 ## Account deletion processing
 
