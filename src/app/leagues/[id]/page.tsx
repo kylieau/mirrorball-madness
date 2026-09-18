@@ -82,7 +82,7 @@ export default async function LeaguePage({
     await Promise.all([
       supabase
         .from("league_members")
-        .select("user_id, role, joined_at, draft_position, profiles(display_name)")
+        .select("user_id, role, joined_at, draft_position, draft_autopilot, profiles(display_name)")
         .eq("league_id", id)
         .order("joined_at"),
       supabase
@@ -476,6 +476,7 @@ export default async function LeaguePage({
   let onTheClockName: string | null = null;
   let isMyTurn = false;
   let draftPickCount = 0;
+  let onTheClockAutopilot = false;
   if (danceCardOn && league.draft_status === "in_progress") {
     const { count } = await supabase
       .from("draft_picks")
@@ -490,6 +491,7 @@ export default async function LeaguePage({
     const onTheClock = (members ?? []).find((m) => m.draft_position === draftPosition);
     onTheClockName = onTheClock?.profiles?.display_name ?? null;
     isMyTurn = onTheClock?.user_id === user.id;
+    onTheClockAutopilot = onTheClock?.draft_autopilot ?? false;
   }
 
   const { data: myMemberships } = await supabase
@@ -652,6 +654,9 @@ export default async function LeaguePage({
                   pickCount={draftPickCount}
                   onTheClockName={onTheClockName}
                   isMyTurn={isMyTurn}
+                  currentTurnStartedAt={league.current_turn_started_at}
+                  pickTimeLimitSeconds={league.pick_time_limit_seconds}
+                  onTheClockAutopilot={onTheClockAutopilot}
                 />
                 {rosterCouples.length > 0 && (
                   <RosterCard couples={rosterCouples} totalPoints={pointsByManager.get(user.id) ?? 0} />

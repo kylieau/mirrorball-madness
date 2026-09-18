@@ -373,6 +373,7 @@ export type Database = {
         Row: {
           couple_id: string
           id: string
+          is_auto: boolean
           league_id: string
           manager_id: string
           pick_number: number
@@ -382,6 +383,7 @@ export type Database = {
         Insert: {
           couple_id: string
           id?: string
+          is_auto?: boolean
           league_id: string
           manager_id: string
           pick_number: number
@@ -391,6 +393,7 @@ export type Database = {
         Update: {
           couple_id?: string
           id?: string
+          is_auto?: boolean
           league_id?: string
           manager_id?: string
           pick_number?: number
@@ -713,6 +716,7 @@ export type Database = {
       }
       league_members: {
         Row: {
+          draft_autopilot: boolean
           draft_position: number | null
           id: string
           joined_at: string
@@ -721,6 +725,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          draft_autopilot?: boolean
           draft_position?: number | null
           id?: string
           joined_at?: string
@@ -729,6 +734,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          draft_autopilot?: boolean
           draft_position?: number | null
           id?: string
           joined_at?: string
@@ -757,6 +763,7 @@ export type Database = {
         Row: {
           commissioner_id: string
           created_at: string
+          current_turn_started_at: string | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
@@ -772,6 +779,7 @@ export type Database = {
         Insert: {
           commissioner_id: string
           created_at?: string
+          current_turn_started_at?: string | null
           draft_scheduled_at?: string | null
           draft_status?: string
           draft_type?: string
@@ -787,6 +795,7 @@ export type Database = {
         Update: {
           commissioner_id?: string
           created_at?: string
+          current_turn_started_at?: string | null
           draft_scheduled_at?: string | null
           draft_status?: string
           draft_type?: string
@@ -1300,6 +1309,7 @@ export type Database = {
         Returns: {
           commissioner_id: string
           created_at: string
+          current_turn_started_at: string | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
@@ -1363,6 +1373,7 @@ export type Database = {
         Returns: {
           commissioner_id: string
           created_at: string
+          current_turn_started_at: string | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
@@ -1383,11 +1394,31 @@ export type Database = {
         }
       }
       leave_league: { Args: { p_league_id: string }; Returns: undefined }
+      make_auto_draft_pick: {
+        Args: { p_league_id: string }
+        Returns: {
+          couple_id: string
+          id: string
+          is_auto: boolean
+          league_id: string
+          manager_id: string
+          pick_number: number
+          picked_at: string
+          round: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "draft_picks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       make_draft_pick: {
         Args: { p_couple_id: string; p_league_id: string }
         Returns: {
           couple_id: string
           id: string
+          is_auto: boolean
           league_id: string
           manager_id: string
           pick_number: number
@@ -1416,6 +1447,30 @@ export type Database = {
       promote_to_commissioner: {
         Args: { p_league_id: string; p_user_id: string }
         Returns: undefined
+      }
+      record_draft_pick: {
+        Args: {
+          p_couple_id: string
+          p_is_auto: boolean
+          p_league_id: string
+          p_manager_id: string
+        }
+        Returns: {
+          couple_id: string
+          id: string
+          is_auto: boolean
+          league_id: string
+          manager_id: string
+          pick_number: number
+          picked_at: string
+          round: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "draft_picks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       reject_waiver_claim: {
         Args: { p_claim_id: string }
@@ -1447,6 +1502,7 @@ export type Database = {
         Returns: {
           commissioner_id: string
           created_at: string
+          current_turn_started_at: string | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
@@ -1467,6 +1523,10 @@ export type Database = {
         }
       }
       request_account_deletion: { Args: never; Returns: undefined }
+      set_draft_autopilot: {
+        Args: { p_enabled: boolean; p_league_id: string }
+        Returns: boolean
+      }
       set_draft_order: {
         Args: { p_league_id: string; p_ordered_user_ids: string[] }
         Returns: undefined
@@ -1476,6 +1536,7 @@ export type Database = {
         Returns: {
           commissioner_id: string
           created_at: string
+          current_turn_started_at: string | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
@@ -1575,6 +1636,7 @@ export type Database = {
         Returns: {
           commissioner_id: string
           created_at: string
+          current_turn_started_at: string | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
@@ -1645,6 +1707,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      undo_last_auto_pick: { Args: { p_league_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

@@ -100,6 +100,10 @@ create table leagues (
   draft_type text not null default 'snake' check (draft_type in ('snake', 'linear')),
   pick_time_limit_seconds int not null default 90,
   draft_status text not null default 'not_started' check (draft_status in ('not_started', 'in_progress', 'completed')),
+  -- Server clock for whoever is on the clock. Set when the draft starts and
+  -- reset after every pick (manual or auto). make_auto_draft_pick times out
+  -- against this; clients only display it. Null until the draft has started.
+  current_turn_started_at timestamptz,
   -- How long before an episode's real-world airs_at this league's Pick 'Em
   -- predictions close. Deliberately a per-league lead time, not a per-league
   -- absolute lock timestamp: every league locks relative to the same real
@@ -119,6 +123,9 @@ create table league_members (
   user_id uuid not null references profiles(id),
   role text not null default 'manager' check (role in ('commissioner', 'manager')),
   draft_position int, -- assigned when draft order is set
+  -- Sit-out / autopilot: when true, make_auto_draft_pick may fire on this
+  -- manager's turn without waiting for the pick clock. Does not start a draft.
+  draft_autopilot boolean not null default false,
   joined_at timestamptz not null default now(),
   unique (league_id, user_id),
   unique (league_id, draft_position)
@@ -240,6 +247,9 @@ create table draft_picks (
   round int not null,
   pick_number int not null, -- overall pick number within the draft
   picked_at timestamptz not null default now(),
+  -- True when make_auto_draft_pick placed this (timeout or autopilot), not
+  -- the manager choosing a couple. Draft log labels these `auto · random`.
+  is_auto boolean not null default false,
   unique (league_id, couple_id),
   unique (league_id, pick_number)
 );
@@ -1025,7 +1035,9 @@ grant execute on function public.update_scoring_categories(uuid, boolean, boolea
 -- a client can't skip its turn or claim an already-picked couple by racing
 -- the UI, since the server recomputes whose turn it is from the pick count
 -- every call (under a row lock on the league, to close the race between two
--- simultaneous picks).
+-- simultaneous picks). Auto-picks (timeout or autopilot) go through
+-- make_auto_draft_pick, which chooses uniformly at random among eligible
+-- remaining couples and records draft_picks.is_auto — it never starts a draft.
 -- ============================================================
 
 grant select on public.people to authenticated;
@@ -1155,9 +1167,12 @@ begin
 
   -- roster_size is the even split (integer division), computed here rather
   -- than commissioner-set. Any remainder couples are left undrafted for the
-  -- season rather than handed out unevenly.
+  -- season rather than handed out unevenly. current_turn_started_at starts
+  -- the first pick clock; this function never places a pick.
   update public.leagues
-  set draft_status = 'in_progress', roster_size = v_couple_count / v_member_count
+  set draft_status = 'in_progress',
+      roster_size = v_couple_count / v_member_count,
+      current_turn_started_at = now()
   where id = p_league_id
   returning * into v_league;
 
@@ -1168,7 +1183,14 @@ $$;
 revoke execute on function public.set_draft_order(uuid, uuid[]) from public;
 grant execute on function public.set_draft_order(uuid, uuid[]) to authenticated;
 
-create function public.make_draft_pick(p_league_id uuid, p_couple_id uuid)
+-- Internal: caller must already hold the leagues row lock. Enforces whose
+-- turn it is, couple eligibility, insert, clock reset, and completion.
+create function public.record_draft_pick(
+  p_league_id uuid,
+  p_couple_id uuid,
+  p_manager_id uuid,
+  p_is_auto boolean
+)
 returns public.draft_picks
 language plpgsql
 security definer set search_path = ''
@@ -1184,7 +1206,7 @@ declare
   v_expected_manager uuid;
   v_pick public.draft_picks;
 begin
-  select * into v_league from public.leagues where id = p_league_id for update;
+  select * into v_league from public.leagues where id = p_league_id;
 
   if not found then
     raise exception 'League not found';
@@ -1224,7 +1246,7 @@ begin
   from public.league_members
   where league_id = p_league_id and draft_position = v_draft_position_needed;
 
-  if v_expected_manager is null or v_expected_manager <> auth.uid() then
+  if v_expected_manager is null or v_expected_manager <> p_manager_id then
     raise exception 'It is not your turn to pick';
   end if;
 
@@ -1244,12 +1266,14 @@ begin
     raise exception 'That couple has already been drafted';
   end if;
 
-  insert into public.draft_picks (league_id, couple_id, manager_id, round, pick_number)
-  values (p_league_id, p_couple_id, auth.uid(), v_round, v_next_pick)
+  insert into public.draft_picks (league_id, couple_id, manager_id, round, pick_number, is_auto)
+  values (p_league_id, p_couple_id, p_manager_id, v_round, v_next_pick, p_is_auto)
   returning * into v_pick;
 
   if v_next_pick = v_total_slots then
-    update public.leagues set draft_status = 'completed' where id = p_league_id;
+    update public.leagues
+    set draft_status = 'completed', current_turn_started_at = now()
+    where id = p_league_id;
 
     insert into public.roster_slots (league_id, manager_id, slot_number, couple_id, source, start_week)
     select league_id, manager_id, row_number() over (partition by manager_id order by pick_number), couple_id, 'draft', 1
@@ -1269,16 +1293,217 @@ begin
       )
     )
     where league_id = p_league_id;
+  else
+    -- Fresh clock for the next manager so one timeout cannot drain the board.
+    update public.leagues
+    set current_turn_started_at = now()
+    where id = p_league_id;
   end if;
 
   return v_pick;
 end;
 $$;
 
+revoke execute on function public.record_draft_pick(uuid, uuid, uuid, boolean) from public, authenticated;
+
+create function public.make_draft_pick(p_league_id uuid, p_couple_id uuid)
+returns public.draft_picks
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_league public.leagues;
+begin
+  -- Serialize concurrent picks on this league (same lock auto-pick takes).
+  select * into v_league from public.leagues where id = p_league_id for update;
+  if not found then
+    raise exception 'League not found';
+  end if;
+
+  if auth.uid() is null then
+    raise exception 'It is not your turn to pick';
+  end if;
+
+  return public.record_draft_pick(p_league_id, p_couple_id, auth.uid(), false);
+end;
+$$;
+
+-- Places one uniformly-random eligible remaining couple for the manager on
+-- the clock. Any league member may call this so a started draft still moves
+-- when the picker never joined the room. Eligible when that manager has
+-- draft_autopilot or the server pick clock has expired. One pick per call —
+-- the next manager gets a fresh clock (unless they are also on autopilot).
+-- Does not start a draft.
+create function public.make_auto_draft_pick(p_league_id uuid)
+returns public.draft_picks
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_league public.leagues;
+  v_member_count int;
+  v_total_slots int;
+  v_next_pick int;
+  v_round int;
+  v_position_in_round int;
+  v_draft_position_needed int;
+  v_expected_manager uuid;
+  v_autopilot boolean;
+  v_turn_started timestamptz;
+  v_couple_id uuid;
+begin
+  if not public.is_league_member(p_league_id) then
+    raise exception 'You are not a member of this league';
+  end if;
+
+  select * into v_league from public.leagues where id = p_league_id for update;
+
+  if not found then
+    raise exception 'League not found';
+  end if;
+
+  if v_league.draft_status <> 'in_progress' then
+    raise exception 'Draft is not in progress';
+  end if;
+
+  select count(*) into v_member_count from public.league_members where league_id = p_league_id;
+  v_total_slots := v_member_count * v_league.roster_size;
+  v_next_pick := (select count(*) from public.draft_picks where league_id = p_league_id) + 1;
+
+  if v_next_pick > v_total_slots then
+    raise exception 'Draft is already complete';
+  end if;
+
+  v_round := ((v_next_pick - 1) / v_member_count) + 1;
+  v_position_in_round := v_next_pick - (v_round - 1) * v_member_count;
+
+  if v_league.draft_type = 'linear' or v_round % 2 = 1 then
+    v_draft_position_needed := v_position_in_round;
+  else
+    v_draft_position_needed := v_member_count - v_position_in_round + 1;
+  end if;
+
+  select user_id, draft_autopilot
+    into v_expected_manager, v_autopilot
+  from public.league_members
+  where league_id = p_league_id and draft_position = v_draft_position_needed;
+
+  if v_expected_manager is null then
+    raise exception 'It is not your turn to pick';
+  end if;
+
+  v_turn_started := coalesce(v_league.current_turn_started_at, now());
+  if not coalesce(v_autopilot, false)
+     and now() < v_turn_started + (v_league.pick_time_limit_seconds * interval '1 second') then
+    raise exception 'Not eligible for an auto-pick yet';
+  end if;
+
+  select c.id into v_couple_id
+  from public.couples c
+  where c.season_id = public.active_season_id()
+    and c.status = 'active'
+    and not exists (
+      select 1 from public.draft_picks dp
+      where dp.league_id = p_league_id and dp.couple_id = c.id
+    )
+  order by random()
+  limit 1;
+
+  if v_couple_id is null then
+    raise exception 'No eligible couples remaining';
+  end if;
+
+  return public.record_draft_pick(p_league_id, v_couple_id, v_expected_manager, true);
+end;
+$$;
+
+create function public.set_draft_autopilot(p_league_id uuid, p_enabled boolean)
+returns boolean
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  if not public.is_league_member(p_league_id) then
+    raise exception 'You are not a member of this league';
+  end if;
+
+  if exists (
+    select 1 from public.leagues
+    where id = p_league_id and draft_status = 'completed'
+  ) then
+    raise exception 'Draft is already over';
+  end if;
+
+  update public.league_members
+  set draft_autopilot = p_enabled
+  where league_id = p_league_id and user_id = auth.uid();
+
+  if not found then
+    raise exception 'You are not a member of this league';
+  end if;
+
+  return p_enabled;
+end;
+$$;
+
+-- Commissioner-only undo of the single most recent auto-pick, and only while
+-- the draft is still in progress (roster_slots have not been seeded).
+create function public.undo_last_auto_pick(p_league_id uuid)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_league public.leagues;
+  v_pick public.draft_picks;
+begin
+  if not public.is_league_commissioner(p_league_id) then
+    raise exception 'Only the commissioner can undo an auto-pick';
+  end if;
+
+  select * into v_league from public.leagues where id = p_league_id for update;
+
+  if not found then
+    raise exception 'League not found';
+  end if;
+
+  if v_league.draft_status <> 'in_progress' then
+    raise exception 'Can only undo an auto-pick while the draft is in progress';
+  end if;
+
+  select * into v_pick
+  from public.draft_picks
+  where league_id = p_league_id
+  order by pick_number desc
+  limit 1
+  for update;
+
+  if not found then
+    raise exception 'No picks to undo';
+  end if;
+
+  if not v_pick.is_auto then
+    raise exception 'The last pick was not an auto-pick';
+  end if;
+
+  delete from public.draft_picks where id = v_pick.id;
+
+  update public.leagues
+  set current_turn_started_at = now()
+  where id = p_league_id;
+end;
+$$;
+
 revoke execute on function public.start_draft(uuid) from public;
 revoke execute on function public.make_draft_pick(uuid, uuid) from public;
+revoke execute on function public.make_auto_draft_pick(uuid) from public;
+revoke execute on function public.set_draft_autopilot(uuid, boolean) from public;
+revoke execute on function public.undo_last_auto_pick(uuid) from public;
 grant execute on function public.start_draft(uuid) to authenticated;
 grant execute on function public.make_draft_pick(uuid, uuid) to authenticated;
+grant execute on function public.make_auto_draft_pick(uuid) to authenticated;
+grant execute on function public.set_draft_autopilot(uuid, boolean) to authenticated;
+grant execute on function public.undo_last_auto_pick(uuid) to authenticated;
 
 alter publication supabase_realtime add table public.leagues;
 alter publication supabase_realtime add table public.league_members;

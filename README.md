@@ -61,7 +61,7 @@ Each milestone should be independently testable before moving to the next.
 - [x] Assign draft order/position to league members — commissioner can shuffle or manually reorder before starting
 - [x] Build draft room UI: available vs. drafted couples board
 - [x] Wire Supabase Realtime so picks broadcast live to all connected managers
-- [x] Build turn indicator with a per-pick timer — visual/informational only, no server-side auto-skip on timeout (deliberately scoped out; would need a scheduled job)
+- [x] Build turn indicator with a per-pick timer — server-authoritative clock (`leagues.current_turn_started_at`); timeout and sit-out/autopilot auto-picks go through `make_auto_draft_pick` (uniform random among eligible remaining; labeled `auto · random` in the log). Does not auto-start a draft.
 - [x] Write `draft_picks` on each pick; enforce one-couple-per-league uniqueness — turn order and uniqueness enforced inside the `make_draft_pick` SECURITY DEFINER function, not trusted from the client
 - [x] Seed `roster_slots` from `draft_picks` when the draft completes — `roster_size` is computed as `floor(couples ÷ members)` and set automatically when the draft starts (no longer commissioner-editable); the draft stops at member_count × roster_size, leaving any remainder couples undrafted for the season rather than splitting unevenly
 - [x] **Verify:** two browsers in the same draft room see picks appear in real time, and an already-picked couple can't be picked again
