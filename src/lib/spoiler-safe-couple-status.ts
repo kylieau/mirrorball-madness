@@ -24,3 +24,11 @@ export function spoilerSafeCoupleStatus(
 
   return couple.status;
 }
+
+export function isSpoilerSafeActive(
+  couple: { status: string; eliminationWeek: number | null },
+  cutoffWeek: number | null,
+  finaleWeekNumber: number | null
+): boolean {
+  return spoilerSafeCoupleStatus(couple, cutoffWeek, finaleWeekNumber) === "active";
+}

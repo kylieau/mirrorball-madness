@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeCoupleWeeklyPoints, deriveCoupleWeeklyTag } from "./roster-weekly-points";
+import {
+  clampRosterCoupleForWeek,
+  computeCoupleWeeklyPoints,
+  deriveCoupleWeeklyTag,
+} from "./roster-weekly-points";
 
 describe("computeCoupleWeeklyPoints", () => {
   it("applies the judges' score multiplier and the category weight, rounded", () => {
@@ -22,5 +26,56 @@ describe("deriveCoupleWeeklyTag", () => {
 
   it("defaults to safe", () => {
     expect(deriveCoupleWeeklyTag("active")).toBe("safe");
+  });
+});
+
+describe("clampRosterCoupleForWeek", () => {
+  const goneWeek3 = { status: "eliminated", eliminationWeek: 3 };
+
+  it("zeros later-week points once the elim is revealed", () => {
+    expect(
+      clampRosterCoupleForWeek(goneWeek3, {
+        cutoffWeek: 5,
+        finaleWeekNumber: null,
+        weekNumber: 5,
+        rawWeeklyPoints: 24,
+      })
+    ).toEqual({ tag: "eliminated", weeklyPoints: 0 });
+  });
+
+  it("keeps the going-home week's points", () => {
+    expect(
+      clampRosterCoupleForWeek(goneWeek3, {
+        cutoffWeek: 3,
+        finaleWeekNumber: null,
+        weekNumber: 3,
+        rawWeeklyPoints: 24,
+      })
+    ).toEqual({ tag: "eliminated", weeklyPoints: 24 });
+  });
+
+  it("looks like an ordinary roster couple before the elim week is revealed", () => {
+    expect(
+      clampRosterCoupleForWeek(goneWeek3, {
+        cutoffWeek: 2,
+        finaleWeekNumber: null,
+        weekNumber: 2,
+        rawWeeklyPoints: 20,
+      })
+    ).toEqual({ tag: "safe", weeklyPoints: 20 });
+  });
+
+  it("leaves a still-competing couple's tag and points alone", () => {
+    expect(
+      clampRosterCoupleForWeek(
+        { status: "active", eliminationWeek: null },
+        {
+          cutoffWeek: 5,
+          finaleWeekNumber: null,
+          weekNumber: 5,
+          rawWeeklyPoints: 22,
+        }
+      )
+    ).toEqual({ tag: "safe", weeklyPoints: 22 });
   });
 });

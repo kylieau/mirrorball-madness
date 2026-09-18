@@ -85,7 +85,7 @@ Each milestone should be independently testable before moving to the next.
 Note: episodes previously only ever came into existence already `completed` (Phase 5's results form always created+finished them atomically), which left no way for a prediction to have anything to lock against ahead of air. Fixed by making the same results form dual-purpose: submitting with no couple scores just schedules the episode (`status: 'upcoming'`) with a lock time; adding scores later flips it to `completed`.
 
 ### Phase 7 — Waivers
-- [x] Detect open roster slots (couple eliminated, no waiver pickup yet) — derived, not stored: a slot is open when its current row (`end_week is null`) points at a couple whose `status = 'eliminated'`
+- [x] Detect open roster slots (couple eliminated, no waiver pickup yet) — derived, not stored: a slot is open when its current row (`end_week is null`) points at a couple whose `status = 'eliminated'`. Spoiler-Free hides that occupancy (`classifyRosterOccupancy`) until the elim week is revealed — Recast copy does not name who went home.
 - [x] Build waiver claim submission UI — `/leagues/[id]/waivers`
 - [x] Implement claim resolution per league's method (reverse standings / FCFS / manual) — FCFS resolves immediately on submission; reverse_standings and manual stay pending until the commissioner processes/approves them (`process_reverse_standings_waivers`, `approve_waiver_claim`/`reject_waiver_claim`)
 - [x] Update `roster_slots` on an approved claim — closes the old row (`end_week` = claim week) and inserts a new one (`start_week` = claim week + 1), all inside one `finalize_waiver_claim` helper shared by all three resolution paths

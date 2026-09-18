@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
+import { RecastCatchUpCard } from "@/components/recast-catch-up-card";
 
 type OpenSlot = { slotNumber: number; formerCoupleName: string };
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -22,6 +23,8 @@ type Couple = { id: string; celebrity_name: string; pro_name: string };
 export function RecastNudgeCard({
   leagueId,
   openSlots,
+  hiddenOpenSlotCount = 0,
+  pendingRevealWeek = null,
   availableCouples,
   coupleDisplayNames,
   claimMethod,
@@ -30,6 +33,8 @@ export function RecastNudgeCard({
 }: {
   leagueId: string;
   openSlots: OpenSlot[];
+  hiddenOpenSlotCount?: number;
+  pendingRevealWeek?: number | null;
   availableCouples: Couple[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
   claimMethod: string | null;
@@ -40,7 +45,11 @@ export function RecastNudgeCard({
   const [pendingCoupleId, setPendingCoupleId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (openSlots.length < 1) return null;
+  if (openSlots.length < 1 && hiddenOpenSlotCount < 1) return null;
+
+  if (openSlots.length < 1) {
+    return <RecastCatchUpCard pendingRevealWeek={pendingRevealWeek} />;
+  }
 
   const singleSlot = openSlots.length === 1 ? openSlots[0] : null;
 

@@ -41,6 +41,12 @@ Implemented on the league **Picks** tab (`?tab=yourpicks`), inside the single Cu
 Out of scope (still): league-wide miss-rate board, bottom-two / “almost had it”.
 Spectator role: won’t do / no longer needed.
 
+## Recast / roster spoiler hygiene
+
+Implemented — Recast nudge + `/leagues/[id]/waivers` no longer name an eliminated couple or say they are “out” until that week is in `resolveSpoilerCutoff`. Unrevealed open slots get a vague catch-up card (`RecastCatchUpCard`) with Mark as watched. Revealed slots (or Spoiler-Free off) keep full claim UI. Fan roster tags/points use `clampRosterCoupleForWeek`; Pick 'Em / waiver availability use `isSpoilerSafeActive`. Helpers: `src/lib/recast-framing.ts`, existing `spoilerSafeCoupleStatus`.
+
+Out of scope (still): feature-announcement infra; DND live-data invent.
+
 ## Account deletion processing
 
 `request_account_deletion` records a request (`profiles.deletion_requested_at`) but nothing surfaces the list of pending requests anywhere. Needs at minimum a way to query it (a Supabase dashboard SQL query is fine for now, given the scale); eventually a small admin view if this ever needs to happen regularly.

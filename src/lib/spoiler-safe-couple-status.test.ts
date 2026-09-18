@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { spoilerSafeCoupleStatus } from "./spoiler-safe-couple-status";
+import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "./spoiler-safe-couple-status";
 
 describe("spoilerSafeCoupleStatus", () => {
   it("clamps an eliminated couple to active before the cutoff, reveals at the cutoff week", () => {
@@ -23,5 +23,13 @@ describe("spoilerSafeCoupleStatus", () => {
   it("passes through a non-resolving status regardless of cutoff", () => {
     expect(spoilerSafeCoupleStatus({ status: "active", eliminationWeek: null }, null, null)).toBe("active");
     expect(spoilerSafeCoupleStatus({ status: "active", eliminationWeek: null }, 5, 10)).toBe("active");
+  });
+});
+
+describe("isSpoilerSafeActive", () => {
+  it("keeps an unrevealed elim in the active pool and drops them once revealed", () => {
+    const couple = { status: "eliminated", eliminationWeek: 3 };
+    expect(isSpoilerSafeActive(couple, 2, null)).toBe(true);
+    expect(isSpoilerSafeActive(couple, 3, null)).toBe(false);
   });
 });
