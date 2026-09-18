@@ -32,6 +32,7 @@ export async function setSpoilerFreeMode(
           .select("week_number")
           .eq("season_id", activeSeasonId)
           .eq("status", "completed")
+          .eq("is_scoring", true)
           .order("week_number", { ascending: false })
           .limit(1)
           .maybeSingle();

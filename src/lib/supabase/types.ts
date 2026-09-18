@@ -572,6 +572,7 @@ export type Database = {
           is_double_elimination_week: boolean
           is_elimination_week: boolean
           is_finale: boolean
+          is_scoring: boolean
           judges_save_available: boolean
           results_published_at: string | null
           results_published_by: string | null
@@ -588,6 +589,7 @@ export type Database = {
           is_double_elimination_week?: boolean
           is_elimination_week?: boolean
           is_finale?: boolean
+          is_scoring?: boolean
           judges_save_available?: boolean
           results_published_at?: string | null
           results_published_by?: string | null
@@ -604,6 +606,7 @@ export type Database = {
           is_double_elimination_week?: boolean
           is_elimination_week?: boolean
           is_finale?: boolean
+          is_scoring?: boolean
           judges_save_available?: boolean
           results_published_at?: string | null
           results_published_by?: string | null

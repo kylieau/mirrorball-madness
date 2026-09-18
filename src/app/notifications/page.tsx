@@ -31,6 +31,7 @@ export default async function NotificationsPage() {
     .from("episodes")
     .select("id, week_number")
     .eq("status", "upcoming")
+    .eq("is_scoring", true)
     .order("week_number", { ascending: true })
     .limit(1)
     .maybeSingle();

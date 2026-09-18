@@ -117,6 +117,7 @@ export default async function WaiversPage({
       .select("id, week_number")
       .eq("season_id", activeSeasonId ?? "")
       .eq("status", "completed")
+      .eq("is_scoring", true)
       .order("week_number", { ascending: false }),
     supabase
       .from("episodes")

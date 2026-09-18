@@ -1,8 +1,11 @@
+import { isScoringWeek } from "./format-week";
+
 export type ThisWeekCarouselEpisode = {
   id: string;
   week_number: number;
   theme: string | null;
   status: string;
+  is_scoring?: boolean | null;
 };
 
 export type ThisWeekSelectionMode = "results" | "peek";
@@ -20,6 +23,7 @@ export function buildThisWeekCarouselWeeks<E extends ThisWeekCarouselEpisode>(
   visibleCompletedIds: Set<string>
 ): E[] {
   return [...seasonEpisodes]
+    .filter((e) => isScoringWeek(e))
     .filter((e) => visibleCompletedIds.has(e.id) || e.status !== "completed")
     .sort((a, b) => a.week_number - b.week_number);
 }

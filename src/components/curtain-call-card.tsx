@@ -35,7 +35,7 @@ export function CurtainCallCard({
             nextHref={neighbors.next ? pastPicksHref(leagueId, neighbors.next.id) : null}
           />
         ) : (
-          <CardDescription>No upcoming episode scheduled yet.</CardDescription>
+          <CardDescription>No upcoming week scheduled yet.</CardDescription>
         )}
       </CardHeader>
       {episode && children ? <CardContent>{children}</CardContent> : null}

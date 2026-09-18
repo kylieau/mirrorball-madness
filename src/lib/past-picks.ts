@@ -105,12 +105,11 @@ export function selectCurtainCallWeek<C extends { id: string }, L extends { id: 
   return recap ? { episode: recap, mode: "recap" } : { episode: null, mode: null };
 }
 
-export function buildCurtainCallWeeks<E extends { id: string; weekNumber: number }>(
-  completed: E[],
-  live: E | null
-): E[] {
-  const weeks = [...completed];
-  if (live && !weeks.some((w) => w.id === live.id)) weeks.push(live);
+export function buildCurtainCallWeeks<
+  E extends { id: string; weekNumber: number; isScoring?: boolean | null },
+>(completed: E[], live: E | null): E[] {
+  const weeks = [...completed].filter((w) => w.isScoring !== false);
+  if (live && live.isScoring !== false && !weeks.some((w) => w.id === live.id)) weeks.push(live);
   return weeks.sort((a, b) => a.weekNumber - b.weekNumber);
 }
 

@@ -48,6 +48,7 @@ type Episode = {
   is_finale: boolean;
   is_elimination_week: boolean;
   is_double_elimination_week: boolean;
+  is_scoring: boolean;
   results_published_at: string | null;
   results_published_by: string | null;
 };

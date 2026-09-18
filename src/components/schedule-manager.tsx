@@ -37,6 +37,7 @@ type Episode = {
   is_elimination_week: boolean;
   is_finale: boolean;
   is_double_elimination_week: boolean;
+  is_scoring: boolean;
   results_published_at: string | null;
 };
 type EpisodeResult = { episode_id: string; couple_id: string };
@@ -166,6 +167,7 @@ export function ScheduleManager({
   const [isEliminationWeek, setIsEliminationWeek] = useState(true);
   const [isFinale, setIsFinale] = useState(false);
   const [isDoubleEliminationWeek, setIsDoubleEliminationWeek] = useState(false);
+  const [isScoring, setIsScoring] = useState(true);
   const [participantCoupleIds, setParticipantCoupleIds] = useState<Set<string>>(new Set());
 
   const selectableCouples = selectableCast(seasonCouples, weekNumber, { published: editingPublished });
@@ -213,6 +215,7 @@ export function ScheduleManager({
     setIsEliminationWeek(e.is_elimination_week);
     setIsFinale(e.is_finale);
     setIsDoubleEliminationWeek(e.is_double_elimination_week);
+    setIsScoring(e.is_scoring);
     const selectable = selectableCast(seasonCouples, e.week_number, { published }).map((c) => c.id);
     setParticipantCoupleIds(new Set(defaultCheckedParticipantIds(participantsByEpisode[e.id], selectable)));
     setSheetOpen(true);
@@ -229,6 +232,7 @@ export function ScheduleManager({
     setIsEliminationWeek(true);
     setIsFinale(false);
     setIsDoubleEliminationWeek(false);
+    setIsScoring(true);
     setParticipantCoupleIds(
       new Set(selectableCast(seasonCouples, nextWeek, { published: false }).map((c) => c.id))
     );
@@ -263,6 +267,7 @@ export function ScheduleManager({
       isEliminationWeek,
       isFinale,
       isDoubleEliminationWeek,
+      isScoring,
       participantCoupleIds: participantIdsToPersist(participantCoupleIds, selectableIds),
     });
     if (result.error) {
@@ -317,6 +322,7 @@ export function ScheduleManager({
                       <Badge variant={RESULTS_STATUS_BADGE_VARIANT[status]}>
                         {RESULTS_STATUS_BADGE_LABEL[status]}
                       </Badge>
+                      {!e.is_scoring && <Badge variant="outline">Exhibition</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {new Date(e.airs_at).toLocaleDateString(undefined, {
@@ -347,7 +353,7 @@ export function ScheduleManager({
           <div className="flex flex-col gap-4 px-4 pb-4">
             {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="flex flex-col gap-2">
-              <Label>Episode Number</Label>
+              <Label>Week Number</Label>
               <Input
                 type="number"
                 min={1}
@@ -392,7 +398,19 @@ export function ScheduleManager({
                 />
                 Double Elimination
               </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={isScoring}
+                  onChange={(e) => setIsScoring(e.target.checked)}
+                />
+                Competition week
+              </label>
             </div>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Uncheck Competition week for exhibition / interview nights so they stay off Results and
+              Picks. Prefer not creating those rows at all — they must not consume a fan week number.
+            </p>
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <Label>Who&apos;s Performing?</Label>

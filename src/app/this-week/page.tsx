@@ -8,6 +8,7 @@ import { TopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { isScoringWeek } from "@/lib/format-week";
 import {
   adjacentThisWeekWeeks,
   buildThisWeekCarouselWeeks,
@@ -52,11 +53,12 @@ export default async function ThisWeekPage({
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const { data: seasonEpisodeRows } = await supabase
     .from("episodes")
-    .select("id, week_number, airs_at, theme, is_finale, status")
+    .select("id, week_number, airs_at, theme, is_finale, status, is_scoring")
     .eq("season_id", activeSeasonId ?? "")
+    .eq("is_scoring", true)
     .order("week_number", { ascending: false });
 
-  const seasonEpisodes = seasonEpisodeRows ?? [];
+  const seasonEpisodes = (seasonEpisodeRows ?? []).filter(isScoringWeek);
   const completedEpisodes = seasonEpisodes.filter((e) => e.status === "completed");
 
   const cutoff = await resolveSpoilerCutoff(
@@ -76,9 +78,9 @@ export default async function ThisWeekPage({
   const neighbors = selectedEpisodeId ? adjacentThisWeekWeeks(carouselWeeks, selectedEpisodeId) : { prev: null, next: null };
   const showResults = selectedMode === "results";
 
-  // Fires whenever a completed episode sits past last_watched_week — even
+  // Fires whenever a completed week sits past last_watched_week — even
   // if an older week is already on screen. Otherwise a viewer who marked
-  // E01 gets stranded on those results with no way to reveal E02.
+  // Week 1 gets stranded on those results with no way to reveal Week 2.
   const pendingReveal = cutoff.pendingRevealEpisode
     ? { weekNumber: cutoff.pendingRevealEpisode.week_number, theme: cutoff.pendingRevealEpisode.theme }
     : null;

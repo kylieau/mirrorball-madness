@@ -40,6 +40,7 @@ export default async function TodayPage() {
     .from("episodes")
     .select("id, week_number")
     .eq("status", "upcoming")
+    .eq("is_scoring", true)
     .order("week_number", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -50,6 +51,7 @@ export default async function TodayPage() {
     .select("id, week_number, results_published_at")
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
+    .eq("is_scoring", true)
     .order("week_number", { ascending: false });
 
   const cutoff = await resolveSpoilerCutoff(
@@ -63,8 +65,8 @@ export default async function TodayPage() {
   const trueLatestCompletedEpisode = completedEpisodes?.[0] ?? null;
   const latestCompletedEpisodeId = cutoff.effectiveLatestEpisode?.id ?? null;
   const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
-  // Same season-wide figure on every league card (episodes aren't scoped
-  // per-league) — mirrors Standings' own through-episode label so Home and
+  // Same season-wide figure on every league card (weeks aren't scoped
+  // per-league) — mirrors Standings' own through-week label so Home and
   // Standings never disagree about how caught-up the viewer is.
   const weeksBehind =
     trueLatestCompletedEpisode && trueLatestCompletedEpisode.id !== latestCompletedEpisodeId

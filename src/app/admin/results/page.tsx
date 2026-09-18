@@ -59,7 +59,7 @@ export default async function AdminResultsPage() {
     supabase
       .from("episodes")
       .select(
-        "id, week_number, airs_at, theme, status, is_finale, is_elimination_week, is_double_elimination_week, results_published_at, results_published_by"
+        "id, week_number, airs_at, theme, status, is_finale, is_elimination_week, is_double_elimination_week, is_scoring, results_published_at, results_published_by"
       )
       .eq("season_id", activeSeasonId ?? "")
       .order("week_number"),

@@ -2,14 +2,20 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
-## Results / Picks episode carousel
+## Results / Picks week carousel
 
-Shared slim ← `Ep. N — {theme}` → control (`EpisodeCarousel` / `formatEpisodeCasualWithTheme`). Not on Home.
+Shared slim ← `Week N — {theme}` → control (`EpisodeCarousel` / `formatEpisodeCasualWithTheme`). Not on Home. Exhibition nights (`episodes.is_scoring = false`) are omitted.
 
-- **Results** (`/this-week`): prev/next are `/this-week?week=` links. Carousel weeks = spoiler-visible completed episodes **plus** upcoming/locked for a theme peek. Unwatched completed weeks are omitted so `?week=` cannot leak results. Completed + visible → results; upcoming/locked → theme peek. Default is the latest visible completed week; before premiere, the first peek week. Pending reveal stays `WeeklyResultsView`'s mark-as-watched card.
+- **Results** (`/this-week`): prev/next are `/this-week?week=` links. Carousel weeks = spoiler-visible completed **competition** weeks **plus** upcoming/locked for a theme peek. Unwatched completed weeks are omitted so `?week=` cannot leak results. Completed + visible → results; upcoming/locked → theme peek. Default is the latest visible completed week; before premiere, the first peek week. Pending reveal stays `WeeklyResultsView`'s mark-as-watched card.
 - **Picks / Curtain Call**: one card (`CurtainCallCard`), titled **Curtain Call**. Same carousel; hrefs are `?tab=yourpicks&week=`. Live/upcoming week → pick form. Completed week → past recap in that same card. Unwatched completed weeks land on the lock card. No second Past picks card.
 
 Out of scope (still): full season schedule dump, a new schedule page, lock-time hint, Home timeline.
+
+## Competition week vs TV episode
+
+Locked product rule: fan-facing unit is a **week** (aka round), not a TV episode. Copy is `Week N` / `Week N — {theme}` via `src/lib/format-week.ts`. Admin/ops keep `formatEpisodeLabel` (`S35 E02`). Do **not** reintroduce `week_part`. S35 premiere nights 1+2 fold into week 1; interview night is exhibition (`is_scoring = false`) and must not consume a competition week number — owner paste-runs `supabase/apply-s35-premiere-fold.sql`. Do not add a “scoring starts at week 2” product flag; manager scores are wiped separately.
+
+Finale (document only): calendar week with two true fantasy rounds → two `week_number`s; one round with two elims → one week + existing double-elim flags.
 
 ## Bottom nav width + sticky desktop
 
@@ -21,7 +27,7 @@ Out of scope (still): redesigning icons/labels.
 
 ### Episode dropdown on the title line
 
-**Superseded by EpisodeCarousel** (PR #17). Fan Results no longer uses `WeekSwitcher` above the theme — the slim ← `Ep. N — {theme}` → control sits under the Results title (`PageHeader` children on `/this-week`). The original nit (dropdown sitting *above* the episode title; wanted same-line, right-aligned) applied to that WeekSwitcher chrome and is gone. Picks uses the same carousel inside the Curtain Call card.
+**Superseded by EpisodeCarousel** (PR #17). Fan Results no longer uses `WeekSwitcher` above the theme — the slim ← `Week N — {theme}` → control sits under the Results title (`PageHeader` children on `/this-week`). The original nit (dropdown sitting *above* the episode title; wanted same-line, right-aligned) applied to that WeekSwitcher chrome and is gone. Picks uses the same carousel inside the Curtain Call card.
 
 Admin View Results is accordion-by-week and has no episode dropdown. Admin Enter Results' "Scheduled Episode" `Select` is form chrome under the card title, not the fan switcher — not parked.
 
@@ -33,7 +39,7 @@ Code already maps `episode_results.outcome = 'bye'` → badge **DND**, pts **—
 
 Implemented on the league **Picks** tab (`?tab=yourpicks`), inside the single Curtain Call card (not a second card, not a new tab).
 
-- Episode switcher is the shared slim `EpisodeCarousel` (`?tab=yourpicks&week=`). Fan labels: `formatEpisodeCasualWithTheme` (`Ep. N — {theme}`), not `formatEpisodeLabel`. Card title is **Curtain Call**.
+- Week switcher is the shared slim `EpisodeCarousel` (`?tab=yourpicks&week=`). Fan labels: `formatEpisodeCasualWithTheme` (`Week N — {theme}`), not `formatEpisodeLabel`. Card title is **Curtain Call**.
 - Per completed episode: your elim pick(s) vs actual, top-scorer pick vs highest `dance_scores.total_score` sum (same helper scoring uses), Curtain Call points from `weekly_manager_scores.prediction_points`.
 - Spoiler-Free: outcomes only for weeks in `resolveSpoilerCutoff` / `allowedEpisodeIds`. Unwatched completed weeks are selectable but locked (“Mark as watched to see how you did”) — no results leak.
 - v1 is **your** history only. Hidden when Curtain Call is off.

@@ -26,7 +26,7 @@ export function SpoilerModeToggle({ initialEnabled }: { initialEnabled: boolean 
     <div className="flex w-full items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm first:border-t-0">
       <div>
         <p>Spoiler-Free Mode</p>
-        <p className="text-xs text-muted-foreground">Hide results until you mark an episode as watched</p>
+        <p className="text-xs text-muted-foreground">Hide results until you mark a week as watched</p>
       </div>
       <Switch checked={enabled} onCheckedChange={handleChange} disabled={pending} />
     </div>

@@ -4,6 +4,7 @@ import {
   formatEpisodeCasualShort,
   formatEpisodeCasualWithTheme,
   formatEpisodeLabel,
+  isScoringWeek,
 } from "./format-week";
 
 describe("formatEpisodeLabel", () => {
@@ -22,26 +23,38 @@ describe("formatEpisodeLabel", () => {
 });
 
 describe("formatEpisodeCasual", () => {
-  it("uses the unpadded Episode N phrase for roomy fan copy", () => {
-    expect(formatEpisodeCasual(2)).toBe("Episode 2");
-    expect(formatEpisodeCasual(12)).toBe("Episode 12");
+  it("uses the unpadded Week N phrase for roomy fan copy", () => {
+    expect(formatEpisodeCasual(2)).toBe("Week 2");
+    expect(formatEpisodeCasual(12)).toBe("Week 12");
   });
 });
 
 describe("formatEpisodeCasualShort", () => {
-  it("uses Ep. N for tight fan UI", () => {
-    expect(formatEpisodeCasualShort(2)).toBe("Ep. 2");
+  it("uses Week N for tight fan UI", () => {
+    expect(formatEpisodeCasualShort(2)).toBe("Week 2");
   });
 });
 
 describe("formatEpisodeCasualWithTheme", () => {
   it("appends a theme with an em dash when one is present", () => {
-    expect(formatEpisodeCasualWithTheme(2, "Latin Night")).toBe("Ep. 2 — Latin Night");
+    expect(formatEpisodeCasualWithTheme(2, "Latin Night")).toBe("Week 2 — Latin Night");
   });
 
   it("falls back to the short label when theme is missing or blank", () => {
-    expect(formatEpisodeCasualWithTheme(2)).toBe("Ep. 2");
-    expect(formatEpisodeCasualWithTheme(2, null)).toBe("Ep. 2");
-    expect(formatEpisodeCasualWithTheme(2, "  ")).toBe("Ep. 2");
+    expect(formatEpisodeCasualWithTheme(2)).toBe("Week 2");
+    expect(formatEpisodeCasualWithTheme(2, null)).toBe("Week 2");
+    expect(formatEpisodeCasualWithTheme(2, "  ")).toBe("Week 2");
+  });
+});
+
+describe("isScoringWeek", () => {
+  it("treats missing or true as a competition week", () => {
+    expect(isScoringWeek({})).toBe(true);
+    expect(isScoringWeek({ is_scoring: true })).toBe(true);
+    expect(isScoringWeek({ is_scoring: null })).toBe(true);
+  });
+
+  it("drops exhibition / interview nights", () => {
+    expect(isScoringWeek({ is_scoring: false })).toBe(false);
   });
 });

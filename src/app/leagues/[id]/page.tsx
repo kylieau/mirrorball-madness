@@ -104,8 +104,9 @@ export default async function LeaguePage({
         ),
       supabase
         .from("episodes")
-        .select("id, week_number, airs_at, theme, is_double_elimination_week")
+        .select("id, week_number, airs_at, theme, is_double_elimination_week, is_scoring")
         .eq("status", "upcoming")
+        .eq("is_scoring", true)
         .order("week_number", { ascending: true })
         .limit(1)
         .maybeSingle(),
@@ -117,9 +118,10 @@ export default async function LeaguePage({
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const { data: completedEpisodes } = await supabase
     .from("episodes")
-    .select("id, week_number, theme, is_double_elimination_week, results_published_at")
+    .select("id, week_number, theme, is_double_elimination_week, results_published_at, is_scoring")
     .eq("season_id", activeSeasonId ?? "")
     .eq("status", "completed")
+    .eq("is_scoring", true)
     .order("week_number", { ascending: false });
   const { data: finaleEpisode } = await supabase
     .from("episodes")
@@ -545,9 +547,15 @@ export default async function LeaguePage({
       id: e.id,
       weekNumber: e.week_number,
       theme: e.theme,
+      isScoring: e.is_scoring,
     })),
     upcomingEpisode
-      ? { id: upcomingEpisode.id, weekNumber: upcomingEpisode.week_number, theme: upcomingEpisode.theme }
+      ? {
+          id: upcomingEpisode.id,
+          weekNumber: upcomingEpisode.week_number,
+          theme: upcomingEpisode.theme,
+          isScoring: upcomingEpisode.is_scoring,
+        }
       : null
   );
 

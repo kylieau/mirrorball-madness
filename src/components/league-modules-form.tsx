@@ -28,7 +28,7 @@ import {
   utcIsoToLocalInput,
 } from "@/lib/use-browser-time-zone";
 import { explainGrandFinaleMethod } from "@/lib/grand-finale-explainer";
-import { formatEpisodeLabel } from "@/lib/format-week";
+import { formatEpisodeCasual } from "@/lib/format-week";
 import {
   airsAtForWeek,
   explainGrandFinaleDeadline,
@@ -111,7 +111,6 @@ export function LeagueModulesForm({
   scoringSettings,
   canEdit,
   seasonEpisodes,
-  seasonNumber,
   effectiveHardDeadlineWeek,
 }: {
   leagueId: string;
@@ -119,11 +118,10 @@ export function LeagueModulesForm({
   scoringSettings: ScoringSettings | null;
   canEdit: boolean;
   seasonEpisodes: SeasonEpisode[];
-  seasonNumber: number | null;
-  // effective_hard_deadline_week — the episode Grand Finale actually locks
-  // at. May have auto-advanced past the commissioner's Anchor week while a
-  // Dance Card draft is still open; the Season Clock labels that episode
-  // next to its airs_at so the two can't look like a mismatched pair.
+  // effective_hard_deadline_week — the week Grand Finale actually locks
+  // against. May have auto-advanced past the commissioner's Anchor week
+  // while a Dance Card draft is still open; the Season Clock labels that
+  // week next to its airs_at so the two can't look like a mismatched pair.
   effectiveHardDeadlineWeek: number | null;
 }) {
   const router = useRouter();
@@ -152,8 +150,8 @@ export function LeagueModulesForm({
   const [judgesStartsWeek, setJudgesStartsWeek] = useState(scoringSettings?.judges_score_starts_week ?? 1);
   const startsWeekItems = Object.fromEntries(
     seasonEpisodes.length > 0
-      ? seasonEpisodes.map((e) => [String(e.week_number), formatEpisodeLabel(e.week_number, seasonNumber)])
-      : [[String(judgesStartsWeek), formatEpisodeLabel(judgesStartsWeek, seasonNumber)]]
+      ? seasonEpisodes.map((e) => [String(e.week_number), formatEpisodeCasual(e.week_number)])
+      : [[String(judgesStartsWeek), formatEpisodeCasual(judgesStartsWeek)]]
   );
   const [judgesScoreMultiplier, setJudgesScoreMultiplier] = useState(
     scoringSettings?.judges_score_multiplier ?? 1
@@ -219,21 +217,18 @@ export function LeagueModulesForm({
   const formattedLockAirsAt = useFormattedDeadline(lockAirsAt);
   const lockDisplay = formatLockWithEpisode(
     lockWeek,
-    seasonNumber,
     formattedLockAirsAt,
     lockAirsAt != null
   );
   const seasonClockCopy = explainSeasonClock({
     anchorWeek: judgesStartsWeek,
     lockWeek,
-    seasonNumber,
     danceCardEnabled: judgesEnabled,
     draftStatus: league.draft_status,
   });
   const grandFinaleDeadlineCopy = explainGrandFinaleDeadline({
     anchorWeek: judgesStartsWeek,
     lockWeek,
-    seasonNumber,
   });
   const showAnchorSync = shouldShowAnchorSyncControl(canEdit, judgesStartsWeek, lockWeek);
 
@@ -347,7 +342,7 @@ export function LeagueModulesForm({
             <CardDescription>Your league&apos;s Hard Deadline — the one week everything else locks around.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col">
-            <SettingRow label="Anchor week" value={formatEpisodeLabel(judgesStartsWeek, seasonNumber)} />
+            <SettingRow label="Anchor week" value={formatEpisodeCasual(judgesStartsWeek)} />
             <SettingRow
               label="Currently locks"
               value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}

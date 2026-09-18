@@ -108,6 +108,7 @@ export type ScheduleEpisodeInput = {
   isEliminationWeek: boolean;
   isFinale: boolean;
   isDoubleEliminationWeek: boolean;
+  isScoring: boolean;
   // Empty = unrestricted (every currently-active couple participates) — the
   // ordinary case. Only populated for a split-broadcast episode (e.g. a
   // two-night premiere where half the cast dances each night).
@@ -135,6 +136,7 @@ export async function applyEpisodeSchedule(
         is_elimination_week: input.isEliminationWeek,
         is_finale: input.isFinale,
         is_double_elimination_week: input.isDoubleEliminationWeek,
+        is_scoring: input.isScoring,
       },
       { onConflict: "season_id,week_number" }
     )

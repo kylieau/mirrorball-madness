@@ -53,6 +53,15 @@ describe("buildThisWeekCarouselWeeks", () => {
   it("keeps upcoming and locked weeks when nothing completed is visible yet", () => {
     expect(buildThisWeekCarouselWeeks([e01, e03], new Set()).map((e) => e.id)).toEqual(["ep-3"]);
   });
+
+  it("omits exhibition / non-scoring weeks from the fan carousel", () => {
+    const interview = ep(3, "completed", { is_scoring: false, theme: "Interview Night" });
+    const visible = new Set(["ep-1", "ep-3"]);
+    expect(buildThisWeekCarouselWeeks([e01, interview, e03], visible).map((e) => e.id)).toEqual([
+      "ep-1",
+      "ep-3",
+    ]);
+  });
 });
 
 describe("selectThisWeekEpisode", () => {

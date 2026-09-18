@@ -127,6 +127,15 @@ describe("buildCurtainCallWeeks", () => {
     const weeks = [{ id: "ep-1", weekNumber: 1 }];
     expect(buildCurtainCallWeeks(weeks, weeks[0]).map((w) => w.id)).toEqual(["ep-1"]);
   });
+
+  it("omits exhibition / non-scoring weeks", () => {
+    const completed = [
+      { id: "ep-1", weekNumber: 1 },
+      { id: "interview", weekNumber: 3, isScoring: false },
+    ];
+    const live = { id: "ep-4", weekNumber: 4 };
+    expect(buildCurtainCallWeeks(completed, live).map((w) => w.id)).toEqual(["ep-1", "ep-4"]);
+  });
 });
 
 describe("isPastPicksLocked", () => {

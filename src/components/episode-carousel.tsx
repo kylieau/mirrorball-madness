@@ -36,7 +36,7 @@ function ArrowSlot({
   );
 }
 
-// Slim ← Ep. N — theme → control shared by Results and Picks.
+// Slim ← Week N — theme → control shared by Results and Picks.
 // Prev/next are real links so flipping re-renders that week's body.
 export function EpisodeCarousel({
   weekNumber,
@@ -52,12 +52,12 @@ export function EpisodeCarousel({
   const label = formatEpisodeCasualWithTheme(weekNumber, theme);
 
   return (
-    <nav aria-label="Episodes" className="flex items-center justify-center">
-      <ArrowSlot href={prevHref} label="Previous episode">
+    <nav aria-label="Weeks" className="flex items-center justify-center">
+      <ArrowSlot href={prevHref} label="Previous week">
         <ChevronLeftIcon className="size-4" />
       </ArrowSlot>
       <p className="min-w-0 max-w-[calc(100%-5rem)] truncate text-center text-sm font-medium">{label}</p>
-      <ArrowSlot href={nextHref} label="Next episode">
+      <ArrowSlot href={nextHref} label="Next week">
         <ChevronRightIcon className="size-4" />
       </ArrowSlot>
     </nav>

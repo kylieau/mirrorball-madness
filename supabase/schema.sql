@@ -293,7 +293,7 @@ create table waiver_claims (
 create table episodes (
   id uuid primary key default gen_random_uuid(),
   season_id uuid not null references seasons(id),
-  week_number int not null, -- resets to 1 each season, so unique per-season below, not globally
+  week_number int not null, -- competition week (aka round), unique per season; not a TV episode number
   airs_at timestamptz not null, -- actual real-world air date/time; set per episode, not assumed weekly-regular
   theme text, -- e.g. "Villains Night" — free text, not a managed list; themes rarely repeat
   expected_dance_count int not null default 1, -- informational only, doesn't gate how many dances a couple can actually submit
@@ -304,6 +304,13 @@ create table episodes (
   -- enforces "0 or 2, never 1" filled slots) — results entry itself already
   -- supports any number of eliminations per episode with no flag needed.
   is_double_elimination_week boolean not null default false,
+  -- Competition / fantasy week (the fan-facing unit). False = exhibition
+  -- (e.g. S35 interview night): omitted from Results/Picks carousels and
+  -- upcoming-pick queries. Does not change scoring math — non-scoring weeks
+  -- simply should not receive dance_scores / weekly_manager_scores. Default
+  -- true so ordinary weeks are unchanged. Do not reintroduce week_part for
+  -- split broadcasts; fold those into one week_number instead.
+  is_scoring boolean not null default true,
   status text not null default 'upcoming' check (status in ('upcoming', 'locked', 'completed')),
   -- guest_judge_name is a leftover caption, not a people(role='judge') row.
   -- It is not shown anywhere and is no longer editable in Enter Results —
@@ -1290,7 +1297,7 @@ begin
       judges_score_starts_week,
       coalesce(
         (select min(week_number) from public.episodes
-         where season_id = public.active_season_id() and airs_at > now()),
+         where season_id = public.active_season_id() and airs_at > now() and is_scoring),
         judges_score_starts_week
       )
     )
@@ -1719,7 +1726,7 @@ as $$
       ss.judges_score_starts_week,
       coalesce(
         (select min(e.week_number) from public.episodes e
-         where e.season_id = public.active_season_id() and e.airs_at > now()),
+         where e.season_id = public.active_season_id() and e.airs_at > now() and e.is_scoring),
         ss.judges_score_starts_week
       )
     )
@@ -2050,7 +2057,7 @@ begin
     raise exception 'That couple is already on a roster in this league';
   end if;
 
-  v_current_week := coalesce((select max(week_number) from public.episodes where status = 'completed'), 0);
+  v_current_week := coalesce((select max(week_number) from public.episodes where status = 'completed' and is_scoring), 0);
 
   insert into public.waiver_claims (league_id, couple_id, manager_id, slot_number, week_number, status)
   values (p_league_id, p_couple_id, auth.uid(), p_slot_number, v_current_week, 'pending')
