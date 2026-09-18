@@ -47,6 +47,12 @@ Implemented — Recast nudge + `/leagues/[id]/waivers` no longer name an elimina
 
 Out of scope (still): feature-announcement infra; DND live-data invent.
 
+## Draft / auto-draft
+
+**Owner-noted, not started** (Kylie via Chief Kimo). Parked as a note only — do not implement from this item.
+
+When a draft starts and a manager isn’t participating, need a way to handle that (e.g. auto-draft). Constraint: **randomized only** — not skill-based, not informed by rankings or any other data. More thoughts may land later.
+
 ## Account deletion processing
 
 `request_account_deletion` records a request (`profiles.deletion_requested_at`) but nothing surfaces the list of pending requests anywhere. Needs at minimum a way to query it (a Supabase dashboard SQL query is fine for now, given the scale); eventually a small admin view if this ever needs to happen regularly.
