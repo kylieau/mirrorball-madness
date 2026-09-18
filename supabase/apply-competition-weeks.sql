@@ -461,7 +461,15 @@ begin
   end if;
 end $$;
 
-create or replace function public.prediction_lock_at(p_league_id uuid, p_week_id uuid)
+-- CREATE OR REPLACE cannot rename input args (42P13). Drop the episode-id
+-- overloads first. The RLS policy references prediction_lock_at, so drop
+-- that policy before the function.
+drop policy if exists "predictions visible to owner pre-lock, league post-lock"
+  on public.predictions;
+drop function if exists public.prediction_lock_at(uuid, uuid);
+drop function if exists public.submit_prediction(uuid, uuid, uuid, uuid, uuid);
+
+create function public.prediction_lock_at(p_league_id uuid, p_week_id uuid)
 returns timestamptz
 language sql
 security definer
@@ -472,9 +480,6 @@ as $$
   from public.episodes e, public.leagues l
   where e.week_id = p_week_id and l.id = p_league_id;
 $$;
-
-drop policy if exists "predictions visible to owner pre-lock, league post-lock"
-  on public.predictions;
 
 alter table public.predictions
   alter column week_id set not null;
@@ -718,18 +723,6 @@ end;
 $$;
 
 revoke execute on function public.record_draft_pick(uuid, uuid, uuid, boolean) from public, authenticated;
-
-create or replace function public.prediction_lock_at(p_league_id uuid, p_week_id uuid)
-returns timestamptz
-language sql
-security definer
-set search_path = ''
-stable
-as $$
-  select min(e.airs_at) - (l.prediction_lock_hours_before_air * interval '1 hour')
-  from public.episodes e, public.leagues l
-  where e.week_id = p_week_id and l.id = p_league_id;
-$$;
 
 create or replace function public.effective_hard_deadline_week(p_league_id uuid)
 returns int
