@@ -481,9 +481,12 @@ security definer
 set search_path = ''
 stable
 as $$
-  select min(e.airs_at) - (l.prediction_lock_hours_before_air * interval '1 hour')
-  from public.episodes e, public.leagues l
-  where e.week_id = p_week_id and l.id = p_league_id;
+  select min(e.airs_at) - (
+    (select l.prediction_lock_hours_before_air from public.leagues l where l.id = p_league_id)
+    * interval '1 hour'
+  )
+  from public.episodes e
+  where e.week_id = p_week_id;
 $$;
 
 alter table public.predictions
@@ -529,18 +532,13 @@ alter table public.weekly_manager_scores
 alter table public.weekly_manager_scores
   drop column if exists episode_id;
 
--- Episode-level competition flags moved onto competition_weeks.
-alter table public.episodes drop column if exists week_number;
-alter table public.episodes drop column if exists is_elimination_week;
-alter table public.episodes drop column if exists is_finale;
-alter table public.episodes drop column if exists is_double_elimination_week;
-alter table public.episodes drop column if exists is_scoring;
-
 drop index if exists idx_predictions_league_episode;
 drop index if exists idx_weekly_scores_league_episode;
 
 -- ---------------------------------------------------------------------------
 -- 4. RPCs now keyed off competition weeks
+-- Recreate these BEFORE dropping episodes.week_number — live SQL functions
+-- (especially effective_hard_deadline_week) still depend on that column.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.create_league(
@@ -933,5 +931,14 @@ revoke execute on function public.submit_prediction(uuid, uuid, uuid, uuid, uuid
 grant execute on function public.submit_prediction(uuid, uuid, uuid, uuid, uuid) to authenticated;
 revoke execute on function public.submit_waiver_claim(uuid, int, uuid) from public;
 grant execute on function public.submit_waiver_claim(uuid, int, uuid) to authenticated;
+
+-- Episode-level competition flags moved onto competition_weeks. After the
+-- RPCs above so Postgres is not still tracking week_number on the old
+-- effective_hard_deadline_week SQL body.
+alter table public.episodes drop column if exists week_number;
+alter table public.episodes drop column if exists is_elimination_week;
+alter table public.episodes drop column if exists is_finale;
+alter table public.episodes drop column if exists is_double_elimination_week;
+alter table public.episodes drop column if exists is_scoring;
 
 commit;

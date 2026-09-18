@@ -1716,9 +1716,12 @@ security definer
 set search_path = ''
 stable
 as $$
-  select min(e.airs_at) - (l.prediction_lock_hours_before_air * interval '1 hour')
-  from public.episodes e, public.leagues l
-  where e.week_id = p_week_id and l.id = p_league_id;
+  select min(e.airs_at) - (
+    (select l.prediction_lock_hours_before_air from public.leagues l where l.id = p_league_id)
+    * interval '1 hour'
+  )
+  from public.episodes e
+  where e.week_id = p_week_id;
 $$;
 
 revoke execute on function public.prediction_lock_at(uuid, uuid) from public;
