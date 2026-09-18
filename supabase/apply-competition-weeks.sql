@@ -63,6 +63,11 @@ create index if not exists idx_episodes_week on public.episodes(week_id);
 create index if not exists idx_predictions_league_week on public.predictions(league_id, week_id);
 create index if not exists idx_weekly_scores_league_week on public.weekly_manager_scores(league_id, week_id);
 
+-- Night Two restore inserts a second episode with week_number = 1 (the
+-- column is still NOT NULL until later). Drop the old 1:1 unique first.
+alter table public.episodes
+  drop constraint if exists episodes_season_id_week_number_key;
+
 -- ---------------------------------------------------------------------------
 -- 2. Data: one competition week per scoring episode, then premiere grouping
 -- ---------------------------------------------------------------------------
@@ -302,15 +307,23 @@ begin
       where id = v_week1.id;
     end if;
 
+    -- week_number (and the old episode-level flags) are still on the live
+    -- table until the DROP COLUMN later in this script. Omitting them
+    -- failed with 23502 on week_number. Flags have defaults but are
+    -- copied from Night One so a NOT NULL / no-default live column
+    -- cannot blank-insert. is_scoring uses to_jsonb so a re-run after
+    -- that column is dropped still parses.
     insert into public.episodes (
-      season_id, episode_number, week_id, airs_at, theme,
+      season_id, episode_number, week_id, week_number, airs_at, theme,
       expected_dance_count, status, guest_judge_name, judges_save_available,
-      results_published_at, results_published_by
+      results_published_at, results_published_by,
+      is_elimination_week, is_finale, is_double_elimination_week
     )
     values (
       v_season_id,
       2,
       v_week1.id,
+      1,
       v_night1.airs_at + interval '1 day',
       'Night Two',
       v_night1.expected_dance_count,
@@ -318,9 +331,17 @@ begin
       v_night1.guest_judge_name,
       v_night1.judges_save_available,
       v_night1.results_published_at,
-      v_night1.results_published_by
+      v_night1.results_published_by,
+      coalesce((to_jsonb(v_night1)->>'is_elimination_week')::boolean, v_week1.is_elimination_week),
+      coalesce((to_jsonb(v_night1)->>'is_finale')::boolean, v_week1.is_finale),
+      coalesce((to_jsonb(v_night1)->>'is_double_elimination_week')::boolean, v_week1.is_double_elimination_week)
     )
     returning id into v_new_id;
+
+    if v_has_is_scoring then
+      execute 'update public.episodes set is_scoring = $1 where id = $2'
+        using coalesce((to_jsonb(v_night1)->>'is_scoring')::boolean, true), v_new_id;
+    end if;
 
     raise notice 'Inserted Night Two episode % (empty dances/participants — re-tick cast in Admin → Schedule)',
       v_new_id;
