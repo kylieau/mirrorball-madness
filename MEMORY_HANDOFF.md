@@ -21,7 +21,14 @@ Draft PR off latest `main`: drop unused `/notifications` `rankBadge` so Spoiler-
 - Recast/waivers spoiler framing; roster-eliminated clamp; feature-announcement infra.
 - `/notifications` `rankBadge` leak — done (this PR).
 
-## 5. Next Steps
+## 5. Verification
+
+- `npm run lint` — pass
+- `npm test` — 19 files / 173 tests pass
+- `npm run build` — pass (includes `/notifications`)
+- No browser pass: `rankBadge` was never rendered on `/notifications`; no `.env.local` in this container for a live session.
+
+## 6. Next Steps
 
 1. Merge this PR when ready — latent leak cleanup, not a visible UI change.
 2. Do not merge from the agent.
