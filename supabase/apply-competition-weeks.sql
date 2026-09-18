@@ -21,6 +21,14 @@
 -- Night One vs Night Two in Admin → Schedule after this runs.
 --
 -- Apply BEFORE deploying the app code that reads competition_weeks / week_id.
+--
+-- Live failures already fixed in this file (re-run the whole script; prior
+-- attempts rolled back):
+--   23502 Night Two omitted still-NOT-NULL week_number — insert now copies
+--         every live episodes column except id.
+--   42P13 CREATE OR REPLACE cannot rename p_episode_id — DROP FUNCTION first.
+--   2BP01 policy depends on prediction_lock_at — DROP POLICY first (one line).
+--   42803 min(airs_at) minus joined lock-hours — scalar subquery, one body.
 
 begin;
 
@@ -99,6 +107,8 @@ declare
   v_overlap_dance_couples int;
   v_ep record;
   v_new_id uuid;
+  v_col_list text;
+  v_overlay jsonb;
 begin
   select id, name into v_season_id, v_season_name
   from public.seasons
@@ -315,41 +325,43 @@ begin
       where id = v_week1.id;
     end if;
 
-    -- week_number (and the old episode-level flags) are still on the live
-    -- table until the DROP COLUMN later in this script. Omitting them
-    -- failed with 23502 on week_number. Flags have defaults but are
-    -- copied from Night One so a NOT NULL / no-default live column
-    -- cannot blank-insert. is_scoring uses to_jsonb so a re-run after
-    -- that column is dropped still parses.
-    insert into public.episodes (
-      season_id, episode_number, week_id, week_number, airs_at, theme,
-      expected_dance_count, status, guest_judge_name, judges_save_available,
-      results_published_at, results_published_by,
-      is_elimination_week, is_finale, is_double_elimination_week
-    )
-    values (
-      v_season_id,
-      2,
-      v_week1.id,
-      1,
-      v_night1.airs_at + interval '1 day',
-      'Night Two',
-      v_night1.expected_dance_count,
-      v_night1.status,
-      v_night1.guest_judge_name,
-      v_night1.judges_save_available,
-      v_night1.results_published_at,
-      v_night1.results_published_by,
-      coalesce((to_jsonb(v_night1)->>'is_elimination_week')::boolean, v_week1.is_elimination_week),
-      coalesce((to_jsonb(v_night1)->>'is_finale')::boolean, v_week1.is_finale),
-      coalesce((to_jsonb(v_night1)->>'is_double_elimination_week')::boolean, v_week1.is_double_elimination_week)
-    )
-    returning id into v_new_id;
+    -- Copy every live episodes column except id (23502 if a still-NOT-NULL
+    -- column is omitted — week_number was the first). Extra jsonb keys are
+    -- ignored after those columns drop, so a re-run still parses.
+    v_overlay := to_jsonb(v_night1) - 'id' || jsonb_build_object(
+      'episode_number', 2,
+      'week_id', v_week1.id,
+      'week_number', 1,
+      'airs_at', v_night1.airs_at + interval '1 day',
+      'theme', 'Night Two',
+      'is_elimination_week', coalesce(
+        (to_jsonb(v_night1)->>'is_elimination_week')::boolean,
+        v_week1.is_elimination_week
+      ),
+      'is_finale', coalesce((to_jsonb(v_night1)->>'is_finale')::boolean, v_week1.is_finale),
+      'is_double_elimination_week', coalesce(
+        (to_jsonb(v_night1)->>'is_double_elimination_week')::boolean,
+        v_week1.is_double_elimination_week
+      ),
+      'is_scoring', coalesce((to_jsonb(v_night1)->>'is_scoring')::boolean, true)
+    );
 
-    if v_has_is_scoring then
-      execute 'update public.episodes set is_scoring = $1 where id = $2'
-        using coalesce((to_jsonb(v_night1)->>'is_scoring')::boolean, true), v_new_id;
-    end if;
+    select string_agg(format('%I', c.column_name), ', ' order by c.ordinal_position)
+    into v_col_list
+    from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'episodes'
+      and c.column_name <> 'id'
+      and coalesce(c.is_generated, 'NEVER') <> 'ALWAYS';
+
+    execute format(
+      'insert into public.episodes (%s)
+       select %s
+       from jsonb_populate_record(null::public.episodes, $1)
+       returning id',
+      v_col_list,
+      v_col_list
+    ) using v_overlay into v_new_id;
 
     raise notice 'Inserted Night Two episode % (empty dances/participants — re-tick cast in Admin → Schedule)',
       v_new_id;
@@ -437,6 +449,26 @@ end $$;
 -- 3. Constraints after backfill
 -- ---------------------------------------------------------------------------
 
+-- SET NOT NULL is table-wide; backfill above is active-season first.
+-- Any leftover null (other seasons, or a row the 1:1 loop skipped) gets
+-- a number after that season's current max so we cannot collide.
+update public.episodes e
+set episode_number = s.assigned
+from (
+  select
+    e2.id,
+    coalesce(m.max_n, 0)
+      + row_number() over (partition by e2.season_id order by e2.airs_at, e2.id) as assigned
+  from public.episodes e2
+  left join (
+    select season_id, max(episode_number) as max_n
+    from public.episodes
+    group by season_id
+  ) m on m.season_id = e2.season_id
+  where e2.episode_number is null
+) s
+where e.id = s.id;
+
 alter table public.episodes
   alter column episode_number set not null;
 
@@ -470,6 +502,9 @@ begin
 end $$;
 
 -- Same trio as after BEGIN (IF EXISTS). Policy drop stays on one line.
+-- CREATE OR REPLACE cannot rename p_episode_id (42P13); the policy
+-- depends on prediction_lock_at (2BP01). There is exactly one
+-- prediction_lock_at body in this file (a second copy used to drift).
 drop policy if exists "predictions visible to owner pre-lock, league post-lock" on public.predictions;
 drop function if exists public.prediction_lock_at(uuid, uuid);
 drop function if exists public.submit_prediction(uuid, uuid, uuid, uuid, uuid);
@@ -488,6 +523,8 @@ as $$
   from public.episodes e
   where e.week_id = p_week_id;
 $$;
+
+delete from public.predictions where week_id is null;
 
 alter table public.predictions
   alter column week_id set not null;
@@ -522,6 +559,8 @@ begin
       unique (league_id, manager_id, week_id);
   end if;
 end $$;
+
+delete from public.weekly_manager_scores where week_id is null;
 
 alter table public.weekly_manager_scores
   alter column week_id set not null;

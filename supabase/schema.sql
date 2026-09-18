@@ -1709,6 +1709,8 @@ grant select on public.predictions to authenticated;
 -- single column anywhere, it's computed. Shared by the RLS policy below and
 -- submit_prediction so the two can't drift apart. Multi-night weeks lock
 -- before Night One.
+-- Lock hours must be a scalar subquery: min(airs_at) minus a joined
+-- leagues.prediction_lock_hours_before_air is 42803 (must GROUP BY).
 create function public.prediction_lock_at(p_league_id uuid, p_week_id uuid)
 returns timestamptz
 language sql

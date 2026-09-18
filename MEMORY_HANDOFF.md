@@ -16,6 +16,7 @@ Option B — competition weeks that can group multiple TV episodes — on branch
 - True `week_id` (not a canonical episode standing in for the week). Curtain Call lock is `min(airs_at)` of the week's episodes.
 - Finale: one round with 2 elims = one week; two true rounds the same calendar week = two weeks. Do not reintroduce `week_part`.
 - Apply SQL before deploying app code that reads `competition_weeks` / `week_id`. This container has no live DB credentials.
+- `prediction_lock_at` must use `min(e.airs_at)` minus a **scalar subquery** for `leagues.prediction_lock_hours_before_air`. A join to `leagues` with `min()` is 42803. Drop the predictions lock policy (one line) before `DROP FUNCTION prediction_lock_at` / `submit_prediction`. There is only one `prediction_lock_at` body in the apply script.
 
 ## 4. Backlog & Deferred Items
 
