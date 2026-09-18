@@ -49,29 +49,22 @@ Out of scope (still): feature-announcement infra; DND live-data invent.
 
 ## Draft / auto-draft
 
-**Owner-noted, not started** (Kylie via Chief Kimo). Parked as a note only — do not implement from this item.
+**v1 implemented.** Random-only auto-pick among eligible remaining couples. No ADP, rankings, or team-needs. Does **not** auto-start a draft.
 
-When a draft starts and a manager isn’t participating, need a way to handle that (e.g. auto-draft). Design notes below stay with this item.
+Shipped:
+- **Timeout on turn** — `leagues.current_turn_started_at` is the server pick clock. Any league member’s client (draft room or the Picks draft-status card) calls `make_auto_draft_pick` when it expires; the RPC re-checks the clock and places one uniform-random eligible couple.
+- **Never joined / not participating** — same RPC and same clock. A started draft still moves if the picker isn’t in the room, as long as someone else is on the league page or in the draft room. Missing people do not start the draft.
+- **Sit out / autopilot** — `league_members.draft_autopilot` plus a toggle in the draft room. On that manager’s turn the same RPC fires without waiting for the clock.
+- **UX** — draft log labels auto-picks `auto · random`. One timeout is one pick; the next manager gets a fresh clock (autopilot chains are delayed ~1s so they don’t blur).
+- **Commissioner undo** — `undo_last_auto_pick` deletes the latest auto-pick only while `draft_status = 'in_progress'`.
 
-**Constraint: random-only.** Not skill-based. No ADP, rankings, or team-needs. Absentees should not get a free edge or a scapegoat — random among *eligible remaining* players only.
+Apply `supabase/apply-auto-draft.sql` in the Supabase SQL Editor before this ships to production (`schema.sql` is the greenfield source of truth).
 
-**Triggers (split these):**
-1. Never joined before the pick clock — need a path so the draft can still move.
-2. Timed out on their turn — auto-pick on timeout.
-
-Optional “sit out / autopilot” toggle for someone who intends to miss the whole draft and take random picks throughout.
-
-**UX:**
-- Label auto-picks clearly in the draft log (`auto · random`).
-- Commissioner undo of a single auto-pick is a nice-to-have.
-- Don’t snowball silently (one timeout should not quietly drain the rest of the board without anyone seeing it).
-
-**Do not auto-start the draft** just because people are missing, unless the league voted that. Starting the draft and auto-picking once it’s running are separate decisions.
-
-**Later niceties** (not the first cut of this item):
+**Later niceties** (still not this cut):
 - Countdown + nudge before the first auto-pick
 - Pause if half the league ghosts
 - Seed RNG per league+draft so picks are auditable
+- Undo after the draft has completed (roster_slots already seeded)
 
 ## Account deletion processing
 

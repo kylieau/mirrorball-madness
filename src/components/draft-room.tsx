@@ -3,8 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { getPickAssignment } from "@/lib/draft";
-import { setDraftOrder, startDraft, makeDraftPick } from "@/app/leagues/[id]/draft/actions";
+import {
+  autoPickTrigger,
+  eligibleRemaining,
+  getPickAssignment,
+  secondsRemainingOnClock,
+} from "@/lib/draft";
+import { useAutoDraftPick } from "@/lib/use-auto-draft-pick";
+import {
+  setDraftOrder,
+  startDraft,
+  makeDraftPick,
+  setDraftAutopilot,
+  undoLastAutoPick,
+} from "@/app/leagues/[id]/draft/actions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,6 +25,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import type { Database } from "@/lib/supabase/types";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
@@ -24,6 +37,7 @@ type Member = {
   user_id: string;
   role: string;
   draft_position: number | null;
+  draft_autopilot: boolean;
   profiles: { display_name: string } | null;
 };
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -34,7 +48,34 @@ type DraftPick = {
   round: number;
   pick_number: number;
   picked_at: string;
+  is_auto: boolean;
 };
+
+function AutopilotToggle({
+  enabled,
+  pending,
+  disabled,
+  onToggle,
+}: {
+  enabled: boolean;
+  pending: boolean;
+  disabled: boolean;
+  onToggle: (enabled: boolean) => void;
+}) {
+  return (
+    <div className="flex w-full items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-left">
+      <div>
+        <p className="text-sm font-medium">Sit out / autopilot</p>
+        <p className="text-xs text-muted-foreground">Random picks for the rest of this draft</p>
+      </div>
+      <Switch
+        checked={enabled}
+        onCheckedChange={onToggle}
+        disabled={pending || disabled}
+      />
+    </div>
+  );
+}
 
 export function DraftRoom({
   league: initialLeague,
@@ -58,6 +99,8 @@ export function DraftRoom({
   const [picks, setPicks] = useState(initialPicks);
   const [pendingCoupleId, setPendingCoupleId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [autopilotPending, setAutopilotPending] = useState(false);
+  const [undoPending, setUndoPending] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -76,8 +119,23 @@ export function DraftRoom({
           setPicks((prev) =>
             prev.some((p) => p.id === newPick.id)
               ? prev
-              : [...prev, newPick].sort((a, b) => a.pick_number - b.pick_number)
+              : [...prev, { ...newPick, is_auto: newPick.is_auto ?? false }].sort(
+                  (a, b) => a.pick_number - b.pick_number
+                )
           );
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "draft_picks",
+        },
+        (payload) => {
+          const oldPick = payload.old as { id?: string };
+          if (!oldPick.id) return;
+          setPicks((prev) => prev.filter((p) => p.id !== oldPick.id));
         }
       )
       .on(
@@ -99,11 +157,19 @@ export function DraftRoom({
           filter: `league_id=eq.${league.id}`,
         },
         (payload) => {
-          const updated = payload.new as { user_id: string; draft_position: number | null };
+          const updated = payload.new as {
+            user_id: string;
+            draft_position: number | null;
+            draft_autopilot?: boolean;
+          };
           setMembers((prev) =>
             prev.map((m) =>
               m.user_id === updated.user_id
-                ? { ...m, draft_position: updated.draft_position }
+                ? {
+                    ...m,
+                    draft_position: updated.draft_position,
+                    draft_autopilot: updated.draft_autopilot ?? m.draft_autopilot,
+                  }
                 : m
             )
           );
@@ -117,7 +183,7 @@ export function DraftRoom({
   }, [league.id]);
 
   const draftedCoupleIds = useMemo(() => new Set(picks.map((p) => p.couple_id)), [picks]);
-  const availableCouples = couples.filter((c) => !draftedCoupleIds.has(c.id));
+  const availableCouples = eligibleRemaining(couples, draftedCoupleIds);
   const totalSlots = members.length * league.roster_size;
   const nextPickNumber = picks.length + 1;
   const { round, draftPosition } = getPickAssignment(
@@ -129,22 +195,36 @@ export function DraftRoom({
   const isMyTurn = league.draft_status === "in_progress" && onTheClock?.user_id === currentUserId;
   const formattedScheduledAt = useFormattedDeadline(league.draft_scheduled_at);
 
-  const [turnStartedAt, setTurnStartedAt] = useState(() => Date.now());
-  useEffect(() => {
-    setTurnStartedAt(Date.now());
-  }, [picks.length]);
-
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
-  const secondsRemaining = Math.max(
-    league.pick_time_limit_seconds - Math.floor((now - turnStartedAt) / 1000),
-    0
+  const secondsRemaining = secondsRemainingOnClock(
+    league.current_turn_started_at,
+    league.pick_time_limit_seconds,
+    now
   );
+  const clockExpired = secondsRemaining <= 0;
+  const onTheClockAutopilot = onTheClock?.draft_autopilot ?? false;
+
+  useAutoDraftPick({
+    leagueId: league.id,
+    draftStatus: league.draft_status,
+    clockExpired,
+    onTheClockAutopilot,
+    onError: setError,
+  });
+
+  const pendingAuto = autoPickTrigger({
+    draftStatus: league.draft_status,
+    clockExpired,
+    onTheClockAutopilot,
+  });
 
   const isCommissioner = members.some((m) => m.user_id === currentUserId && m.role === "commissioner");
+  const myAutopilot = members.find((m) => m.user_id === currentUserId)?.draft_autopilot ?? false;
+  const lastPick = picks[picks.length - 1];
 
   function coupleParts(coupleId: string): CoupleNameParts | null {
     if (coupleDisplayNames[coupleId]) return coupleDisplayNames[coupleId];
@@ -193,6 +273,32 @@ export function DraftRoom({
     const { error } = await makeDraftPick(league.id, coupleId);
     if (error) setError(error);
     setPendingCoupleId(null);
+  }
+
+  async function handleAutopilot(enabled: boolean) {
+    setError(null);
+    setAutopilotPending(true);
+    const { error } = await setDraftAutopilot(league.id, enabled);
+    if (error) {
+      setError(error);
+    } else {
+      setMembers((prev) =>
+        prev.map((m) => (m.user_id === currentUserId ? { ...m, draft_autopilot: enabled } : m))
+      );
+    }
+    setAutopilotPending(false);
+  }
+
+  async function handleUndoLastAutoPick() {
+    setError(null);
+    setUndoPending(true);
+    const { error } = await undoLastAutoPick(league.id);
+    if (error) {
+      setError(error);
+    } else {
+      setPicks((prev) => prev.slice(0, -1));
+    }
+    setUndoPending(false);
   }
 
   if (league.draft_status === "not_started") {
@@ -291,6 +397,14 @@ export function DraftRoom({
             )}
           </>
         )}
+        <AutopilotToggle
+          enabled={myAutopilot}
+          pending={autopilotPending}
+          disabled={false}
+          onToggle={(checked) => {
+            void handleAutopilot(checked);
+          }}
+        />
       </div>
     );
   }
@@ -327,7 +441,10 @@ export function DraftRoom({
                     return parts ? <CoupleName {...parts} /> : "Unknown couple";
                   })()}
                 </span>
-                <span className="text-muted-foreground">Rd {p.round}</span>
+                <span className="text-muted-foreground">
+                  Rd {p.round}
+                  {p.is_auto ? " · auto · random" : ""}
+                </span>
               </div>
             ))}
           </CardContent>
@@ -350,9 +467,18 @@ export function DraftRoom({
           <span className="font-medium text-foreground">
             {isMyTurn ? "Your turn" : `${onTheClock?.profiles?.display_name ?? "..."}'s turn`}
           </span>{" "}
-          · {secondsRemaining}s
+          · {pendingAuto ? "Auto-picking…" : `${secondsRemaining}s`}
         </p>
       </div>
+
+      <AutopilotToggle
+        enabled={myAutopilot}
+        pending={autopilotPending}
+        disabled={false}
+        onToggle={(checked) => {
+          void handleAutopilot(checked);
+        }}
+      />
 
       <div className="grid gap-6 sm:grid-cols-2">
         <Card>
@@ -366,7 +492,7 @@ export function DraftRoom({
                 key={c.id}
                 variant="outline"
                 className="justify-start"
-                disabled={!isMyTurn || pendingCoupleId !== null}
+                disabled={!isMyTurn || pendingCoupleId !== null || myAutopilot}
                 onClick={() => handlePick(c.id)}
               >
                 <CoupleName {...(coupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name })} />
@@ -390,7 +516,21 @@ export function DraftRoom({
                     return parts ? <CoupleName {...parts} /> : "Unknown couple";
                   })()}
                 </span>
-                <span className="text-muted-foreground">{managerLabel(p.manager_id)}</span>
+                <span className="text-muted-foreground">
+                  {managerLabel(p.manager_id)}
+                  {p.is_auto ? " · auto · random" : ""}
+                </span>
+                {isCommissioner && lastPick?.id === p.id && p.is_auto && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto"
+                    disabled={undoPending}
+                    onClick={() => void handleUndoLastAutoPick()}
+                  >
+                    Undo
+                  </Button>
+                )}
               </div>
             ))}
           </CardContent>

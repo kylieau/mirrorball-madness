@@ -67,7 +67,7 @@ export default async function DraftPage({
   const [{ data: members }, { data: couples }, { data: picks }] = await Promise.all([
     supabase
       .from("league_members")
-      .select("user_id, role, draft_position, profiles(display_name)")
+      .select("user_id, role, draft_position, draft_autopilot, profiles(display_name)")
       .eq("league_id", id)
       .order("draft_position"),
     supabase
@@ -78,7 +78,7 @@ export default async function DraftPage({
       .eq("season_id", activeSeasonId ?? ""),
     supabase
       .from("draft_picks")
-      .select("id, couple_id, manager_id, round, pick_number, picked_at")
+      .select("id, couple_id, manager_id, round, pick_number, picked_at, is_auto")
       .eq("league_id", id)
       .order("pick_number"),
   ]);
@@ -96,10 +96,19 @@ export default async function DraftPage({
   return (
     <DraftRoom
       league={league}
-      members={members ?? []}
+      members={(members ?? []).map((m) => ({
+        user_id: m.user_id,
+        role: m.role,
+        draft_position: m.draft_position,
+        draft_autopilot: m.draft_autopilot ?? false,
+        profiles: m.profiles,
+      }))}
       couples={flatCouples}
       coupleDisplayNames={coupleDisplayNames}
-      initialPicks={picks ?? []}
+      initialPicks={(picks ?? []).map((p) => ({
+        ...p,
+        is_auto: p.is_auto ?? false,
+      }))}
       currentUserId={user.id}
       closeHref={closeHref}
     />

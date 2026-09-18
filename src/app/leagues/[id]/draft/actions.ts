@@ -25,3 +25,28 @@ export async function makeDraftPick(leagueId: string, coupleId: string) {
   });
   return { error: error?.message ?? null };
 }
+
+export async function makeAutoDraftPick(leagueId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("make_auto_draft_pick", {
+    p_league_id: leagueId,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function setDraftAutopilot(leagueId: string, enabled: boolean) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_draft_autopilot", {
+    p_league_id: leagueId,
+    p_enabled: enabled,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function undoLastAutoPick(leagueId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("undo_last_auto_pick", {
+    p_league_id: leagueId,
+  });
+  return { error: error?.message ?? null };
+}
