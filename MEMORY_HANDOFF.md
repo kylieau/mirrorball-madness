@@ -11,7 +11,7 @@ Owner must paste-run `supabase/apply-s35-premiere-fold.sql` in the Supabase SQL 
 - Fan labels: `formatEpisodeCasual` / `Short` / `WithTheme` now say `Week N` / `Week N — {theme}`. Admin `formatEpisodeLabel` stays `S35 E02`.
 - `episodes.is_scoring` (default true) = competition week. Exhibition/interview nights are omitted from Results and Picks carousels. Admin Schedule has a Competition week checkbox.
 - S35 one-shot SQL folds premiere night 1+2 into week 1 with theme `Premiere: Nights One & Two`, deletes unused interview night (or parks at week_number 0), remaps week ints, RAISE NOTICE before/after.
-- Docs: CLAUDE.md, BACKLOG.md, this file.
+- Fan Results Eliminated banner stacks each couple on its own line when a week has 2+ elims.
 
 ## 3. Key Decisions & Lessons Learned
 

@@ -153,9 +153,11 @@ export function WeeklyResultsView({
       {eliminated.length > 0 && (
         <div className="mb-4 rounded-2xl border border-primary/40 bg-linear-to-br from-curtain to-curtain-light px-5 py-4 text-center">
           <p className="text-xs text-accent">Eliminated</p>
-          <p className="mt-1 font-heading text-lg font-semibold">
-            {eliminated.map((r) => (r.parts ? `${r.parts.celebrity} & ${r.parts.pro}` : "Unknown")).join(", ")}
-          </p>
+          <div className="mt-1 font-heading text-lg font-semibold">
+            {eliminated.map((r) => (
+              <p key={r.couple_id}>{r.parts ? `${r.parts.celebrity} & ${r.parts.pro}` : "Unknown"}</p>
+            ))}
+          </div>
         </div>
       )}
 
