@@ -90,7 +90,7 @@ The app currently has one deliberate fixed look (dark ballroom + gold, from the 
 
 ## Account-nav follow-up edits
 
-After the Today/Leagues/Settings navigation shipped, there are edits wanted on that end — not yet articulated. Revisit once those thoughts are sorted.
+Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Home Screen, Appearance (coming soon), Account & data. Site Admin and Sign out stay below. No further account-nav edits currently queued.
 
 ## Known scoring/data limitations (not bugs, just scoped-out edge cases)
 
