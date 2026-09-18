@@ -23,6 +23,7 @@ import { ProfileForm } from "@/components/profile-form";
 import { AccountDataForm } from "@/components/account-data-form";
 import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
 import { ADD_TO_HOME_SCREEN_COPY } from "@/lib/add-to-home-screen";
+import { SiteAdminNav } from "@/components/site-admin-nav";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 import { cn } from "cn";
 
@@ -37,7 +38,7 @@ const ROW_CLASSES =
 // this sheet in place. Notifications stays a plain Link (a scrollable
 // content list, not a settings form — see BACKLOG.md). Add to Home Screen
 // is its own page (`/settings/add-to-home-screen`), not nested under
-// Notifications. Admin stays a Link to the separate /admin/results surface.
+// Notifications. Super-admin Site Admin is Results + Accounts.
 export function AccountSettingsSheet({
   displayName,
   isSuperAdmin,
@@ -111,15 +112,7 @@ export function AccountSettingsSheet({
             </Dialog>
           </div>
 
-          {isSuperAdmin && (
-            <Link
-              href="/admin/results"
-              className="flex items-center justify-between rounded-2xl border border-border px-4 py-4 text-sm font-medium transition-colors hover:bg-muted"
-            >
-              <span>Site Admin</span>
-              <ChevronRightIcon className="size-4 text-muted-foreground" />
-            </Link>
-          )}
+          {isSuperAdmin && <SiteAdminNav />}
 
           <form action={signOut}>
             <Button type="submit" variant="outline" className="w-full">

@@ -68,7 +68,9 @@ Apply `supabase/apply-auto-draft.sql` in the Supabase SQL Editor before this shi
 
 ## Account deletion processing
 
-`request_account_deletion` records a request (`profiles.deletion_requested_at`) but nothing surfaces the list of pending requests anywhere. Needs at minimum a way to query it (a Supabase dashboard SQL query is fine for now, given the scale); eventually a small admin view if this ever needs to happen regularly.
+v1 queue shipped. Super-admins (`profiles.is_super_admin` only — not `RESULTS_ENTRY_OPEN_TO_ALL`) see pending `deletion_requested_at` rows at `/admin/accounts` (email, display name, requested-at, user id) and can **clear a request**. Clearing does not delete the auth user or league history. Dashboard one-off: [supabase/queries/pending-account-deletions.sql](supabase/queries/pending-account-deletions.sql).
+
+Still out of scope: actually deleting `auth.users` / cascading league history. There is no safe automatic wipe — historical scores stay woven into other members' standings.
 
 ## Notifications
 
