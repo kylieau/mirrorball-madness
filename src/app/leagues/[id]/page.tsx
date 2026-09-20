@@ -653,6 +653,9 @@ export default async function LeaguePage({
                       episode={upcomingEpisode}
                       lockAt={lockAt}
                       activeCouples={activeCouples}
+                      totalCouples={seasonCouples.length}
+                      eliminationPredictionPoints={scoringSettings?.elimination_prediction_points ?? 171}
+                      topScorerPredictionPoints={scoringSettings?.top_scorer_prediction_points ?? 114}
                       coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
                       existingPrediction={ownPrediction}
                       isLocked={isLocked}

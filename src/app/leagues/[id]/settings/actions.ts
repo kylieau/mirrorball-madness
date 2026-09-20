@@ -130,9 +130,16 @@ export type ScoringCategoriesInput = {
   firstPlacePoints: number;
   secondPlacePoints: number;
   thirdPlacePoints: number;
+  fourthPlacePoints: number;
+  fifthPlacePoints: number;
   eliminationPredictionPoints: number;
   topScorerPredictionPoints: number;
   bonusPicksPointsPerCorrect: number;
+  bonusPicksFirstPlacePoints: number;
+  bonusPicksSecondPlacePoints: number;
+  bonusPicksThirdPlacePoints: number;
+  bonusPicksFourthPlacePoints: number;
+  bonusPicksFifthPlacePoints: number;
 };
 
 export async function updateScoringCategories(
@@ -160,9 +167,16 @@ export async function updateScoringCategories(
     p_first_place_points: input.firstPlacePoints,
     p_second_place_points: input.secondPlacePoints,
     p_third_place_points: input.thirdPlacePoints,
+    p_fourth_place_points: input.fourthPlacePoints,
+    p_fifth_place_points: input.fifthPlacePoints,
     p_elimination_prediction_points: input.eliminationPredictionPoints,
     p_top_scorer_prediction_points: input.topScorerPredictionPoints,
     p_bonus_picks_points_per_correct: input.bonusPicksPointsPerCorrect,
+    p_bonus_picks_first_place_points: input.bonusPicksFirstPlacePoints,
+    p_bonus_picks_second_place_points: input.bonusPicksSecondPlacePoints,
+    p_bonus_picks_third_place_points: input.bonusPicksThirdPlacePoints,
+    p_bonus_picks_fourth_place_points: input.bonusPicksFourthPlacePoints,
+    p_bonus_picks_fifth_place_points: input.bonusPicksFifthPlacePoints,
   });
 
   if (error) return { error: error.message };

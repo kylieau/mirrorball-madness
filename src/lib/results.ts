@@ -240,7 +240,6 @@ async function recomputeWeekScores(
   week: {
     id: string;
     week_number: number;
-    is_finale: boolean;
     is_double_elimination_week: boolean;
   },
   episodeIds: string[],
@@ -259,7 +258,7 @@ async function recomputeWeekScores(
     totalScore: Number(row.total_score),
   }));
   const otherOutcomes = (allOutcomes ?? []).filter((row) => row.episode_id !== thisEpisodeId);
-  const episodeOutcomeInputs: { coupleId: string; outcome: Outcome; bonusPoints: number }[] = [
+  const rawOutcomeRows = [
     ...otherOutcomes.map((row) => ({
       coupleId: row.couple_id,
       outcome: row.outcome as Outcome,
@@ -279,37 +278,64 @@ async function recomputeWeekScores(
     .filter((r) => RESOLVING_OUTCOMES.has(r.outcome as Outcome))
     .map((r) => r.couple_id);
 
+  // Fetched unconditionally (not just on a resolving week) because
+  // couplesRemaining/totalCouples now feed Curtain Call's couples-remaining
+  // scaling every week, not just weeks where a couple's fate newly resolved.
+  const { data: seasonCouples, error: seasonCouplesErr } = await admin
+    .from("couples")
+    .select("id, status, elimination_week")
+    .eq("season_id", seasonId);
+  if (seasonCouplesErr) return seasonCouplesErr.message;
+
+  const totalCouples = (seasonCouples ?? []).length;
+  const eliminationWeeks = [
+    ...new Set(
+      (seasonCouples ?? [])
+        .filter((c) => c.status === "eliminated" || c.status === "withdrawn")
+        .map((c) => c.elimination_week!)
+    ),
+  ].sort((a, b) => a - b);
+  const rankByWeek = new Map(eliminationWeeks.map((weekNumber, i) => [weekNumber, i + 1]));
+
   const actualPositionByCouple = new Map<string, number>();
-  let totalCouples = 0;
-  if (newlyResolvedCoupleIds.length > 0) {
-    const { data: seasonCouples, error: seasonCouplesErr } = await admin
-      .from("couples")
-      .select("id, status, elimination_week")
-      .eq("season_id", seasonId);
-    if (seasonCouplesErr) return seasonCouplesErr.message;
-
-    totalCouples = (seasonCouples ?? []).length;
-    const eliminationWeeks = [
-      ...new Set(
-        (seasonCouples ?? [])
-          .filter((c) => c.status === "eliminated" || c.status === "withdrawn")
-          .map((c) => c.elimination_week!)
-      ),
-    ].sort((a, b) => a - b);
-    const rankByWeek = new Map(eliminationWeeks.map((weekNumber, i) => [weekNumber, i + 1]));
-
-    for (const couple of seasonCouples ?? []) {
-      if (couple.status === "winner") actualPositionByCouple.set(couple.id, totalCouples);
-      else if (couple.status === "runner_up") actualPositionByCouple.set(couple.id, totalCouples - 1);
-      else if (couple.status === "third_place") actualPositionByCouple.set(couple.id, totalCouples - 2);
-      else if (
-        (couple.status === "eliminated" || couple.status === "withdrawn") &&
-        couple.elimination_week !== null
-      ) {
-        actualPositionByCouple.set(couple.id, rankByWeek.get(couple.elimination_week)!);
-      }
+  for (const couple of seasonCouples ?? []) {
+    if (couple.status === "winner") actualPositionByCouple.set(couple.id, totalCouples);
+    else if (couple.status === "runner_up") actualPositionByCouple.set(couple.id, totalCouples - 1);
+    else if (couple.status === "third_place") actualPositionByCouple.set(couple.id, totalCouples - 2);
+    else if (
+      (couple.status === "eliminated" || couple.status === "withdrawn") &&
+      couple.elimination_week !== null
+    ) {
+      actualPositionByCouple.set(couple.id, rankByWeek.get(couple.elimination_week)!);
     }
   }
+
+  // finalPlacement: 1 = winner .. 5 = fifth place, reusing the same numeric
+  // position Grand Finale's full-order prediction already resolves against
+  // — see computeWeeklyScores in src/lib/scoring.ts. No new couples.status
+  // value, no new admin UI: 4th/5th place is derived, not entered.
+  const finalPlacementByCouple = new Map<string, number>();
+  for (const [coupleId, actualPosition] of actualPositionByCouple) {
+    const placement = totalCouples - actualPosition + 1;
+    if (placement <= 5) finalPlacementByCouple.set(coupleId, placement);
+  }
+
+  // How many couples were still in the running going into this week, before
+  // any of this week's own eliminations — matches what managers saw when
+  // they locked their Curtain Call pick. Using "< week.week_number" (not a
+  // live couples.status check) makes this correct regardless of whether
+  // this call is entering one of several episodes sharing this week, or
+  // correcting a week whose couples.status has already been mutated above.
+  const couplesRemaining =
+    totalCouples -
+    (seasonCouples ?? []).filter(
+      (c) => c.elimination_week !== null && c.elimination_week < week.week_number
+    ).length;
+
+  const episodeOutcomeInputs = rawOutcomeRows.map((row) => ({
+    ...row,
+    finalPlacement: finalPlacementByCouple.get(row.coupleId) ?? null,
+  }));
 
   for (const league of leagues ?? []) {
     const [{ data: scoringSettings }, { data: rosterSlots }, { data: predictions }] = await Promise.all([
@@ -366,6 +392,13 @@ async function recomputeWeekScores(
         firstPlacePoints: scoringSettings.first_place_points,
         secondPlacePoints: scoringSettings.second_place_points,
         thirdPlacePoints: scoringSettings.third_place_points,
+        fourthPlacePoints: scoringSettings.fourth_place_points,
+        fifthPlacePoints: scoringSettings.fifth_place_points,
+        bonusPicksFirstPlacePoints: scoringSettings.bonus_picks_first_place_points,
+        bonusPicksSecondPlacePoints: scoringSettings.bonus_picks_second_place_points,
+        bonusPicksThirdPlacePoints: scoringSettings.bonus_picks_third_place_points,
+        bonusPicksFourthPlacePoints: scoringSettings.bonus_picks_fourth_place_points,
+        bonusPicksFifthPlacePoints: scoringSettings.bonus_picks_fifth_place_points,
       },
       rosterSlots: judgesScoreStarted
         ? rosterSlots
@@ -380,8 +413,9 @@ async function recomputeWeekScores(
         predictedEliminatedCoupleId2: p.predicted_eliminated_couple_id_2,
         predictedTopScorerCoupleId: p.predicted_top_scorer_couple_id,
       })),
-      isFinale: week.is_finale,
       isDoubleElimination: week.is_double_elimination_week,
+      couplesRemaining,
+      totalCouples,
       categoryWeights: {
         judges: scoringSettings.judges_score_category_weight,
         eliminations: scoringSettings.eliminations_category_weight,
@@ -440,7 +474,7 @@ export async function applyEpisodeResults(
     ? (
         await admin
           .from("competition_weeks")
-          .select("id, week_number, is_finale, is_double_elimination_week")
+          .select("id, week_number, is_double_elimination_week")
           .eq("id", episode.week_id)
           .single()
       ).data

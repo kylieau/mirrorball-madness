@@ -14,6 +14,7 @@ import {
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { coupleNameNode } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
+import { curtainCallPayout } from "@/lib/scoring";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 
@@ -69,6 +70,9 @@ export function PickEmBox({
   episode,
   lockAt,
   activeCouples,
+  totalCouples,
+  eliminationPredictionPoints,
+  topScorerPredictionPoints,
   coupleDisplayNames,
   existingPrediction,
   isLocked,
@@ -79,6 +83,13 @@ export function PickEmBox({
   episode: { id: string; week_number: number; theme: string | null };
   lockAt: string | null;
   activeCouples: Couple[];
+  // Season-wide cast size — for the "N pts · M couples left" preview, not
+  // itself spoiler-sensitive (cast size is public). couplesRemaining for
+  // that preview reuses activeCouples.length below: the same spoiler-safe
+  // count already driving which couples this picker offers.
+  totalCouples: number;
+  eliminationPredictionPoints: number;
+  topScorerPredictionPoints: number;
   coupleDisplayNames: Record<string, CoupleNameParts>;
   existingPrediction: {
     predicted_eliminated_couple_id: string | null;
@@ -160,6 +171,20 @@ export function PickEmBox({
       ? `Locks at ${formattedLockAt}`
       : null;
 
+  // Same ratio applied server-side at scoring time (computeWeeklyScores in
+  // src/lib/scoring.ts) — couplesRemaining reuses activeCouples.length, the
+  // same spoiler-safe count already driving this picker's options, so a
+  // spoiler-shy manager never sees a preview that reveals more than their
+  // own picker does.
+  const couplesRemaining = activeCouples.length;
+  const eliminationPreview = Math.round(
+    curtainCallPayout(eliminationPredictionPoints, couplesRemaining, totalCouples)
+  );
+  const topScorerPreview = Math.round(
+    curtainCallPayout(topScorerPredictionPoints, couplesRemaining, totalCouples)
+  );
+  const couplesLeftLabel = `${couplesRemaining} couple${couplesRemaining === 1 ? "" : "s"} left`;
+
   return (
     <div className="flex flex-col gap-4">
         {lockLine && <p className="text-sm text-muted-foreground">{lockLine}</p>}
@@ -173,6 +198,9 @@ export function PickEmBox({
         {!isLocked ? (
           editing ? (
             <>
+              <p className="text-xs text-muted-foreground">
+                Correct elimination: {eliminationPreview} pts · {couplesLeftLabel}
+              </p>
               {isDoubleElimination ? (
                 <>
                   <CoupleSelect
@@ -204,6 +232,9 @@ export function PickEmBox({
                   nameFor={nameFor}
                 />
               )}
+              <p className="text-xs text-muted-foreground">
+                Correct top scorer: {topScorerPreview} pts · {couplesLeftLabel}
+              </p>
               <CoupleSelect
                 id="top-scorer"
                 label="Who scores highest?"

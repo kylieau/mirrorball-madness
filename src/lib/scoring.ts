@@ -3,9 +3,19 @@ export type ScoringSettings = {
   survivalPoints: number;
   eliminationPredictionPoints: number;
   topScorerPredictionPoints: number;
+  // Placement bonus (a rostered couple finishing in the finale's top 5) is
+  // split into two additive halves so each module's weight/toggle governs
+  // only its own half — see DANCE_CARD_PLACEMENT_KEY / GRAND_FINALE_PLACEMENT_KEY below.
   firstPlacePoints: number;
   secondPlacePoints: number;
   thirdPlacePoints: number;
+  fourthPlacePoints: number;
+  fifthPlacePoints: number;
+  bonusPicksFirstPlacePoints: number;
+  bonusPicksSecondPlacePoints: number;
+  bonusPicksThirdPlacePoints: number;
+  bonusPicksFourthPlacePoints: number;
+  bonusPicksFifthPlacePoints: number;
 };
 
 export type RosterSlot = { managerId: string; coupleId: string };
@@ -25,6 +35,11 @@ export type EpisodeOutcome = {
   coupleId: string;
   outcome: Outcome;
   bonusPoints: number;
+  // 1 = winner .. 5 = fifth place, null otherwise. Caller-supplied (from the
+  // same finale-position computation results.ts already does for the
+  // full-order Grand Finale prediction) — keeps this module ignorant of
+  // season-wide couple counts, which it has no other reason to know.
+  finalPlacement: number | null;
 };
 
 export type Prediction = {
@@ -50,10 +65,24 @@ export type CategoryWeights = {
   bonus: number;
 };
 
-const PODIUM_POINTS_KEY: Record<string, keyof ScoringSettings> = {
-  winner: "firstPlacePoints",
-  runner_up: "secondPlacePoints",
-  third_place: "thirdPlacePoints",
+// Dance-Card-half and Grand-Finale-half of the placement bonus, keyed by
+// numeric finalPlacement (1..5) rather than by Outcome — a couple's 4th/5th
+// place finish isn't a distinct couples.status value, it's derived from the
+// same elimination-order ranking Grand Finale's full-order prediction
+// already resolves against.
+const DANCE_CARD_PLACEMENT_KEY: Record<number, keyof ScoringSettings> = {
+  1: "firstPlacePoints",
+  2: "secondPlacePoints",
+  3: "thirdPlacePoints",
+  4: "fourthPlacePoints",
+  5: "fifthPlacePoints",
+};
+const GRAND_FINALE_PLACEMENT_KEY: Record<number, keyof ScoringSettings> = {
+  1: "bonusPicksFirstPlacePoints",
+  2: "bonusPicksSecondPlacePoints",
+  3: "bonusPicksThirdPlacePoints",
+  4: "bonusPicksFourthPlacePoints",
+  5: "bonusPicksFifthPlacePoints",
 };
 
 // Anything else (safe, winner, runner_up, third_place) earns survival points.
@@ -95,6 +124,18 @@ export function findEliminatedCoupleIds(
   return new Set(episodeOutcomes.filter((o) => o.outcome === "eliminated").map((o) => o.coupleId));
 }
 
+// Curtain Call's weekly picks pay out proportional to how many couples were
+// still in the running when the pick was made — correctly calling an
+// elimination from 12 couples is harder, and worth more, than from 4.
+// basePoints is a season-average target (elimination_prediction_points /
+// top_scorer_prediction_points): this ratio redistributes it across weeks
+// rather than changing the season total. Exported so the picking UI can
+// render the identical preview number.
+export function curtainCallPayout(basePoints: number, couplesRemaining: number, totalCouples: number): number {
+  if (totalCouples <= 0) return basePoints;
+  return basePoints * (couplesRemaining / totalCouples);
+}
+
 // Pure and DB-free by design: the caller is responsible for fetching
 // already-week-scoped data (e.g. only roster_slots active this week) — this
 // function just does the arithmetic, which is what makes it unit-testable
@@ -105,8 +146,9 @@ export function computeWeeklyScores({
   danceScores,
   episodeOutcomes,
   predictions,
-  isFinale,
   isDoubleElimination,
+  couplesRemaining,
+  totalCouples,
   categoryWeights = { judges: 1, eliminations: 1, bonus: 1 },
   grandFinalePointsByManager = {},
 }: {
@@ -115,18 +157,21 @@ export function computeWeeklyScores({
   danceScores: DanceScore[];
   episodeOutcomes: EpisodeOutcome[];
   predictions: Prediction[];
-  isFinale: boolean;
   isDoubleElimination: boolean;
+  couplesRemaining: number;
+  totalCouples: number;
   categoryWeights?: CategoryWeights;
   grandFinalePointsByManager?: Record<string, number>;
 }): WeeklyManagerScore[] {
   const coupleTotalScore = sumDanceScoresByCouple(danceScores);
   const outcomeByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.outcome]));
   const bonusPointsByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.bonusPoints]));
+  const finalPlacementByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.finalPlacement]));
   const topScorerCoupleIds = findTopScorerCoupleIdsFromTotals(coupleTotalScore);
   const eliminatedCoupleIds = findEliminatedCoupleIds(episodeOutcomes);
 
   const rosterPointsByManager = new Map<string, number>();
+  const finalePlacementBonusByManager = new Map<string, number>();
   for (const { managerId, coupleId } of rosterSlots) {
     let points = (coupleTotalScore.get(coupleId) ?? 0) * scoringSettings.judgesScoreMultiplier;
 
@@ -135,8 +180,14 @@ export function computeWeeklyScores({
       points += scoringSettings.survivalPoints;
     }
 
-    if (isFinale && outcome && outcome in PODIUM_POINTS_KEY) {
-      points += scoringSettings[PODIUM_POINTS_KEY[outcome]];
+    const finalPlacement = finalPlacementByCouple.get(coupleId);
+    if (finalPlacement && finalPlacement in DANCE_CARD_PLACEMENT_KEY) {
+      points += scoringSettings[DANCE_CARD_PLACEMENT_KEY[finalPlacement]];
+      finalePlacementBonusByManager.set(
+        managerId,
+        (finalePlacementBonusByManager.get(managerId) ?? 0) +
+          scoringSettings[GRAND_FINALE_PLACEMENT_KEY[finalPlacement]]
+      );
     }
 
     points += bonusPointsByCouple.get(coupleId) ?? 0;
@@ -148,17 +199,17 @@ export function computeWeeklyScores({
   for (const p of predictions) {
     let points = 0;
     if (p.predictedEliminatedCoupleId && eliminatedCoupleIds.has(p.predictedEliminatedCoupleId)) {
-      points += scoringSettings.eliminationPredictionPoints;
+      points += curtainCallPayout(scoringSettings.eliminationPredictionPoints, couplesRemaining, totalCouples);
     }
     if (
       isDoubleElimination &&
       p.predictedEliminatedCoupleId2 &&
       eliminatedCoupleIds.has(p.predictedEliminatedCoupleId2)
     ) {
-      points += scoringSettings.eliminationPredictionPoints;
+      points += curtainCallPayout(scoringSettings.eliminationPredictionPoints, couplesRemaining, totalCouples);
     }
     if (p.predictedTopScorerCoupleId && topScorerCoupleIds.has(p.predictedTopScorerCoupleId)) {
-      points += scoringSettings.topScorerPredictionPoints;
+      points += curtainCallPayout(scoringSettings.topScorerPredictionPoints, couplesRemaining, totalCouples);
     }
     predictionPointsByManager.set(
       p.managerId,
@@ -170,12 +221,14 @@ export function computeWeeklyScores({
     ...rosterPointsByManager.keys(),
     ...predictionPointsByManager.keys(),
     ...Object.keys(grandFinalePointsByManager),
+    ...finalePlacementBonusByManager.keys(),
   ]);
 
   return [...managerIds].map((managerId) => {
     const rosterPoints = rosterPointsByManager.get(managerId) ?? 0;
     const predictionPoints = predictionPointsByManager.get(managerId) ?? 0;
-    const grandFinalePoints = grandFinalePointsByManager[managerId] ?? 0;
+    const grandFinalePoints =
+      (grandFinalePointsByManager[managerId] ?? 0) + (finalePlacementBonusByManager.get(managerId) ?? 0);
     return {
       managerId,
       rosterPoints,

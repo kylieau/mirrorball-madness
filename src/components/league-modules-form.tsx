@@ -55,11 +55,18 @@ type ScoringSettings = {
   bonus_picks_distance_penalty: number | null;
   bonus_picks_tier_size: number | null;
   bonus_picks_points_per_correct: number;
+  bonus_picks_first_place_points: number;
+  bonus_picks_second_place_points: number;
+  bonus_picks_third_place_points: number;
+  bonus_picks_fourth_place_points: number;
+  bonus_picks_fifth_place_points: number;
   judges_score_multiplier: number;
   survival_points: number;
   first_place_points: number;
   second_place_points: number;
   third_place_points: number;
+  fourth_place_points: number;
+  fifth_place_points: number;
   elimination_prediction_points: number;
   top_scorer_prediction_points: number;
   scoring_configured: boolean;
@@ -168,6 +175,12 @@ export function LeagueModulesForm({
   const [thirdPlacePoints, setThirdPlacePoints] = useState(
     scoringSettings?.third_place_points ?? 40
   );
+  const [fourthPlacePoints, setFourthPlacePoints] = useState(
+    scoringSettings?.fourth_place_points ?? 14
+  );
+  const [fifthPlacePoints, setFifthPlacePoints] = useState(
+    scoringSettings?.fifth_place_points ?? 7
+  );
   const [waiverMode, setWaiverMode] = useState<WaiverMode>(
     (league.waiver_mode as WaiverMode) ?? "reverse_standings"
   );
@@ -201,6 +214,21 @@ export function LeagueModulesForm({
   const [bonusTierSize, setBonusTierSize] = useState(scoringSettings?.bonus_picks_tier_size ?? 3);
   const [bonusPicksPointsPerCorrect, setBonusPicksPointsPerCorrect] = useState(
     scoringSettings?.bonus_picks_points_per_correct ?? 50
+  );
+  const [bonusPicksFirstPlacePoints, setBonusPicksFirstPlacePoints] = useState(
+    scoringSettings?.bonus_picks_first_place_points ?? 106
+  );
+  const [bonusPicksSecondPlacePoints, setBonusPicksSecondPlacePoints] = useState(
+    scoringSettings?.bonus_picks_second_place_points ?? 53
+  );
+  const [bonusPicksThirdPlacePoints, setBonusPicksThirdPlacePoints] = useState(
+    scoringSettings?.bonus_picks_third_place_points ?? 28
+  );
+  const [bonusPicksFourthPlacePoints, setBonusPicksFourthPlacePoints] = useState(
+    scoringSettings?.bonus_picks_fourth_place_points ?? 14
+  );
+  const [bonusPicksFifthPlacePoints, setBonusPicksFifthPlacePoints] = useState(
+    scoringSettings?.bonus_picks_fifth_place_points ?? 7
   );
 
   const [submitting, setSubmitting] = useState(false);
@@ -275,9 +303,16 @@ export function LeagueModulesForm({
       firstPlacePoints,
       secondPlacePoints,
       thirdPlacePoints,
+      fourthPlacePoints,
+      fifthPlacePoints,
       eliminationPredictionPoints,
       topScorerPredictionPoints,
       bonusPicksPointsPerCorrect,
+      bonusPicksFirstPlacePoints,
+      bonusPicksSecondPlacePoints,
+      bonusPicksThirdPlacePoints,
+      bonusPicksFourthPlacePoints,
+      bonusPicksFifthPlacePoints,
     };
 
     const leagueInput: LeagueSettingsInput = {
@@ -380,6 +415,8 @@ export function LeagueModulesForm({
               <SettingRow label="1st Place Bonus" value={firstPlacePoints} />
               <SettingRow label="2nd Place Bonus" value={secondPlacePoints} />
               <SettingRow label="3rd Place Bonus" value={thirdPlacePoints} />
+              <SettingRow label="4th Place Bonus" value={fourthPlacePoints} />
+              <SettingRow label="5th Place Bonus" value={fifthPlacePoints} />
               <SettingRow label="Recast Mode" value={WAIVER_MODE_ITEMS[waiverMode]} />
               {waiverMode === "waivers" && (
                 <SettingRow label="Recast Method" value={WAIVER_CLAIM_METHOD_ITEMS[waiverClaimMethod]} />
@@ -429,6 +466,11 @@ export function LeagueModulesForm({
               <p className="pt-2 text-sm text-muted-foreground">
                 {explainGrandFinaleMethod(bonusMethod, bonusDistancePenalty, bonusTierSize, bonusPicksPointsPerCorrect)}
               </p>
+              <SettingRow label="1st Place Bonus" value={bonusPicksFirstPlacePoints} />
+              <SettingRow label="2nd Place Bonus" value={bonusPicksSecondPlacePoints} />
+              <SettingRow label="3rd Place Bonus" value={bonusPicksThirdPlacePoints} />
+              <SettingRow label="4th Place Bonus" value={bonusPicksFourthPlacePoints} />
+              <SettingRow label="5th Place Bonus" value={bonusPicksFifthPlacePoints} />
             </CardContent>
           </Card>
         )}
@@ -597,6 +639,9 @@ export function LeagueModulesForm({
                   value={judgesScoreMultiplier}
                   onChange={(e) => setJudgesScoreMultiplier(Number(e.target.value))}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Auto-calibrated to your roster size once the draft starts, unless you change it here first.
+                </p>
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="survivalPoints">Survival Points</Label>
@@ -636,6 +681,26 @@ export function LeagueModulesForm({
                   min={0}
                   value={thirdPlacePoints}
                   onChange={(e) => setThirdPlacePoints(Number(e.target.value))}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="fourthPlacePoints">4th Place Bonus</Label>
+                <Input
+                  id="fourthPlacePoints"
+                  type="number"
+                  min={0}
+                  value={fourthPlacePoints}
+                  onChange={(e) => setFourthPlacePoints(Number(e.target.value))}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="fifthPlacePoints">5th Place Bonus</Label>
+                <Input
+                  id="fifthPlacePoints"
+                  type="number"
+                  min={0}
+                  value={fifthPlacePoints}
+                  onChange={(e) => setFifthPlacePoints(Number(e.target.value))}
                 />
               </div>
             </div>
@@ -849,6 +914,66 @@ export function LeagueModulesForm({
             <p className="text-sm text-muted-foreground">
               {explainGrandFinaleMethod(bonusMethod, bonusDistancePenalty, bonusTierSize, bonusPicksPointsPerCorrect)}
             </p>
+
+            <div className="border-t border-border pt-4">
+              <p className="pb-2 text-sm font-medium">Placement Bonus</p>
+              <p className="pb-4 text-sm text-muted-foreground">
+                A separate bonus for a rostered couple actually finishing in the top 5 — on top of the
+                full-order prediction above, and on top of Dance Card&apos;s own placement bonus.
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="bonusPicksFirstPlacePoints">1st Place Bonus</Label>
+                  <Input
+                    id="bonusPicksFirstPlacePoints"
+                    type="number"
+                    min={0}
+                    value={bonusPicksFirstPlacePoints}
+                    onChange={(e) => setBonusPicksFirstPlacePoints(Number(e.target.value))}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="bonusPicksSecondPlacePoints">2nd Place Bonus</Label>
+                  <Input
+                    id="bonusPicksSecondPlacePoints"
+                    type="number"
+                    min={0}
+                    value={bonusPicksSecondPlacePoints}
+                    onChange={(e) => setBonusPicksSecondPlacePoints(Number(e.target.value))}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="bonusPicksThirdPlacePoints">3rd Place Bonus</Label>
+                  <Input
+                    id="bonusPicksThirdPlacePoints"
+                    type="number"
+                    min={0}
+                    value={bonusPicksThirdPlacePoints}
+                    onChange={(e) => setBonusPicksThirdPlacePoints(Number(e.target.value))}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="bonusPicksFourthPlacePoints">4th Place Bonus</Label>
+                  <Input
+                    id="bonusPicksFourthPlacePoints"
+                    type="number"
+                    min={0}
+                    value={bonusPicksFourthPlacePoints}
+                    onChange={(e) => setBonusPicksFourthPlacePoints(Number(e.target.value))}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="bonusPicksFifthPlacePoints">5th Place Bonus</Label>
+                  <Input
+                    id="bonusPicksFifthPlacePoints"
+                    type="number"
+                    min={0}
+                    value={bonusPicksFifthPlacePoints}
+                    onChange={(e) => setBonusPicksFifthPlacePoints(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

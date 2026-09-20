@@ -133,7 +133,7 @@ create table league_members (
   unique (league_id, draft_position)
 );
 
--- judges_score_multiplier..third_place_points: per-event point values within
+-- judges_score_multiplier..fifth_place_points: per-event point values within
 -- the Judges' Scores category (draft fantasy) and the Eliminations category
 -- (elimination_prediction_points/top_scorer_prediction_points — both weekly
 -- Pick 'Em guesses, folded into one "Eliminations" category total).
@@ -155,15 +155,36 @@ create table league_members (
 -- once, tracked as weeks resolve). Only meaningful when
 -- bonus_picks_category_enabled — see bonus_picks_config_required below for
 -- what "configured" requires per scoring method.
+--
+-- Placement bonus (a rostered couple finishing in the finale's top 5) is
+-- split into two additive halves so each toggle/weight does what it visibly
+-- claims: first_place_points..fifth_place_points is the Dance-Card-half
+-- (weighted by judges_score_category_weight, alongside dance score and
+-- survival), bonus_picks_first_place_points..bonus_picks_fifth_place_points
+-- is the Grand-Finale-half (weighted by bonus_picks_category_weight,
+-- alongside the full-order prediction). See computeWeeklyScores in
+-- src/lib/scoring.ts. Both halves and every other point value below are
+-- ordinary commissioner-editable defaults, calibrated (not hand-set) by
+-- scripts/monte-carlo-calibration/ — see that script for how, and
+-- judges_score_multiplier_customized below for why judges_score_multiplier
+-- is the one column with special write semantics.
 create table scoring_settings (
   league_id uuid primary key references leagues(id) on delete cascade,
   judges_score_multiplier numeric not null default 1.0,
+  -- Flips true (and stays true) the moment a commissioner explicitly saves a
+  -- value for judges_score_multiplier via update_scoring_categories — so
+  -- start_draft's roster-size-keyed calibrated default (see
+  -- dance_card_calibration below) only overwrites this column while nobody
+  -- has customized it yet, never clobbering an intentional pre-draft choice.
+  judges_score_multiplier_customized boolean not null default false,
   survival_points numeric not null default 15,
-  elimination_prediction_points numeric not null default 30, -- 0 disables
-  top_scorer_prediction_points numeric not null default 20, -- 0 disables
-  first_place_points numeric not null default 150,
-  second_place_points numeric not null default 75,
-  third_place_points numeric not null default 40,
+  elimination_prediction_points numeric not null default 171, -- 0 disables
+  top_scorer_prediction_points numeric not null default 114, -- 0 disables
+  first_place_points numeric not null default 106,
+  second_place_points numeric not null default 53,
+  third_place_points numeric not null default 28,
+  fourth_place_points numeric not null default 14,
+  fifth_place_points numeric not null default 7,
 
   judges_score_category_enabled boolean not null default true,
   eliminations_category_enabled boolean not null default true,
@@ -177,7 +198,12 @@ create table scoring_settings (
   bonus_picks_scoring_method text check (bonus_picks_scoring_method in ('exact_position', 'distance_based', 'binary_tier')),
   bonus_picks_distance_penalty numeric, -- points docked per position off; only used by 'distance_based'
   bonus_picks_tier_size int, -- e.g. 3 for "top 3"; only used by 'binary_tier'
-  bonus_picks_points_per_correct numeric not null default 50, -- base value a correctly-placed couple earns
+  bonus_picks_points_per_correct numeric not null default 257, -- base value a correctly-placed couple earns
+  bonus_picks_first_place_points numeric not null default 106,
+  bonus_picks_second_place_points numeric not null default 53,
+  bonus_picks_third_place_points numeric not null default 28,
+  bonus_picks_fourth_place_points numeric not null default 14,
+  bonus_picks_fifth_place_points numeric not null default 7,
 
   -- Every new league gets this row with defaults on insert (create_league),
   -- but the commissioner never explicitly reviewed them until they save this
@@ -197,6 +223,30 @@ create table scoring_settings (
     )
   )
 );
+
+-- Monte Carlo-derived (scripts/monte-carlo-calibration/), one row per swept
+-- roster size (couples per manager). start_draft() reads this once, at the
+-- moment roster_size is fixed, to seed scoring_settings.judges_score_multiplier
+-- for that league. Never queried anywhere else — update_scoring_categories()
+-- only ever writes judges_score_multiplier directly, this table is
+-- read-only reference data.
+create table dance_card_calibration (
+  roster_size int primary key check (roster_size > 0),
+  judges_score_multiplier_default numeric not null
+);
+
+grant select on public.dance_card_calibration to authenticated;
+create policy "dance card calibration is viewable by all authenticated users"
+on public.dance_card_calibration for select
+using (true);
+
+insert into public.dance_card_calibration (roster_size, judges_score_multiplier_default) values
+  (1, 2.362),
+  (2, 1.618),
+  (3, 1.332),
+  (4, 1.168),
+  (5, 1.072),
+  (6, 1.053);
 
 -- ============================================================
 -- Couples (global for the active season)
@@ -1010,7 +1060,14 @@ create function public.update_scoring_categories(
   p_third_place_points numeric,
   p_elimination_prediction_points numeric,
   p_top_scorer_prediction_points numeric,
-  p_bonus_picks_points_per_correct numeric
+  p_bonus_picks_points_per_correct numeric,
+  p_fourth_place_points numeric,
+  p_fifth_place_points numeric,
+  p_bonus_picks_first_place_points numeric,
+  p_bonus_picks_second_place_points numeric,
+  p_bonus_picks_third_place_points numeric,
+  p_bonus_picks_fourth_place_points numeric,
+  p_bonus_picks_fifth_place_points numeric
 )
 returns public.scoring_settings
 language plpgsql
@@ -1035,14 +1092,27 @@ begin
     bonus_picks_scoring_method = p_bonus_picks_scoring_method,
     bonus_picks_distance_penalty = p_bonus_picks_distance_penalty,
     bonus_picks_tier_size = p_bonus_picks_tier_size,
+    -- Right-hand sides here still see the pre-update row, even though
+    -- judges_score_multiplier is also being overwritten in this same
+    -- statement — so this correctly flags "did the commissioner just change
+    -- it" without a separate select.
+    judges_score_multiplier_customized = judges_score_multiplier_customized
+      or (judges_score_multiplier is distinct from p_judges_score_multiplier),
     judges_score_multiplier = p_judges_score_multiplier,
     survival_points = p_survival_points,
     first_place_points = p_first_place_points,
     second_place_points = p_second_place_points,
     third_place_points = p_third_place_points,
+    fourth_place_points = p_fourth_place_points,
+    fifth_place_points = p_fifth_place_points,
     elimination_prediction_points = p_elimination_prediction_points,
     top_scorer_prediction_points = p_top_scorer_prediction_points,
     bonus_picks_points_per_correct = p_bonus_picks_points_per_correct,
+    bonus_picks_first_place_points = p_bonus_picks_first_place_points,
+    bonus_picks_second_place_points = p_bonus_picks_second_place_points,
+    bonus_picks_third_place_points = p_bonus_picks_third_place_points,
+    bonus_picks_fourth_place_points = p_bonus_picks_fourth_place_points,
+    bonus_picks_fifth_place_points = p_bonus_picks_fifth_place_points,
     scoring_configured = true
   where league_id = p_league_id
   returning * into v_settings;
@@ -1052,9 +1122,9 @@ end;
 $$;
 
 revoke execute on function public.update_league_settings(uuid, text, text, int, numeric) from public;
-revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric) from public;
+revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric) from public;
 grant execute on function public.update_league_settings(uuid, text, text, int, numeric) to authenticated;
-grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric) to authenticated;
+grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric) to authenticated;
 
 -- ============================================================
 -- Draft: couples are global read-only reference data; starting the draft and
@@ -1156,6 +1226,8 @@ declare
   v_league public.leagues;
   v_member_count int;
   v_couple_count int;
+  v_roster_size int;
+  v_calibrated_multiplier numeric;
 begin
   select * into v_league from public.leagues where id = p_league_id for update;
 
@@ -1197,12 +1269,34 @@ begin
   -- than commissioner-set. Any remainder couples are left undrafted for the
   -- season rather than handed out unevenly. current_turn_started_at starts
   -- the first pick clock; this function never places a pick.
+  v_roster_size := v_couple_count / v_member_count;
+
   update public.leagues
   set draft_status = 'in_progress',
-      roster_size = v_couple_count / v_member_count,
+      roster_size = v_roster_size,
       current_turn_started_at = now()
   where id = p_league_id
   returning * into v_league;
+
+  -- Seed judges_score_multiplier from the roster-size-keyed calibration
+  -- table now that roster_size is fixed for the season — but only while the
+  -- commissioner hasn't customized it themselves (see
+  -- judges_score_multiplier_customized on scoring_settings). Clamp to the
+  -- nearest defined roster size if this season's split falls outside the
+  -- table's swept range.
+  select judges_score_multiplier_default into v_calibrated_multiplier
+  from public.dance_card_calibration
+  where roster_size = (
+    select roster_size from public.dance_card_calibration
+    order by abs(roster_size - v_roster_size), roster_size
+    limit 1
+  );
+
+  if v_calibrated_multiplier is not null then
+    update public.scoring_settings
+    set judges_score_multiplier = v_calibrated_multiplier
+    where league_id = p_league_id and not judges_score_multiplier_customized;
+  end if;
 
   return v_league;
 end;
