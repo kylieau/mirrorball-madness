@@ -13,6 +13,7 @@ type DanceScore = {
   episode_id: string;
   couple_id: string;
   dance_style_id: string;
+  song_title: string | null;
   total_score: number;
 };
 type EpisodeResult = {
@@ -138,7 +139,11 @@ export function WeeklyResultsView({
       return {
         ...r,
         parts: coupleParts(r.couple_id),
-        danceLabel: dances.map((d) => danceStyleById.get(d.dance_style_id) ?? "Unknown dance").join(" + "),
+        danceLabels: dances.map((d) => {
+          const style = danceStyleById.get(d.dance_style_id) ?? "Unknown dance";
+          const song = d.song_title?.trim();
+          return song ? `${style} · ${song}` : style;
+        }),
         total: dances.reduce((sum, d) => sum + d.total_score, 0),
       };
     })
@@ -180,7 +185,11 @@ export function WeeklyResultsView({
                 </span>
                 <p className="text-sm font-semibold">
                   {r.parts ? <CoupleName {...r.parts} /> : "Unknown"}
-                  {r.danceLabel && <span className="block text-xs font-normal text-muted-foreground">{r.danceLabel}</span>}
+                  {r.danceLabels.map((label, i) => (
+                    <span key={i} className="block text-xs font-normal text-muted-foreground">
+                      {label}
+                    </span>
+                  ))}
                 </p>
                 {leaguesByCouple?.[r.couple_id]?.map((line) => (
                   <p key={line} className="mt-0.5 text-xs text-accent">
