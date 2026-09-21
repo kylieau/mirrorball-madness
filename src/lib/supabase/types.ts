@@ -1526,6 +1526,7 @@ export type Database = {
           commissioner_id: string
           created_at: string
           current_turn_started_at: string | null
+          custom_pick_order: string[] | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
@@ -1590,6 +1591,7 @@ export type Database = {
           commissioner_id: string
           created_at: string
           current_turn_started_at: string | null
+          custom_pick_order: string[] | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
@@ -1722,6 +1724,7 @@ export type Database = {
           commissioner_id: string
           created_at: string
           current_turn_started_at: string | null
+          custom_pick_order: string[] | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
@@ -1743,13 +1746,13 @@ export type Database = {
       }
       request_account_deletion: { Args: never; Returns: undefined }
       reset_draft: { Args: { p_league_id: string }; Returns: undefined }
-      set_draft_autopilot: {
-        Args: { p_enabled: boolean; p_league_id: string }
-        Returns: boolean
-      }
       set_custom_draft_order: {
         Args: { p_league_id: string; p_user_ids: string[] }
         Returns: undefined
+      }
+      set_draft_autopilot: {
+        Args: { p_enabled: boolean; p_league_id: string }
+        Returns: boolean
       }
       set_draft_order: {
         Args: { p_league_id: string; p_ordered_user_ids: string[] }
@@ -1769,6 +1772,7 @@ export type Database = {
           commissioner_id: string
           created_at: string
           current_turn_started_at: string | null
+          custom_pick_order: string[] | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
@@ -1870,6 +1874,7 @@ export type Database = {
           commissioner_id: string
           created_at: string
           current_turn_started_at: string | null
+          custom_pick_order: string[] | null
           draft_scheduled_at: string | null
           draft_status: string
           draft_type: string
