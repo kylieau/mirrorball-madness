@@ -2,125 +2,112 @@
 
 ## 1. Current State
 
-**Draft safety shipped and verified live** (SQL applied by the user; 34-check
-throwaway-account script `scratch/test-draft-safety.mjs` passed). Covers: membership freeze
-while `in_progress`; `update_scoring_categories` refuses Dance Card off mid-draft (other
-edits allowed); commissioner `reset_draft` (full wipe incl. `weekly_manager_scores`,
-type-the-name dialog), `undo_last_pick` (any pick), `set_member_draft_autopilot`; lobby
-auto-saves draft order and reconciles joiners/leavers via realtime; advisory presence dots
-and a soft confirm at Start; pick confirmation dialog + "You drafted" banner; refetch on tab
-visibility/resubscribe/own pick.
+**No feature in flight.** This session built and shipped two things for the live draft, both
+pushed to `main` (`a7f1e9e`, `ed045aa`) with their SQL applied live and integration-tested:
 
-**Bug fixed:** `start_draft` sized rosters from all season couples, but picks need
-`status='active'`, so any draft started after an elimination could never finish. Now counts
-active couples (`supabase/apply-start-draft-active-couples.sql`, applied). Not yet re-run
-against the test script (its roster_size assertion is written but unexecuted).
+1. **Draft safety** — membership freeze while `in_progress`; `update_scoring_categories`
+   refuses turning Dance Card off mid-draft (other scoring edits stay allowed); commissioner
+   `reset_draft` (full wipe, in progress *or* completed), `undo_last_pick` (any pick, replaces
+   `undo_last_auto_pick`), `set_member_draft_autopilot`; lobby auto-saves draft order and
+   reconciles joiners/leavers via realtime; advisory Realtime presence dots + a soft confirm at
+   Start; pick confirmation dialog + "You drafted" banner; refetch on tab visibility /
+   channel resubscribe / own pick.
+2. **Draft queue** — private per-manager ranked list (`draft_queues`, `set_draft_queue`);
+   `make_auto_draft_pick` takes the queue first, else random; `draft_picks.auto_source`
+   (`queue`/`random`/null) drives the `auto · queue` / `auto · random` log label.
 
-All drafts were reset live on 2026-09-21 (only "matt with the stars" was started; none real).
+Also fixed a real bug: `start_draft` sized `roster_size` from *all* season couples while picks
+require `status='active'`, so any draft started after an elimination could never finish. Now
+counts active couples (16 couples / 14 active / 3 managers → 4 rounds).
 
-`src/lib/supabase/types.ts` was hand-edited for the three new RPCs; regenerate once
-`SUPABASE_ACCESS_TOKEN` is available.
+All league drafts were reset live on 2026-09-21 (only "matt with the stars" had started; none
+were real).
 
-**Change 2 (draft queue) shipped and verified live** (SQL applied; `scratch/test-draft-queue.mjs`
-and `scratch/test-draft-safety.mjs` both pass, including the active-couples roster sizing).
-Private `draft_queues` + `set_draft_queue`; `make_auto_draft_pick` takes the queue first then
-random; `draft_picks.auto_source` drives the `auto · queue` / `auto · random` log label;
-`record_draft_pick`'s last arg is now text `p_auto_source`. UI is `draft-queue-card.tsx`
-(state + debounced save in `draft-room.tsx` via `use-debounced-save.ts`). The draft room also
-stopped listing eliminated couples as pickable. Neither feature has been exercised in a
-browser. `src/lib/supabase/types.ts` is still hand-edited; regenerate when a
-`SUPABASE_ACCESS_TOKEN` is available.
-
-Unrelated, still uncommitted and not ours: `ios/.../project.pbxproj`, `scratch/`.
-
-## Previous session
-
-**Cross-league picks shipped to `main` (`c8d9fc2`), not yet clicked through in a browser.**
-Curtain Call and Grand Finale pick forms now have:
-- **Also save to…** — a collapsed "Also save to N leagues ▾" toggle above Save; opens one
-  tickable row per other league, each with its own note ("Replaces your current picks",
-  "Picks are locked", "<module> is off in this league"). One Save loops the existing submit
-  RPCs per league. Only leagues with nothing to replace start ticked; the collapsed line
-  adds "· ↻ replaces existing picks" when a ticked league has picks.
-- **Use my picks from…** — a select on an *empty* form that pre-fills it from another league.
-  Never saves by itself.
-
-No schema change. Everything else is the state left by the prior session (Grand Finale
-pinning, Season 35 schedule loaded); no other feature is in flight.
+**The UI has not been click-tested in a browser** — only `tsc`/eslint/`npm test` (255 pass) and
+the RPC scripts. The user plans to test on 2026-09-22 before real drafts.
 
 ## 2. Changes Made
 
-`git diff --stat 98f44aa HEAD` (this session's code commit, plus this file):
-- `src/lib/copy-picks.ts` — **new**: `planDestination`, `defaultSelection`, `isSelectable`,
-  `adaptCurtainCallPick`, `adaptGrandFinaleOrder`
-- `src/lib/copy-picks.test.ts` — **new**, 14 tests
-- `src/lib/other-league-picks.ts` — **new**: `loadOtherLeaguePicks` (viewer's own picks +
-  per-league plan)
-- `src/components/other-leagues-picker.tsx` — **new**: `AlsoSaveTo`, `UsePicksFrom`,
-  `OtherLeagueSaveSummary`
-- `src/app/leagues/[id]/predictions/actions.ts` — `submitPredictionToLeagues`,
-  `submitGrandFinalePredictionToLeagues` (thin loops over the existing actions)
-- `src/components/pick-em-box.tsx`, `src/components/grand-finale-box.tsx` — wire both features
-- `src/app/leagues/[id]/page.tsx` — calls the loader, passes `otherLeagues` to both boxes
-- `CLAUDE.md` — one bullet describing the feature; `MEMORY_HANDOFF.md` — this file
+`git diff --stat 98f44aa HEAD` (session start → now). **Ours:**
+- `supabase/schema.sql`, **new** `supabase/apply-draft-safety.sql`,
+  `apply-start-draft-active-couples.sql`, `apply-draft-queue.sql` (all applied live)
+- `src/app/leagues/[id]/draft/actions.ts`, `page.tsx`
+- `src/components/draft-room.tsx`; **new** `draft-managers-card.tsx`, `draft-queue-card.tsx`,
+  `reset-draft-dialog.tsx`
+- `src/lib/draft.ts`, `draft.test.ts`; **new** `src/lib/use-debounced-save.ts`
+- `src/lib/supabase/types.ts` (**hand-edited**, see Backlog), `CLAUDE.md`, this file
+
+**Not ours** (a parallel session's copy-picks work + a display tweak, already on `main`):
+`src/app/leagues/[id]/page.tsx`, `predictions/actions.ts`, `all-results-view.tsx`,
+`grand-finale-box.tsx`, `pick-em-box.tsx`, `other-leagues-picker.tsx`, `copy-picks.ts(+test)`,
+`other-league-picks.ts`.
 
 Uncommitted and not ours: `ios/App/App.xcodeproj/project.pbxproj`, `scratch/` (holds this
-session's live test `copy-picks-live.mts` and `vitest.live.config.mts`).
+session's verification scripts: `test-draft-safety.mjs`, `test-draft-queue.mjs`,
+`create-test-league.mjs`, `reset-all-drafts.mjs`, `check-leftovers.mjs`, etc.).
+
+**Throwaway fixtures still live — delete after the user's UI test:** league "Draft Test
+(throwaway)" (`d39b26a3-1076-48d0-b07e-2a143acf31f7`, invite `2KPRRJ`) and auth user
+`draft-test-manager@example.test` (`9d7484e9-8199-4427-89db-56a72d6b9afe`). Delete the league
+first (it cascades), then the user. The user's own account is a co-commissioner in it.
 
 ## 3. Key Decisions & Lessons Learned
 
-- **No new SQL.** `submit_prediction` / `submit_grand_finale_prediction` already enforce
-  membership, module-on and per-league lock, so the UI only decides what to *offer*. A new
-  atomic copy RPC was rejected (would need an owner-run SQL handoff just for atomicity).
-- **One-time copy, not a link.** No sync, no new table. Dance Card is deliberately excluded
-  (drafts are per-league).
-- **Pins and the eligible-couple pool are per viewer, not per league**, so one pinned list
-  serves every league; pre-filled Grand Finale orders go through `adaptGrandFinaleOrder`
-  (→ `pinEliminatedFirst`). Pinning is still UI-only.
-- **Grand Finale no longer locks at first elimination reveal** (built, run live, reversed by
-  the user). Its lock is the hard deadline only. A null GF deadline means locked (RPC
-  refuses it); a null Curtain Call lock means open. Don't reintroduce an elimination lock.
-- **UI iteration:** checkbox list → chips → collapsed toggle with one row per league. The
-  user approved the last. The added shadcn checkbox was deleted as unused.
-- **`src/lib` value imports must be relative** (`./x`), not `@/…` — Vitest has no alias.
-  Type-only `@/` imports are fine.
-- **Live integration tests here run through vitest with a config in `scratch/`**:
-  `NODE_OPTIONS="--experimental-websocket" npx vitest run --config scratch/vitest.live.config.mts`
-  (no tsx runner). It creates throwaway users/leagues on the live project and cleans up in
-  `afterAll`; the cleanup was verified. Throwaway-account writes worked from this container.
-- **Don't `npm run build` while `next dev` listens on :3000** — use `tsc --noEmit`, eslint,
+- **`reset_draft` is a full wipe**: deletes `draft_picks`, `roster_slots`, `waiver_claims`,
+  `weekly_manager_scores`; back to `not_started`. **Keeps** `draft_position`,
+  `draft_autopilot`, predictions, scoring settings, queues, and the frozen
+  `judges_score_starts_week` (a floor, so a redraft can't score already-aired weeks). Confirm
+  is type-the-league-name. The user explicitly chose "wipe scores too" — don't add a
+  scored-history block.
+- **Membership freeze, not leave-handling**: join/leave/remove reject mid-draft ("Draft in
+  progress — ask the commissioner to cancel it first"). A gap/null `draft_position` strands
+  every pick and the pick math keys off member count.
+- **Queues are private** (own table, owner-only RLS) because `league_members` is readable and
+  realtime-broadcast league-wide. Queue is a wishlist: drafted/eliminated entries are skipped
+  at pick time, not pruned server-side. Feeds autopilot/timeout only — no new draft mode.
+- **Presence is advisory only** (never enforced server-side): dots + soft `window.confirm`
+  at Start.
+- **Realtime doesn't replay missed events** (phone sleep / signal loss) — hence the refetch on
+  resume/resubscribe. Timeout auto-picks still need at least one connected browser.
+- **Debounced-save state lives in `DraftRoom`, not the card** (`use-debounced-save.ts`): the
+  lobby and in-progress views are separate returns, so a card holding its own state remounts
+  and loses edits.
+- **`record_draft_pick`'s last arg is now text `p_auto_source`** (was boolean `p_is_auto`);
+  the old overload was dropped. Internal function, revoked from clients.
+- **`update_scoring_categories` guard is narrow** (only Dance Card off mid-draft), so
+  commissioners can still tune point values during a draft.
+- **`create or replace` apply files are extracted from `schema.sql`** so the two can't drift;
+  hand the user plain `.sql` files (no heredocs).
+- **Live DB writes**: DDL still goes through the user (SQL Editor), but service-role REST
+  writes work from `.mjs` scripts (used for the reset and test fixtures). RPCs that check
+  `auth.uid()` need a signed-in throwaway user, not the service role.
+- **Working style the user prefers here**: questions one at a time as clickable options with a
+  recommendation; separate changes for separate concerns; rejecting `ExitPlanMode` means stop
+  and wait for their next message; stage files by name (a parallel session shares this tree).
+- **Don't `npm run build` while `next dev` listens on :3000.** Use `tsc --noEmit`, eslint,
   `npm test`.
-- **Plan mode:** a rejected `ExitPlanMode` means stop; the user may follow with instructions.
-- **A parallel session shares this tree.** Stage by name; never `git add -A`.
-- **Re-read live data before acting on an earlier read**; schema/RPC changes go to the user
-  as plain `.sql` files.
 
 ## 4. Backlog & Deferred Items
 
-- **Browser click-through of both features** is unverified (the RPC and loader layers were
-  verified live; the forms were only type/lint/unit checked).
-- Possible tweak: the row notes are long on narrow phones — shorten to "Off" / "Locked" if
-  cramped. Also possible: name the ticked leagues in the collapsed line, or default to zero
-  ticked.
-- Copy only happens from the edit form; pushing already-saved picks needs Edit → Save.
-- The DB doesn't check that a picked couple is still active (only the picker does).
-- **Site Admin visibility** (next planned task): `/admin/results` opens to any signed-in user
-  when `RESULTS_ENTRY_OPEN_TO_ALL=true` but is linked only from `SiteAdminNav`;
-  `/admin/accounts` is strictly super-admin.
-- **Assumed schedule dates** (editable on Admin > Schedule): Week 5 Oct 13, Week 10 Nov 17,
-  Week 11 Nov 24; Week 5 has no theme.
-- Spoiler-Free callout on `/today` still to be confirmed. Server-side Grand Finale pin
-  enforcement deferred. Monte Carlo re-run against real Season 35 data once more weeks exist;
-  `dance_card_calibration` clamp path never exercised live.
+- **Regenerate `src/lib/supabase/types.ts`** once a `SUPABASE_ACCESS_TOKEN` exists (currently
+  hand-edited for `reset_draft`, `set_member_draft_autopilot`, `undo_last_pick`,
+  `set_draft_queue`, `draft_queues`, `draft_picks.auto_source`, `record_draft_pick` args).
+- **Confirm the deploy for `ed045aa` succeeded** on Vercel (past builds broke silently). The
+  old deployed UI would call the dropped `undo_last_auto_pick`.
+- **Auto-picks aren't announced** in the UI (dialog/banner cover manual picks only); no timer
+  refetch for a silently stalled connection.
+- **`league_members` DELETE realtime listener is unfiltered** (Supabase can't filter DELETEs),
+  so other leagues' removals trigger a harmless extra refetch.
+- **Site Admin visibility** (from an earlier session): the user wants some Site Admin pages
+  moved to public view; scoped, deliberately not started.
+- **Possible future ideas, not requested:** rewind-to-pick undo; a "ready check" beyond advisory
+  presence.
 
 ## 5. Next Steps
 
-1. Run `git status` and `git fetch && git log HEAD..origin/main --oneline` first.
-2. Click through both features in a signed-in browser with a user in ≥2 leagues: Save with
-   another league ticked, the collapsed/expanded toggle, "Use my picks from…" on an empty
-   form, and a locked or module-off league. Fix anything found.
-3. Then start **Site Admin visibility**. Recommendation: a read-only public Schedule (episodes
-   by week, themes, air times) linked from the Home episode banner, not under `/admin`. Skip a
-   public View Results. Keep Accounts, the Settings tab and Enter/Publish Results gated; later
-   replace `RESULTS_ENTRY_OPEN_TO_ALL` with a per-person "results editor" flag on `profiles`
-   (a column users can't write, per the column-grant rule in `CLAUDE.md`).
+1. The user click-tests the draft UI on 2026-09-22 with the throwaway league + account (two
+   browsers). Start the new session with "read MEMORY_HANDOFF.md" and their findings; fix any
+   UI bugs (likely spots: confirm dialog, queue `Select`, presence/Start warning, realtime
+   member reconcile).
+2. When they say they're done, delete the throwaway league and user (see §2).
+3. Regenerate `types.ts` when a token is available.
