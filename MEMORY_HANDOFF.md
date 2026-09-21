@@ -72,7 +72,6 @@ regression draft that still works. The one "failure" was a wrong expectation in 
 - **Results notes:** bolding league names would separate them from the noun.
 - **Auto-picks aren't announced** in the draft UI; no timer refetch for a silently stalled connection.
 - **Site Admin visibility:** the user wants some Site Admin pages moved public; scoped, not started.
-- The user mentioned "two things in mind" at the start of the session; the second one (after sticky headers) was never stated.
 
 ## 5. Next Steps
 
