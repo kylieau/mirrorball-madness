@@ -2,131 +2,111 @@
 
 ## 1. Current State
 
-**Home episode banner — implemented, uncommitted on `main`.** Adds a compact
-theatrical "Week N" banner (picks-open / on-air status, season-progress dots)
-at the top of `/today` that collapses into a slim sticky bar on scroll; the
-per-league `DeadlineStub`s render in a new compact variant beneath it. Prior
-scoring-calibration work is shipped and unchanged (`05173e9`). `tsc`, eslint,
-`npm test` (228 pass) and `npm run build` are clean. **Not yet seen in a
-browser** (no browser tool in this container) — scroll-collapse, reduced-motion
-and the on-air state still need a manual look.
+**Home episode banner + results leaderboard song titles — shipped and pushed to
+`origin/main` (`c2da7d7`, `9fa8f13`).** No work in progress on this side.
 
-Follow-up: Home stubs quieted — `DeadlineStub` keeps the ticket notches but is
-a flat muted tint with the league name only (no pick type) and a "Make picks ›"
-text link; the Spoiler-Free callout lost its gold glow. The temporary `compact`
-prop was dropped. Not yet checked in a browser.
+- **Episode banner** on `/today`: theatrical "Week N" strip (picks-open / on-air
+  status, season-progress dots) that collapses into a slim sticky bar on scroll.
+  Deadline stubs were quieted (ticket notches kept, flat muted tint, league name
+  only, "Make picks ›" text link) and the Spoiler-Free callout lost its gold glow.
+  User confirmed the banner works in a browser; the quieter stubs/callout were not
+  explicitly confirmed by eye.
+- **Results leaderboard** now shows the song title beside each dance style, one
+  line per dance ("Foxtrot · Song Title").
+- **Live data fixes (run by the user in the Supabase SQL Editor, verified
+  read-only afterwards):** Week 1's dances were all on Night One (E1); the eight
+  women's `dance_scores` + `episode_results` were moved to Night Two (E2). Men's
+  Night One song titles were then filled in (title only, no artist).
 
-Design calls: shows the show's `earliestAirsAt` (lock time is per-league, so
-not a banner concern); "on air" derived from `airs_at` since nothing writes
-`episodes.status = 'locked'`; no "Results are in" state (`SpoilerRevealCallout`
-already owns it); hidden when there is no live week; kept the season track
-despite the old "Home has no season strip" note (CLAUDE.md updated).
+Scoring calibration (`05173e9`) and competition weeks (PR #29) are older, shipped,
+and unchanged.
 
-Files: `src/lib/episode-banner.ts` (+ test), `src/components/episode-banner.tsx`,
-`deadline-stub.tsx` (`compact`), `home-dashboard.tsx`, `today/page.tsx`,
-`globals.css` (pulse/glow keyframes), `CLAUDE.md`.
+**Another session is mid-flight** on Grand Finale lock work: uncommitted
+`supabase/schema.sql` and untracked `supabase/apply-grand-finale-lock.sql` are
+theirs — do not stage or commit them. `ios/App/App.xcodeproj/project.pbxproj` is
+also a pre-existing unrelated modification.
 
 ## 2. Changes Made
 
-Committed at `05173e9` ("Add scoring calibration layer for Dance
-Card/Curtain Call/Grand Finale"):
-- `supabase/schema.sql` — `scoring_settings` new columns
-  (`fourth_place_points`, `fifth_place_points`,
-  `bonus_picks_first_place_points`..`bonus_picks_fifth_place_points`,
-  `judges_score_multiplier_customized`), recalibrated defaults on existing
-  point columns, new `dance_card_calibration` table, `update_scoring_categories()`
-  (19→26 args) and `start_draft()` updated.
-- `src/lib/scoring.ts` — `computeWeeklyScores` drops `isFinale`, adds
-  `couplesRemaining`/`totalCouples` + exported `curtainCallPayout()`;
-  podium bonus keyed by numeric `finalPlacement` (1-5) instead of `Outcome`.
-- `src/lib/results.ts` (`recomputeWeekScores`) — unconditionally computes
-  `couplesRemaining`/`totalCouples`/`finalPlacementByCouple` every call now,
-  not just resolving weeks.
-- `src/lib/season-clock-sync.ts` — a second, direct caller of
-  `update_scoring_categories` (bypasses the Settings form's action wrapper)
-  that needed the same 7 new params; found via typecheck after regenerating
-  `types.ts`, easy to miss by grepping only the obvious call site.
-- `src/components/league-modules-form.tsx` — 4th/5th Dance Card inputs, new
-  Grand Finale "Placement Bonus" sub-section, auto-calibration copy note.
-- `src/components/pick-em-box.tsx`, `src/app/leagues/[id]/page.tsx` — "N pts
-  · M couples left" pick preview.
-- `src/app/leagues/[id]/settings/actions.ts` — `ScoringCategoriesInput` +7 fields.
-- `src/lib/scoring.test.ts` — rewritten, 27 tests.
-- `src/lib/supabase/types.ts` — regenerated from live schema.
-- `scripts/monte-carlo-calibration/run.mjs` + `README.md` — new, committed
-  (plain Node, no `tsx`/`ts-node` in this repo — deliberately dependency-free).
-- `CLAUDE.md`, `MEMORY_HANDOFF.md` — docs updated.
+`git diff --stat b5a77d7..HEAD` (this session's commits):
+- `CLAUDE.md` — Episode-vs-Week bullet now describes the Home `EpisodeBanner`
+  (replaced the old "Home has no season strip" line)
+- `MEMORY_HANDOFF.md` — this file
+- `src/app/globals.css` — `live-pulse` / `dot-glow` keyframes + `--animate-*` tokens
+- `src/app/today/page.tsx` — computes banner state, passes `episodeBanner`, drops
+  the unused `moduleLabel` from `deadlines`
+- `src/app/this-week/page.tsx` — also selects `song_title` from `dance_scores`
+- `src/components/episode-banner.tsx` — new (client component, IntersectionObserver
+  collapse, `motion-reduce:` variants)
+- `src/components/deadline-stub.tsx` — quiet restyle, text-link CTA
+- `src/components/home-dashboard.tsx` — renders banner, label = league name only
+- `src/components/spoiler-reveal-callout.tsx` — glow shadow replaced by thin border
+- `src/components/weekly-results-view.tsx` — per-dance "Style · Song" lines
+- `src/lib/episode-banner.ts` + `episode-banner.test.ts` — new pure helper + 6 tests
 
-**Not committed (by design):** `scratch/add-scoring-calibration.sql` (the
-live-DB delta, already applied and no longer needed) and
-`scratch/verify-scoring-calibration.mts` (the live integration test) — this
-repo's `scratch/` has never been tracked in git, every prior session's
-scratch files are local-only. Also left `ios/App/App.xcodeproj/project.pbxproj`
-untouched — unrelated in-progress modification present at session start,
-not this session's to stage.
+Untracked/local only (never committed, by repo convention): `scratch/` including
+`fix-week1-dance-split.sql`, `add-week1-men-song-titles.sql`,
+`check-week1-dance-split.mjs`, `check-week1-related.mjs`.
 
 ## 3. Key Decisions & Lessons Learned
 
-- **Always `git fetch && git log HEAD..origin/main` before trusting a plan
-  built from local files.** This session's plan was drafted in Plan Mode
-  against a checkout 23 commits behind `origin/main` (missing the
-  competition-weeks restructuring). Several assumptions had to be
-  re-verified against the real pulled code before implementing — function
-  names, line numbers, and `episode_id` vs `week_id` scoping had all
-  changed; the scoring-formula shape itself hadn't.
-- **Placement bonus split into two additive halves** (Dance Card weight +
-  Grand Finale weight, 50/50 variance-share) rather than moved wholesale
-  into Grand Finale's weight. The UI's "Grand Finale" module was, before
-  this session, exclusively the full-order prediction — 1st/2nd/3rd place
-  bonuses lived entirely inside Dance Card's weight despite reading like a
-  Grand Finale concept. A naive full move would've silently changed
-  existing leagues' math whenever their two weights differ; the split
-  preserves "toggle a module off, no renormalization needed" in both
-  directions. 4th/5th tiers derive from the existing numeric finale
-  position (reused from the full-order prediction), not new
-  `couples.status` values.
-- **`judges_score_multiplier` should *decrease* as roster size grows**
-  (2.36 at size 1 → 1.05 at size 6) — opposite the original spec's prose
-  ("spread shrinks as leagues grow"). Real finite-population-sampling
-  effect: Dance Card scores as a *sum* across a roster, not an average, and
-  a sum's variance rises (not falls) until roster size passes half the cast
-  size — a threshold this app's ≥2-manager minimum never lets a league
-  reach. **Confirmed with Kylie: leave as built, no code change** — a
-  uniform multiplier can't change the skill/luck *ratio* within Dance Card
-  anyway, only its total magnitude, so equalizing literal measured variance
-  (the spec's own definition of "spread") is the correct, achievable goal
-  regardless of the mismatched prose justification. Full reasoning saved in
-  auto-memory (`mirrorball_madness_scoring_calibration.md`).
-- **Monte Carlo calibration scripts belong outside `src/`, in plain JS** —
-  no `tsx`/`ts-node` in this repo; a TypeScript one-off would need extra
-  tooling just to run once.
-- **A live integration test caught what a `grep` for the RPC name alone
-  would've missed**: `season-clock-sync.ts` calls `update_scoring_categories`
-  directly, not through the Settings action wrapper. Regenerating
-  `types.ts` and re-running `tsc` surfaced it immediately; worth re-running
-  a full typecheck (not just building the file you think you changed)
-  after any RPC signature change.
+- **Banner shows the show's `earliestAirsAt`, not a lock time** — picks lock time is
+  per-league (`leagues.prediction_lock_hours_before_air`, `prediction_lock_at`), so a
+  single global "Locks Tue 7pm" would be wrong. Per-league countdowns stay on the stubs.
+- **"On air" is derived from `airs_at`**, never read from `episodes.status` —
+  `'locked'` is declared but nothing ever writes it (only `upcoming ⇄ completed`).
+- **No "Results are in" banner state** — `SpoilerRevealCallout` already owns that for
+  Spoiler-Free viewers, and for everyone else `liveWeek` advances the moment results
+  publish. Banner has two states only; hidden when there is no live week or the live
+  week has no episodes.
+- **Fan copy is "Week N"** (`formatEpisodeCasual`), not "Episode N" — the mockup's
+  wording was overridden by the repo convention.
+- **Season track kept on purpose** despite the old "no season strip" note; CLAUDE.md
+  was updated so the docs no longer contradict it.
+- **Plans go stale fast in this repo.** The first banner plan was written against the
+  old single `episodes` table; competition weeks (`competition_weeks` + `episodes`)
+  landed underneath it. Re-read the real code (`src/lib/competition-week.ts`,
+  `today/page.tsx`) and `git fetch && git log HEAD..origin/main` before trusting a plan.
+- **A parallel session shares this working tree.** Stage files by name, never
+  `git add -A`; check `git status` for others' WIP before committing.
+- **Don't `npm run build` while `next dev` is listening on :3000** — it overwrites
+  `.next` under the running server. Use `tsc --noEmit`, eslint and `npm test` instead.
+- **Live DB writes are blocked from this container's tooling** (the permission
+  classifier denied a service-role update). Hand the user a plain `.sql` file for the
+  Supabase SQL Editor, then verify with a read-only service-role script. Reads work.
+- **No TypeScript runner in the repo** — ad-hoc scripts must be plain `.mjs`, run from
+  the project root with `NODE_OPTIONS="--experimental-websocket"`. The active season is
+  found via `seasons.is_active`; `rpc("active_season_id")` returns null under the
+  service role.
+- **`episode_results` / `dance_scores` are keyed by `episode_id`** (judge scores follow
+  via `dance_score_id`); scores, predictions and standings key off `week_id`, so moving
+  dances between episodes of the same week needs no rescoring.
+- **Scoring calibration lessons** (older): placement bonus is split across Dance Card
+  and Grand Finale weights; `judges_score_multiplier` decreasing with roster size is
+  correct as built; Monte Carlo scripts stay plain JS outside `src/`; re-run a full
+  typecheck after any RPC signature change.
 
 ## 4. Backlog & Deferred Items
 
-- Manually click through the Settings form's new Placement Bonus fields and
-  a live Curtain Call pick in a browser — no browser automation tool in
-  this container, and the RPC-level live test already exercises the same
-  server paths, so this is unseen-but-likely-fine polish, not a known gap.
-- Re-run the Monte Carlo script against real Season 35 data once a season's
-  worth of judge scores / elimination order / manager pick accuracy exists
-  — see `scripts/monte-carlo-calibration/README.md`.
-- `dance_card_calibration`'s clamp-to-nearest-roster-size path (only
-  exercised when roster size falls outside the swept 1-6 range) wasn't run
-  live — worth a check if a very-few-managers league shows up against this
-  season's 16-couple cast (roster_size could reach 8).
-- DND / "—" live check still owed (pre-existing, unrelated to scoring).
-- Actually deleting `auth.users` / profiles / league history — still no
-  safe automatic path (pre-existing, unrelated).
+- Eyeball the quieter deadline stubs and the calmer Spoiler-Free callout on `/today`
+  (banner itself is confirmed). Also try OS reduced-motion and the on-air state once
+  an episode's `airs_at` has passed and it isn't completed.
+- Episode 4 in the live data has the placeholder theme "test" (`airs_at`
+  2026-09-21) sitting in its own week — likely leftover test data; check before it
+  becomes the live week.
+- Browser click-through of the Settings Placement Bonus fields and a live Curtain Call
+  pick (from the scoring calibration work).
+- Re-run the Monte Carlo script against real Season 35 data once enough weeks exist
+  (`scripts/monte-carlo-calibration/README.md`).
+- `dance_card_calibration` clamp-to-nearest path (roster size outside 1-6) never
+  exercised live.
+- DND / "—" live check still owed; safe deletion of `auth.users`/profiles with league
+  history still has no automatic path (both pre-existing).
 
 ## 5. Next Steps
 
-Nothing blocking or in-flight. When resuming:
-1. Default to waiting for the next feature request or bug report.
-2. If picking up the browser QA item above, no schema/type work is needed
-   first — everything is live and verified server-side already.
+Nothing blocking or in flight on this work. When resuming:
+1. Check `git status` and `git fetch && git log HEAD..origin/main` — the other
+   session's Grand Finale lock work may have landed or changed shared files.
+2. Default to waiting for the next feature request or bug report; if picking up
+   backlog, start with the browser look at `/today` (item 1 above).
