@@ -14,6 +14,7 @@ import { coupleNameNode } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 import { formatEpisodeCasualShort } from "@/lib/format-week";
+import { pinEliminatedFirst, pinnedEliminatedIds } from "@/lib/grand-finale-pins";
 
 type Couple = {
   id: string;
@@ -60,7 +61,11 @@ export function GrandFinaleBox({
   // Editing an existing prediction skips straight to the reorder step,
   // pre-filled — only a brand-new prediction starts with tap-to-build.
   const [phase, setPhase] = useState<"select" | "edit">(existingOrder ? "edit" : "select");
-  const [order, setOrder] = useState<string[]>(existingOrder ?? []);
+  // Already-revealed eliminations are fixed at the bottom of the ranking; only
+  // the still-competing couples are the viewer's to place.
+  const pinnedIds = pinnedEliminatedIds(couples);
+  const pinnedCount = pinnedIds.length;
+  const [order, setOrder] = useState<string[]>(existingOrder ?? pinnedIds);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Read-only "here's your order" view whenever a saved prediction already
@@ -84,17 +89,17 @@ export function GrandFinaleBox({
   }
 
   function undoLastTap() {
-    setOrder(order.slice(0, -1));
+    if (order.length > pinnedCount) setOrder(order.slice(0, -1));
   }
 
   function startOver() {
-    setOrder([]);
+    setOrder(pinnedIds);
     setPhase("select");
   }
 
   function moveEntry(index: number, direction: -1 | 1) {
     const target = index + direction;
-    if (target < 0 || target >= order.length) return;
+    if (index < pinnedCount || target < pinnedCount || target >= order.length) return;
     const next = [...order];
     [next[index], next[target]] = [next[target], next[index]];
     setOrder(next);
@@ -147,7 +152,10 @@ export function GrandFinaleBox({
             </div>
           ))}
           {!locked && (
-            <Button variant="outline" size="sm" className="mt-2 self-start" onClick={() => setReviewing(false)}>
+            <Button variant="outline" size="sm" className="mt-2 self-start" onClick={() => {
+                setOrder(pinEliminatedFirst(order, pinnedIds));
+                setReviewing(false);
+              }}>
               Edit order
             </Button>
           )}
@@ -190,25 +198,8 @@ export function GrandFinaleBox({
         <CardContent className="flex flex-col gap-4">
           <p className="text-sm font-medium text-accent">
             {order.length} of {couples.length} placed
+            {pinnedCount > 0 && ` · ${pinnedCount} already eliminated`}
           </p>
-
-          <div className="flex flex-col gap-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {order.length === 0 ? "Tap who's eliminated first" : "Tap who's eliminated next"}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {remaining.map((c) => (
-                <Button
-                  key={c.id}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => tapCouple(c.id)}
-                >
-                  {nameFor(c.id)}
-                </Button>
-              ))}
-            </div>
-          </div>
 
           {order.length > 0 && (
             <div className="flex flex-col gap-1">
@@ -216,17 +207,36 @@ export function GrandFinaleBox({
                 Your order so far
               </p>
               {order.map((coupleId, i) => (
-                <div key={coupleId} className="flex items-center justify-between text-sm">
-                  <span>
-                    {i + 1}. {nameFor(coupleId)}
-                  </span>
+                <div key={coupleId} className="text-sm">
+                  {i + 1}. {nameFor(coupleId)}
                 </div>
               ))}
-              <Button variant="ghost" size="sm" className="self-start" onClick={undoLastTap}>
-                Undo last tap
-              </Button>
+              {order.length > pinnedCount && (
+                <Button variant="ghost" size="sm" className="self-start" onClick={undoLastTap}>
+                  Undo last tap
+                </Button>
+              )}
             </div>
           )}
+
+          <div className="flex flex-col gap-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {order.length === pinnedCount ? "Tap who's eliminated first" : "Tap who's eliminated next"}
+            </p>
+            <div className="grid grid-cols-2 gap-1">
+              {remaining.map((c) => (
+                <Button
+                  key={c.id}
+                  variant="outline"
+                  size="sm"
+                  className="h-auto justify-start whitespace-normal py-1.5 text-left"
+                  onClick={() => tapCouple(c.id)}
+                >
+                  {nameFor(c.id)}
+                </Button>
+              ))}
+            </div>
+          </div>
 
           <Button disabled>Save prediction ({order.length}/{couples.length})</Button>
         </CardContent>
@@ -270,7 +280,7 @@ export function GrandFinaleBox({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    disabled={displayIndex === 0}
+                    disabled={displayIndex === 0 || actualIndex < pinnedCount}
                     onClick={() => moveEntry(actualIndex, 1)}
                   >
                     ↑
@@ -278,7 +288,7 @@ export function GrandFinaleBox({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    disabled={displayIndex === order.length - 1}
+                    disabled={actualIndex <= pinnedCount}
                     onClick={() => moveEntry(actualIndex, -1)}
                   >
                     ↓
