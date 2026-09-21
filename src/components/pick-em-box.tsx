@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { submitPrediction } from "@/app/leagues/[id]/predictions/actions";
+import {
+  submitPredictionToLeagues,
+  type LeagueSaveResult,
+} from "@/app/leagues/[id]/predictions/actions";
+import { AlsoSaveTo, OtherLeagueSaveSummary, UsePicksFrom } from "@/components/other-leagues-picker";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,6 +19,7 @@ import type { CoupleNameParts } from "@/lib/couple-display";
 import { coupleNameNode } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 import { curtainCallPayout } from "@/lib/scoring";
+import { adaptCurtainCallPick, defaultSelection, type CurtainCallDestination } from "@/lib/copy-picks";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 
@@ -78,6 +83,7 @@ export function PickEmBox({
   isLocked,
   isDoubleElimination,
   revealedPredictions,
+  otherLeagues,
 }: {
   leagueId: string;
   episode: { id: string; week_number: number; theme: string | null };
@@ -104,6 +110,7 @@ export function PickEmBox({
     eliminatedLabel2: string | null;
     topScorerLabel: string | null;
   }[];
+  otherLeagues: CurtainCallDestination[];
 }) {
   const [eliminatedId, setEliminatedId] = useState(
     existingPrediction?.predicted_eliminated_couple_id ?? ""
@@ -124,6 +131,9 @@ export function PickEmBox({
   const [editing, setEditing] = useState(
     !existingPrediction?.predicted_eliminated_couple_id && !existingPrediction?.predicted_top_scorer_couple_id
   );
+  const [alsoSaveTo, setAlsoSaveTo] = useState(() => defaultSelection(otherLeagues));
+  const [otherResults, setOtherResults] = useState<LeagueSaveResult[]>([]);
+  const [filledFrom, setFilledFrom] = useState<string | null>(null);
   const formattedLockAt = useFormattedDeadline(lockAt);
 
   function nameFor(coupleId: string) {
@@ -149,18 +159,31 @@ export function PickEmBox({
   const eliminationPickValid =
     !isDoubleElimination || (!eliminatedId && !eliminatedId2) || (!!eliminatedId && !!eliminatedId2);
 
+  function fillFrom(sourceLeagueId: string) {
+    const source = otherLeagues.find((l) => l.id === sourceLeagueId);
+    if (!source?.pick) return;
+    const pick = adaptCurtainCallPick(source.pick, new Set(activeCouples.map((c) => c.id)));
+    setEliminatedId(pick.elim1 ?? "");
+    setEliminatedId2(pick.elim2 ?? "");
+    setTopScorerId(pick.topScorer ?? "");
+    setFilledFrom(source.name);
+  }
+
   async function handleSubmit() {
     setError(null);
+    setOtherResults([]);
     setSubmitting(true);
-    const result = await submitPrediction(
-      leagueId,
+    const results = await submitPredictionToLeagues(
+      [leagueId, ...alsoSaveTo],
       episode.id,
       eliminatedId || null,
       isDoubleElimination ? eliminatedId2 || null : null,
       topScorerId || null
     );
-    if (result.error) setError(result.error);
+    const own = results.find((r) => r.leagueId === leagueId);
+    if (own?.error) setError(own.error);
     else setEditing(false);
+    setOtherResults(results.filter((r) => r.leagueId !== leagueId));
     setSubmitting(false);
   }
 
@@ -184,6 +207,7 @@ export function PickEmBox({
     curtainCallPayout(topScorerPredictionPoints, couplesRemaining, totalCouples)
   );
   const couplesLeftLabel = `${couplesRemaining} couple${couplesRemaining === 1 ? "" : "s"} left`;
+  const pickSources = otherLeagues.filter((l) => l.pick);
 
   return (
     <div className="flex flex-col gap-4">
@@ -194,10 +218,17 @@ export function PickEmBox({
           </div>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
+        <OtherLeagueSaveSummary results={otherResults} destinations={otherLeagues} />
 
         {!isLocked ? (
           editing ? (
             <>
+              {!hasSavedPick && <UsePicksFrom sources={pickSources} onPick={fillFrom} />}
+              {filledFrom && (
+                <p className="text-xs text-muted-foreground">
+                  Filled in from {filledFrom} — review, then save.
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 Correct elimination: {eliminationPreview} pts · {couplesLeftLabel}
               </p>
@@ -242,6 +273,12 @@ export function PickEmBox({
                 onChange={setTopScorerId}
                 couples={activeCouples}
                 nameFor={nameFor}
+              />
+              <AlsoSaveTo
+                destinations={otherLeagues}
+                selected={alsoSaveTo}
+                onChange={setAlsoSaveTo}
+                disabled={submitting}
               />
               <div className="flex gap-2">
                 <Button onClick={handleSubmit} disabled={submitting || !eliminationPickValid}>

@@ -13,6 +13,7 @@ import { CurtainCallCard } from "@/components/curtain-call-card";
 import { PickEmBox } from "@/components/pick-em-box";
 import { PastPicksRecap } from "@/components/past-picks-card";
 import { GrandFinaleBox } from "@/components/grand-finale-box";
+import { loadOtherLeaguePicks } from "@/lib/other-league-picks";
 import { DraftStatusCard } from "@/components/draft-status-card";
 import { RecastNudgeCard } from "@/components/recast-nudge-card";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
@@ -386,6 +387,14 @@ export default async function LeaguePage({
       : null;
   }
 
+  const otherLeaguePicks = await loadOtherLeaguePicks(supabase, {
+    userId: user.id,
+    currentLeagueId: id,
+    curtainCallWeekId: curtainCallOn && upcomingEpisode && !isLocked ? upcomingEpisode.id : null,
+    includeGrandFinale: grandFinaleOn && !grandFinaleLocked,
+    now: new Date(),
+  });
+
   const picksNeeded =
     (curtainCallOn && !!upcomingEpisode && !isLocked && !ownPrediction) ||
     (grandFinaleOn && !grandFinaleLocked && !grandFinaleOrder);
@@ -661,6 +670,7 @@ export default async function LeaguePage({
                       isLocked={isLocked}
                       isDoubleElimination={upcomingEpisode.is_double_elimination_week}
                       revealedPredictions={revealedPredictions}
+                      otherLeagues={otherLeaguePicks.curtainCall}
                     />
                   ) : curtainCallMode === "recap" && curtainCallEpisode ? (
                     <PastPicksRecap
@@ -719,6 +729,7 @@ export default async function LeaguePage({
                   existingOrder={grandFinaleOrder}
                   deadline={grandFinaleDeadline}
                   isLocked={grandFinaleLocked}
+                  otherLeagues={otherLeaguePicks.grandFinale}
                 />
               </div>
             )}

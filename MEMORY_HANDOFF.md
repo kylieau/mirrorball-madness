@@ -2,7 +2,18 @@
 
 ## 1. Current State
 
-**No feature in flight.** This session shipped two things and then scoped a third:
+**Cross-league picks built, uncommitted, browser flow not yet exercised.** "Also save
+to…" and "Use my picks from…" on the Curtain Call and Grand Finale forms (see the
+CLAUDE.md bullet). Verified: `tsc`, eslint, `npm test` (14 new tests in
+`copy-picks.test.ts`), and a live throwaway-account run
+(`scratch/copy-picks-live.mts`, via `scratch/vitest.live.config.mts`; cleanup
+confirmed). Not verified: clicking through the two forms in a signed-in browser. Files:
+`src/lib/copy-picks.ts`, `src/lib/other-league-picks.ts`,
+`src/components/other-leagues-picker.tsx` (collapsed toggle → one row per league; the user
+approved this design after trying chips), plus edits to `actions.ts`, `pick-em-box.tsx`, `grand-finale-box.tsx`, and the
+league `page.tsx`. Stage by name when committing. Next: click-through, then commit.
+
+Earlier, prior session — **no feature in flight.** It shipped two things and then scoped a third:
 1. **Grand Finale picker** (pushed, `74e8193`): stays open until the hard deadline;
    couples whose elimination is already *revealed* to the viewer are pinned first
    and immovable, so the viewer ranks only the still-competing couples. Selection

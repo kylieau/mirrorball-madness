@@ -44,3 +44,41 @@ export async function submitGrandFinalePrediction(
   revalidatePath(`/leagues/${leagueId}`);
   return { error: null };
 }
+
+export type LeagueSaveResult = { leagueId: string; error: string | null };
+
+// Each league is an independent save through the same RPC, so a lock or a
+// disabled module in one destination can't sink the others. The RPC rejects
+// leagues the caller isn't in, so ids from the client need no filtering here.
+export async function submitPredictionToLeagues(
+  leagueIds: string[],
+  weekId: string,
+  predictedEliminatedCoupleId: string | null,
+  predictedEliminatedCoupleId2: string | null,
+  predictedTopScorerCoupleId: string | null
+): Promise<LeagueSaveResult[]> {
+  return Promise.all(
+    [...new Set(leagueIds)].map(async (leagueId) => ({
+      leagueId,
+      ...(await submitPrediction(
+        leagueId,
+        weekId,
+        predictedEliminatedCoupleId,
+        predictedEliminatedCoupleId2,
+        predictedTopScorerCoupleId
+      )),
+    }))
+  );
+}
+
+export async function submitGrandFinalePredictionToLeagues(
+  leagueIds: string[],
+  coupleIdsInOrder: string[]
+): Promise<LeagueSaveResult[]> {
+  return Promise.all(
+    [...new Set(leagueIds)].map(async (leagueId) => ({
+      leagueId,
+      ...(await submitGrandFinalePrediction(leagueId, coupleIdsInOrder)),
+    }))
+  );
+}

@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { submitGrandFinalePrediction } from "@/app/leagues/[id]/predictions/actions";
+import {
+  submitGrandFinalePredictionToLeagues,
+  type LeagueSaveResult,
+} from "@/app/leagues/[id]/predictions/actions";
+import { AlsoSaveTo, OtherLeagueSaveSummary, UsePicksFrom } from "@/components/other-leagues-picker";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,6 +19,7 @@ import type { CoupleNameParts } from "@/lib/couple-display";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 import { formatEpisodeCasualShort } from "@/lib/format-week";
 import { pinEliminatedFirst, pinnedEliminatedIds } from "@/lib/grand-finale-pins";
+import { adaptGrandFinaleOrder, defaultSelection, type GrandFinaleDestination } from "@/lib/copy-picks";
 
 type Couple = {
   id: string;
@@ -48,6 +53,7 @@ export function GrandFinaleBox({
   existingOrder,
   deadline,
   isLocked,
+  otherLeagues,
 }: {
   leagueId: string;
   couples: Couple[];
@@ -55,6 +61,7 @@ export function GrandFinaleBox({
   existingOrder: string[] | null;
   deadline: string | null;
   isLocked: boolean;
+  otherLeagues: GrandFinaleDestination[];
 }) {
   const alphabeticalCouples = [...couples].sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
 
@@ -71,6 +78,9 @@ export function GrandFinaleBox({
   // Read-only "here's your order" view whenever a saved prediction already
   // exists — reordering reopens the arrows, saving successfully closes them.
   const [reviewing, setReviewing] = useState(!!existingOrder);
+  const [alsoSaveTo, setAlsoSaveTo] = useState(() => defaultSelection(otherLeagues));
+  const [otherResults, setOtherResults] = useState<LeagueSaveResult[]>([]);
+  const [filledFrom, setFilledFrom] = useState<string | null>(null);
   const formattedDeadline = useFormattedDeadline(deadline);
 
   const coupleById = new Map(couples.map((c) => [c.id, c]));
@@ -80,6 +90,22 @@ export function GrandFinaleBox({
     return coupleNameNode(
       coupleDisplayNames[coupleId] ?? { celebrity: c?.celebrity_name ?? "Unknown", pro: c?.pro_name ?? "Unknown" }
     );
+  }
+
+  // Only offer a league whose ranking fits this season's cast, so a pre-fill
+  // never lands in the reorder step in a state the RPC would reject.
+  const seasonCoupleIds = couples.map((c) => c.id);
+  const pickSources = otherLeagues.filter(
+    (l) => l.order && adaptGrandFinaleOrder(l.order, seasonCoupleIds, pinnedIds)
+  );
+
+  function fillFrom(sourceLeagueId: string) {
+    const source = otherLeagues.find((l) => l.id === sourceLeagueId);
+    const adapted = source?.order && adaptGrandFinaleOrder(source.order, seasonCoupleIds, pinnedIds);
+    if (!source || !adapted) return;
+    setOrder(adapted);
+    setFilledFrom(source.name);
+    setPhase("edit");
   }
 
   function tapCouple(coupleId: string) {
@@ -107,10 +133,13 @@ export function GrandFinaleBox({
 
   async function handleSubmit() {
     setError(null);
+    setOtherResults([]);
     setSubmitting(true);
-    const result = await submitGrandFinalePrediction(leagueId, order);
-    if (result.error) setError(result.error);
+    const results = await submitGrandFinalePredictionToLeagues([leagueId, ...alsoSaveTo], order);
+    const own = results.find((r) => r.leagueId === leagueId);
+    if (own?.error) setError(own.error);
     else setReviewing(true);
+    setOtherResults(results.filter((r) => r.leagueId !== leagueId));
     setSubmitting(false);
   }
 
@@ -137,6 +166,7 @@ export function GrandFinaleBox({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
+          <OtherLeagueSaveSummary results={otherResults} destinations={otherLeagues} />
           {/* Displayed winner-first (reverse of storage order, which stays
               elimination-ascending to match what the RPC expects) so "1."
               lines up with the predicted winner named above, not with
@@ -196,6 +226,8 @@ export function GrandFinaleBox({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          {order.length === pinnedCount && <UsePicksFrom sources={pickSources} onPick={fillFrom} />}
+
           <p className="text-sm font-medium text-accent">
             {order.length} of {couples.length} placed
             {pinnedCount > 0 && ` · ${pinnedCount} already eliminated`}
@@ -259,6 +291,9 @@ export function GrandFinaleBox({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {filledFrom && (
+          <p className="text-xs text-muted-foreground">Filled in from {filledFrom} — review, then save.</p>
+        )}
 
         <div className="flex flex-col gap-1">
           {/* Displayed winner-first, same reasoning as renderSummary above.
@@ -298,6 +333,13 @@ export function GrandFinaleBox({
             );
           })}
         </div>
+
+        <AlsoSaveTo
+          destinations={otherLeagues}
+          selected={alsoSaveTo}
+          onChange={setAlsoSaveTo}
+          disabled={submitting}
+        />
 
         <div className="flex gap-2">
           <Button onClick={handleSubmit} disabled={submitting}>
