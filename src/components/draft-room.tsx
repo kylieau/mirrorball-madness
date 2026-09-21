@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -17,6 +17,7 @@ import {
   startDraft,
   makeDraftPick,
   setDraftAutopilot,
+  setDraftQueue,
   setMemberDraftAutopilot,
   undoLastPick,
 } from "@/app/leagues/[id]/draft/actions";
@@ -42,7 +43,9 @@ import type { Database } from "@/lib/supabase/types";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
+import { useDebouncedSave } from "@/lib/use-debounced-save";
 import { DraftManagersCard, PresenceDot } from "@/components/draft-managers-card";
+import { DraftQueueCard } from "@/components/draft-queue-card";
 import { ResetDraftDialog } from "@/components/reset-draft-dialog";
 import { XIcon } from "lucide-react";
 
@@ -54,7 +57,7 @@ type Member = {
   draft_autopilot: boolean;
   profiles: { display_name: string } | null;
 };
-type Couple = { id: string; celebrity_name: string; pro_name: string };
+type Couple = { id: string; status: string; celebrity_name: string; pro_name: string };
 type DraftPick = {
   id: string;
   couple_id: string;
@@ -63,6 +66,7 @@ type DraftPick = {
   pick_number: number;
   picked_at: string;
   is_auto: boolean;
+  auto_source: string | null;
 };
 
 function AutopilotToggle({
@@ -80,7 +84,9 @@ function AutopilotToggle({
     <div className="flex w-full items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-left">
       <div>
         <p className="text-sm font-medium">Sit out / autopilot</p>
-        <p className="text-xs text-muted-foreground">Random picks for the rest of this draft</p>
+        <p className="text-xs text-muted-foreground">
+          Auto-picks from your queue, then random, for the rest of this draft
+        </p>
       </div>
       <Switch
         checked={enabled}
@@ -97,6 +103,7 @@ export function DraftRoom({
   couples,
   coupleDisplayNames,
   initialPicks,
+  initialQueue,
   currentUserId,
   closeHref,
 }: {
@@ -105,6 +112,7 @@ export function DraftRoom({
   couples: Couple[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
   initialPicks: DraftPick[];
+  initialQueue: string[];
   currentUserId: string;
   closeHref: string;
 }) {
@@ -132,7 +140,7 @@ export function DraftRoom({
         .order("draft_position"),
       supabase
         .from("draft_picks")
-        .select("id, couple_id, manager_id, round, pick_number, picked_at, is_auto")
+        .select("id, couple_id, manager_id, round, pick_number, picked_at, is_auto, auto_source")
         .eq("league_id", league.id)
         .order("pick_number"),
       supabase.from("leagues").select("*").eq("id", league.id).single(),
@@ -254,7 +262,10 @@ export function DraftRoom({
   }, [league.id, currentUserId, refreshDraftState]);
 
   const draftedCoupleIds = useMemo(() => new Set(picks.map((p) => p.couple_id)), [picks]);
-  const availableCouples = eligibleRemaining(couples, draftedCoupleIds);
+  const availableCouples = eligibleRemaining(couples, draftedCoupleIds).filter(
+    (c) => c.status === "active"
+  );
+  const availableCoupleIds = new Set(availableCouples.map((c) => c.id));
   const totalSlots = members.length * league.roster_size;
   const nextPickNumber = picks.length + 1;
   const { round, draftPosition } = getPickAssignment(
@@ -323,8 +334,9 @@ export function DraftRoom({
     return [...saved, ...unsaved];
   });
   const [savingOrder, setSavingOrder] = useState(false);
-  const [orderSaveState, setOrderSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  const orderSaveTimeout = useRef<number | undefined>(undefined);
+  const orderSave = useDebouncedSave();
+  const queueSave = useDebouncedSave();
+  const [queue, setQueue] = useState(initialQueue);
 
   function shuffle<T>(arr: T[]) {
     const copy = [...arr];
@@ -367,17 +379,20 @@ export function DraftRoom({
   // Debounced so a run of arrow clicks lands as one RPC, not a race of them.
   function updateOrder(next: string[]) {
     setLocalDraftOrder(next);
-    setOrderSaveState("saving");
-    window.clearTimeout(orderSaveTimeout.current);
-    orderSaveTimeout.current = window.setTimeout(async () => {
+    orderSave.schedule(async () => {
       const { error } = await setDraftOrder(league.id, next);
-      if (error) {
-        setError(error);
-        setOrderSaveState("idle");
-      } else {
-        setOrderSaveState("saved");
-      }
-    }, 500);
+      if (error) setError(error);
+      return !error;
+    });
+  }
+
+  function updateQueue(next: string[]) {
+    setQueue(next);
+    queueSave.schedule(async () => {
+      const { error } = await setDraftQueue(league.id, next);
+      if (error) setError(error);
+      return !error;
+    });
   }
 
   async function handleStartDraft() {
@@ -391,7 +406,7 @@ export function DraftRoom({
     ) {
       return;
     }
-    window.clearTimeout(orderSaveTimeout.current);
+    orderSave.cancel();
     const { error: orderError } = await setDraftOrder(league.id, draftOrder);
     if (orderError) {
       setError(orderError);
@@ -454,6 +469,19 @@ export function DraftRoom({
     }
     setUndoPending(false);
   }
+
+  const draftQueueCard = (
+    <DraftQueueCard
+      queue={queue}
+      saveState={queueSave.saveState}
+      availableIds={availableCoupleIds}
+      nameFor={(id) => {
+        const parts = coupleParts(id);
+        return parts ? <CoupleName {...parts} /> : "Unknown couple";
+      }}
+      onChange={updateQueue}
+    />
+  );
 
   if (league.draft_status === "not_started") {
     const savedOrder = members
@@ -521,7 +549,7 @@ export function DraftRoom({
                 Shuffle
               </Button>
               <span className="text-xs text-muted-foreground">
-                {orderSaveState === "saving" ? "Saving…" : orderSaveState === "saved" ? "Saved" : ""}
+                {orderSave.saveState === "saving" ? "Saving…" : orderSave.saveState === "saved" ? "Saved" : ""}
               </span>
             </div>
             <Button
@@ -566,6 +594,9 @@ export function DraftRoom({
             void handleAutopilot(checked);
           }}
         />
+        <div className="w-full text-left">
+          {draftQueueCard}
+        </div>
       </div>
     );
   }
@@ -604,7 +635,7 @@ export function DraftRoom({
                 </span>
                 <span className="text-muted-foreground">
                   Rd {p.round}
-                  {p.is_auto ? " · auto · random" : ""}
+                  {p.is_auto ? ` · auto · ${p.auto_source ?? "random"}` : ""}
                 </span>
               </div>
             ))}
@@ -672,6 +703,8 @@ export function DraftRoom({
         onToggleAutopilot={(userId, enabled) => void handleMemberAutopilot(userId, enabled)}
       />
 
+      {draftQueueCard}
+
       <div className="grid gap-6 sm:grid-cols-2">
         <Card>
           <CardHeader>
@@ -710,7 +743,7 @@ export function DraftRoom({
                 </span>
                 <span className="text-muted-foreground">
                   {managerLabel(p.manager_id)}
-                  {p.is_auto ? " · auto · random" : ""}
+                  {p.is_auto ? ` · auto · ${p.auto_source ?? "random"}` : ""}
                 </span>
                 {isCommissioner && lastPick?.id === p.id && (
                   <Button

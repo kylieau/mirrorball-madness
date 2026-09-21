@@ -94,3 +94,21 @@ export function reconcileOrder(
   const known = new Set(kept);
   return [...kept, ...memberIds.filter((id) => !known.has(id))];
 }
+
+// Mirrors make_auto_draft_pick's queue rule: the highest-ranked queued couple
+// that is still eligible, else null (caller falls back to random). Display /
+// test only — the server is the authority.
+export function pickFromQueue(
+  queue: readonly string[],
+  eligibleIds: ReadonlySet<string>
+): string | null {
+  return queue.find((id) => eligibleIds.has(id)) ?? null;
+}
+
+export function moveQueueEntry<T>(queue: readonly T[], index: number, direction: -1 | 1): T[] {
+  const target = index + direction;
+  if (target < 0 || target >= queue.length) return [...queue];
+  const next = [...queue];
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}

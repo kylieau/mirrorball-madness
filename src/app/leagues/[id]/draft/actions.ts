@@ -72,3 +72,12 @@ export async function resetDraft(leagueId: string) {
   });
   return { error: error?.message ?? null };
 }
+
+export async function setDraftQueue(leagueId: string, coupleIds: string[]) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_draft_queue", {
+    p_league_id: leagueId,
+    p_couple_ids: coupleIds,
+  });
+  return { error: error?.message ?? null };
+}

@@ -21,10 +21,15 @@ All drafts were reset live on 2026-09-21 (only "matt with the stars" was started
 `src/lib/supabase/types.ts` was hand-edited for the three new RPCs; regenerate once
 `SUPABASE_ACCESS_TOKEN` is available.
 
-**Next: Change 2, the per-manager draft queue** (plan in
-`~/.claude/plans/can-we-build-a-greedy-peach.md`): private `draft_queues` table,
-`make_auto_draft_pick` reads it before random, `draft_picks.auto_source`. Draft log says
-`auto · random` for all auto-picks until then.
+**Change 2 (draft queue) shipped and verified live** (SQL applied; `scratch/test-draft-queue.mjs`
+and `scratch/test-draft-safety.mjs` both pass, including the active-couples roster sizing).
+Private `draft_queues` + `set_draft_queue`; `make_auto_draft_pick` takes the queue first then
+random; `draft_picks.auto_source` drives the `auto · queue` / `auto · random` log label;
+`record_draft_pick`'s last arg is now text `p_auto_source`. UI is `draft-queue-card.tsx`
+(state + debounced save in `draft-room.tsx` via `use-debounced-save.ts`). The draft room also
+stopped listing eliminated couples as pickable. Neither feature has been exercised in a
+browser. `src/lib/supabase/types.ts` is still hand-edited; regenerate when a
+`SUPABASE_ACCESS_TOKEN` is available.
 
 Unrelated, still uncommitted and not ours: `ios/.../project.pbxproj`, `scratch/`.
 

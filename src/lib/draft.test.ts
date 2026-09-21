@@ -4,6 +4,8 @@ import {
   eligibleRemaining,
   getPickAssignment,
   isBenignAutoPickError,
+  moveQueueEntry,
+  pickFromQueue,
   partitionPresence,
   reconcileOrder,
   pickRandomEligible,
@@ -164,5 +166,28 @@ describe("reconcileOrder", () => {
 
   it("drops leavers and appends joiners", () => {
     expect(reconcileOrder(["c", "a", "b"], ["a", "b", "d"])).toEqual(["a", "b", "d"]);
+  });
+});
+
+describe("pickFromQueue", () => {
+  it("takes the highest-ranked couple that is still eligible", () => {
+    expect(pickFromQueue(["a", "b", "c"], new Set(["b", "c"]))).toBe("b");
+  });
+
+  it("returns null when the queue is empty or exhausted", () => {
+    expect(pickFromQueue([], new Set(["a"]))).toBeNull();
+    expect(pickFromQueue(["a"], new Set(["b"]))).toBeNull();
+  });
+});
+
+describe("moveQueueEntry", () => {
+  it("swaps with the neighbour", () => {
+    expect(moveQueueEntry(["a", "b", "c"], 1, -1)).toEqual(["b", "a", "c"]);
+    expect(moveQueueEntry(["a", "b", "c"], 1, 1)).toEqual(["a", "c", "b"]);
+  });
+
+  it("is a no-op at the edges", () => {
+    expect(moveQueueEntry(["a", "b"], 0, -1)).toEqual(["a", "b"]);
+    expect(moveQueueEntry(["a", "b"], 1, 1)).toEqual(["a", "b"]);
   });
 });

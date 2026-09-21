@@ -302,8 +302,22 @@ create table draft_picks (
   -- True when make_auto_draft_pick placed this (timeout or autopilot), not
   -- the manager choosing a couple. Draft log labels these `auto · random`.
   is_auto boolean not null default false,
+  -- Where an auto-pick came from: the manager's own queue or the random
+  -- fallback. Null for manual picks. Draft log labels `auto · queue` / `auto · random`.
+  auto_source text check (auto_source in ('queue', 'random')),
   unique (league_id, couple_id),
   unique (league_id, pick_number)
+);
+
+-- A manager's ranked wishlist for auto-picks (autopilot or an expired clock).
+-- Private: only its owner can read it. Ranking order is array order; entries
+-- that are already drafted or no longer active are skipped at pick time, and
+-- when the list is exhausted make_auto_draft_pick falls back to random.
+create table draft_queues (
+  league_id uuid not null references leagues(id) on delete cascade,
+  user_id uuid not null references profiles(id),
+  couple_ids uuid[] not null default '{}',
+  primary key (league_id, user_id)
 );
 
 -- ============================================================
@@ -1161,8 +1175,10 @@ grant execute on function public.update_scoring_categories(uuid, boolean, boolea
 -- the UI, since the server recomputes whose turn it is from the pick count
 -- every call (under a row lock on the league, to close the race between two
 -- simultaneous picks). Auto-picks (timeout or autopilot) go through
--- make_auto_draft_pick, which chooses uniformly at random among eligible
--- remaining couples and records draft_picks.is_auto — it never starts a draft.
+-- make_auto_draft_pick, which takes the picker's highest-ranked available
+-- couple from their draft_queues row, else chooses uniformly at random among
+-- eligible remaining couples, and records draft_picks.is_auto / auto_source —
+-- it never starts a draft.
 -- ============================================================
 
 grant select on public.people to authenticated;
@@ -1182,6 +1198,12 @@ grant select on public.draft_picks to authenticated;
 create policy "draft picks are viewable by league members"
 on public.draft_picks for select
 using (public.is_league_member(league_id));
+
+grant select on public.draft_queues to authenticated;
+
+create policy "draft queues are viewable by their owner"
+on public.draft_queues for select
+using (user_id = (select auth.uid()));
 
 -- Sets (or overwrites) the full draft order before the draft starts. The
 -- client always calls this before start_draft — including for the "random"
@@ -1341,7 +1363,7 @@ create function public.record_draft_pick(
   p_league_id uuid,
   p_couple_id uuid,
   p_manager_id uuid,
-  p_is_auto boolean
+  p_auto_source text
 )
 returns public.draft_picks
 language plpgsql
@@ -1418,8 +1440,8 @@ begin
     raise exception 'That couple has already been drafted';
   end if;
 
-  insert into public.draft_picks (league_id, couple_id, manager_id, round, pick_number, is_auto)
-  values (p_league_id, p_couple_id, p_manager_id, v_round, v_next_pick, p_is_auto)
+  insert into public.draft_picks (league_id, couple_id, manager_id, round, pick_number, is_auto, auto_source)
+  values (p_league_id, p_couple_id, p_manager_id, v_round, v_next_pick, p_auto_source is not null, p_auto_source)
   returning * into v_pick;
 
   if v_next_pick = v_total_slots then
@@ -1458,7 +1480,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.record_draft_pick(uuid, uuid, uuid, boolean) from public, authenticated;
+revoke execute on function public.record_draft_pick(uuid, uuid, uuid, text) from public, authenticated;
 
 create function public.make_draft_pick(p_league_id uuid, p_couple_id uuid)
 returns public.draft_picks
@@ -1478,7 +1500,7 @@ begin
     raise exception 'It is not your turn to pick';
   end if;
 
-  return public.record_draft_pick(p_league_id, p_couple_id, auth.uid(), false);
+  return public.record_draft_pick(p_league_id, p_couple_id, auth.uid(), null);
 end;
 $$;
 
@@ -1505,6 +1527,7 @@ declare
   v_autopilot boolean;
   v_turn_started timestamptz;
   v_couple_id uuid;
+  v_auto_source text;
 begin
   if not public.is_league_member(p_league_id) then
     raise exception 'You are not a member of this league';
@@ -1552,22 +1575,45 @@ begin
     raise exception 'Not eligible for an auto-pick yet';
   end if;
 
+  -- The on-the-clock manager's own queue first (definer bypasses its
+  -- owner-only RLS): highest-ranked couple still active and undrafted.
   select c.id into v_couple_id
-  from public.couples c
-  where c.season_id = public.active_season_id()
+  from public.draft_queues q
+  cross join lateral unnest(q.couple_ids) with ordinality as u(couple_id, pos)
+  join public.couples c on c.id = u.couple_id
+  where q.league_id = p_league_id
+    and q.user_id = v_expected_manager
+    and c.season_id = public.active_season_id()
     and c.status = 'active'
     and not exists (
       select 1 from public.draft_picks dp
       where dp.league_id = p_league_id and dp.couple_id = c.id
     )
-  order by random()
+  order by u.pos
   limit 1;
+
+  v_auto_source := 'queue';
+
+  if v_couple_id is null then
+    v_auto_source := 'random';
+
+    select c.id into v_couple_id
+    from public.couples c
+    where c.season_id = public.active_season_id()
+      and c.status = 'active'
+      and not exists (
+        select 1 from public.draft_picks dp
+        where dp.league_id = p_league_id and dp.couple_id = c.id
+      )
+    order by random()
+    limit 1;
+  end if;
 
   if v_couple_id is null then
     raise exception 'No eligible couples remaining';
   end if;
 
-  return public.record_draft_pick(p_league_id, v_couple_id, v_expected_manager, true);
+  return public.record_draft_pick(p_league_id, v_couple_id, v_expected_manager, v_auto_source);
 end;
 $$;
 
@@ -1597,6 +1643,47 @@ begin
   end if;
 
   return p_enabled;
+end;
+$$;
+
+-- Saves the caller's own auto-pick queue. Allowed before and during the draft.
+-- Drafted or since-eliminated couples may linger in it; make_auto_draft_pick
+-- skips them, so only season membership and uniqueness are enforced here.
+create function public.set_draft_queue(p_league_id uuid, p_couple_ids uuid[])
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  if not public.is_league_member(p_league_id) then
+    raise exception 'You are not a member of this league';
+  end if;
+
+  if exists (
+    select 1 from public.leagues
+    where id = p_league_id and draft_status = 'completed'
+  ) then
+    raise exception 'Draft is already over';
+  end if;
+
+  if (select count(distinct u) from unnest(p_couple_ids) as u)
+     is distinct from coalesce(array_length(p_couple_ids, 1), 0) then
+    raise exception 'A couple can only be in your queue once';
+  end if;
+
+  if exists (
+    select 1 from unnest(p_couple_ids) as u
+    where not exists (
+      select 1 from public.couples c
+      where c.id = u and c.season_id = public.active_season_id()
+    )
+  ) then
+    raise exception 'Queue includes a couple that is not part of the current season';
+  end if;
+
+  insert into public.draft_queues (league_id, user_id, couple_ids)
+  values (p_league_id, auth.uid(), p_couple_ids)
+  on conflict (league_id, user_id) do update set couple_ids = excluded.couple_ids;
 end;
 $$;
 
@@ -1726,6 +1813,7 @@ revoke execute on function public.start_draft(uuid) from public;
 revoke execute on function public.make_draft_pick(uuid, uuid) from public;
 revoke execute on function public.make_auto_draft_pick(uuid) from public;
 revoke execute on function public.set_draft_autopilot(uuid, boolean) from public;
+revoke execute on function public.set_draft_queue(uuid, uuid[]) from public;
 revoke execute on function public.undo_last_pick(uuid) from public;
 revoke execute on function public.set_member_draft_autopilot(uuid, uuid, boolean) from public;
 revoke execute on function public.reset_draft(uuid) from public;
@@ -1733,6 +1821,7 @@ grant execute on function public.start_draft(uuid) to authenticated;
 grant execute on function public.make_draft_pick(uuid, uuid) to authenticated;
 grant execute on function public.make_auto_draft_pick(uuid) to authenticated;
 grant execute on function public.set_draft_autopilot(uuid, boolean) to authenticated;
+grant execute on function public.set_draft_queue(uuid, uuid[]) to authenticated;
 grant execute on function public.undo_last_pick(uuid) to authenticated;
 grant execute on function public.set_member_draft_autopilot(uuid, uuid, boolean) to authenticated;
 grant execute on function public.reset_draft(uuid) to authenticated;

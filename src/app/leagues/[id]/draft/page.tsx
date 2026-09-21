@@ -64,7 +64,7 @@ export default async function DraftPage({
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
 
-  const [{ data: members }, { data: couples }, { data: picks }] = await Promise.all([
+  const [{ data: members }, { data: couples }, { data: picks }, { data: queue }] = await Promise.all([
     supabase
       .from("league_members")
       .select("user_id, role, draft_position, draft_autopilot, profiles(display_name)")
@@ -73,19 +73,26 @@ export default async function DraftPage({
     supabase
       .from("couples")
       .select(
-        "id, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
+        "id, status, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
       )
       .eq("season_id", activeSeasonId ?? ""),
     supabase
       .from("draft_picks")
-      .select("id, couple_id, manager_id, round, pick_number, picked_at, is_auto")
+      .select("id, couple_id, manager_id, round, pick_number, picked_at, is_auto, auto_source")
       .eq("league_id", id)
       .order("pick_number"),
+    supabase
+      .from("draft_queues")
+      .select("couple_ids")
+      .eq("league_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ]);
 
   const flatCouples = (couples ?? [])
     .map((c) => ({
       id: c.id,
+      status: c.status,
       celebrity_name: c.celebrity?.name ?? "Unknown",
       pro_name: c.pro?.name ?? "Unknown",
     }))
@@ -109,6 +116,7 @@ export default async function DraftPage({
         ...p,
         is_auto: p.is_auto ?? false,
       }))}
+      initialQueue={queue?.couple_ids ?? []}
       currentUserId={user.id}
       closeHref={closeHref}
     />

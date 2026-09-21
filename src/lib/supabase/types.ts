@@ -520,6 +520,7 @@ export type Database = {
       }
       draft_picks: {
         Row: {
+          auto_source: string | null
           couple_id: string
           id: string
           is_auto: boolean
@@ -530,6 +531,7 @@ export type Database = {
           round: number
         }
         Insert: {
+          auto_source?: string | null
           couple_id: string
           id?: string
           is_auto?: boolean
@@ -540,6 +542,7 @@ export type Database = {
           round: number
         }
         Update: {
+          auto_source?: string | null
           couple_id?: string
           id?: string
           is_auto?: boolean
@@ -567,6 +570,39 @@ export type Database = {
           {
             foreignKeyName: "draft_picks_manager_id_fkey"
             columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      draft_queues: {
+        Row: {
+          couple_ids: string[]
+          league_id: string
+          user_id: string
+        }
+        Insert: {
+          couple_ids?: string[]
+          league_id: string
+          user_id: string
+        }
+        Update: {
+          couple_ids?: string[]
+          league_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_queues_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_queues_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1624,8 +1660,8 @@ export type Database = {
       }
       record_draft_pick: {
         Args: {
+          p_auto_source: string
           p_couple_id: string
-          p_is_auto: boolean
           p_league_id: string
           p_manager_id: string
         }
@@ -1704,6 +1740,10 @@ export type Database = {
       }
       set_draft_order: {
         Args: { p_league_id: string; p_ordered_user_ids: string[] }
+        Returns: undefined
+      }
+      set_draft_queue: {
+        Args: { p_couple_ids: string[]; p_league_id: string }
         Returns: undefined
       }
       set_member_draft_autopilot: {
