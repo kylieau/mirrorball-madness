@@ -2,19 +2,29 @@
 
 ## 1. Current State
 
-**Scoring calibration layer — shipped, live, verified, on `main`.** No
-active work in progress. Commissioner module weights (Dance Card / Curtain
-Call / Grand Finale) previously multiplied never-calibrated raw point
-values, so a stated weight didn't deliver proportional standings influence.
-Added a spread-equalization layer underneath the weights, values solved by
-a one-time offline Monte Carlo simulation. SQL is applied live, `types.ts`
-regenerated from the live schema, full verification suite clean, committed
-and pushed to `main` at `05173e9`.
+**Home episode banner — implemented, uncommitted on `main`.** Adds a compact
+theatrical "Week N" banner (picks-open / on-air status, season-progress dots)
+at the top of `/today` that collapses into a slim sticky bar on scroll; the
+per-league `DeadlineStub`s render in a new compact variant beneath it. Prior
+scoring-calibration work is shipped and unchanged (`05173e9`). `tsc`, eslint,
+`npm test` (228 pass) and `npm run build` are clean. **Not yet seen in a
+browser** (no browser tool in this container) — scroll-collapse, reduced-motion
+and the on-air state still need a manual look.
 
-Also corrected in this session: competition weeks (Option B — a Week can
-group multiple TV episodes) was already merged to `main` (PR #29, commit
-`c19eb43`) before this session started — an earlier revision of this file
-still described it as in-progress on a branch; that was stale.
+Follow-up: Home stubs quieted — `DeadlineStub` keeps the ticket notches but is
+a flat muted tint with the league name only (no pick type) and a "Make picks ›"
+text link; the Spoiler-Free callout lost its gold glow. The temporary `compact`
+prop was dropped. Not yet checked in a browser.
+
+Design calls: shows the show's `earliestAirsAt` (lock time is per-league, so
+not a banner concern); "on air" derived from `airs_at` since nothing writes
+`episodes.status = 'locked'`; no "Results are in" state (`SpoilerRevealCallout`
+already owns it); hidden when there is no live week; kept the season track
+despite the old "Home has no season strip" note (CLAUDE.md updated).
+
+Files: `src/lib/episode-banner.ts` (+ test), `src/components/episode-banner.tsx`,
+`deadline-stub.tsx` (`compact`), `home-dashboard.tsx`, `today/page.tsx`,
+`globals.css` (pulse/glow keyframes), `CLAUDE.md`.
 
 ## 2. Changes Made
 

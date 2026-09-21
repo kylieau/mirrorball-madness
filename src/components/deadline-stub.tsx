@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { cn } from "cn";
 
-// The mockup's "ticket stub" pattern for a next-deadline callout — a
-// curtain-colored card with punched-out notches on each edge, used
-// wherever the app needs to surface "something is due soon."
+// The mockup's "ticket stub" pattern for a next-deadline callout — a muted
+// curtain-tinted card with punched-out notches on each edge. Kept quiet on
+// purpose: the episode banner above it is Home's one loud theatrical element.
 export function DeadlineStub({
   label,
   headline,
@@ -20,19 +20,18 @@ export function DeadlineStub({
   return (
     <div
       className={cn(
-        "relative rounded-2xl border border-primary/40 bg-linear-to-br from-curtain to-curtain-light px-5 py-4",
+        "relative flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-curtain/40 px-4 py-3",
         className
       )}
     >
       <span className="absolute top-1/2 -left-[7px] size-3.5 -translate-y-1/2 rounded-full bg-background" />
       <span className="absolute top-1/2 -right-[7px] size-3.5 -translate-y-1/2 rounded-full bg-background" />
-      <p className="text-xs text-accent">{label}</p>
-      <p className="mt-1 font-heading text-xl font-semibold text-foreground">{headline}</p>
-      <Link
-        href={href}
-        className="mt-2 inline-block rounded-full bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground"
-      >
-        {ctaLabel}
+      <div className="min-w-0">
+        <p className="truncate text-xs text-muted-foreground">{label}</p>
+        <p className="mt-0.5 font-heading text-base font-semibold text-foreground">{headline}</p>
+      </div>
+      <Link href={href} className="shrink-0 text-xs font-semibold text-accent">
+        {ctaLabel} ›
       </Link>
     </div>
   );

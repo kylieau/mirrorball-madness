@@ -8,6 +8,7 @@ import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
+import { computeEpisodeBannerState } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 
 export default async function TodayPage() {
@@ -144,9 +145,14 @@ export default async function TodayPage() {
     weeksBehind,
   }));
 
+  const episodeBannerState = computeEpisodeBannerState({
+    liveWeek,
+    picksModuleOn: leagues.some((l) => l.curtainCallOn),
+  });
+
   const deadlines = summaries
     .filter((s) => s.picksDue && s.nextDeadline)
-    .map((s) => ({ leagueId: s.id, leagueName: s.name, moduleLabel: s.nextDeadline!.label, iso: s.nextDeadline!.iso }))
+    .map((s) => ({ leagueId: s.id, leagueName: s.name, iso: s.nextDeadline!.iso }))
     .sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime());
 
   const recentActivity = [
@@ -171,6 +177,7 @@ export default async function TodayPage() {
           deadlines={deadlines}
           recentActivity={recentActivity}
           pendingReveal={pendingReveal}
+          episodeBanner={episodeBannerState ? { state: episodeBannerState, weeksDone: completedWeeks.length } : null}
         />
       </div>
 

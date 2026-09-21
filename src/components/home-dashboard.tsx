@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { DeadlineStub } from "@/components/deadline-stub";
+import { EpisodeBanner } from "@/components/episode-banner";
 import { SpoilerRevealCallout } from "@/components/spoiler-reveal-callout";
+import type { EpisodeBannerState } from "@/lib/episode-banner";
 import { formatCountdown } from "@/lib/format-countdown";
 import { SettingsIcon } from "lucide-react";
 
@@ -25,16 +27,20 @@ export function HomeDashboard({
   deadlines,
   recentActivity,
   pendingReveal,
+  episodeBanner,
 }: {
   leagues: HomeLeague[];
-  deadlines: { leagueId: string; leagueName: string; moduleLabel: string; iso: string }[];
+  deadlines: { leagueId: string; leagueName: string; iso: string }[];
   recentActivity: string[];
   pendingReveal: { weekNumber: number } | null;
+  episodeBanner: { state: EpisodeBannerState; weeksDone: number } | null;
 }) {
   const needingPicks = leagues.filter((l) => l.picksDue).length;
 
   return (
     <div>
+      {episodeBanner && <EpisodeBanner state={episodeBanner.state} weeksDone={episodeBanner.weeksDone} />}
+
       <p className="mb-4 text-sm text-muted-foreground">
         {leagues.length} league{leagues.length === 1 ? "" : "s"}
         {needingPicks > 0 ? ` · ${needingPicks} need${needingPicks === 1 ? "s" : ""} picks` : " · all caught up"}
@@ -47,7 +53,7 @@ export function HomeDashboard({
           {deadlines.map((d) => (
             <DeadlineStub
               key={d.leagueId}
-              label={`${d.leagueName} · ${d.moduleLabel}`}
+              label={d.leagueName}
               headline={`Closes in ${formatCountdown(d.iso)}`}
               ctaLabel="Make picks"
               href={`/leagues/${d.leagueId}?tab=yourpicks`}

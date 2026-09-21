@@ -50,7 +50,7 @@ export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
         type="button"
         onClick={handleMark}
         disabled={pending}
-        className="mb-4 flex w-full items-start gap-3 rounded-2xl bg-card px-4 py-3 text-left shadow-[0_0_0_1px_rgba(201,162,75,0.55),0_16px_48px_rgba(201,162,75,0.22)] disabled:opacity-50"
+        className="mb-4 flex w-full items-start gap-3 rounded-2xl border border-primary/30 bg-card px-4 py-3 text-left disabled:opacity-50"
       >
         <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
           <EyeOffIcon className="size-4" />
