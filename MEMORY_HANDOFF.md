@@ -2,96 +2,92 @@
 
 ## 1. Current State
 
-**Cross-league picks built, uncommitted, browser flow not yet exercised.** "Also save
-to…" and "Use my picks from…" on the Curtain Call and Grand Finale forms (see the
-CLAUDE.md bullet). Verified: `tsc`, eslint, `npm test` (14 new tests in
-`copy-picks.test.ts`), and a live throwaway-account run
-(`scratch/copy-picks-live.mts`, via `scratch/vitest.live.config.mts`; cleanup
-confirmed). Not verified: clicking through the two forms in a signed-in browser. Files:
-`src/lib/copy-picks.ts`, `src/lib/other-league-picks.ts`,
-`src/components/other-leagues-picker.tsx` (collapsed toggle → one row per league; the user
-approved this design after trying chips), plus edits to `actions.ts`, `pick-em-box.tsx`, `grand-finale-box.tsx`, and the
-league `page.tsx`. Stage by name when committing. Next: click-through, then commit.
+**Cross-league picks shipped to `main` (`c8d9fc2`), not yet clicked through in a browser.**
+Curtain Call and Grand Finale pick forms now have:
+- **Also save to…** — a collapsed "Also save to N leagues ▾" toggle above Save; opens one
+  tickable row per other league, each with its own note ("Replaces your current picks",
+  "Picks are locked", "<module> is off in this league"). One Save loops the existing submit
+  RPCs per league. Only leagues with nothing to replace start ticked; the collapsed line
+  adds "· ↻ replaces existing picks" when a ticked league has picks.
+- **Use my picks from…** — a select on an *empty* form that pre-fills it from another league.
+  Never saves by itself.
 
-Earlier, prior session — **no feature in flight.** It shipped two things and then scoped a third:
-1. **Grand Finale picker** (pushed, `74e8193`): stays open until the hard deadline;
-   couples whose elimination is already *revealed* to the viewer are pinned first
-   and immovable, so the viewer ranks only the still-competing couples. Selection
-   step is a 2-column list under a "your order so far" list. Listing all 16 couples
-   is by design (full-order ranking; the RPC requires every couple once).
-2. **Season 35 schedule** (live in the DB, file added this commit): Weeks 3-11 with
-   themes and air times. The stray "test" Week 3 was *retitled* Yacht Rock Night,
-   not deleted (the user had already edited its date to Sep 29).
-3. **Site Admin visibility** (scoped only, deliberately not started): the user wants
-   to move some Site Admin pages into public view and asked to do it in a new session.
+No schema change. Everything else is the state left by the prior session (Grand Finale
+pinning, Season 35 schedule loaded); no other feature is in flight.
 
 ## 2. Changes Made
 
-`git diff --stat 9fe610b HEAD` (session start to `eecc627`):
-- `src/components/grand-finale-box.tsx` — pinning + 2-column selection grid
-- `src/lib/grand-finale-pins.ts` — **new**: `pinnedEliminatedIds`, `pinEliminatedFirst`
-- `src/lib/grand-finale-pins.test.ts` — **new**, 4 tests
-- `supabase/revert-grand-finale-lock.sql` — **new**: restores the original
-  `effective_grand_finale_deadline` (already run by the user)
-- `CLAUDE.md` — Grand Finale bullet describes pinning
-- `MEMORY_HANDOFF.md` — this file
+`git diff --stat 98f44aa HEAD` (this session's code commit, plus this file):
+- `src/lib/copy-picks.ts` — **new**: `planDestination`, `defaultSelection`, `isSelectable`,
+  `adaptCurtainCallPick`, `adaptGrandFinaleOrder`
+- `src/lib/copy-picks.test.ts` — **new**, 14 tests
+- `src/lib/other-league-picks.ts` — **new**: `loadOtherLeaguePicks` (viewer's own picks +
+  per-league plan)
+- `src/components/other-leagues-picker.tsx` — **new**: `AlsoSaveTo`, `UsePicksFrom`,
+  `OtherLeagueSaveSummary`
+- `src/app/leagues/[id]/predictions/actions.ts` — `submitPredictionToLeagues`,
+  `submitGrandFinalePredictionToLeagues` (thin loops over the existing actions)
+- `src/components/pick-em-box.tsx`, `src/components/grand-finale-box.tsx` — wire both features
+- `src/app/leagues/[id]/page.tsx` — calls the loader, passes `otherLeagues` to both boxes
+- `CLAUDE.md` — one bullet describing the feature; `MEMORY_HANDOFF.md` — this file
 
-Added in this commit: `supabase/apply-season-35-schedule.sql` (already run live;
-Weeks 1-11 verified by read-only query).
-
-Uncommitted and not ours: `ios/App/App.xcodeproj/project.pbxproj`, `scratch/`.
+Uncommitted and not ours: `ios/App/App.xcodeproj/project.pbxproj`, `scratch/` (holds this
+session's live test `copy-picks-live.mts` and `vitest.live.config.mts`).
 
 ## 3. Key Decisions & Lessons Learned
 
-- **A Grand Finale lock was built, run live, then reversed.** The user first chose
-  "lock at first reveal", then decided it shouldn't lock and chose "stay open, pin
-  eliminated couples". Don't reintroduce an elimination-based lock.
-- **Pinning is UI-only.** The RPC can't enforce it without per-viewer spoiler
-  progress. Unrevealed eliminations are deliberately not pinned (spoiler safety, via
-  `spoilerSafeCoupleStatus`). Same-week eliminations pin in name order.
-- **Eliminated status only appears on the saved/locked GF summary**, never in the
-  select step, so "preview doesn't show eliminated couples" is expected.
-- **Service role can't call `effective_grand_finale_deadline`** (granted to
-  `authenticated` only). Verify from tables or a signed-in session.
-- **Schedule conventions:** shows air Tuesday 8pm ET = 00:00 UTC next day (01:00 UTC
-  after DST ends Nov 1); an episode's `theme` mirrors its week's `theme`.
-- **Re-read live data before acting on an earlier read.** Episode 4's date changed
-  between my two reads (the user edited it), which made a planned delete wrong.
-- **Spoiler-Free callout** = the gold Home banner + auto-opening "Mark as watched"
-  dialog (`spoiler-reveal-callout.tsx`) shown when a completed week is unwatched.
-- **Plan mode:** the user rejects `ExitPlanMode` when they don't want to proceed in
-  that session; treat that as "stop", and restore any plan file you overwrote.
-- **A parallel session shares this tree** (it swept one of my `CLAUDE.md` edits into
-  its commit). Stage by name; never `git add -A`.
-- **Don't `npm run build` while `next dev` listens on :3000.** Use `tsc --noEmit`,
-  eslint and `npm test`.
-- **Live DB writes are blocked from this container.** Hand over plain `.sql` files
-  for the Supabase SQL Editor; verify with read-only service-role `.mjs` scripts run
-  from the project root with `NODE_OPTIONS="--experimental-websocket"`.
+- **No new SQL.** `submit_prediction` / `submit_grand_finale_prediction` already enforce
+  membership, module-on and per-league lock, so the UI only decides what to *offer*. A new
+  atomic copy RPC was rejected (would need an owner-run SQL handoff just for atomicity).
+- **One-time copy, not a link.** No sync, no new table. Dance Card is deliberately excluded
+  (drafts are per-league).
+- **Pins and the eligible-couple pool are per viewer, not per league**, so one pinned list
+  serves every league; pre-filled Grand Finale orders go through `adaptGrandFinaleOrder`
+  (→ `pinEliminatedFirst`). Pinning is still UI-only.
+- **Grand Finale no longer locks at first elimination reveal** (built, run live, reversed by
+  the user). Its lock is the hard deadline only. A null GF deadline means locked (RPC
+  refuses it); a null Curtain Call lock means open. Don't reintroduce an elimination lock.
+- **UI iteration:** checkbox list → chips → collapsed toggle with one row per league. The
+  user approved the last. The added shadcn checkbox was deleted as unused.
+- **`src/lib` value imports must be relative** (`./x`), not `@/…` — Vitest has no alias.
+  Type-only `@/` imports are fine.
+- **Live integration tests here run through vitest with a config in `scratch/`**:
+  `NODE_OPTIONS="--experimental-websocket" npx vitest run --config scratch/vitest.live.config.mts`
+  (no tsx runner). It creates throwaway users/leagues on the live project and cleans up in
+  `afterAll`; the cleanup was verified. Throwaway-account writes worked from this container.
+- **Don't `npm run build` while `next dev` listens on :3000** — use `tsc --noEmit`, eslint,
+  `npm test`.
+- **Plan mode:** a rejected `ExitPlanMode` means stop; the user may follow with instructions.
+- **A parallel session shares this tree.** Stage by name; never `git add -A`.
+- **Re-read live data before acting on an earlier read**; schema/RPC changes go to the user
+  as plain `.sql` files.
 
 ## 4. Backlog & Deferred Items
 
-- **Site Admin visibility** (next task). Current state: `/admin/results` (Enter /
-  View / Schedule / Settings tabs) opens to any signed-in user when
-  `RESULTS_ENTRY_OPEN_TO_ALL=true` but is linked only from `SiteAdminNav`
-  (super-admin only, in Settings). `/admin/accounts` is strictly super-admin. All
-  results writes use the service-role client and affect every league.
-- **Assumed schedule dates** (not given by the user, editable on Admin > Schedule):
-  Week 5 Oct 13, Week 10 (Semi-Finals) Nov 17, Week 11 (Finale) Nov 24. Week 5 has
-  no theme (TBA).
-- Spoiler-Free callout on `/today` still to be confirmed by the user.
-- Server-side pin enforcement for Grand Finale is deferred.
-- Older items: Monte Carlo re-run against real Season 35 data once more weeks exist
-  (`scripts/monte-carlo-calibration/README.md`); `dance_card_calibration` clamp path
-  (roster size outside 1-6) never exercised live.
+- **Browser click-through of both features** is unverified (the RPC and loader layers were
+  verified live; the forms were only type/lint/unit checked).
+- Possible tweak: the row notes are long on narrow phones — shorten to "Off" / "Locked" if
+  cramped. Also possible: name the ticked leagues in the collapsed line, or default to zero
+  ticked.
+- Copy only happens from the edit form; pushing already-saved picks needs Edit → Save.
+- The DB doesn't check that a picked couple is still active (only the picker does).
+- **Site Admin visibility** (next planned task): `/admin/results` opens to any signed-in user
+  when `RESULTS_ENTRY_OPEN_TO_ALL=true` but is linked only from `SiteAdminNav`;
+  `/admin/accounts` is strictly super-admin.
+- **Assumed schedule dates** (editable on Admin > Schedule): Week 5 Oct 13, Week 10 Nov 17,
+  Week 11 Nov 24; Week 5 has no theme.
+- Spoiler-Free callout on `/today` still to be confirmed. Server-side Grand Finale pin
+  enforcement deferred. Monte Carlo re-run against real Season 35 data once more weeks exist;
+  `dance_card_calibration` clamp path never exercised live.
 
 ## 5. Next Steps
 
-1. Run `git status` and `git fetch && git log HEAD..origin/main` first.
-2. Decide the Site Admin scope with the user. My recommendation: a **read-only
-   public Schedule** (episodes by week, themes, air times) linked from the Home
-   episode banner, not under `/admin`. Skip a public View Results (duplicates
-   `/this-week`, would need `resolveSpoilerCutoff`). Keep Accounts, the Settings tab
-   and Enter/Publish Results gated; later replace `RESULTS_ENTRY_OPEN_TO_ALL` with a
-   per-person "results editor" flag on `profiles` (a column users can't write, per
-   the column-grant rule in `CLAUDE.md`).
+1. Run `git status` and `git fetch && git log HEAD..origin/main --oneline` first.
+2. Click through both features in a signed-in browser with a user in ≥2 leagues: Save with
+   another league ticked, the collapsed/expanded toggle, "Use my picks from…" on an empty
+   form, and a locked or module-off league. Fix anything found.
+3. Then start **Site Admin visibility**. Recommendation: a read-only public Schedule (episodes
+   by week, themes, air times) linked from the Home episode banner, not under `/admin`. Skip a
+   public View Results. Keep Accounts, the Settings tab and Enter/Publish Results gated; later
+   replace `RESULTS_ENTRY_OPEN_TO_ALL` with a per-person "results editor" flag on `profiles`
+   (a column users can't write, per the column-grant rule in `CLAUDE.md`).
