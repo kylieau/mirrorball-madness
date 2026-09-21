@@ -52,7 +52,7 @@ import {
 type ScoringMethod = GrandFinaleMethod;
 type WaiverMode = "locked" | "waivers";
 type WaiverClaimMethod = "reverse_standings" | "fcfs" | "manual";
-type DraftType = "snake" | "linear";
+type DraftType = "snake" | "linear" | "custom";
 
 type ScoringSettings = {
   judges_score_category_enabled: boolean;
@@ -121,6 +121,7 @@ const WAIVER_CLAIM_METHOD_ITEMS: Record<WaiverClaimMethod, string> = {
 const DRAFT_TYPE_ITEMS: Record<DraftType, string> = {
   snake: "Snake (Reverses Order Each Round)",
   linear: "Linear (Same Order Every Round)",
+  custom: "Custom (Set Each Round Yourself)",
 };
 
 export function LeagueModulesForm({
@@ -874,8 +875,14 @@ export function LeagueModulesForm({
                       <SelectContent>
                         <SelectItem value="snake">Snake</SelectItem>
                         <SelectItem value="linear">Linear</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
                       </SelectContent>
                     </Select>
+                    {draftType === "custom" && (
+                      <p className="text-xs text-muted-foreground">
+                        Arrange each round in the draft lobby, where the rounds are known.
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="draftScheduledAt">

@@ -79,6 +79,15 @@ export async function resetDraft(leagueId: string) {
   return { error: null };
 }
 
+export async function setCustomDraftOrder(leagueId: string, userIds: string[]) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_custom_draft_order", {
+    p_league_id: leagueId,
+    p_user_ids: userIds,
+  });
+  return { error: error?.message ?? null };
+}
+
 export async function setDraftQueue(leagueId: string, coupleIds: string[]) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_draft_queue", {

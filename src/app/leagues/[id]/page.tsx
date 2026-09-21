@@ -22,7 +22,7 @@ import { LeagueHeader } from "@/components/league-header";
 import { LeagueTabs } from "@/components/league-tabs";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { getStandingMessage } from "@/lib/standings-message";
-import { getPickAssignment } from "@/lib/draft";
+import { managerIdForPick, type DraftType } from "@/lib/draft";
 import { clampRosterCoupleForWeek } from "@/lib/roster-weekly-points";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
@@ -586,12 +586,13 @@ export default async function LeaguePage({
       .select("id", { count: "exact", head: true })
       .eq("league_id", id);
     draftPickCount = count ?? 0;
-    const { draftPosition } = getPickAssignment(
+    const onTheClockId = managerIdForPick(
       draftPickCount + 1,
-      (members ?? []).length,
-      league.draft_type as "snake" | "linear"
+      members ?? [],
+      league.draft_type as DraftType,
+      league.custom_pick_order
     );
-    const onTheClock = (members ?? []).find((m) => m.draft_position === draftPosition);
+    const onTheClock = (members ?? []).find((m) => m.user_id === onTheClockId);
     onTheClockName = onTheClock?.profiles?.display_name ?? null;
     isMyTurn = onTheClock?.user_id === user.id;
     onTheClockAutopilot = onTheClock?.draft_autopilot ?? false;

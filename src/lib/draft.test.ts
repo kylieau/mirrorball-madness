@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   autoPickTrigger,
+  buildSnakeSequence,
   eligibleRemaining,
   getPickAssignment,
   isBenignAutoPickError,
+  managerIdForPick,
+  moveInCustomOrder,
   moveQueueEntry,
+  predictedRounds,
+  reconcileCustomOrder,
+  roundForPick,
   pickFromQueue,
   partitionPresence,
   reconcileOrder,
@@ -189,5 +195,104 @@ describe("moveQueueEntry", () => {
   it("is a no-op at the edges", () => {
     expect(moveQueueEntry(["a", "b"], 0, -1)).toEqual(["a", "b"]);
     expect(moveQueueEntry(["a", "b"], 1, 1)).toEqual(["a", "b"]);
+  });
+});
+
+const members = [
+  { user_id: "a", draft_position: 1 },
+  { user_id: "b", draft_position: 2 },
+  { user_id: "c", draft_position: 3 },
+];
+
+describe("managerIdForPick", () => {
+  it("follows snake through the turn", () => {
+    expect(managerIdForPick(1, members)).toBe("a");
+    expect(managerIdForPick(3, members)).toBe("c");
+    expect(managerIdForPick(4, members)).toBe("c");
+    expect(managerIdForPick(6, members)).toBe("a");
+  });
+
+  it("repeats the order every round for linear", () => {
+    expect(managerIdForPick(4, members, "linear")).toBe("a");
+  });
+
+  it("reads a custom sequence straight off by pick number", () => {
+    const order = ["c", "a", "b", "b", "c", "a"];
+    expect(managerIdForPick(1, members, "custom", order)).toBe("c");
+    expect(managerIdForPick(4, members, "custom", order)).toBe("b");
+    expect(managerIdForPick(6, members, "custom", order)).toBe("a");
+  });
+
+  it("returns null past the end of a custom sequence rather than guessing", () => {
+    expect(managerIdForPick(7, members, "custom", ["a", "b", "c"])).toBeNull();
+    expect(managerIdForPick(1, members, "custom", null)).toBeNull();
+  });
+});
+
+describe("roundForPick", () => {
+  it("counts rounds independently of the order rule", () => {
+    expect(roundForPick(1, 3)).toBe(1);
+    expect(roundForPick(3, 3)).toBe(1);
+    expect(roundForPick(4, 3)).toBe(2);
+  });
+});
+
+describe("buildSnakeSequence", () => {
+  it("reverses every even round", () => {
+    expect(buildSnakeSequence(["a", "b", "c"], 2)).toEqual(["a", "b", "c", "c", "b", "a"]);
+  });
+
+  it("does not mutate the order it is given", () => {
+    const order = ["a", "b", "c"];
+    buildSnakeSequence(order, 3);
+    expect(order).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("reconcileCustomOrder", () => {
+  const ids = ["a", "b", "c"];
+
+  it("keeps a sequence that still gives everyone the right number of picks", () => {
+    const custom = ["c", "a", "b", "b", "c", "a"];
+    expect(reconcileCustomOrder(custom, ids, 2)).toEqual(custom);
+  });
+
+  it("rebuilds when the round count changes, seeded from round one", () => {
+    expect(reconcileCustomOrder(["c", "a", "b", "b", "c", "a"], ids, 1)).toEqual(["c", "a", "b"]);
+  });
+
+  it("drops a leaver and appends a joiner", () => {
+    const rebuilt = reconcileCustomOrder(["c", "a", "b", "b", "c", "a"], ["c", "a", "d"], 2);
+    expect(rebuilt).toEqual(["c", "a", "d", "d", "a", "c"]);
+  });
+
+  it("recovers from an empty or malformed sequence", () => {
+    expect(reconcileCustomOrder([], ids, 1)).toEqual(ids);
+    expect(reconcileCustomOrder(["a", "a", "a"], ids, 1)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("predictedRounds", () => {
+  it("is the even split, with the remainder left undrafted", () => {
+    expect(predictedRounds(11, 5)).toBe(2);
+    expect(predictedRounds(11, 4)).toBe(2);
+    expect(predictedRounds(11, 6)).toBe(1);
+  });
+
+  it("is zero with no members rather than dividing by zero", () => {
+    expect(predictedRounds(11, 0)).toBe(0);
+  });
+});
+
+describe("moveInCustomOrder", () => {
+  const sequence = ["a", "b", "c", "c", "b", "a"];
+
+  it("swaps within the round it was given", () => {
+    expect(moveInCustomOrder(sequence, 3, 1, 0, 1)).toEqual(["a", "b", "c", "b", "c", "a"]);
+  });
+
+  it("refuses to move past a round boundary", () => {
+    expect(moveInCustomOrder(sequence, 3, 1, 0, -1)).toEqual(sequence);
+    expect(moveInCustomOrder(sequence, 3, 0, 2, 1)).toEqual(sequence);
   });
 });

@@ -85,7 +85,7 @@ export type LeagueSettingsInput = {
   waiverClaimMethod: "reverse_standings" | "fcfs" | "manual";
   pickTimeLimitSeconds: number;
   predictionLockHoursBeforeAir: number;
-  draftType: "snake" | "linear";
+  draftType: "snake" | "linear" | "custom";
   draftScheduledAt: string | null;
 };
 

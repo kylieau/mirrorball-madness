@@ -1,5 +1,14 @@
+export type DraftType = "snake" | "linear" | "custom";
+
+// A round is the same slice of the board whatever the order rule is.
+export function roundForPick(pickNumber: number, memberCount: number): number {
+  return Math.floor((pickNumber - 1) / memberCount) + 1;
+}
+
 // Mirrors the pick-order math in the make_draft_pick Postgres function, for
 // display only — the server is the actual authority on whose turn it is.
+// Positional rules only: 'custom' has no draft_position to derive, so it goes
+// through managerIdForPick instead.
 export function getPickAssignment(
   pickNumber: number,
   memberCount: number,
@@ -110,5 +119,78 @@ export function moveQueueEntry<T>(queue: readonly T[], index: number, direction:
   if (target < 0 || target >= queue.length) return [...queue];
   const next = [...queue];
   [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
+// Mirrors record_draft_pick's turn resolution across all three order rules:
+// 'custom' names the manager for each pick outright, the others derive a
+// draft_position. Display only — the server is the authority.
+export function managerIdForPick(
+  pickNumber: number,
+  members: readonly { user_id: string; draft_position: number | null }[],
+  draftType: DraftType = "snake",
+  customPickOrder: readonly string[] | null = null
+): string | null {
+  if (draftType === "custom") return customPickOrder?.[pickNumber - 1] ?? null;
+
+  const { draftPosition } = getPickAssignment(pickNumber, members.length, draftType);
+  return members.find((m) => m.draft_position === draftPosition)?.user_id ?? null;
+}
+
+// The sequence a custom order starts from, so "Custom" opens on what the
+// league would have done anyway rather than on something arbitrary.
+export function buildSnakeSequence(orderedUserIds: readonly string[], rounds: number): string[] {
+  const sequence: string[] = [];
+  for (let round = 1; round <= rounds; round++) {
+    sequence.push(...(round % 2 === 1 ? orderedUserIds : [...orderedUserIds].reverse()));
+  }
+  return sequence;
+}
+
+// Membership or the active cast moved under a saved custom order. A sequence
+// that no longer gives every member exactly `rounds` picks can't be repaired
+// in place, so it is rebuilt from snake — seeded with the commissioner's own
+// round-one arrangement so their intent survives where it still can.
+export function reconcileCustomOrder(
+  current: readonly string[],
+  memberIds: readonly string[],
+  rounds: number
+): string[] {
+  const members = new Set(memberIds);
+  const valid =
+    rounds > 0 &&
+    current.length === memberIds.length * rounds &&
+    current.every((id) => members.has(id)) &&
+    memberIds.every((id) => current.filter((x) => x === id).length === rounds);
+  if (valid) return [...current];
+
+  const firstRound = [...new Set(current.slice(0, memberIds.length))];
+  return buildSnakeSequence(reconcileOrder(firstRound, memberIds), Math.max(rounds, 0));
+}
+
+// Rounds the lobby shows before start_draft derives roster_size: the same
+// even split (active couples / members), so the grid matches the real draft.
+export function predictedRounds(activeCoupleCount: number, memberCount: number): number {
+  if (memberCount <= 0) return 0;
+  return Math.floor(activeCoupleCount / memberCount);
+}
+
+// Swaps two adjacent picks inside one round of a custom sequence. Rounds are
+// slices of the whole sequence, so a move never crosses a round boundary and
+// each round stays a permutation of the members — which is what keeps
+// "everyone gets the same number of picks" true by construction.
+export function moveInCustomOrder(
+  sequence: readonly string[],
+  memberCount: number,
+  roundIndex: number,
+  indexInRound: number,
+  direction: -1 | 1
+): string[] {
+  const target = indexInRound + direction;
+  if (target < 0 || target >= memberCount) return [...sequence];
+
+  const base = roundIndex * memberCount;
+  const next = [...sequence];
+  [next[base + indexInRound], next[base + target]] = [next[base + target], next[base + indexInRound]];
   return next;
 }

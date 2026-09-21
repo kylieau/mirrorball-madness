@@ -5,14 +5,20 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
   autoPickTrigger,
+  buildSnakeSequence,
   eligibleRemaining,
-  getPickAssignment,
+  managerIdForPick,
   partitionPresence,
+  predictedRounds,
+  reconcileCustomOrder,
   reconcileOrder,
+  roundForPick,
   secondsRemainingOnClock,
+  type DraftType,
 } from "@/lib/draft";
 import { useAutoDraftPick } from "@/lib/use-auto-draft-pick";
 import {
+  setCustomDraftOrder,
   setDraftOrder,
   startDraft,
   makeDraftPick,
@@ -48,6 +54,7 @@ import { useDebouncedSave } from "@/lib/use-debounced-save";
 import { DraftManagersCard, PresenceDot } from "@/components/draft-managers-card";
 import { DraftAwayNote } from "@/components/draft-away-note";
 import { adaptDraftQueue, type DraftQueueDestination } from "@/lib/copy-picks";
+import { CustomDraftOrderCard } from "@/components/custom-draft-order-card";
 import { DraftQueueCard } from "@/components/draft-queue-card";
 import { LeagueRostersCard } from "@/components/league-rosters-card";
 import { buildLeagueRosters, orderManagersForRosters } from "@/lib/league-rosters";
@@ -273,12 +280,17 @@ export function DraftRoom({
   const availableCoupleIds = new Set(availableCouples.map((c) => c.id));
   const totalSlots = members.length * league.roster_size;
   const nextPickNumber = picks.length + 1;
-  const { round, draftPosition } = getPickAssignment(
+  const draftType = league.draft_type as DraftType;
+  const activeCoupleCount = couples.filter((c) => c.status === "active").length;
+  const customRounds = predictedRounds(activeCoupleCount, members.length);
+  const round = roundForPick(nextPickNumber, members.length);
+  const onTheClockId = managerIdForPick(
     nextPickNumber,
-    members.length,
-    league.draft_type as "snake" | "linear"
+    members,
+    draftType,
+    league.custom_pick_order
   );
-  const onTheClock = members.find((m) => m.draft_position === draftPosition);
+  const onTheClock = members.find((m) => m.user_id === onTheClockId);
   const isMyTurn = league.draft_status === "in_progress" && onTheClock?.user_id === currentUserId;
   const formattedScheduledAt = useFormattedDeadline(league.draft_scheduled_at);
 
@@ -340,6 +352,8 @@ export function DraftRoom({
   });
   const [savingOrder, setSavingOrder] = useState(false);
   const orderSave = useDebouncedSave();
+  const customOrderSave = useDebouncedSave();
+  const [customOrder, setCustomOrder] = useState<string[]>(league.custom_pick_order ?? []);
   const queueSave = useDebouncedSave();
   const [queue, setQueue] = useState(initialQueue);
 
@@ -373,6 +387,21 @@ export function DraftRoom({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members]);
 
+  // 'custom' opens on what snake would have done, then stays valid as members
+  // join or leave and as the active cast moves the round count.
+  useEffect(() => {
+    if (!isCommissioner || draftType !== "custom" || league.draft_status !== "not_started") return;
+    if (customRounds < 1) return;
+    const next =
+      customOrder.length === 0
+        ? buildSnakeSequence(draftOrder, customRounds)
+        : reconcileCustomOrder(customOrder, members.map((m) => m.user_id), customRounds);
+    if (next.length !== customOrder.length || next.some((id, i) => id !== customOrder[i])) {
+      updateCustomOrder(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, draftType, customRounds]);
+
   function moveOrderEntry(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= draftOrder.length) return;
@@ -386,6 +415,15 @@ export function DraftRoom({
     setLocalDraftOrder(next);
     orderSave.schedule(async () => {
       const { error } = await setDraftOrder(league.id, next);
+      if (error) setError(error);
+      return !error;
+    });
+  }
+
+  function updateCustomOrder(next: string[]) {
+    setCustomOrder(next);
+    customOrderSave.schedule(async () => {
+      const { error } = await setCustomDraftOrder(league.id, next);
       if (error) setError(error);
       return !error;
     });
@@ -525,6 +563,19 @@ export function DraftRoom({
         {error && <p className="text-sm text-destructive">{error}</p>}
         {isCommissioner ? (
           <>
+            {draftType === "custom" ? (
+              <CustomDraftOrderCard
+                sequence={customOrder}
+                rounds={customRounds}
+                memberCount={members.length}
+                managerLabel={managerLabel}
+                saveState={customOrderSave.saveState}
+                editable
+                onChange={updateCustomOrder}
+                onResetToSnake={() => updateCustomOrder(buildSnakeSequence(draftOrder, customRounds))}
+              />
+            ) : (
+              <>
             <p className="text-sm text-muted-foreground">
               Draft order (drag with the arrows, or leave it shuffled):
             </p>
@@ -571,6 +622,8 @@ export function DraftRoom({
                 {orderSave.saveState === "saving" ? "Saving…" : orderSave.saveState === "saved" ? "Saved" : ""}
               </span>
             </div>
+              </>
+            )}
             <Button
               onClick={async () => {
                 setSavingOrder(true);
@@ -592,7 +645,19 @@ export function DraftRoom({
             <p className="text-sm text-muted-foreground">
               Waiting for the commissioner to start the draft.
             </p>
-            {savedOrder.length > 0 && (
+            {draftType === "custom" && customOrder.length > 0 ? (
+              <CustomDraftOrderCard
+                sequence={customOrder}
+                rounds={customRounds}
+                memberCount={members.length}
+                managerLabel={managerLabel}
+                saveState="idle"
+                editable={false}
+                onChange={() => {}}
+                onResetToSnake={() => {}}
+              />
+            ) : (
+            savedOrder.length > 0 && (
               <div className="flex w-full flex-col gap-1 text-left text-sm">
                 <p className="text-xs text-muted-foreground">Draft order set by commissioner:</p>
                 {savedOrder.map((m) => (
@@ -602,6 +667,7 @@ export function DraftRoom({
                   </p>
                 ))}
               </div>
+            )
             )}
           </>
         )}

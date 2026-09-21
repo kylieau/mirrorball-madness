@@ -99,7 +99,11 @@ create table leagues (
   waiver_mode text not null default 'locked' check (waiver_mode in ('locked', 'waivers')),
   waiver_claim_method text check (waiver_claim_method in ('reverse_standings', 'fcfs', 'manual')),
   draft_scheduled_at timestamptz,
-  draft_type text not null default 'snake' check (draft_type in ('snake', 'linear')),
+  draft_type text not null default 'snake' check (draft_type in ('snake', 'linear', 'custom')),
+  -- 'custom' only: the full pick-by-pick sequence, custom_pick_order[pick_number]
+  -- = user_id. An array rather than its own table because it is read once per
+  -- pick from the already-locked leagues row. Null for snake/linear.
+  custom_pick_order uuid[],
   pick_time_limit_seconds int not null default 90,
   draft_status text not null default 'not_started' check (draft_status in ('not_started', 'in_progress', 'completed')),
   -- Server clock for whoever is on the clock. Set when the draft starts and
@@ -1066,6 +1070,12 @@ begin
     pick_time_limit_seconds = p_pick_time_limit_seconds,
     prediction_lock_hours_before_air = p_prediction_lock_hours_before_air,
     draft_type = case when draft_status = 'not_started' then p_draft_type else draft_type end,
+    -- Switching away from 'custom' drops the stale sequence, so a later switch
+    -- back cannot silently reuse an order built for a different member list.
+    custom_pick_order = case
+      when draft_status = 'not_started' and p_draft_type <> 'custom' then null
+      else custom_pick_order
+    end,
     draft_scheduled_at = case when draft_status = 'not_started' then p_draft_scheduled_at else draft_scheduled_at end
   where id = p_league_id
   returning * into v_league;
@@ -1275,6 +1285,77 @@ begin
 end;
 $$;
 
+-- The 'custom' counterpart to set_draft_order: the whole pick-by-pick
+-- sequence rather than just round one, so a commissioner can hand-balance a
+-- lopsided cast (snake pairs pick i with pick 2N+1-i, which punishes the end
+-- seats once it is obvious which couples are worthless). Stored whole because
+-- there is no per-round rule to derive it from.
+--
+-- Round count is roster_size, which start_draft only derives at the moment
+-- the draft begins, so the exact length cannot be checked here — this
+-- enforces "every member the same number of times" and start_draft enforces
+-- "and that number is roster_size".
+create function public.set_custom_draft_order(p_league_id uuid, p_user_ids uuid[])
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_league public.leagues;
+  v_member_count int;
+  v_picks_each int;
+begin
+  select * into v_league from public.leagues where id = p_league_id for update;
+
+  if not found or not public.is_league_commissioner(p_league_id) then
+    raise exception 'Only the commissioner can set the draft order';
+  end if;
+
+  if not exists (
+    select 1 from public.scoring_settings
+    where league_id = p_league_id and judges_score_category_enabled
+  ) then
+    raise exception 'Dance Card is not enabled for this league';
+  end if;
+
+  if v_league.draft_status <> 'not_started' then
+    raise exception 'Draft order can only be set before the draft starts';
+  end if;
+
+  select count(*) into v_member_count from public.league_members where league_id = p_league_id;
+
+  if coalesce(array_length(p_user_ids, 1), 0) = 0
+     or coalesce(array_length(p_user_ids, 1), 0) % v_member_count <> 0 then
+    raise exception 'Order must give every manager the same number of picks';
+  end if;
+
+  v_picks_each := array_length(p_user_ids, 1) / v_member_count;
+
+  if exists (
+    select 1 from public.league_members m
+    where m.league_id = p_league_id
+      and (select count(*) from unnest(p_user_ids) as u where u = m.user_id) <> v_picks_each
+  ) then
+    raise exception 'Order must give every manager the same number of picks';
+  end if;
+
+  if exists (
+    select 1 from unnest(p_user_ids) as u
+    where not exists (
+      select 1 from public.league_members lm
+      where lm.league_id = p_league_id and lm.user_id = u
+    )
+  ) then
+    raise exception 'Order includes someone who is not a member of this league';
+  end if;
+
+  update public.leagues
+  set draft_type = 'custom',
+      custom_pick_order = p_user_ids
+  where id = p_league_id;
+end;
+$$;
+
 create function public.start_draft(p_league_id uuid)
 returns public.leagues
 language plpgsql
@@ -1331,6 +1412,24 @@ begin
   -- season rather than handed out unevenly. current_turn_started_at starts
   -- the first pick clock; this function never places a pick.
   v_roster_size := v_couple_count / v_member_count;
+
+  -- A custom order is a full pick-by-pick sequence, so it can only be checked
+  -- here, where roster_size (and therefore the round count) first exists.
+  -- Membership or the active cast may have moved since it was set.
+  if v_league.draft_type = 'custom' then
+    if coalesce(array_length(v_league.custom_pick_order, 1), 0) <> v_member_count * v_roster_size then
+      raise exception 'Custom draft order does not cover every pick — set it again in the draft lobby';
+    end if;
+
+    if exists (
+      select 1 from public.league_members m
+      where m.league_id = p_league_id
+        and (select count(*) from unnest(v_league.custom_pick_order) as u where u = m.user_id)
+            <> v_roster_size
+    ) then
+      raise exception 'Custom draft order must give every manager exactly % picks', v_roster_size;
+    end if;
+  end if;
 
   update public.leagues
   set draft_status = 'in_progress',
@@ -1417,17 +1516,21 @@ begin
   v_round := ((v_next_pick - 1) / v_member_count) + 1;
   v_position_in_round := v_next_pick - (v_round - 1) * v_member_count;
 
-  -- Snake order: odd rounds go 1..N, even rounds go N..1. Linear repeats
-  -- 1..N every round.
-  if v_league.draft_type = 'linear' or v_round % 2 = 1 then
-    v_draft_position_needed := v_position_in_round;
+  -- Custom order names the manager for each pick outright; snake goes 1..N on
+  -- odd rounds and N..1 on even ones; linear repeats 1..N every round.
+  if v_league.draft_type = 'custom' then
+    v_expected_manager := v_league.custom_pick_order[v_next_pick];
   else
-    v_draft_position_needed := v_member_count - v_position_in_round + 1;
-  end if;
+    if v_league.draft_type = 'linear' or v_round % 2 = 1 then
+      v_draft_position_needed := v_position_in_round;
+    else
+      v_draft_position_needed := v_member_count - v_position_in_round + 1;
+    end if;
 
-  select user_id into v_expected_manager
-  from public.league_members
-  where league_id = p_league_id and draft_position = v_draft_position_needed;
+    select user_id into v_expected_manager
+    from public.league_members
+    where league_id = p_league_id and draft_position = v_draft_position_needed;
+  end if;
 
   if v_expected_manager is null or v_expected_manager <> p_manager_id then
     raise exception 'It is not your turn to pick';
@@ -1563,16 +1666,24 @@ begin
   v_round := ((v_next_pick - 1) / v_member_count) + 1;
   v_position_in_round := v_next_pick - (v_round - 1) * v_member_count;
 
-  if v_league.draft_type = 'linear' or v_round % 2 = 1 then
-    v_draft_position_needed := v_position_in_round;
-  else
-    v_draft_position_needed := v_member_count - v_position_in_round + 1;
-  end if;
+  if v_league.draft_type = 'custom' then
+    v_expected_manager := v_league.custom_pick_order[v_next_pick];
 
-  select user_id, draft_autopilot
-    into v_expected_manager, v_autopilot
-  from public.league_members
-  where league_id = p_league_id and draft_position = v_draft_position_needed;
+    select draft_autopilot into v_autopilot
+    from public.league_members
+    where league_id = p_league_id and user_id = v_expected_manager;
+  else
+    if v_league.draft_type = 'linear' or v_round % 2 = 1 then
+      v_draft_position_needed := v_position_in_round;
+    else
+      v_draft_position_needed := v_member_count - v_position_in_round + 1;
+    end if;
+
+    select user_id, draft_autopilot
+      into v_expected_manager, v_autopilot
+    from public.league_members
+    where league_id = p_league_id and draft_position = v_draft_position_needed;
+  end if;
 
   if v_expected_manager is null then
     raise exception 'It is not your turn to pick';
@@ -1822,6 +1933,7 @@ revoke execute on function public.start_draft(uuid) from public;
 revoke execute on function public.make_draft_pick(uuid, uuid) from public;
 revoke execute on function public.make_auto_draft_pick(uuid) from public;
 revoke execute on function public.set_draft_autopilot(uuid, boolean) from public;
+revoke execute on function public.set_custom_draft_order(uuid, uuid[]) from public;
 revoke execute on function public.set_draft_queue(uuid, uuid[]) from public;
 revoke execute on function public.undo_last_pick(uuid) from public;
 revoke execute on function public.set_member_draft_autopilot(uuid, uuid, boolean) from public;
@@ -1830,6 +1942,7 @@ grant execute on function public.start_draft(uuid) to authenticated;
 grant execute on function public.make_draft_pick(uuid, uuid) to authenticated;
 grant execute on function public.make_auto_draft_pick(uuid) to authenticated;
 grant execute on function public.set_draft_autopilot(uuid, boolean) to authenticated;
+grant execute on function public.set_custom_draft_order(uuid, uuid[]) to authenticated;
 grant execute on function public.set_draft_queue(uuid, uuid[]) to authenticated;
 grant execute on function public.undo_last_pick(uuid) to authenticated;
 grant execute on function public.set_member_draft_autopilot(uuid, uuid, boolean) to authenticated;
