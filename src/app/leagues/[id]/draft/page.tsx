@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DraftRoom } from "@/components/draft-room";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
+import { loadOtherLeagueQueues } from "@/lib/other-league-picks";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { XIcon } from "lucide-react";
 
@@ -64,7 +65,7 @@ export default async function DraftPage({
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
 
-  const [{ data: members }, { data: couples }, { data: picks }, { data: queue }] = await Promise.all([
+  const [{ data: members }, { data: couples }, { data: picks }, { data: queue }, otherQueues] = await Promise.all([
     supabase
       .from("league_members")
       .select("user_id, role, draft_position, draft_autopilot, profiles(display_name)")
@@ -87,6 +88,7 @@ export default async function DraftPage({
       .eq("league_id", id)
       .eq("user_id", user.id)
       .maybeSingle(),
+    loadOtherLeagueQueues(supabase, { userId: user.id, currentLeagueId: id }),
   ]);
 
   const flatCouples = (couples ?? [])
@@ -114,6 +116,7 @@ export default async function DraftPage({
       coupleDisplayNames={coupleDisplayNames}
       initialPicks={picks ?? []}
       initialQueue={queue?.couple_ids ?? []}
+      otherQueues={otherQueues}
       currentUserId={user.id}
       closeHref={closeHref}
     />

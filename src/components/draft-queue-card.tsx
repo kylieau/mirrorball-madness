@@ -1,8 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { defaultSelection, type DraftQueueDestination } from "@/lib/copy-picks";
 import { moveQueueEntry } from "@/lib/draft";
 import type { SaveState } from "@/lib/use-debounced-save";
+import { AlsoSaveTo, OtherLeagueSaveSummary, UsePicksFrom } from "@/components/other-leagues-picker";
+import type { LeagueSaveResult } from "@/app/leagues/[id]/predictions/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -21,13 +24,29 @@ export function DraftQueueCard({
   availableIds,
   nameFor,
   onChange,
+  otherLeagues,
+  onCopyToLeagues,
+  onUseFrom,
 }: {
   queue: string[];
   saveState: SaveState;
   availableIds: ReadonlySet<string>;
   nameFor: (coupleId: string) => ReactNode;
   onChange: (next: string[]) => void;
+  otherLeagues: DraftQueueDestination[];
+  onCopyToLeagues: (leagueIds: string[]) => Promise<LeagueSaveResult[]>;
+  onUseFrom: (leagueId: string) => void;
 }) {
+  const [copyTo, setCopyTo] = useState(() => defaultSelection(otherLeagues));
+  const [copying, setCopying] = useState(false);
+  const [copyResults, setCopyResults] = useState<LeagueSaveResult[]>([]);
+
+  async function handleCopy() {
+    setCopying(true);
+    setCopyResults(await onCopyToLeagues(copyTo));
+    setCopying(false);
+  }
+
   // Drafted couples silently drop out; the server skips them anyway, so this
   // only keeps the list honest and the next save tidy.
   const visible = queue.filter((id) => availableIds.has(id));
@@ -114,6 +133,33 @@ export function DraftQueueCard({
               ))}
             </SelectContent>
           </Select>
+        )}
+
+        {visible.length === 0 && (
+          <UsePicksFrom
+            sources={otherLeagues.filter((d) => d.queue)}
+            onPick={onUseFrom}
+            placeholder="Use my queue from…"
+          />
+        )}
+
+        {queue.length > 0 && otherLeagues.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <AlsoSaveTo
+              destinations={otherLeagues}
+              selected={copyTo}
+              onChange={setCopyTo}
+              disabled={copying}
+              verb="Copy to"
+              replaceNote="replaces existing queue"
+            />
+            {copyTo.length > 0 && (
+              <Button variant="outline" size="sm" className="self-start" disabled={copying} onClick={handleCopy}>
+                {copying ? "Copying…" : "Copy Queue"}
+              </Button>
+            )}
+            <OtherLeagueSaveSummary results={copyResults} destinations={otherLeagues} savedLabel="Copied to" />
+          </div>
         )}
 
         <p className="h-4 text-xs text-muted-foreground">

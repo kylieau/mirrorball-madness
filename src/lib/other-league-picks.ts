@@ -4,7 +4,9 @@ import {
   planDestination,
   type CurtainCallDestination,
   type CurtainCallPick,
+  type DraftQueueDestination,
   type GrandFinaleDestination,
+  planQueueDestination,
 } from "./copy-picks";
 
 type Client = SupabaseClient<Database>;
@@ -151,4 +153,42 @@ async function loadGrandFinale(
       };
     })
   );
+}
+
+// The viewer's draft queue in each of their other leagues. Queues are owner-only
+// under RLS, so this only ever reads the viewer's own rows.
+export async function loadOtherLeagueQueues(
+  supabase: Client,
+  { userId, currentLeagueId }: { userId: string; currentLeagueId: string }
+): Promise<DraftQueueDestination[]> {
+  const { data: memberships } = await supabase
+    .from("league_members")
+    .select("leagues(id, name, draft_status)")
+    .eq("user_id", userId);
+  const others = (memberships ?? []).flatMap((m) => (m.leagues && m.leagues.id !== currentLeagueId ? [m.leagues] : []));
+  if (others.length === 0) return [];
+
+  const otherIds = others.map((l) => l.id);
+  const [{ data: settings }, { data: queues }] = await Promise.all([
+    supabase.from("scoring_settings").select("league_id, judges_score_category_enabled").in("league_id", otherIds),
+    supabase.from("draft_queues").select("league_id, couple_ids").in("league_id", otherIds).eq("user_id", userId),
+  ]);
+  const danceCardByLeague = new Map((settings ?? []).map((s) => [s.league_id, s.judges_score_category_enabled]));
+  const queueByLeague = new Map(
+    (queues ?? []).filter((q) => q.couple_ids.length > 0).map((q) => [q.league_id, q.couple_ids])
+  );
+
+  return others.map((league) => {
+    const queue = queueByLeague.get(league.id) ?? null;
+    return {
+      id: league.id,
+      name: league.name,
+      queue,
+      ...planQueueDestination({
+        danceCardOn: danceCardByLeague.get(league.id) ?? true,
+        draftCompleted: league.draft_status === "completed",
+        hasQueue: !!queue,
+      }),
+    };
+  });
 }

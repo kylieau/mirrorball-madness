@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   adaptCurtainCallPick,
+  adaptDraftQueue,
   adaptGrandFinaleOrder,
   defaultSelection,
   isSelectable,
   planDestination,
+  planQueueDestination,
 } from "./copy-picks";
 
 const now = new Date("2026-09-22T12:00:00Z");
@@ -103,5 +105,34 @@ describe("adaptGrandFinaleOrder", () => {
   it("ignores couples outside the season and still requires full coverage", () => {
     expect(adaptGrandFinaleOrder(["x", "a", "b", "c", "d"], season, [])).toEqual(["a", "b", "c", "d"]);
     expect(adaptGrandFinaleOrder(["x", "a", "b", "c"], season, [])).toBeNull();
+  });
+});
+
+describe("planQueueDestination", () => {
+  const open = { danceCardOn: true, draftCompleted: false, hasQueue: false };
+
+  it("offers a league with no queue as ok", () => {
+    expect(planQueueDestination(open)).toEqual({ status: "ok", note: null });
+  });
+
+  it("flags an existing queue as will_replace", () => {
+    expect(planQueueDestination({ ...open, hasQueue: true }).status).toBe("will_replace");
+  });
+
+  it("reports Dance Card off ahead of a finished draft", () => {
+    expect(planQueueDestination({ danceCardOn: false, draftCompleted: true, hasQueue: true })).toEqual({
+      status: "module_off",
+      note: "Dance Card is off in this league",
+    });
+  });
+
+  it("locks once the draft is over", () => {
+    expect(planQueueDestination({ ...open, draftCompleted: true }).status).toBe("locked");
+  });
+});
+
+describe("adaptDraftQueue", () => {
+  it("keeps the order and drops couples outside the season", () => {
+    expect(adaptDraftQueue(["c", "x", "a"], ["a", "b", "c"])).toEqual(["c", "a"]);
   });
 });

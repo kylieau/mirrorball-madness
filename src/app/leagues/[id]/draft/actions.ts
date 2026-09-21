@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { LeagueSaveResult } from "@/app/leagues/[id]/predictions/actions";
 
 export async function setDraftOrder(leagueId: string, orderedUserIds: string[]) {
   const supabase = await createClient();
@@ -85,4 +86,18 @@ export async function setDraftQueue(leagueId: string, coupleIds: string[]) {
     p_couple_ids: coupleIds,
   });
   return { error: error?.message ?? null };
+}
+
+// Each league is an independent save through the same RPC, so a finished draft
+// or Dance Card being off in one destination can't sink the others.
+export async function setDraftQueueForLeagues(
+  leagueIds: string[],
+  coupleIds: string[]
+): Promise<LeagueSaveResult[]> {
+  return Promise.all(
+    [...new Set(leagueIds)].map(async (leagueId) => ({
+      leagueId,
+      ...(await setDraftQueue(leagueId, coupleIds)),
+    }))
+  );
 }

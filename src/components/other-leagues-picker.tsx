@@ -17,11 +17,15 @@ export function AlsoSaveTo({
   selected,
   onChange,
   disabled,
+  verb = "Also save to",
+  replaceNote = "replaces existing picks",
 }: {
   destinations: Destination[];
   selected: string[];
   onChange: (leagueIds: string[]) => void;
   disabled?: boolean;
+  verb?: string;
+  replaceNote?: string;
 }) {
   const [open, setOpen] = useState(false);
   if (destinations.length === 0) return null;
@@ -33,8 +37,8 @@ export function AlsoSaveTo({
   const replacing = destinations.filter((d) => d.status === "will_replace" && selected.includes(d.id));
   const summary =
     selected.length === 0
-      ? "Also save to other leagues"
-      : `Also save to ${selected.length} league${selected.length === 1 ? "" : "s"}`;
+      ? `${verb} other leagues`
+      : `${verb} ${selected.length} league${selected.length === 1 ? "" : "s"}`;
 
   return (
     <div className="flex flex-col gap-2">
@@ -45,7 +49,7 @@ export function AlsoSaveTo({
         className="flex items-center gap-1.5 self-start text-xs text-muted-foreground"
       >
         <span className="font-medium text-foreground">{summary}</span>
-        {replacing.length > 0 && <span>· ↻ replaces existing picks</span>}
+        {replacing.length > 0 && <span>· ↻ {replaceNote}</span>}
         <span aria-hidden>{open ? "▴" : "▾"}</span>
       </button>
       {open && (
@@ -84,13 +88,14 @@ export function AlsoSaveTo({
 export function UsePicksFrom({
   sources,
   onPick,
+  placeholder = "Use my picks from…",
 }: {
   sources: { id: string; name: string }[];
   onPick: (leagueId: string) => void;
+  placeholder?: string;
 }) {
   if (sources.length === 0) return null;
 
-  const placeholder = "Use my picks from…";
   const items = { "": placeholder, ...Object.fromEntries(sources.map((s) => [s.id, s.name])) };
 
   return (
@@ -112,9 +117,11 @@ export function UsePicksFrom({
 export function OtherLeagueSaveSummary({
   results,
   destinations,
+  savedLabel = "Also saved to",
 }: {
   results: LeagueSaveResult[];
   destinations: Destination[];
+  savedLabel?: string;
 }) {
   if (results.length === 0) return null;
   const nameFor = (id: string) => destinations.find((d) => d.id === id)?.name ?? "another league";
@@ -128,7 +135,7 @@ export function OtherLeagueSaveSummary({
           </li>
         ) : (
           <li key={r.leagueId} className="text-emerald-text">
-            ✓ Also saved to {nameFor(r.leagueId)}
+            ✓ {savedLabel} {nameFor(r.leagueId)}
           </li>
         )
       )}

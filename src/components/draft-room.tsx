@@ -18,6 +18,7 @@ import {
   makeDraftPick,
   setDraftAutopilot,
   setDraftQueue,
+  setDraftQueueForLeagues,
   setMemberDraftAutopilot,
   undoLastPick,
 } from "@/app/leagues/[id]/draft/actions";
@@ -46,6 +47,7 @@ import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 import { useDebouncedSave } from "@/lib/use-debounced-save";
 import { DraftManagersCard, PresenceDot } from "@/components/draft-managers-card";
 import { DraftAwayNote } from "@/components/draft-away-note";
+import { adaptDraftQueue, type DraftQueueDestination } from "@/lib/copy-picks";
 import { DraftQueueCard } from "@/components/draft-queue-card";
 import { LeagueRostersCard } from "@/components/league-rosters-card";
 import { buildLeagueRosters, orderManagersForRosters } from "@/lib/league-rosters";
@@ -105,6 +107,7 @@ export function DraftRoom({
   coupleDisplayNames,
   initialPicks,
   initialQueue,
+  otherQueues,
   currentUserId,
   closeHref,
 }: {
@@ -114,6 +117,7 @@ export function DraftRoom({
   coupleDisplayNames: Record<string, CoupleNameParts>;
   initialPicks: DraftPick[];
   initialQueue: string[];
+  otherQueues: DraftQueueDestination[];
   currentUserId: string;
   closeHref: string;
 }) {
@@ -481,6 +485,19 @@ export function DraftRoom({
         return parts ? <CoupleName {...parts} /> : "Unknown couple";
       }}
       onChange={updateQueue}
+      otherLeagues={otherQueues}
+      onCopyToLeagues={(leagueIds) => setDraftQueueForLeagues(leagueIds, queue)}
+      onUseFrom={(leagueId) => {
+        const source = otherQueues.find((d) => d.id === leagueId)?.queue;
+        if (source) {
+          updateQueue(
+            adaptDraftQueue(
+              source,
+              couples.map((c) => c.id)
+            )
+          );
+        }
+      }}
     />
   );
 

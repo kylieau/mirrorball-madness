@@ -17,6 +17,7 @@ export type CurtainCallPick = {
 
 export type CurtainCallDestination = Destination & { pick: CurtainCallPick | null };
 export type GrandFinaleDestination = Destination & { order: string[] | null };
+export type DraftQueueDestination = Destination & { queue: string[] | null };
 
 export function isSelectable(status: DestinationStatus): boolean {
   return status === "ok" || status === "will_replace";
@@ -67,4 +68,25 @@ export function adaptGrandFinaleOrder(
   const kept = order.filter((id) => season.has(id));
   if (kept.length !== season.size) return null;
   return pinEliminatedFirst(kept, pinnedIds);
+}
+
+// The queue has no deadline of its own: it stays editable until the draft is
+// over, and a league without Dance Card has no draft to queue for.
+export function planQueueDestination(input: {
+  danceCardOn: boolean;
+  draftCompleted: boolean;
+  hasQueue: boolean;
+}): { status: DestinationStatus; note: string | null } {
+  if (!input.danceCardOn) return { status: "module_off", note: "Dance Card is off in this league" };
+  if (input.draftCompleted) return { status: "locked", note: "Draft is over" };
+  return input.hasQueue
+    ? { status: "will_replace", note: "Replaces your current queue" }
+    : { status: "ok", note: null };
+}
+
+// The RPC rejects couples outside the current season; order is otherwise the
+// viewer's own wishlist and carries over untouched.
+export function adaptDraftQueue(queue: string[], seasonCoupleIds: string[]): string[] {
+  const season = new Set(seasonCoupleIds);
+  return queue.filter((id) => season.has(id));
 }
