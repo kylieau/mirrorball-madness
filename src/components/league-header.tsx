@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeagueSwitcher, type SwitcherLeague } from "@/components/league-switcher";
-import { PageHeader } from "@/components/page-header";
 import { StickyPageHeader } from "@/components/sticky-page-header";
 import { TopBar } from "@/components/top-bar";
 import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
@@ -60,15 +59,10 @@ export function LeagueHeader({
             )
           }
         />
-        <PageHeader
-          flush
-          title={title}
-          aside={
-            switcherLeagues.length > 1 && (
-              <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
-            )
-          }
-        />
+        <h1 className="sr-only">{title}</h1>
+        {switcherLeagues.length > 1 && (
+          <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
+        )}
       </StickyPageHeader>
 
       {justCreated && canEdit && (

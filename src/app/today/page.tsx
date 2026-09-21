@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { HomeDashboard } from "@/components/home-dashboard";
-import { PageHeader } from "@/components/page-header";
 import { StickyPageHeader } from "@/components/sticky-page-header";
 import { TopBar } from "@/components/top-bar";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
@@ -171,7 +170,7 @@ export default async function TodayPage() {
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-8">
       <StickyPageHeader>
         <TopBar {...accountSettingsData} email={user.email ?? ""} />
-        <PageHeader flush title="Home" />
+        <h1 className="sr-only">Home</h1>
       </StickyPageHeader>
 
       <div className={BOTTOM_NAV_CLEARANCE}>

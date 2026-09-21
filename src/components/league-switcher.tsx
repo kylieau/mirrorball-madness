@@ -14,7 +14,7 @@ export type SwitcherLeague = {
   picksDue: boolean;
 };
 
-// Lives beside the page title (Your Picks / Standings
+// Lives under the top bar (Your Picks / Standings
 // only — the caller decides whether to render this at all). Nothing to
 // switch to with just one league, so it renders nothing rather than a dead
 // chip.
