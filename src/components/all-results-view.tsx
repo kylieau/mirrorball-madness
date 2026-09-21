@@ -151,22 +151,17 @@ export function AllResultsView({
     isLast: boolean;
   }) {
     const scores = judgeScoresByDance.get(dance.id) ?? [];
-    const values = scores.map((s) => s.score);
-    const spread = values.length > 1 ? Math.max(...values) - Math.min(...values) : 0;
     return (
       <tr className={isLast ? "border-b border-border last:border-b-0" : undefined}>
         <td colSpan={colSpan} className="px-2 pb-1.5 pl-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-xs text-muted-foreground">
-            <span>
-              {danceStyleById.get(dance.dance_style_id) ?? "Unknown dance"}: {dance.total_score}
-              {scores.length > 0 && (
-                <>
-                  {" "}
-                  ({scores.map((s) => `${judgeById.get(s.judge_id) ?? "?"}: ${s.score}`).join(", ")})
-                </>
-              )}
-            </span>
-            {spread > 0 && <span>spread: {spread}</span>}
+          <div className="text-xs text-muted-foreground">
+            {danceStyleById.get(dance.dance_style_id) ?? "Unknown dance"}: {dance.total_score}
+            {scores.length > 0 && (
+              <>
+                {" "}
+                ({scores.map((s) => `${judgeById.get(s.judge_id) ?? "?"}: ${s.score}`).join(", ")})
+              </>
+            )}
           </div>
         </td>
       </tr>
