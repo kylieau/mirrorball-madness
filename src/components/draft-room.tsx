@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
   autoPickTrigger,
   eligibleRemaining,
   getPickAssignment,
+  partitionPresence,
+  reconcileOrder,
   secondsRemainingOnClock,
 } from "@/lib/draft";
 import { useAutoDraftPick } from "@/lib/use-auto-draft-pick";
@@ -15,7 +17,8 @@ import {
   startDraft,
   makeDraftPick,
   setDraftAutopilot,
-  undoLastAutoPick,
+  setMemberDraftAutopilot,
+  undoLastPick,
 } from "@/app/leagues/[id]/draft/actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,11 +28,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import type { Database } from "@/lib/supabase/types";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
+import { DraftManagersCard, PresenceDot } from "@/components/draft-managers-card";
+import { ResetDraftDialog } from "@/components/reset-draft-dialog";
 import { XIcon } from "lucide-react";
 
 type League = Database["public"]["Tables"]["leagues"]["Row"];
@@ -101,11 +115,42 @@ export function DraftRoom({
   const [error, setError] = useState<string | null>(null);
   const [autopilotPending, setAutopilotPending] = useState(false);
   const [undoPending, setUndoPending] = useState(false);
+  const [memberAutopilotPendingId, setMemberAutopilotPendingId] = useState<string | null>(null);
+  const [confirmCoupleId, setConfirmCoupleId] = useState<string | null>(null);
+  const [justDrafted, setJustDrafted] = useState<string | null>(null);
+  const [presentIds, setPresentIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  // Realtime doesn't replay events missed while a phone slept or lost signal,
+  // so refetch the whole picture on resume, on resubscribe, and after our own pick.
+  const refreshDraftState = useCallback(async () => {
+    const supabase = createClient();
+    const [{ data: membersData }, { data: picksData }, { data: leagueData }] = await Promise.all([
+      supabase
+        .from("league_members")
+        .select("user_id, role, draft_position, draft_autopilot, profiles(display_name)")
+        .eq("league_id", league.id)
+        .order("draft_position"),
+      supabase
+        .from("draft_picks")
+        .select("id, couple_id, manager_id, round, pick_number, picked_at, is_auto")
+        .eq("league_id", league.id)
+        .order("pick_number"),
+      supabase.from("leagues").select("*").eq("id", league.id).single(),
+    ]);
+    if (membersData) {
+      setMembers(membersData.map((m) => ({ ...m, draft_autopilot: m.draft_autopilot ?? false })));
+    }
+    if (picksData) setPicks(picksData.map((p) => ({ ...p, is_auto: p.is_auto ?? false })));
+    if (leagueData) setLeague(leagueData);
+  }, [league.id]);
 
   useEffect(() => {
     const supabase = createClient();
+
     const channel = supabase
-      .channel(`league-${league.id}-draft`)
+      .channel(`league-${league.id}-draft`, {
+        config: { presence: { key: currentUserId } },
+      })
       .on(
         "postgres_changes",
         {
@@ -175,12 +220,38 @@ export function DraftRoom({
           );
         }
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "league_members", filter: `league_id=eq.${league.id}` },
+        () => void refreshDraftState()
+      )
+      // DELETE payloads carry only the row id and can't be filtered by league,
+      // so refetch rather than patch.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "league_members" },
+        () => void refreshDraftState()
+      )
+      .on("presence", { event: "sync" }, () => {
+        setPresentIds(new Set(Object.keys(channel.presenceState())));
+      })
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          void channel.track({ user_id: currentUserId });
+          void refreshDraftState();
+        }
+      });
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshDraftState();
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
+      document.removeEventListener("visibilitychange", onVisible);
       supabase.removeChannel(channel);
     };
-  }, [league.id]);
+  }, [league.id, currentUserId, refreshDraftState]);
 
   const draftedCoupleIds = useMemo(() => new Set(picks.map((p) => p.couple_id)), [picks]);
   const availableCouples = eligibleRemaining(couples, draftedCoupleIds);
@@ -222,6 +293,12 @@ export function DraftRoom({
     onTheClockAutopilot,
   });
 
+  useEffect(() => {
+    if (!justDrafted) return;
+    const timeoutId = window.setTimeout(() => setJustDrafted(null), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [justDrafted]);
+
   const isCommissioner = members.some((m) => m.user_id === currentUserId && m.role === "commissioner");
   const myAutopilot = members.find((m) => m.user_id === currentUserId)?.draft_autopilot ?? false;
   const lastPick = picks[picks.length - 1];
@@ -236,8 +313,18 @@ export function DraftRoom({
     return members.find((m) => m.user_id === userId)?.profiles?.display_name ?? "Unknown";
   }
 
-  const [draftOrder, setLocalDraftOrder] = useState<string[]>(() => shuffle(initialMembers.map((m) => m.user_id)));
+  const [draftOrder, setLocalDraftOrder] = useState<string[]>(() => {
+    const saved = initialMembers
+      .filter((m) => m.draft_position !== null)
+      .sort((a, b) => (a.draft_position ?? 0) - (b.draft_position ?? 0))
+      .map((m) => m.user_id);
+    if (saved.length === 0) return shuffle(initialMembers.map((m) => m.user_id));
+    const unsaved = initialMembers.filter((m) => m.draft_position === null).map((m) => m.user_id);
+    return [...saved, ...unsaved];
+  });
   const [savingOrder, setSavingOrder] = useState(false);
+  const [orderSaveState, setOrderSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const orderSaveTimeout = useRef<number | undefined>(undefined);
 
   function shuffle<T>(arr: T[]) {
     const copy = [...arr];
@@ -248,16 +335,63 @@ export function DraftRoom({
     return copy;
   }
 
+  // Persist the initial shuffle so managers see an order before the
+  // commissioner touches anything.
+  useEffect(() => {
+    const nobodySaved = initialMembers.every((m) => m.draft_position === null);
+    if (isCommissioner && league.draft_status === "not_started" && nobodySaved) {
+      updateOrder(draftOrder);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Membership changed in the lobby: fold joiners/leavers into the saved order
+  // (set_draft_order requires every member exactly once).
+  useEffect(() => {
+    if (!isCommissioner || league.draft_status !== "not_started") return;
+    const next = reconcileOrder(draftOrder, members.map((m) => m.user_id));
+    if (next.length !== draftOrder.length || next.some((id, i) => id !== draftOrder[i])) {
+      updateOrder(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members]);
+
   function moveOrderEntry(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= draftOrder.length) return;
     const next = [...draftOrder];
     [next[index], next[target]] = [next[target], next[index]];
+    updateOrder(next);
+  }
+
+  // Debounced so a run of arrow clicks lands as one RPC, not a race of them.
+  function updateOrder(next: string[]) {
     setLocalDraftOrder(next);
+    setOrderSaveState("saving");
+    window.clearTimeout(orderSaveTimeout.current);
+    orderSaveTimeout.current = window.setTimeout(async () => {
+      const { error } = await setDraftOrder(league.id, next);
+      if (error) {
+        setError(error);
+        setOrderSaveState("idle");
+      } else {
+        setOrderSaveState("saved");
+      }
+    }, 500);
   }
 
   async function handleStartDraft() {
     setError(null);
+    const { absent } = partitionPresence(members, presentIds);
+    if (
+      absent.length > 0 &&
+      !window.confirm(
+        `${absent.length} of ${members.length} managers aren't in the room yet. They'll auto-pick at random when their clock runs out. Start anyway?`
+      )
+    ) {
+      return;
+    }
+    window.clearTimeout(orderSaveTimeout.current);
     const { error: orderError } = await setDraftOrder(league.id, draftOrder);
     if (orderError) {
       setError(orderError);
@@ -271,8 +405,14 @@ export function DraftRoom({
     setError(null);
     setPendingCoupleId(coupleId);
     const { error } = await makeDraftPick(league.id, coupleId);
-    if (error) setError(error);
     setPendingCoupleId(null);
+    setConfirmCoupleId(null);
+    if (error) {
+      setError(error);
+      return;
+    }
+    setJustDrafted(coupleId);
+    await refreshDraftState();
   }
 
   async function handleAutopilot(enabled: boolean) {
@@ -289,10 +429,24 @@ export function DraftRoom({
     setAutopilotPending(false);
   }
 
-  async function handleUndoLastAutoPick() {
+  async function handleMemberAutopilot(userId: string, enabled: boolean) {
+    setError(null);
+    setMemberAutopilotPendingId(userId);
+    const { error } = await setMemberDraftAutopilot(league.id, userId, enabled);
+    if (error) {
+      setError(error);
+    } else {
+      setMembers((prev) =>
+        prev.map((m) => (m.user_id === userId ? { ...m, draft_autopilot: enabled } : m))
+      );
+    }
+    setMemberAutopilotPendingId(null);
+  }
+
+  async function handleUndoLastPick() {
     setError(null);
     setUndoPending(true);
-    const { error } = await undoLastAutoPick(league.id);
+    const { error } = await undoLastPick(league.id);
     if (error) {
       setError(error);
     } else {
@@ -333,7 +487,8 @@ export function DraftRoom({
                   key={userId}
                   className="flex items-center justify-between rounded-md border border-border px-3 py-1.5 text-sm"
                 >
-                  <span>
+                  <span className="flex items-center gap-2">
+                    <PresenceDot present={presentIds.has(userId)} />
                     {i + 1}. {managerLabel(userId)}
                   </span>
                   <span className="flex gap-1">
@@ -357,13 +512,18 @@ export function DraftRoom({
                 </div>
               ))}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setLocalDraftOrder(shuffle(draftOrder))}
-            >
-              Shuffle
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => updateOrder(shuffle(draftOrder))}
+              >
+                Shuffle
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {orderSaveState === "saving" ? "Saving…" : orderSaveState === "saved" ? "Saved" : ""}
+              </span>
+            </div>
             <Button
               onClick={async () => {
                 setSavingOrder(true);
@@ -389,7 +549,8 @@ export function DraftRoom({
               <div className="flex w-full flex-col gap-1 text-left text-sm">
                 <p className="text-xs text-muted-foreground">Draft order set by commissioner:</p>
                 {savedOrder.map((m) => (
-                  <p key={m.user_id}>
+                  <p key={m.user_id} className="flex items-center gap-2">
+                    <PresenceDot present={presentIds.has(m.user_id)} />
                     {m.draft_position}. {m.profiles?.display_name}
                   </p>
                 ))}
@@ -453,6 +614,12 @@ export function DraftRoom({
         <Button render={<Link href={`/leagues/${league.id}`} />} nativeButton={false}>
           Back to {league.name}
         </Button>
+
+        {isCommissioner && (
+          <div className="flex justify-center border-t border-border pt-4">
+            <ResetDraftDialog leagueId={league.id} leagueName={league.name} />
+          </div>
+        )}
       </div>
     );
   }
@@ -471,6 +638,22 @@ export function DraftRoom({
         </p>
       </div>
 
+      {justDrafted && (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-md bg-emerald/20 px-3 py-2 text-sm font-medium text-emerald-text"
+        >
+          <span>✓</span>
+          <span>
+            You drafted{" "}
+            {(() => {
+              const parts = coupleParts(justDrafted);
+              return parts ? <CoupleName {...parts} /> : "your pick";
+            })()}
+          </span>
+        </div>
+      )}
+
       <AutopilotToggle
         enabled={myAutopilot}
         pending={autopilotPending}
@@ -478,6 +661,15 @@ export function DraftRoom({
         onToggle={(checked) => {
           void handleAutopilot(checked);
         }}
+      />
+
+      <DraftManagersCard
+        managers={members}
+        presentIds={presentIds}
+        onTheClockUserId={onTheClock?.user_id}
+        isCommissioner={isCommissioner}
+        pendingUserId={memberAutopilotPendingId}
+        onToggleAutopilot={(userId, enabled) => void handleMemberAutopilot(userId, enabled)}
       />
 
       <div className="grid gap-6 sm:grid-cols-2">
@@ -493,7 +685,7 @@ export function DraftRoom({
                 variant="outline"
                 className="justify-start"
                 disabled={!isMyTurn || pendingCoupleId !== null || myAutopilot}
-                onClick={() => handlePick(c.id)}
+                onClick={() => setConfirmCoupleId(c.id)}
               >
                 <CoupleName {...(coupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name })} />
               </Button>
@@ -520,13 +712,13 @@ export function DraftRoom({
                   {managerLabel(p.manager_id)}
                   {p.is_auto ? " · auto · random" : ""}
                 </span>
-                {isCommissioner && lastPick?.id === p.id && p.is_auto && (
+                {isCommissioner && lastPick?.id === p.id && (
                   <Button
                     variant="ghost"
                     size="sm"
                     className="ml-auto"
                     disabled={undoPending}
-                    onClick={() => void handleUndoLastAutoPick()}
+                    onClick={() => void handleUndoLastPick()}
                   >
                     Undo
                   </Button>
@@ -536,6 +728,46 @@ export function DraftRoom({
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={confirmCoupleId !== null}
+        onOpenChange={(open) => {
+          if (!open && pendingCoupleId === null) setConfirmCoupleId(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm your pick</DialogTitle>
+            <DialogDescription>
+              {(() => {
+                const parts = confirmCoupleId ? coupleParts(confirmCoupleId) : null;
+                return parts ? (
+                  <>
+                    Draft <CoupleName {...parts} />? Confirm to submit your pick.
+                  </>
+                ) : null;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />} disabled={pendingCoupleId !== null}>
+              Cancel
+            </DialogClose>
+            <Button
+              disabled={pendingCoupleId !== null || !isMyTurn}
+              onClick={() => confirmCoupleId && void handlePick(confirmCoupleId)}
+            >
+              {pendingCoupleId !== null ? "Drafting…" : "Confirm pick"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {isCommissioner && (
+        <div className="flex justify-end border-t border-border pt-4">
+          <ResetDraftDialog leagueId={league.id} leagueName={league.name} />
+        </div>
+      )}
     </div>
   );
 }

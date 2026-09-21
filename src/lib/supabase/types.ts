@@ -1697,6 +1697,7 @@ export type Database = {
         }
       }
       request_account_deletion: { Args: never; Returns: undefined }
+      reset_draft: { Args: { p_league_id: string }; Returns: undefined }
       set_draft_autopilot: {
         Args: { p_enabled: boolean; p_league_id: string }
         Returns: boolean
@@ -1704,6 +1705,10 @@ export type Database = {
       set_draft_order: {
         Args: { p_league_id: string; p_ordered_user_ids: string[] }
         Returns: undefined
+      }
+      set_member_draft_autopilot: {
+        Args: { p_enabled: boolean; p_league_id: string; p_user_id: string }
+        Returns: boolean
       }
       start_draft: {
         Args: { p_league_id: string }
@@ -1797,7 +1802,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      undo_last_auto_pick: { Args: { p_league_id: string }; Returns: undefined }
+      undo_last_pick: { Args: { p_league_id: string }; Returns: undefined }
       update_league_settings: {
         Args: {
           p_draft_scheduled_at: string

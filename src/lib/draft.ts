@@ -70,3 +70,27 @@ export function isBenignAutoPickError(message: string | null | undefined): boole
     message.includes("Draft is already complete")
   );
 }
+
+// Presence is advisory only — the server never checks it, so it can't block
+// or break a draft. `presentIds` may include people who are not members.
+export function partitionPresence<T extends { user_id: string }>(
+  members: readonly T[],
+  presentIds: ReadonlySet<string>
+): { present: T[]; absent: T[] } {
+  const present: T[] = [];
+  const absent: T[] = [];
+  for (const m of members) (presentIds.has(m.user_id) ? present : absent).push(m);
+  return { present, absent };
+}
+
+// Keeps the commissioner's arrangement when membership changes in the lobby:
+// leavers drop out, joiners go to the end.
+export function reconcileOrder(
+  order: readonly string[],
+  memberIds: readonly string[]
+): string[] {
+  const current = new Set(memberIds);
+  const kept = order.filter((id) => current.has(id));
+  const known = new Set(kept);
+  return [...kept, ...memberIds.filter((id) => !known.has(id))];
+}

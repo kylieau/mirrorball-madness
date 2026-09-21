@@ -43,9 +43,31 @@ export async function setDraftAutopilot(leagueId: string, enabled: boolean) {
   return { error: error?.message ?? null };
 }
 
-export async function undoLastAutoPick(leagueId: string) {
+export async function setMemberDraftAutopilot(
+  leagueId: string,
+  userId: string,
+  enabled: boolean
+) {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("undo_last_auto_pick", {
+  const { error } = await supabase.rpc("set_member_draft_autopilot", {
+    p_league_id: leagueId,
+    p_user_id: userId,
+    p_enabled: enabled,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function undoLastPick(leagueId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("undo_last_pick", {
+    p_league_id: leagueId,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function resetDraft(leagueId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reset_draft", {
     p_league_id: leagueId,
   });
   return { error: error?.message ?? null };

@@ -2,6 +2,34 @@
 
 ## 1. Current State
 
+**Draft safety shipped and verified live** (SQL applied by the user; 34-check
+throwaway-account script `scratch/test-draft-safety.mjs` passed). Covers: membership freeze
+while `in_progress`; `update_scoring_categories` refuses Dance Card off mid-draft (other
+edits allowed); commissioner `reset_draft` (full wipe incl. `weekly_manager_scores`,
+type-the-name dialog), `undo_last_pick` (any pick), `set_member_draft_autopilot`; lobby
+auto-saves draft order and reconciles joiners/leavers via realtime; advisory presence dots
+and a soft confirm at Start; pick confirmation dialog + "You drafted" banner; refetch on tab
+visibility/resubscribe/own pick.
+
+**Bug fixed:** `start_draft` sized rosters from all season couples, but picks need
+`status='active'`, so any draft started after an elimination could never finish. Now counts
+active couples (`supabase/apply-start-draft-active-couples.sql`, applied). Not yet re-run
+against the test script (its roster_size assertion is written but unexecuted).
+
+All drafts were reset live on 2026-09-21 (only "matt with the stars" was started; none real).
+
+`src/lib/supabase/types.ts` was hand-edited for the three new RPCs; regenerate once
+`SUPABASE_ACCESS_TOKEN` is available.
+
+**Next: Change 2, the per-manager draft queue** (plan in
+`~/.claude/plans/can-we-build-a-greedy-peach.md`): private `draft_queues` table,
+`make_auto_draft_pick` reads it before random, `draft_picks.auto_source`. Draft log says
+`auto · random` for all auto-picks until then.
+
+Unrelated, still uncommitted and not ours: `ios/.../project.pbxproj`, `scratch/`.
+
+## Previous session
+
 **Cross-league picks shipped to `main` (`c8d9fc2`), not yet clicked through in a browser.**
 Curtain Call and Grand Finale pick forms now have:
 - **Also save to…** — a collapsed "Also save to N leagues ▾" toggle above Save; opens one

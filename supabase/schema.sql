@@ -725,6 +725,10 @@ begin
     raise exception 'Invite code not found';
   end if;
 
+  if v_league.draft_status = 'in_progress' then
+    raise exception 'Draft in progress — ask the commissioner to cancel it first';
+  end if;
+
   insert into public.league_members (league_id, user_id, role)
   values (v_league.id, auth.uid(), 'manager')
   on conflict (league_id, user_id) do nothing;
@@ -748,6 +752,13 @@ as $$
 begin
   if public.is_league_commissioner(p_league_id) then
     raise exception 'Commissioners can''t leave their own league';
+  end if;
+
+  if exists (
+    select 1 from public.leagues
+    where id = p_league_id and draft_status = 'in_progress'
+  ) then
+    raise exception 'Draft in progress — ask the commissioner to cancel it first';
   end if;
 
   delete from public.league_members
@@ -777,6 +788,13 @@ begin
 
   if p_user_id = auth.uid() then
     raise exception 'Use Leave League to remove yourself';
+  end if;
+
+  if exists (
+    select 1 from public.leagues
+    where id = p_league_id and draft_status = 'in_progress'
+  ) then
+    raise exception 'Draft in progress — ask the commissioner to cancel it first';
   end if;
 
   delete from public.league_members
@@ -1080,6 +1098,15 @@ begin
     raise exception 'Only the commissioner can update scoring categories';
   end if;
 
+  -- Turning Dance Card off mid-draft would make every remaining pick fail
+  -- record_draft_pick's Dance Card check and strand the draft.
+  if not p_judges_score_category_enabled and exists (
+    select 1 from public.leagues
+    where id = p_league_id and draft_status = 'in_progress'
+  ) then
+    raise exception 'Dance Card can''t be turned off while the draft is in progress';
+  end if;
+
   update public.scoring_settings
   set
     judges_score_category_enabled = p_judges_score_category_enabled,
@@ -1258,9 +1285,12 @@ begin
     raise exception 'Draft order has not been set for all members yet';
   end if;
 
+  -- Only active couples: record_draft_pick rejects anyone else, so counting
+  -- an already-eliminated couple would size rosters for picks that can never
+  -- be made and leave the draft one pick short of complete.
   select count(*) into v_couple_count
   from public.couples
-  where season_id = public.active_season_id();
+  where season_id = public.active_season_id() and status = 'active';
   if v_member_count > v_couple_count then
     raise exception 'Not enough couples for every member to get at least one';
   end if;
@@ -1570,9 +1600,10 @@ begin
 end;
 $$;
 
--- Commissioner-only undo of the single most recent auto-pick, and only while
--- the draft is still in progress (roster_slots have not been seeded).
-create function public.undo_last_auto_pick(p_league_id uuid)
+-- Commissioner-only undo of the single most recent pick (manual or auto), and
+-- only while the draft is still in progress (roster_slots have not been
+-- seeded). Repeat to step back further.
+create function public.undo_last_pick(p_league_id uuid)
 returns void
 language plpgsql
 security definer set search_path = ''
@@ -1582,7 +1613,7 @@ declare
   v_pick public.draft_picks;
 begin
   if not public.is_league_commissioner(p_league_id) then
-    raise exception 'Only the commissioner can undo an auto-pick';
+    raise exception 'Only the commissioner can undo a pick';
   end if;
 
   select * into v_league from public.leagues where id = p_league_id for update;
@@ -1592,7 +1623,7 @@ begin
   end if;
 
   if v_league.draft_status <> 'in_progress' then
-    raise exception 'Can only undo an auto-pick while the draft is in progress';
+    raise exception 'Can only undo a pick while the draft is in progress';
   end if;
 
   select * into v_pick
@@ -1606,10 +1637,6 @@ begin
     raise exception 'No picks to undo';
   end if;
 
-  if not v_pick.is_auto then
-    raise exception 'The last pick was not an auto-pick';
-  end if;
-
   delete from public.draft_picks where id = v_pick.id;
 
   update public.leagues
@@ -1618,16 +1645,97 @@ begin
 end;
 $$;
 
+-- Commissioner-only sit-out toggle for any member, for the manager who walked
+-- away mid-draft. Same flag a manager sets on themselves via
+-- set_draft_autopilot.
+create function public.set_member_draft_autopilot(
+  p_league_id uuid,
+  p_user_id uuid,
+  p_enabled boolean
+)
+returns boolean
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  if not public.is_league_commissioner(p_league_id) then
+    raise exception 'Only the commissioner can set autopilot for another member';
+  end if;
+
+  if exists (
+    select 1 from public.leagues
+    where id = p_league_id and draft_status = 'completed'
+  ) then
+    raise exception 'Draft is already over';
+  end if;
+
+  update public.league_members
+  set draft_autopilot = p_enabled
+  where league_id = p_league_id and user_id = p_user_id;
+
+  if not found then
+    raise exception 'That person is not a member of this league';
+  end if;
+
+  return p_enabled;
+end;
+$$;
+
+-- Commissioner-only full wipe of the draft, in progress or completed. Deletes
+-- the picks, the rosters seeded from them (including waiver moves), and the
+-- weekly scores computed from those rosters, then returns the league to
+-- not_started. Keeps draft_position / draft_autopilot (one click to restart),
+-- predictions, and scoring settings — including the frozen
+-- judges_score_starts_week, a floor so a redraft can't score weeks that
+-- already aired. judges_score_multiplier re-derives at the next start_draft.
+create function public.reset_draft(p_league_id uuid)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_league public.leagues;
+begin
+  if not public.is_league_commissioner(p_league_id) then
+    raise exception 'Only the commissioner can reset the draft';
+  end if;
+
+  select * into v_league from public.leagues where id = p_league_id for update;
+
+  if not found then
+    raise exception 'League not found';
+  end if;
+
+  if v_league.draft_status = 'not_started' then
+    raise exception 'The draft has not started';
+  end if;
+
+  delete from public.weekly_manager_scores where league_id = p_league_id;
+  delete from public.waiver_claims where league_id = p_league_id;
+  delete from public.roster_slots where league_id = p_league_id;
+  delete from public.draft_picks where league_id = p_league_id;
+
+  update public.leagues
+  set draft_status = 'not_started',
+      current_turn_started_at = null
+  where id = p_league_id;
+end;
+$$;
+
 revoke execute on function public.start_draft(uuid) from public;
 revoke execute on function public.make_draft_pick(uuid, uuid) from public;
 revoke execute on function public.make_auto_draft_pick(uuid) from public;
 revoke execute on function public.set_draft_autopilot(uuid, boolean) from public;
-revoke execute on function public.undo_last_auto_pick(uuid) from public;
+revoke execute on function public.undo_last_pick(uuid) from public;
+revoke execute on function public.set_member_draft_autopilot(uuid, uuid, boolean) from public;
+revoke execute on function public.reset_draft(uuid) from public;
 grant execute on function public.start_draft(uuid) to authenticated;
 grant execute on function public.make_draft_pick(uuid, uuid) to authenticated;
 grant execute on function public.make_auto_draft_pick(uuid) to authenticated;
 grant execute on function public.set_draft_autopilot(uuid, boolean) to authenticated;
-grant execute on function public.undo_last_auto_pick(uuid) to authenticated;
+grant execute on function public.undo_last_pick(uuid) to authenticated;
+grant execute on function public.set_member_draft_autopilot(uuid, uuid, boolean) to authenticated;
+grant execute on function public.reset_draft(uuid) to authenticated;
 
 alter publication supabase_realtime add table public.leagues;
 alter publication supabase_realtime add table public.league_members;

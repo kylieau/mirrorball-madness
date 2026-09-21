@@ -4,6 +4,8 @@ import {
   eligibleRemaining,
   getPickAssignment,
   isBenignAutoPickError,
+  partitionPresence,
+  reconcileOrder,
   pickRandomEligible,
   secondsRemainingOnClock,
 } from "./draft";
@@ -132,5 +134,35 @@ describe("isBenignAutoPickError", () => {
   it("does not swallow real failures", () => {
     expect(isBenignAutoPickError("You are not a member of this league")).toBe(false);
     expect(isBenignAutoPickError(null)).toBe(false);
+  });
+});
+
+describe("partitionPresence", () => {
+  const members = [{ user_id: "a" }, { user_id: "b" }, { user_id: "c" }];
+
+  it("splits members by who is present", () => {
+    const { present, absent } = partitionPresence(members, new Set(["a", "c"]));
+    expect(present.map((m) => m.user_id)).toEqual(["a", "c"]);
+    expect(absent.map((m) => m.user_id)).toEqual(["b"]);
+  });
+
+  it("ignores present ids that are not members", () => {
+    const { present, absent } = partitionPresence(members, new Set(["a", "zzz"]));
+    expect(present).toHaveLength(1);
+    expect(absent).toHaveLength(2);
+  });
+
+  it("treats everyone as absent when nobody is present", () => {
+    expect(partitionPresence(members, new Set()).absent).toHaveLength(3);
+  });
+});
+
+describe("reconcileOrder", () => {
+  it("keeps the arrangement when membership is unchanged", () => {
+    expect(reconcileOrder(["c", "a", "b"], ["a", "b", "c"])).toEqual(["c", "a", "b"]);
+  });
+
+  it("drops leavers and appends joiners", () => {
+    expect(reconcileOrder(["c", "a", "b"], ["a", "b", "d"])).toEqual(["a", "b", "d"]);
   });
 });
