@@ -2,76 +2,85 @@
 
 ## 1. Current State
 
-**Grand Finale picker fixes — shipped on `main` at `74e8193`, nothing in flight.**
-Investigated a report that the Grand Finale list still showed already-eliminated
-couples (16 listed vs "14 left" on Curtain Call). Outcome:
-- Listing all 16 is **by design**: it's a full-order ranking of the whole cast;
-  `submit_grand_finale_prediction` requires every season couple exactly once and
-  scoring resolves each couple against its actual position.
-- The real problem was that the picker stayed editable after eliminations aired
-  (deadline = hard-deadline week, `judges_score_starts_week` = 2 in two leagues).
-- Final behaviour: picking stays open until the hard deadline; couples whose
-  elimination is already *revealed* to the viewer are pinned first and immovable,
-  so the viewer ranks only the still-competing couples.
-- Selection step redesigned: "your order so far" list on top, remaining couples in
-  a 2-column grid of full-width buttons (16 couples = 8 rows) instead of wrapped bubbles.
+**No feature in flight.** This session shipped two things and then scoped a third:
+1. **Grand Finale picker** (pushed, `74e8193`): stays open until the hard deadline;
+   couples whose elimination is already *revealed* to the viewer are pinned first
+   and immovable, so the viewer ranks only the still-competing couples. Selection
+   step is a 2-column list under a "your order so far" list. Listing all 16 couples
+   is by design (full-order ranking; the RPC requires every couple once).
+2. **Season 35 schedule** (live in the DB, file added this commit): Weeks 3-11 with
+   themes and air times. The stray "test" Week 3 was *retitled* Yacht Rock Night,
+   not deleted (the user had already edited its date to Sep 29).
+3. **Site Admin visibility** (scoped only, deliberately not started): the user wants
+   to move some Site Admin pages into public view and asked to do it in a new session.
 
 ## 2. Changes Made
 
-`git diff --stat 9fe610b HEAD` (this session's commit `74e8193`):
-- `src/components/grand-finale-box.tsx` — pinning wired in, 2-column selection grid
+`git diff --stat 9fe610b HEAD` (session start to `eecc627`):
+- `src/components/grand-finale-box.tsx` — pinning + 2-column selection grid
 - `src/lib/grand-finale-pins.ts` — **new**: `pinnedEliminatedIds`, `pinEliminatedFirst`
 - `src/lib/grand-finale-pins.test.ts` — **new**, 4 tests
 - `supabase/revert-grand-finale-lock.sql` — **new**: restores the original
   `effective_grand_finale_deadline` (already run by the user)
-- `CLAUDE.md` — Grand Finale bullet describes pinning (not a lock)
+- `CLAUDE.md` — Grand Finale bullet describes pinning
+- `MEMORY_HANDOFF.md` — this file
+
+Added in this commit: `supabase/apply-season-35-schedule.sql` (already run live;
+Weeks 1-11 verified by read-only query).
 
 Uncommitted and not ours: `ios/App/App.xcodeproj/project.pbxproj`, `scratch/`.
 
 ## 3. Key Decisions & Lessons Learned
 
-- **A lock was built, run live, then reversed.** The user first chose "lock at
-  first reveal", I shipped it as SQL, they ran it, then decided Grand Finale
-  *shouldn't* lock and chose "stay open, pin eliminated couples". Don't reintroduce
-  an elimination-based lock. `schema.sql` never kept it (reverted); the live DB was
-  restored via `revert-grand-finale-lock.sql`.
-- **Pinning is UI-only.** The RPC can't enforce it without knowing each viewer's
-  spoiler progress, so a direct API call can still move a pinned couple. Unrevealed
-  eliminations are deliberately not pinned (spoiler safety, via `spoilerSafeCoupleStatus`).
-- **Same-week eliminations** are pinned in name order; scoring gives both the same
-  actual position, so points are unaffected.
-- **Eliminated status is only shown on the saved/locked summary**, never in the
-  select step — "preview doesn't show eliminated couples" is expected, not a bug.
-- **Service role cannot call `effective_grand_finale_deadline`** (revoked from public,
-  granted to `authenticated` only) — verify deadline logic from the underlying tables
-  or a signed-in session, not by RPC with the service key.
-- **A parallel session swept my uncommitted `CLAUDE.md` edit into its commit
-  `c2da7d7`.** Stage by name; check `git log -- <file>` if a diff looks odd.
-- **Don't `npm run build` while `next dev` listens on :3000** — use `tsc --noEmit`,
+- **A Grand Finale lock was built, run live, then reversed.** The user first chose
+  "lock at first reveal", then decided it shouldn't lock and chose "stay open, pin
+  eliminated couples". Don't reintroduce an elimination-based lock.
+- **Pinning is UI-only.** The RPC can't enforce it without per-viewer spoiler
+  progress. Unrevealed eliminations are deliberately not pinned (spoiler safety, via
+  `spoilerSafeCoupleStatus`). Same-week eliminations pin in name order.
+- **Eliminated status only appears on the saved/locked GF summary**, never in the
+  select step, so "preview doesn't show eliminated couples" is expected.
+- **Service role can't call `effective_grand_finale_deadline`** (granted to
+  `authenticated` only). Verify from tables or a signed-in session.
+- **Schedule conventions:** shows air Tuesday 8pm ET = 00:00 UTC next day (01:00 UTC
+  after DST ends Nov 1); an episode's `theme` mirrors its week's `theme`.
+- **Re-read live data before acting on an earlier read.** Episode 4's date changed
+  between my two reads (the user edited it), which made a planned delete wrong.
+- **Spoiler-Free callout** = the gold Home banner + auto-opening "Mark as watched"
+  dialog (`spoiler-reveal-callout.tsx`) shown when a completed week is unwatched.
+- **Plan mode:** the user rejects `ExitPlanMode` when they don't want to proceed in
+  that session; treat that as "stop", and restore any plan file you overwrote.
+- **A parallel session shares this tree** (it swept one of my `CLAUDE.md` edits into
+  its commit). Stage by name; never `git add -A`.
+- **Don't `npm run build` while `next dev` listens on :3000.** Use `tsc --noEmit`,
   eslint and `npm test`.
-- **Live DB writes are blocked from this container** — hand over plain `.sql` files
-  for the Supabase SQL Editor, verify with read-only service-role `.mjs` scripts run
+- **Live DB writes are blocked from this container.** Hand over plain `.sql` files
+  for the Supabase SQL Editor; verify with read-only service-role `.mjs` scripts run
   from the project root with `NODE_OPTIONS="--experimental-websocket"`.
 
 ## 4. Backlog & Deferred Items
 
-- The new selection layout and pinning have **not been eyeballed in a browser**
-  (only typecheck, lint, 232 tests). Check phone width: 2 columns, long "A & B"
-  names wrap, pinned rows show no arrows, "Edit order" re-pins a stale saved ranking.
-- Optional hardening: server-side pin enforcement would need per-user spoiler
-  progress in the DB; currently deferred.
-- Episode 4 in live data has placeholder theme "test" (`airs_at` 2026-09-21) in its
-  own week — likely leftover test data; check before it becomes the live week.
-- Still owed from earlier sessions: eyeball quieter deadline stubs and Spoiler-Free
-  callout on `/today`; browser click-through of Settings Placement Bonus fields and a
-  live Curtain Call pick; re-run the Monte Carlo calibration against real Season 35
-  data (`scripts/monte-carlo-calibration/README.md`); `dance_card_calibration`
-  clamp path (roster size outside 1-6) never exercised live.
+- **Site Admin visibility** (next task). Current state: `/admin/results` (Enter /
+  View / Schedule / Settings tabs) opens to any signed-in user when
+  `RESULTS_ENTRY_OPEN_TO_ALL=true` but is linked only from `SiteAdminNav`
+  (super-admin only, in Settings). `/admin/accounts` is strictly super-admin. All
+  results writes use the service-role client and affect every league.
+- **Assumed schedule dates** (not given by the user, editable on Admin > Schedule):
+  Week 5 Oct 13, Week 10 (Semi-Finals) Nov 17, Week 11 (Finale) Nov 24. Week 5 has
+  no theme (TBA).
+- Spoiler-Free callout on `/today` still to be confirmed by the user.
+- Server-side pin enforcement for Grand Finale is deferred.
+- Older items: Monte Carlo re-run against real Season 35 data once more weeks exist
+  (`scripts/monte-carlo-calibration/README.md`); `dance_card_calibration` clamp path
+  (roster size outside 1-6) never exercised live.
 
 ## 5. Next Steps
 
-1. Run `git status` and `git fetch && git log HEAD..origin/main` first — a parallel
-   session shares this tree.
-2. Load a league's Picks tab with Grand Finale on and click through the select →
-   reorder → save flow at phone width (backlog item 1). Fix any layout issue found.
-3. Otherwise wait for the next request.
+1. Run `git status` and `git fetch && git log HEAD..origin/main` first.
+2. Decide the Site Admin scope with the user. My recommendation: a **read-only
+   public Schedule** (episodes by week, themes, air times) linked from the Home
+   episode banner, not under `/admin`. Skip a public View Results (duplicates
+   `/this-week`, would need `resolveSpoilerCutoff`). Keep Accounts, the Settings tab
+   and Enter/Publish Results gated; later replace `RESULTS_ENTRY_OPEN_TO_ALL` with a
+   per-person "results editor" flag on `profiles` (a column users can't write, per
+   the column-grant rule in `CLAUDE.md`).
