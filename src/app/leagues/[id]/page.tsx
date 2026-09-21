@@ -689,10 +689,7 @@ export default async function LeaguePage({
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {message && <p className="text-sm text-muted-foreground">{message}</p>}
-
+    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-8">
       <LeagueHeader
         leagueId={id}
         inviteCode={league.invite_code}
@@ -705,6 +702,9 @@ export default async function LeaguePage({
         accountSettingsData={accountSettingsData}
         viewerEmail={user.email ?? ""}
       />
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {message && <p className="text-sm text-muted-foreground">{message}</p>}
 
       <LeagueTabs
         leagueId={id}

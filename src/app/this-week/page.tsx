@@ -4,6 +4,7 @@ import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
 import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
 import { PageHeader } from "@/components/page-header";
+import { StickyPageHeader } from "@/components/sticky-page-header";
 import { TopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
@@ -186,11 +187,10 @@ export default async function ThisWeekPage({
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
-      <TopBar {...accountSettingsData} email={user.email ?? ""} />
-
-      <div className={BOTTOM_NAV_CLEARANCE}>
-        <PageHeader title="Results">
+    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-8">
+      <StickyPageHeader>
+        <TopBar {...accountSettingsData} email={user.email ?? ""} />
+        <PageHeader flush title="Results">
           {selectedWeek && (
             <EpisodeCarousel
               weekNumber={selectedWeek.week_number}
@@ -201,6 +201,9 @@ export default async function ThisWeekPage({
             />
           )}
         </PageHeader>
+      </StickyPageHeader>
+
+      <div className={BOTTOM_NAV_CLEARANCE}>
         {selectedMode === "peek" && selectedWeek ? (
           <div>
             {pendingReveal && (

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeagueSwitcher, type SwitcherLeague } from "@/components/league-switcher";
 import { PageHeader } from "@/components/page-header";
+import { StickyPageHeader } from "@/components/sticky-page-header";
 import { TopBar } from "@/components/top-bar";
 import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
@@ -40,30 +41,35 @@ export function LeagueHeader({
   const leagueSettingsHref = `/leagues/${leagueId}/settings?from=${encodeURIComponent(currentPath)}`;
 
   return (
-    <div>
-      <TopBar
-        {...accountSettingsData}
-        email={viewerEmail}
-        actionSlot={
-          danceCardOn &&
-          waiversOn && (
-            <Button
-              render={<Link href={`/leagues/${leagueId}/waivers`} />}
-              nativeButton={false}
-              variant="outline"
-              size="sm"
-            >
-              Recast
-            </Button>
-          )
-        }
-      />
-
-      <PageHeader title={title}>
-        {switcherLeagues.length > 1 && (
-          <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
-        )}
-      </PageHeader>
+    <>
+      <StickyPageHeader>
+        <TopBar
+          {...accountSettingsData}
+          email={viewerEmail}
+          actionSlot={
+            danceCardOn &&
+            waiversOn && (
+              <Button
+                render={<Link href={`/leagues/${leagueId}/waivers`} />}
+                nativeButton={false}
+                variant="outline"
+                size="sm"
+              >
+                Recast
+              </Button>
+            )
+          }
+        />
+        <PageHeader
+          flush
+          title={title}
+          aside={
+            switcherLeagues.length > 1 && (
+              <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
+            )
+          }
+        />
+      </StickyPageHeader>
 
       {justCreated && canEdit && (
         <Card className="border-primary">
@@ -93,6 +99,6 @@ export function LeagueHeader({
           </CardContent>
         </Card>
       )}
-    </div>
+    </>
   );
 }

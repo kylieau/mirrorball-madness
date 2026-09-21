@@ -119,7 +119,7 @@ export function EpisodeBanner({ state, weeksDone }: { state: EpisodeBannerState;
         </div>
       </div>
 
-      <div className="sticky top-0 z-30 h-0" aria-hidden>
+      <div className="sticky top-[var(--sticky-header-h,0px)] z-30 h-0" aria-hidden>
         <div
           className={cn(
             "absolute inset-x-0 top-0 overflow-hidden rounded-b-xl border-b-2 border-primary shadow-[0_8px_18px_rgba(0,0,0,0.5)] transition duration-200 motion-reduce:transition-none",

@@ -14,7 +14,7 @@ export type SwitcherLeague = {
   picksDue: boolean;
 };
 
-// Lives in the switcher slot under the page title (Your Picks / Standings
+// Lives beside the page title (Your Picks / Standings
 // only — the caller decides whether to render this at all). Nothing to
 // switch to with just one league, so it renders nothing rather than a dead
 // chip.
@@ -33,9 +33,9 @@ export function LeagueSwitcher({
 
   return (
     <Sheet>
-      <SheetTrigger className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-        {current?.name}
-        <ChevronDownIcon className="size-3.5 text-accent" aria-hidden />
+      <SheetTrigger className="flex max-w-full items-center gap-1.5 text-sm font-medium text-muted-foreground">
+        <span className="truncate">{current?.name}</span>
+        <ChevronDownIcon className="size-3.5 shrink-0 text-accent" aria-hidden />
       </SheetTrigger>
       <SheetContent side="top" showCloseButton={false} className="mx-auto max-w-md rounded-b-2xl border-x">
         <SheetHeader>

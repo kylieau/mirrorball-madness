@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { HomeDashboard } from "@/components/home-dashboard";
 import { PageHeader } from "@/components/page-header";
+import { StickyPageHeader } from "@/components/sticky-page-header";
 import { TopBar } from "@/components/top-bar";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
@@ -167,11 +168,13 @@ export default async function TodayPage() {
   ].slice(0, 3);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
-      <TopBar {...accountSettingsData} email={user.email ?? ""} />
+    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-8">
+      <StickyPageHeader>
+        <TopBar {...accountSettingsData} email={user.email ?? ""} />
+        <PageHeader flush title="Home" />
+      </StickyPageHeader>
 
       <div className={BOTTOM_NAV_CLEARANCE}>
-        <PageHeader title="Home" />
         <HomeDashboard
           leagues={leagues}
           deadlines={deadlines}
