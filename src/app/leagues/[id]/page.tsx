@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -22,12 +23,18 @@ import { LeagueTabs } from "@/components/league-tabs";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { getStandingMessage } from "@/lib/standings-message";
 import { getPickAssignment } from "@/lib/draft";
-import { clampRosterCoupleForWeek, computeCoupleWeeklyPoints } from "@/lib/roster-weekly-points";
+import { clampRosterCoupleForWeek } from "@/lib/roster-weekly-points";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { partitionRecastSlots } from "@/lib/recast-framing";
+import { LeagueRostersCard } from "@/components/league-rosters-card";
+import { scoringModule, type ScoringModuleKey } from "@/lib/scoring-modules";
+import { EpisodeCarousel } from "@/components/episode-carousel";
+import { adjacentThisWeekWeeks, rosterWeekHref } from "@/lib/this-week-carousel";
+import { buildLeagueRosters, orderManagersForRosters } from "@/lib/league-rosters";
+import { judgePointsThroughWeek, slotActiveInWeek } from "@/lib/roster-couple-points";
 import {
   buildCurtainCallWeeks,
   buildPastPicksComparison,
@@ -40,10 +47,10 @@ export default async function LeaguePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; message?: string; justCreated?: string; week?: string; tab?: string }>;
+  searchParams: Promise<{ error?: string; message?: string; justCreated?: string; week?: string; rosterWeek?: string; tab?: string }>;
 }) {
   const { id } = await params;
-  const { error, message, justCreated, week: weekParam, tab } = await searchParams;
+  const { error, message, justCreated, week: weekParam, rosterWeek: rosterWeekParam, tab } = await searchParams;
   const activeTab = tab === "standings" ? "standings" : "picks";
   const supabase = await createClient();
 
@@ -401,70 +408,135 @@ export default async function LeaguePage({
 
   const categoryBreakdown = (
     [
-      danceCardOn && {
-        label: "Dance Card",
-        points: Math.round(
-          (rosterPointsByManager.get(user.id) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
-        ),
-      },
       curtainCallOn && {
-        label: "Curtain Call",
+        label: scoringModule("curtainCall").name,
         points: Math.round(
           (predictionPointsByManager.get(user.id) ?? 0) * (scoringSettings?.eliminations_category_weight ?? 1)
         ),
       },
+      danceCardOn && {
+        label: scoringModule("danceCard").name,
+        points: Math.round(
+          (rosterPointsByManager.get(user.id) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
+        ),
+      },
       grandFinaleOn && {
-        label: "Grand Finale",
+        label: scoringModule("grandFinale").name,
         points: Math.round(
           (grandFinalePointsByManager.get(user.id) ?? 0) * (scoringSettings?.bonus_picks_category_weight ?? 1)
         ),
       },
-    ] as const
-  ).filter((c): c is { label: string; points: number } => !!c);
+    ]
+  ).filter((c) => c !== false);
 
-  const rosterCoupleIds = (rosterSlots ?? [])
-    .map((r) => r.couple_id)
-    .filter((cid): cid is string => !!cid);
+  // Everyone's current roster is public once the draft is done — the standings
+  // are read through who holds which couples.
+  const showLeagueRosters = danceCardOn && league.draft_status === "completed";
+  const { data: allLeagueSlots } = showLeagueRosters
+    ? await supabase
+        .from("roster_slots")
+        .select("manager_id, couple_id, start_week, end_week")
+        .eq("league_id", id)
+        .order("slot_number")
+    : { data: [] as { manager_id: string; couple_id: string | null; start_week: number; end_week: number | null }[] };
+  const leagueSlotPeriods = (allLeagueSlots ?? [])
+    .filter((r): r is typeof r & { couple_id: string } => !!r.couple_id)
+    .map((r) => ({ managerId: r.manager_id, coupleId: r.couple_id, startWeek: r.start_week, endWeek: r.end_week }));
 
-  const { data: rosterDanceScores } =
-    (cutoff.effectiveLatestEpisode?.episodeIds.length ?? 0) > 0 && rosterCoupleIds.length > 0
+  // Flipping model shared with Curtain Call: visible completed weeks only,
+  // latest by default. With none yet, roster views show who holds what now,
+  // with no points.
+  const visibleDanceWeeks = [...completedEpisodes]
+    .filter((w) => cutoff.allowedEpisodeIds.has(w.id))
+    .sort((a, b) => a.week_number - b.week_number);
+  const latestVisibleDanceWeek = visibleDanceWeeks[visibleDanceWeeks.length - 1] ?? null;
+  const yourRosterWeek =
+    visibleDanceWeeks.find((w) => w.id === rosterWeekParam) ?? latestVisibleDanceWeek;
+
+  const episodeWeekNumber = new Map<string, number>();
+  for (const week of groupedWeeks) {
+    if (!cutoff.allowedEpisodeIds.has(week.id)) continue;
+    for (const episode of week.episodes) episodeWeekNumber.set(episode.id, week.week_number);
+  }
+  const { data: leagueDanceScores } =
+    leagueSlotPeriods.length > 0 && episodeWeekNumber.size > 0
       ? await supabase
           .from("dance_scores")
-          .select("couple_id, total_score")
-          .in("episode_id", cutoff.effectiveLatestEpisode!.episodeIds)
-          .in("couple_id", rosterCoupleIds)
-      : { data: [] as { couple_id: string; total_score: number }[] };
+          .select("couple_id, episode_id, total_score")
+          .in("episode_id", [...episodeWeekNumber.keys()])
+          .in("couple_id", [...new Set(leagueSlotPeriods.map((slot) => slot.coupleId))])
+      : { data: [] as { couple_id: string; episode_id: string; total_score: number }[] };
+  const judgePointsInputs = {
+    scores: (leagueDanceScores ?? []).map((row) => ({
+      coupleId: row.couple_id,
+      weekNumber: episodeWeekNumber.get(row.episode_id) ?? 0,
+      totalScore: row.total_score,
+    })),
+    judgesScoreStartsWeek: scoringSettings?.judges_score_starts_week ?? 1,
+    multiplier: scoringSettings?.judges_score_multiplier ?? 1,
+    categoryWeight: scoringSettings?.judges_score_category_weight ?? 1,
+  };
+  const flatCouplesById = new Map(flatCouples.map((c) => [c.id, c]));
 
-  // A couple can dance more than once in a night (e.g. a finale), so their
-  // week's judges' score is the sum across every dance_scores row, same as
-  // This Week sums per couple.
-  const weeklyScoreByCouple = new Map<string, number>();
-  for (const row of rosterDanceScores ?? []) {
-    weeklyScoreByCouple.set(row.couple_id, (weeklyScoreByCouple.get(row.couple_id) ?? 0) + row.total_score);
-  }
+  // Your Picks → Your roster: the viewer's roster as it stood in the selected
+  // week (so a Recast swap reads correctly), that week's points per couple
+  // and a running total.
+  const yourSlotsForWeek = leagueSlotPeriods.filter(
+    (slot) =>
+      slot.managerId === user.id &&
+      (yourRosterWeek ? slotActiveInWeek(slot, yourRosterWeek.week_number) : slot.endWeek === null)
+  );
+  const yourRosterPoints = yourRosterWeek
+    ? judgePointsThroughWeek({ ...judgePointsInputs, slots: yourSlotsForWeek, week: yourRosterWeek.week_number })
+    : undefined;
+  const rosterCouples = yourSlotsForWeek.flatMap((slot) => {
+    const couple = flatCouplesById.get(slot.coupleId);
+    if (!couple) return [];
+    const points = yourRosterPoints?.get(slot.coupleId);
+    const names = allDisplayNames.get(slot.coupleId) ?? { celebrity: couple.celebrity_name, pro: couple.pro_name };
+    const clamped = clampRosterCoupleForWeek(
+      { status: couple.status, eliminationWeek: couple.elimination_week },
+      {
+        cutoffWeek: yourRosterWeek?.week_number ?? null,
+        finaleWeekNumber,
+        weekNumber: yourRosterWeek?.week_number ?? null,
+        rawWeeklyPoints: points?.week ?? 0,
+      }
+    );
+    return [{ ...names, coupleId: slot.coupleId, ...clamped, totalPoints: points?.total }];
+  });
+  const yourRosterNeighbors = yourRosterWeek
+    ? adjacentThisWeekWeeks(visibleDanceWeeks, yourRosterWeek.id)
+    : { prev: null, next: null };
 
-  const rosterCouples = (rosterSlots ?? [])
-    .filter((r) => r.couples)
-    .map((r) => {
-      const names = allDisplayNames.get(r.couple_id!) ?? {
-        celebrity: r.couples!.celebrity?.name ?? "Unknown",
-        pro: r.couples!.pro?.name ?? "Unknown",
-      };
-      const clamped = clampRosterCoupleForWeek(
-        { status: r.couples!.status, eliminationWeek: r.couples!.elimination_week },
-        {
-          cutoffWeek: latestCompletedWeek,
-          finaleWeekNumber,
-          weekNumber: latestCompletedWeek,
-          rawWeeklyPoints: computeCoupleWeeklyPoints(
-            weeklyScoreByCouple.get(r.couple_id!) ?? 0,
-            scoringSettings?.judges_score_multiplier ?? 1,
-            scoringSettings?.judges_score_category_weight ?? 1
-          ),
-        }
-      );
-      return { ...names, coupleId: r.couple_id!, ...clamped };
-    });
+  // Standings → Dance Cards: everyone's current roster with season totals.
+  const currentSlotPeriods = leagueSlotPeriods.filter((slot) => slot.endWeek === null);
+  const seasonPointsByCouple = latestVisibleDanceWeek
+    ? judgePointsThroughWeek({
+        ...judgePointsInputs,
+        slots: currentSlotPeriods,
+        week: latestVisibleDanceWeek.week_number,
+      })
+    : undefined;
+  const leagueRosters = showLeagueRosters
+    ? buildLeagueRosters({
+        managers: orderManagersForRosters(standings, user.id),
+        slots: currentSlotPeriods,
+        couples: flatCouples
+          .filter((c) => c.season_id === activeSeasonId)
+          .map((c) => ({
+            id: c.id,
+            status: c.status,
+            eliminationWeek: c.elimination_week,
+            names: allDisplayNames.get(c.id) ?? { celebrity: c.celebrity_name, pro: c.pro_name },
+          })),
+        viewerId: user.id,
+        asOfWeek: latestVisibleDanceWeek?.week_number,
+        pointsByCoupleId: seasonPointsByCouple
+          ? new Map([...seasonPointsByCouple].map(([coupleId, p]) => [coupleId, { total: p.total }]))
+          : undefined,
+      })
+    : null;
 
   const recastSlotSource = (rosterSlots ?? [])
     .filter((s) => s.couples)
@@ -641,9 +713,10 @@ export default async function LeaguePage({
           <div className="flex flex-col gap-6">
             {curtainCallOn && (
               <div className="flex flex-col gap-3">
-                {showSectionLabels && <SectionLabel icon="🔮" label="Curtain Call" first />}
+                {showSectionLabels && <SectionLabel module="curtainCall" first />}
                 <CurtainCallCard
                   leagueId={id}
+                  rosterWeekId={rosterWeekParam}
                   episode={
                     curtainCallEpisode
                       ? {
@@ -655,6 +728,11 @@ export default async function LeaguePage({
                       : null
                   }
                   weeks={curtainCallWeeks}
+                  invite={
+                    curtainCallMode === "picks" && !isLocked
+                      ? "Who's taking their final bow, and who's stealing the show? Make your call before the curtain rises."
+                      : undefined
+                  }
                 >
                   {curtainCallMode === "picks" && upcomingEpisode ? (
                     <PickEmBox
@@ -685,7 +763,7 @@ export default async function LeaguePage({
             )}
             {danceCardOn && (
               <div className="flex flex-col gap-3">
-                {showSectionLabels && <SectionLabel icon="🪩" label="Dance Card" first={!curtainCallOn} />}
+                {showSectionLabels && <SectionLabel module="danceCard" first={!curtainCallOn} />}
                 <DraftStatusCard
                   leagueId={id}
                   draftStatus={league.draft_status}
@@ -700,7 +778,29 @@ export default async function LeaguePage({
                   onTheClockAutopilot={onTheClockAutopilot}
                 />
                 {rosterCouples.length > 0 && (
-                  <RosterCard couples={rosterCouples} totalPoints={pointsByManager.get(user.id) ?? 0} />
+                  <RosterCard
+                    couples={rosterCouples}
+                    totalPoints={pointsByManager.get(user.id) ?? 0}
+                    carousel={
+                      yourRosterWeek ? (
+                        <EpisodeCarousel
+                          weekNumber={yourRosterWeek.week_number}
+                          theme={yourRosterWeek.theme}
+                          nightsLabel={yourRosterWeek.nightsLabel}
+                          prevHref={
+                            yourRosterNeighbors.prev
+                              ? rosterWeekHref(id, yourRosterNeighbors.prev.id, weekParam)
+                              : null
+                          }
+                          nextHref={
+                            yourRosterNeighbors.next
+                              ? rosterWeekHref(id, yourRosterNeighbors.next.id, weekParam)
+                              : null
+                          }
+                        />
+                      ) : undefined
+                    }
+                  />
                 )}
                 {waiversOn && (
                   <RecastNudgeCard
@@ -715,12 +815,20 @@ export default async function LeaguePage({
                     totalManagers={standings.length}
                   />
                 )}
+                {showLeagueRosters && (
+                  <Link
+                    href={`/leagues/${id}?tab=standings#rosters`}
+                    className="text-sm font-medium text-accent hover:underline"
+                  >
+                    See Everyone&apos;s Dance Cards →
+                  </Link>
+                )}
               </div>
             )}
             {grandFinaleOn && (
               <div className="flex flex-col gap-3">
                 {showSectionLabels && (
-                  <SectionLabel icon="🏆" label="Grand Finale" first={!curtainCallOn && !danceCardOn} />
+                  <SectionLabel module="grandFinale" first={!curtainCallOn && !danceCardOn} />
                 )}
                 <GrandFinaleBox
                   leagueId={id}
@@ -763,6 +871,16 @@ export default async function LeaguePage({
               curtainCallOn={curtainCallOn}
               grandFinaleOn={grandFinaleOn}
             />
+            {leagueRosters && (
+              <div id="rosters" className="mt-6 scroll-mt-4">
+                <LeagueRostersCard
+                  description="Where every couple ended up."
+                  unrosteredLabel="Not on a roster"
+                  note="Points are judges' scores only. Survival and placement bonuses count toward manager totals, not couples."
+                  {...leagueRosters}
+                />
+              </div>
+            )}
           </div>
         }
       />
@@ -774,7 +892,8 @@ export default async function LeaguePage({
 // single-module league has nothing to disambiguate, so it skips straight
 // to its one card. `first` drops the divider a later section gets, since
 // nothing above it needs separating from.
-function SectionLabel({ icon, label, first }: { icon: string; label: string; first?: boolean }) {
+function SectionLabel({ module, first }: { module: ScoringModuleKey; first?: boolean }) {
+  const { icon, name } = scoringModule(module);
   return (
     <div
       className={
@@ -784,7 +903,7 @@ function SectionLabel({ icon, label, first }: { icon: string; label: string; fir
       }
     >
       <span>{icon}</span>
-      {label}
+      {name}
     </div>
   );
 }

@@ -42,7 +42,7 @@ export function DraftQueueCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your auto-pick queue</CardTitle>
+        <CardTitle>Your Auto-Pick Queue</CardTitle>
         <CardDescription>
           Ranked wishlist only you can see. If you&apos;re on autopilot or your clock runs
           out, you get your highest-ranked couple that&apos;s still available; if your

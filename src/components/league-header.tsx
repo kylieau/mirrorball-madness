@@ -75,7 +75,7 @@ export function LeagueHeader({
             <div className="flex items-center justify-between gap-4">
               <span className="font-mono text-2xl font-bold tracking-widest">{inviteCode}</span>
               <Button render={<Link href={leagueSettingsHref} />} nativeButton={false} size="sm">
-                Set league rules
+                Set League Rules
               </Button>
             </div>
             <CopyInviteLinkButton inviteCode={inviteCode} />

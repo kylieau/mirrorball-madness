@@ -79,7 +79,7 @@ export function RecastNudgeCard({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SheetTrigger render={<Button size="sm" />}>Browse recast pool</SheetTrigger>
+          <SheetTrigger render={<Button size="sm" />}>Browse Recast Pool</SheetTrigger>
         </CardContent>
       </Card>
 
@@ -127,7 +127,7 @@ export function RecastNudgeCard({
             <p className="text-sm text-muted-foreground">
               You have {openSlots.length} open slots — head to the full{" "}
               <Link href={`/leagues/${leagueId}/waivers`} className="font-medium underline">
-                Recast page
+                Recast Page
               </Link>{" "}
               to fill each one.
             </p>

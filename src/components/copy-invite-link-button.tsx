@@ -28,7 +28,7 @@ export function CopyInviteLinkButton({
         </>
       ) : (
         <>
-          <CopyIcon className="size-4" /> Copy invite link
+          <CopyIcon className="size-4" /> Copy Invite Link
         </>
       )}
     </Button>

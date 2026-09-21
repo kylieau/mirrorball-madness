@@ -5,7 +5,7 @@
 // in-flow gold banner stays after dismiss so Home still has a CTA that
 // isn't another stub. Both "Mark as watched" actions actually advance
 // last_watched_week, then land on This Week so the newly revealed episode
-// is the one on screen. "Not yet" only closes the modal.
+// is the one on screen. "Not Yet" only closes the modal.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -100,7 +100,7 @@ export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
               {pending ? "Marking as watched..." : "Mark as watched"}
             </Button>
             <DialogClose render={<Button variant="ghost" className="w-full" disabled={pending} />}>
-              Not yet
+              Not Yet
             </DialogClose>
           </DialogFooter>
         </DialogContent>

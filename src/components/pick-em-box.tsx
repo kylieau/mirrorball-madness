@@ -310,17 +310,17 @@ export function PickEmBox({
                     ) : eliminatedId ? (
                       nameFor(eliminatedId)
                     ) : (
-                      "No pick"
+                      "No Pick"
                     )}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Top scorer</span>
-                  <span className="font-medium">{topScorerId ? nameFor(topScorerId) : "No pick"}</span>
+                  <span className="text-muted-foreground">Top Scorer</span>
+                  <span className="font-medium">{topScorerId ? nameFor(topScorerId) : "No Pick"}</span>
                 </div>
               </div>
               <Button variant="outline" size="sm" className="self-start" onClick={() => setEditing(true)}>
-                Edit picks
+                Edit Picks
               </Button>
             </div>
           )

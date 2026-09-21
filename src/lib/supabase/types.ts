@@ -1204,6 +1204,7 @@ export type Database = {
           bonus_picks_scoring_method: string | null
           bonus_picks_second_place_points: number
           bonus_picks_third_place_points: number
+          bonus_picks_tier_pay_style: string
           bonus_picks_tier_size: number | null
           elimination_prediction_points: number
           eliminations_category_enabled: boolean
@@ -1234,6 +1235,7 @@ export type Database = {
           bonus_picks_scoring_method?: string | null
           bonus_picks_second_place_points?: number
           bonus_picks_third_place_points?: number
+          bonus_picks_tier_pay_style?: string
           bonus_picks_tier_size?: number | null
           elimination_prediction_points?: number
           eliminations_category_enabled?: boolean
@@ -1264,6 +1266,7 @@ export type Database = {
           bonus_picks_scoring_method?: string | null
           bonus_picks_second_place_points?: number
           bonus_picks_third_place_points?: number
+          bonus_picks_tier_pay_style?: string
           bonus_picks_tier_size?: number | null
           elimination_prediction_points?: number
           eliminations_category_enabled?: boolean
@@ -1607,6 +1610,7 @@ export type Database = {
       make_auto_draft_pick: {
         Args: { p_league_id: string }
         Returns: {
+          auto_source: string | null
           couple_id: string
           id: string
           is_auto: boolean
@@ -1626,6 +1630,7 @@ export type Database = {
       make_draft_pick: {
         Args: { p_couple_id: string; p_league_id: string }
         Returns: {
+          auto_source: string | null
           couple_id: string
           id: string
           is_auto: boolean
@@ -1666,6 +1671,7 @@ export type Database = {
           p_manager_id: string
         }
         Returns: {
+          auto_source: string | null
           couple_id: string
           id: string
           is_auto: boolean
@@ -1888,6 +1894,7 @@ export type Database = {
           p_bonus_picks_scoring_method: string
           p_bonus_picks_second_place_points: number
           p_bonus_picks_third_place_points: number
+          p_bonus_picks_tier_pay_style: string
           p_bonus_picks_tier_size: number
           p_elimination_prediction_points: number
           p_eliminations_category_enabled: boolean
@@ -1916,6 +1923,7 @@ export type Database = {
           bonus_picks_scoring_method: string | null
           bonus_picks_second_place_points: number
           bonus_picks_third_place_points: number
+          bonus_picks_tier_pay_style: string
           bonus_picks_tier_size: number | null
           elimination_prediction_points: number
           eliminations_category_enabled: boolean

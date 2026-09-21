@@ -45,7 +45,10 @@ import { CoupleName } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 import { useDebouncedSave } from "@/lib/use-debounced-save";
 import { DraftManagersCard, PresenceDot } from "@/components/draft-managers-card";
+import { DraftAwayNote } from "@/components/draft-away-note";
 import { DraftQueueCard } from "@/components/draft-queue-card";
+import { LeagueRostersCard } from "@/components/league-rosters-card";
+import { buildLeagueRosters, orderManagersForRosters } from "@/lib/league-rosters";
 import { ResetDraftDialog } from "@/components/reset-draft-dialog";
 import { XIcon } from "lucide-react";
 
@@ -65,8 +68,6 @@ type DraftPick = {
   round: number;
   pick_number: number;
   picked_at: string;
-  is_auto: boolean;
-  auto_source: string | null;
 };
 
 function AutopilotToggle({
@@ -83,7 +84,7 @@ function AutopilotToggle({
   return (
     <div className="flex w-full items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-left">
       <div>
-        <p className="text-sm font-medium">Sit out / autopilot</p>
+        <p className="text-sm font-medium">Sit Out / Autopilot</p>
         <p className="text-xs text-muted-foreground">
           Auto-picks from your queue, then random, for the rest of this draft
         </p>
@@ -140,7 +141,7 @@ export function DraftRoom({
         .order("draft_position"),
       supabase
         .from("draft_picks")
-        .select("id, couple_id, manager_id, round, pick_number, picked_at, is_auto, auto_source")
+        .select("id, couple_id, manager_id, round, pick_number, picked_at")
         .eq("league_id", league.id)
         .order("pick_number"),
       supabase.from("leagues").select("*").eq("id", league.id).single(),
@@ -148,7 +149,7 @@ export function DraftRoom({
     if (membersData) {
       setMembers(membersData.map((m) => ({ ...m, draft_autopilot: m.draft_autopilot ?? false })));
     }
-    if (picksData) setPicks(picksData.map((p) => ({ ...p, is_auto: p.is_auto ?? false })));
+    if (picksData) setPicks(picksData);
     if (leagueData) setLeague(leagueData);
   }, [league.id]);
 
@@ -172,7 +173,7 @@ export function DraftRoom({
           setPicks((prev) =>
             prev.some((p) => p.id === newPick.id)
               ? prev
-              : [...prev, { ...newPick, is_auto: newPick.is_auto ?? false }].sort(
+              : [...prev, newPick].sort(
                   (a, b) => a.pick_number - b.pick_number
                 )
           );
@@ -503,6 +504,7 @@ export function DraftRoom({
             Scheduled for {formattedScheduledAt || "…"}
           </p>
         )}
+        <DraftAwayNote pickTimeLimitSeconds={league.pick_time_limit_seconds} />
         {error && <p className="text-sm text-destructive">{error}</p>}
         {isCommissioner ? (
           <>
@@ -560,7 +562,7 @@ export function DraftRoom({
               }}
               disabled={members.length < 2 || savingOrder}
             >
-              Start draft
+              Start Draft
             </Button>
             {members.length < 2 && (
               <p className="text-xs text-muted-foreground">
@@ -602,10 +604,6 @@ export function DraftRoom({
   }
 
   if (league.draft_status === "completed") {
-    const myPicks = picks
-      .filter((p) => p.manager_id === currentUserId)
-      .sort((a, b) => a.round - b.round);
-
     return (
       <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-16">
         <div className="text-center">
@@ -620,31 +618,43 @@ export function DraftRoom({
           Your roster is locked in
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Your roster</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {myPicks.map((p) => (
-              <div key={p.id} className="flex items-baseline justify-between text-sm">
-                <span>
-                  {(() => {
-                    const parts = coupleParts(p.couple_id);
-                    return parts ? <CoupleName {...parts} /> : "Unknown couple";
-                  })()}
-                </span>
-                <span className="text-muted-foreground">
-                  Rd {p.round}
-                  {p.is_auto ? ` · auto · ${p.auto_source ?? "random"}` : ""}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <LeagueRostersCard
+          description="Every roster, and where every couple landed."
+          unrosteredLabel="Not drafted"
+          {...buildLeagueRosters({
+            managers: orderManagersForRosters(
+              members.map((m) => ({
+                managerId: m.user_id,
+                displayName: managerLabel(m.user_id),
+                totalPoints: 0,
+              })),
+              currentUserId
+            ),
+            slots: [...picks]
+              .sort((x, y) => x.pick_number - y.pick_number)
+              .map((p) => ({ managerId: p.manager_id, coupleId: p.couple_id })),
+            couples: couples.map((c) => ({
+              id: c.id,
+              status: c.status,
+              eliminationWeek: null,
+              names: coupleParts(c.id) ?? { celebrity: c.celebrity_name, pro: c.pro_name },
+            })),
+            viewerId: currentUserId,
+          })}
+        />
 
-        <Button render={<Link href={`/leagues/${league.id}`} />} nativeButton={false}>
-          Back to {league.name}
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button render={<Link href={`/leagues/${league.id}`} />} nativeButton={false}>
+            Back to {league.name}
+          </Button>
+          <Button
+            variant="outline"
+            render={<Link href={`/leagues/${league.id}?tab=standings#rosters`} />}
+            nativeButton={false}
+          >
+            See Standings
+          </Button>
+        </div>
 
         {isCommissioner && (
           <div className="flex justify-center border-t border-border pt-4">
@@ -741,10 +751,7 @@ export function DraftRoom({
                     return parts ? <CoupleName {...parts} /> : "Unknown couple";
                   })()}
                 </span>
-                <span className="text-muted-foreground">
-                  {managerLabel(p.manager_id)}
-                  {p.is_auto ? ` · auto · ${p.auto_source ?? "random"}` : ""}
-                </span>
+                <span className="text-muted-foreground">{managerLabel(p.manager_id)}</span>
                 {isCommissioner && lastPick?.id === p.id && (
                   <Button
                     variant="ghost"
@@ -770,7 +777,7 @@ export function DraftRoom({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm your pick</DialogTitle>
+            <DialogTitle>Confirm Your Pick</DialogTitle>
             <DialogDescription>
               {(() => {
                 const parts = confirmCoupleId ? coupleParts(confirmCoupleId) : null;

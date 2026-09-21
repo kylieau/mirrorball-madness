@@ -274,7 +274,7 @@ export async function publishEpisodeDraft(
   }
 
   // Derived from what was actually entered, not separately tracked — the
-  // form's "Dances (per couple)" field only caps how many rows you can add
+  // form's "Dances (Per Couple)" field only caps how many rows you can add
   // per couple while drafting, it isn't itself persisted anywhere.
   const expectedDanceCount = Math.max(1, ...[...dancesByCouple.values()].map((list) => list.length));
 

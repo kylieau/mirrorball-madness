@@ -57,6 +57,7 @@ export async function syncSeasonClockAnchor(
     p_bonus_picks_third_place_points: settings.bonus_picks_third_place_points,
     p_bonus_picks_fourth_place_points: settings.bonus_picks_fourth_place_points,
     p_bonus_picks_fifth_place_points: settings.bonus_picks_fifth_place_points,
+    p_bonus_picks_tier_pay_style: settings.bonus_picks_tier_pay_style,
   });
   if (error) return { error: error.message, anchorWeek: null };
   return { error: null, anchorWeek: lockWeek };

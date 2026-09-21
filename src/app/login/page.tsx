@@ -38,7 +38,7 @@ export default async function LoginPage({
       <p className="text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}
         <Link href={signUpHref} className="underline underline-offset-4">
-          Sign up
+          Sign Up
         </Link>
       </p>
     </div>

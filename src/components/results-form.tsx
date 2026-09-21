@@ -76,7 +76,7 @@ const STATUS_LABELS: Record<StatusValue, string> = {
   bye: "Did Not Dance",
   winner: "Winner",
   runner_up: "Runner-up",
-  third_place: "Third place",
+  third_place: "Third Place",
 };
 
 function statusOptions(isFinale: boolean): StatusValue[] {
@@ -624,7 +624,7 @@ export function ResultsForm({
                 <p className="text-sm">{selectedEpisode.theme ?? "—"}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="danceCount">Dances (per couple)</Label>
+                <Label htmlFor="danceCount">Dances (Per Couple)</Label>
                 <Input
                   id="danceCount"
                   type="number"
@@ -865,7 +865,7 @@ export function ResultsForm({
 
               <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
                 <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">Custom event</Label>
+                  <Label className="text-xs text-muted-foreground">Custom Event</Label>
                   <Input
                     className="w-48"
                     placeholder="e.g. Dance-off win"
@@ -874,7 +874,7 @@ export function ResultsForm({
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">Couple (optional)</Label>
+                  <Label className="text-xs text-muted-foreground">Couple (Optional)</Label>
                   <Select
                     items={{ "": "—", ...Object.fromEntries(episodeCouples.map((c) => [c.id, coupleNameNode(coupleParts(c))])) }}
                     value={customMomentCoupleId}
@@ -898,7 +898,7 @@ export function ResultsForm({
                   onClick={handleAddCustomMoment}
                   disabled={!customMomentLabel.trim() || addingCustomMoment}
                 >
-                  + Add custom event
+                  + Add Custom Event
                 </Button>
               </div>
             </CardContent>
@@ -964,7 +964,7 @@ function BonusDisclosure({
   if (!open) {
     return (
       <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        + Bonus points
+        + Bonus Points
       </Button>
     );
   }
@@ -1041,7 +1041,7 @@ function TeamDanceSheetContent({
       </SheetHeader>
       <div className="flex flex-col gap-4 px-4 pb-4">
         <div className="flex flex-col gap-2">
-          <Label className="text-xs text-muted-foreground">Couples on this team</Label>
+          <Label className="text-xs text-muted-foreground">Couples on This Team</Label>
           <div className="flex flex-wrap gap-3">
             {availableCouples.map((c) => (
               <label key={c.id} className="flex items-center gap-1.5 text-sm">
@@ -1088,7 +1088,7 @@ function TeamDanceSheetContent({
             reset();
           }}
         >
-          Add team dance
+          Add Team Dance
         </Button>
       </div>
     </SheetContent>

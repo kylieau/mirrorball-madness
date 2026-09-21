@@ -151,7 +151,7 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
             }}
           >
             <Input
-              aria-label="Judge name"
+              aria-label="Judge Name"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               onKeyDown={(e) => {
@@ -221,7 +221,7 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Scoring judges</CardTitle>
+        <CardTitle>Scoring Judges</CardTitle>
         <CardDescription>
           The standing panel plus anyone who can give a score. Adding a name adds
           a score box on every dance. Archive a guest when they&apos;re done —
@@ -240,14 +240,14 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
         )}
         <div className="flex gap-2">
           <Input
-            placeholder="Judge name"
+            placeholder="Judge Name"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             disabled={rowLocked}
           />
           <Button onClick={handleAdd} disabled={busy || rowLocked || !newName.trim()}>
             <PlusIcon className="size-4" />
-            Add judge
+            Add Judge
           </Button>
         </div>
         {archived.length > 0 && (

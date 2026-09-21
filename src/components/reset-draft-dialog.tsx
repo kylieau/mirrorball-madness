@@ -19,9 +19,11 @@ import { Label } from "@/components/ui/label";
 export function ResetDraftDialog({
   leagueId,
   leagueName,
+  onReset,
 }: {
   leagueId: string;
   leagueName: string;
+  onReset?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [confirmName, setConfirmName] = useState("");
@@ -39,12 +41,13 @@ export function ResetDraftDialog({
     }
     setOpen(false);
     setConfirmName("");
+    onReset?.();
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="destructive" size="sm" />}>
-        Reset draft
+        Reset Draft
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

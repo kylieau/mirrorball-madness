@@ -24,7 +24,7 @@ export default async function JoinLeaguePage({
         <CardHeader>
           <CardTitle>You&apos;ve been invited to a league</CardTitle>
           <CardDescription>
-            Invite code <span className="font-mono font-medium text-foreground">{inviteCode}</span>
+            Invite Code <span className="font-mono font-medium text-foreground">{inviteCode}</span>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -32,7 +32,7 @@ export default async function JoinLeaguePage({
             <form action={joinLeague}>
               <input type="hidden" name="inviteCode" value={inviteCode} />
               <Button type="submit" className="w-full">
-                Join league
+                Join League
               </Button>
             </form>
           ) : (

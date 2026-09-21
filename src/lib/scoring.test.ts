@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeGrandFinalePoints, computeWeeklyScores, curtainCallPayout, type ScoringSettings } from "./scoring";
+import { bandOf, bandPayoutFraction, computeGrandFinalePoints, computeWeeklyScores, curtainCallPayout, type ScoringSettings } from "./scoring";
 
 const settings: ScoringSettings = {
   judgesScoreMultiplier: 1,
@@ -499,6 +499,7 @@ describe("computeGrandFinalePoints", () => {
       method: "exact_position",
       distancePenalty: null,
       tierSize: null,
+      tierPayStyle: "equal",
       pointsPerCorrect: 50,
     });
 
@@ -517,6 +518,7 @@ describe("computeGrandFinalePoints", () => {
       method: "distance_based",
       distancePenalty: 5,
       tierSize: null,
+      tierPayStyle: "equal",
       pointsPerCorrect: 50,
     });
 
@@ -524,26 +526,49 @@ describe("computeGrandFinalePoints", () => {
     expect(points.bob).toBe(35); // 3 positions off: 50 - 3*5
   });
 
-  it("binary_tier: full credit only when predicted AND actually in the top tier", () => {
+  it("band_tier: pays when predicted and actual land in the same band, at any depth", () => {
+    // totalCouples=6, width 3 -> bands: positions 4-6 (band 0), 1-3 (band 1)
     const points = computeGrandFinalePoints({
       predictions: [
-        // top 3 by position (totalCouples=6, tierSize=3) is positions 4,5,6
-        { managerId: "alice", coupleId: "winner", predictedPosition: 5 }, // predicted top 3
-        { managerId: "bob", coupleId: "early-out", predictedPosition: 1 }, // predicted NOT top 3
+        { managerId: "alice", coupleId: "winner", predictedPosition: 5 }, // band 0, actual band 0
+        { managerId: "alice", coupleId: "early-out", predictedPosition: 2 }, // band 1, actual band 1
+        { managerId: "bob", coupleId: "early-out", predictedPosition: 5 }, // band 0, actual band 1
       ],
       resolvedCouples: [
-        { coupleId: "winner", actualPosition: 6 }, // actually top 3 (won)
-        { coupleId: "early-out", actualPosition: 1 }, // actually not top 3
+        { coupleId: "winner", actualPosition: 6 },
+        { coupleId: "early-out", actualPosition: 1 },
       ],
       totalCouples,
-      method: "binary_tier",
+      method: "band_tier",
       distancePenalty: null,
       tierSize: 3,
+      tierPayStyle: "equal",
       pointsPerCorrect: 50,
     });
 
-    expect(points.alice).toBe(50); // correctly called a finalist
-    expect(points.bob).toBe(0); // correctly excluded, but that earns no credit
+    expect(points.alice).toBe(100); // both couples in the right band
+    expect(points.bob).toBe(0);
+  });
+
+  it("band_tier graded: lower bands pay a decaying fraction", () => {
+    const points = computeGrandFinalePoints({
+      predictions: [
+        { managerId: "alice", coupleId: "winner", predictedPosition: 6 },
+        { managerId: "alice", coupleId: "early-out", predictedPosition: 1 },
+      ],
+      resolvedCouples: [
+        { coupleId: "winner", actualPosition: 6 },
+        { coupleId: "early-out", actualPosition: 1 },
+      ],
+      totalCouples,
+      method: "band_tier",
+      distancePenalty: null,
+      tierSize: 3,
+      tierPayStyle: "graded",
+      pointsPerCorrect: 100,
+    });
+
+    expect(points.alice).toBe(175); // band 0 at 100% + band 1 at 75%
   });
 
   it("ignores predictions for couples not in the resolved batch", () => {
@@ -554,9 +579,36 @@ describe("computeGrandFinalePoints", () => {
       method: "exact_position",
       distancePenalty: null,
       tierSize: null,
+      tierPayStyle: "equal",
       pointsPerCorrect: 50,
     });
 
     expect(points).toEqual({});
+  });
+});
+
+describe("bandOf / bandPayoutFraction", () => {
+  it("counts bands down from the winner and leaves a smaller last band", () => {
+    // 12 couples, width 5: 12-8 (band 0), 7-3 (band 1), 2-1 (band 2)
+    expect(bandOf(12, 12, 5)).toBe(0);
+    expect(bandOf(8, 12, 5)).toBe(0);
+    expect(bandOf(7, 12, 5)).toBe(1);
+    expect(bandOf(3, 12, 5)).toBe(1);
+    expect(bandOf(2, 12, 5)).toBe(2);
+    expect(bandOf(1, 12, 5)).toBe(2);
+  });
+
+  it("puts everyone in one band when the width covers the cast", () => {
+    expect(bandOf(1, 12, 20)).toBe(0);
+    expect(bandOf(12, 12, 20)).toBe(0);
+  });
+
+  it("treats width 1 as one band per spot", () => {
+    expect(bandOf(11, 12, 1)).toBe(1);
+  });
+
+  it("graded pay steps down 25% per band and floors at 25%", () => {
+    expect([0, 1, 2, 3, 4, 5].map((b) => bandPayoutFraction(b, "graded"))).toEqual([1, 0.75, 0.5, 0.25, 0.25, 0.25]);
+    expect(bandPayoutFraction(4, "equal")).toBe(1);
   });
 });

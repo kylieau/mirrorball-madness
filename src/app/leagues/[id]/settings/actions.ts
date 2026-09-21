@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncSeasonClockAnchor as writeSeasonClockAnchor } from "@/lib/season-clock-sync";
+import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
 
 export async function renameLeague(
   leagueId: string,
@@ -122,9 +123,10 @@ export type ScoringCategoriesInput = {
   eliminationsCategoryWeight: number;
   bonusPicksCategoryWeight: number;
   judgesScoreStartsWeek: number;
-  bonusPicksScoringMethod: "exact_position" | "distance_based" | "binary_tier" | null;
+  bonusPicksScoringMethod: GrandFinaleMethod | null;
   bonusPicksDistancePenalty: number | null;
   bonusPicksTierSize: number | null;
+  bonusPicksTierPayStyle: TierPayStyle;
   judgesScoreMultiplier: number;
   survivalPoints: number;
   firstPlacePoints: number;
@@ -177,6 +179,7 @@ export async function updateScoringCategories(
     p_bonus_picks_third_place_points: input.bonusPicksThirdPlacePoints,
     p_bonus_picks_fourth_place_points: input.bonusPicksFourthPlacePoints,
     p_bonus_picks_fifth_place_points: input.bonusPicksFifthPlacePoints,
+    p_bonus_picks_tier_pay_style: input.bonusPicksTierPayStyle,
   });
 
   if (error) return { error: error.message };

@@ -35,7 +35,7 @@ function outcomeTag(r: EpisodeResult): { label: string; className: string } {
   if (r.outcome === "withdrawn") return { label: "Withdrew", className: "bg-muted text-muted-foreground" };
   if (r.outcome === "winner") return { label: "Winner", className: "bg-primary/15 text-accent" };
   if (r.outcome === "runner_up") return { label: "Runner-up", className: "bg-primary/15 text-accent" };
-  if (r.outcome === "third_place") return { label: "Third place", className: "bg-primary/15 text-accent" };
+  if (r.outcome === "third_place") return { label: "Third Place", className: "bg-primary/15 text-accent" };
   if (r.outcome === "bye") return { label: "DND", className: "bg-muted text-muted-foreground" };
   return { label: "Safe", className: "bg-emerald/20 text-emerald-text" };
 }
@@ -211,7 +211,7 @@ export function WeeklyResultsView({
       {managerScores.length > 0 && nameByManager && (
         <>
           <div className="mb-2 mt-6 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
-            <span>Points by team</span>
+            <span>Points by Team</span>
             <span className="font-normal text-muted-foreground">{managerScores.length} managers</span>
           </div>
           <div className="flex flex-col">

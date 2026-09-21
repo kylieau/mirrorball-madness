@@ -49,7 +49,7 @@ export default async function LeaguesPage({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Leagues</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Browse &amp; manage</p>
+            <p className="mt-1 text-sm text-muted-foreground">Browse &amp; Manage</p>
             {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
           </div>
           <CreateJoinLeagueDialogs />

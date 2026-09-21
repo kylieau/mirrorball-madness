@@ -36,7 +36,7 @@ function statusLabel(couple: Couple): string {
     case "runner_up":
       return "Runner-up";
     case "third_place":
-      return "Third place";
+      return "Third Place";
     case "eliminated":
       return `Eliminated — ${formatEpisodeCasualShort(couple.elimination_week!)}`;
     case "withdrawn":
@@ -145,7 +145,7 @@ export function GrandFinaleBox({
 
   // Shared read-only treatment for both "locked" and "saved, still
   // editable" — surfaces the predicted winner prominently instead of just
-  // the full order, matching every "Your predicted winner" mockup
+  // the full order, matching every "Your Season Bracket" mockup
   // regardless of which other modules are on. Keeps GrandFinaleBox a single
   // card shape everywhere it renders rather than a Grand-Finale-only
   // variant and a combined-with-other-modules variant.
@@ -155,7 +155,7 @@ export function GrandFinaleBox({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle>Your predicted winner</CardTitle>
+            <CardTitle>Your Season Bracket</CardTitle>
             <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
               {locked ? "Locked" : "Saved"}
             </span>
@@ -186,7 +186,7 @@ export function GrandFinaleBox({
                 setOrder(pinEliminatedFirst(order, pinnedIds));
                 setReviewing(false);
               }}>
-              Edit order
+              Edit Order
             </Button>
           )}
         </CardContent>
@@ -199,7 +199,7 @@ export function GrandFinaleBox({
       return (
         <Card>
           <CardHeader>
-            <CardTitle>Your season ranking</CardTitle>
+            <CardTitle>Your Season Bracket</CardTitle>
             <CardDescription>Predictions are locked.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -219,7 +219,7 @@ export function GrandFinaleBox({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Your season ranking</CardTitle>
+          <CardTitle>Your Season Bracket</CardTitle>
           <CardDescription>
             Tap couples in the order you think they&apos;ll be eliminated — first tap is who goes home first, last is your predicted winner. Saving needs every couple placed.
             {deadline ? ` Locks at ${formattedDeadline}.` : ""}
@@ -236,7 +236,7 @@ export function GrandFinaleBox({
           {order.length > 0 && (
             <div className="flex flex-col gap-1">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Your order so far
+                Your Order So Far
               </p>
               {order.map((coupleId, i) => (
                 <div key={coupleId} className="text-sm">
@@ -245,7 +245,7 @@ export function GrandFinaleBox({
               ))}
               {order.length > pinnedCount && (
                 <Button variant="ghost" size="sm" className="self-start" onClick={undoLastTap}>
-                  Undo last tap
+                  Undo Last Tap
                 </Button>
               )}
             </div>
@@ -283,7 +283,7 @@ export function GrandFinaleBox({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your season ranking</CardTitle>
+        <CardTitle>Your Season Bracket</CardTitle>
         <CardDescription>
           Review your predicted order, season winner to first eliminated. Use the arrows to fine-tune.
           {deadline ? ` Locks at ${formattedDeadline}.` : ""}
@@ -346,7 +346,7 @@ export function GrandFinaleBox({
             {submitting ? "Saving..." : "Save prediction"}
           </Button>
           <Button variant="outline" onClick={startOver} disabled={submitting}>
-            Start over
+            Start Over
           </Button>
         </div>
       </CardContent>

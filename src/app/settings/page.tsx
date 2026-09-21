@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/auth/actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { SettingsSection } from "@/components/settings-section";
 import { ChevronRightIcon, XIcon } from "lucide-react";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
 import { SiteAdminNav } from "@/components/site-admin-nav";
 import { ADD_TO_HOME_SCREEN_COPY } from "@/lib/add-to-home-screen";
+import { getAccountSettingsData } from "@/lib/account-settings-data";
+import { LeagueSettingsLinks } from "@/components/league-settings-links";
 
 const LINKED_ROWS: { label: string; href: string; hint?: string }[] = [
   { label: "Profile", href: "/settings/profile" },
@@ -18,7 +20,7 @@ const LINKED_ROWS: { label: string; href: string; hint?: string }[] = [
     href: "/settings/add-to-home-screen",
     hint: ADD_TO_HOME_SCREEN_COPY.detail,
   },
-  { label: "Account & data", href: "/settings/account" },
+  { label: "Account & Data", href: "/settings/account" },
 ];
 
 export default async function SettingsPage({
@@ -44,11 +46,7 @@ export default async function SettingsPage({
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_super_admin, spoiler_free_mode")
-    .eq("id", user.id)
-    .single();
+  const { isSuperAdmin, spoilerFreeMode, leagues } = await getAccountSettingsData(supabase, user.id);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
@@ -59,13 +57,11 @@ export default async function SettingsPage({
 
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Account-wide</p>
           {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
           {message && <p className="mt-2 text-sm text-muted-foreground">{message}</p>}
         </div>
 
-        <Card>
-          <CardContent className="flex flex-col p-0">
+        <SettingsSection title="Account-Wide">
             {LINKED_ROWS.map((row) => (
               <Link
                 key={row.href}
@@ -81,19 +77,16 @@ export default async function SettingsPage({
                 <ChevronRightIcon className="size-4 text-muted-foreground" />
               </Link>
             ))}
-            <div className="flex items-center justify-between border-b border-border px-4 py-3 text-sm text-muted-foreground last:border-b-0">
-              <span>Appearance</span>
-              <span className="text-xs">Coming soon</span>
-            </div>
-            <SpoilerModeToggle initialEnabled={profile?.spoiler_free_mode ?? false} />
-          </CardContent>
-        </Card>
+            <SpoilerModeToggle initialEnabled={spoilerFreeMode} />
+        </SettingsSection>
 
-        {profile?.is_super_admin && <SiteAdminNav />}
+        <LeagueSettingsLinks leagues={leagues} fromHref={backHref} />
+
+        {isSuperAdmin && <SiteAdminNav />}
 
         <form action={signOut}>
           <Button type="submit" variant="outline" className="w-full">
-            Sign out
+            Sign Out
           </Button>
         </form>
       </div>

@@ -37,6 +37,16 @@ To do it:
    §6 rollout notes) — only future leagues, or leagues that draft after the
    re-fit ships, pick up the new numbers.
 
+## Grand Finale methods
+
+The full-order pick is scored three ways (`exact_position`, `distance_based`,
+`band_tier` equal/graded) and each gets its own `bonus_picks_points_per_correct`
+solved to the same `bonusPicksBudget`. The non-exact methods' shape knobs are
+fixed script parameters (`DISTANCE_ZERO_AT`, `BAND_WIDTH`, `GRADED_BAND_*`),
+not solved. Partial-credit methods are especially sensitive to
+`GF_ORDER_NOISE_SD` (how good managers are at ordering the cast), so re-fit that
+first when real pick data exists.
+
 ## Known simplifications (worth revisiting on a re-fit, not blocking now)
 
 - Single elimination per week only — double-elimination weeks aren't

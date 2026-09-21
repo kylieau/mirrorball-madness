@@ -195,10 +195,15 @@ create table scoring_settings (
 
   judges_score_starts_week int not null default 1 check (judges_score_starts_week > 0),
 
-  bonus_picks_scoring_method text check (bonus_picks_scoring_method in ('exact_position', 'distance_based', 'binary_tier')),
+  bonus_picks_scoring_method text check (bonus_picks_scoring_method in ('exact_position', 'distance_based', 'band_tier')),
   bonus_picks_distance_penalty numeric, -- points docked per position off; only used by 'distance_based'
-  bonus_picks_tier_size int, -- e.g. 3 for "top 3"; only used by 'binary_tier'
-  bonus_picks_points_per_correct numeric not null default 257, -- base value a correctly-placed couple earns
+  bonus_picks_tier_size int, -- couples per band (3 = 1st-3rd, 4th-6th, ...); only used by 'band_tier'
+  bonus_picks_tier_pay_style text not null default 'equal' check (bonus_picks_tier_pay_style in ('equal', 'graded')), -- 'graded': lower bands pay 75/50/25% (floor 25%); only used by 'band_tier'
+  -- Base value a correctly-placed couple earns. Calibrated per method
+  -- (scripts/monte-carlo-calibration/): exact_position 257, distance_based 200,
+  -- band_tier 162 equal / 252 graded — the column default matches the
+  -- distance_based default method.
+  bonus_picks_points_per_correct numeric not null default 200,
   bonus_picks_first_place_points numeric not null default 106,
   bonus_picks_second_place_points numeric not null default 53,
   bonus_picks_third_place_points numeric not null default 28,
@@ -219,7 +224,7 @@ create table scoring_settings (
     (not bonus_picks_category_enabled) or (
       bonus_picks_scoring_method is not null
       and (bonus_picks_scoring_method != 'distance_based' or bonus_picks_distance_penalty is not null)
-      and (bonus_picks_scoring_method != 'binary_tier' or bonus_picks_tier_size is not null)
+      and (bonus_picks_scoring_method != 'band_tier' or bonus_picks_tier_size is not null)
     )
   )
 );
@@ -708,6 +713,7 @@ begin
     eliminations_category_enabled,
     bonus_picks_category_enabled,
     bonus_picks_scoring_method,
+    bonus_picks_distance_penalty,
     scoring_configured
   )
   values (
@@ -715,7 +721,8 @@ begin
     p_dance_card_enabled,
     p_curtain_call_enabled,
     v_grand_finale_enabled,
-    case when v_grand_finale_enabled then 'exact_position' end,
+    case when v_grand_finale_enabled then 'distance_based' end,
+    case when v_grand_finale_enabled then 50 end,
     true
   );
 
@@ -1099,7 +1106,8 @@ create function public.update_scoring_categories(
   p_bonus_picks_second_place_points numeric,
   p_bonus_picks_third_place_points numeric,
   p_bonus_picks_fourth_place_points numeric,
-  p_bonus_picks_fifth_place_points numeric
+  p_bonus_picks_fifth_place_points numeric,
+  p_bonus_picks_tier_pay_style text
 )
 returns public.scoring_settings
 language plpgsql
@@ -1133,6 +1141,7 @@ begin
     bonus_picks_scoring_method = p_bonus_picks_scoring_method,
     bonus_picks_distance_penalty = p_bonus_picks_distance_penalty,
     bonus_picks_tier_size = p_bonus_picks_tier_size,
+    bonus_picks_tier_pay_style = p_bonus_picks_tier_pay_style,
     -- Right-hand sides here still see the pre-update row, even though
     -- judges_score_multiplier is also being overwritten in this same
     -- statement — so this correctly flags "did the commissioner just change
@@ -1163,9 +1172,9 @@ end;
 $$;
 
 revoke execute on function public.update_league_settings(uuid, text, text, int, numeric) from public;
-revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric) from public;
+revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text) from public;
 grant execute on function public.update_league_settings(uuid, text, text, int, numeric) to authenticated;
-grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric) to authenticated;
+grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text) to authenticated;
 
 -- ============================================================
 -- Draft: couples are global read-only reference data; starting the draft and

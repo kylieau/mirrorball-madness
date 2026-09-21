@@ -64,7 +64,7 @@ function ClearRequestButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
-        Clear request
+        Clear Request
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -78,7 +78,7 @@ function ClearRequestButton({
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button onClick={handleClear} disabled={submitting}>
-            {submitting ? "Clearing..." : "Clear request"}
+            {submitting ? "Clearing..." : "Clear Request"}
           </Button>
         </DialogFooter>
       </DialogContent>

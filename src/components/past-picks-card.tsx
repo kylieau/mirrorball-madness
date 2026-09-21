@@ -48,7 +48,7 @@ function ResultRows({
         if (row.kind === "nailed") {
           return (
             <div key={`nailed-${row.coupleIds.join("-") || i}`} className="flex items-start justify-between gap-3">
-              <span className="text-muted-foreground">Nailed it</span>
+              <span className="text-muted-foreground">Nailed It</span>
               <span className="inline-flex items-center justify-end gap-1.5 text-right font-medium">
                 <CoupleNames ids={row.coupleIds} names={names} fallback="—" />
                 <span className="text-emerald-text" aria-label="Correct">
@@ -70,11 +70,11 @@ function ResultRows({
                 <CoupleNames
                   ids={row.pickIds}
                   names={names}
-                  fallback="No pick"
+                  fallback="No Pick"
                   className="font-normal text-muted-foreground line-through"
                 />
               ) : (
-                <span className="font-normal text-muted-foreground">No pick</span>
+                <span className="font-normal text-muted-foreground">No Pick</span>
               )}
               <span className="text-muted-foreground" aria-hidden>
                 →
@@ -116,7 +116,7 @@ export function PastPicksRecap({
   return (
     <div className="flex flex-col gap-3 text-sm">
       <div className="flex flex-col gap-1.5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who went home</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who Went Home</p>
         <ResultRows
           rows={collapsePickRows(comparison.eliminationPicks, comparison.actualEliminatedIds)}
           names={coupleDisplayNames}
@@ -124,7 +124,7 @@ export function PastPicksRecap({
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who scored highest</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who Scored Highest</p>
         <ResultRows
           rows={collapsePickRows([comparison.topScorer], comparison.actualTopScorerIds)}
           names={coupleDisplayNames}

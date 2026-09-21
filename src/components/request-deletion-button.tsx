@@ -35,7 +35,7 @@ export function RequestDeletionButton() {
   return (
     <Dialog>
       <DialogTrigger render={<Button variant="destructive" className="self-start" />}>
-        Delete my account
+        Delete My Account
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

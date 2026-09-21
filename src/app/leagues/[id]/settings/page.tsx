@@ -52,7 +52,13 @@ export default async function LeagueSettingsPage({
   const isCommissioner = viewerMembership.role === "commissioner";
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [{ data: weekRows }, { data: episodeRows }, { data: activeSeason }, { data: effectiveHardDeadlineWeek }] =
+  const [
+    { data: weekRows },
+    { data: episodeRows },
+    { data: activeSeason },
+    { data: effectiveHardDeadlineWeek },
+    { count: totalCouples },
+  ] =
     await Promise.all([
       supabase
         .from("competition_weeks")
@@ -65,6 +71,10 @@ export default async function LeagueSettingsPage({
         .eq("season_id", activeSeasonId ?? ""),
       supabase.from("seasons").select("season_number").eq("id", activeSeasonId ?? "").maybeSingle(),
       supabase.rpc("effective_hard_deadline_week", { p_league_id: id }),
+      supabase
+        .from("couples")
+        .select("id", { count: "exact", head: true })
+        .eq("season_id", activeSeasonId ?? ""),
     ]);
   const seasonNumber = activeSeason?.season_number ?? null;
   const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
@@ -77,15 +87,21 @@ export default async function LeagueSettingsPage({
   const closeHref = safeRelativePath(from, `/leagues/${id}?tab=yourpicks`);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
+    <div
+      className={`mx-auto flex max-w-2xl flex-col gap-4 px-4 ${
+        // Room for the pinned Save bar so the last section isn't hidden behind it.
+        isCommissioner ? "pb-36" : "pb-8"
+      }`}
+    >
       <div className="flex flex-col gap-6">
-        <Link href={closeHref} aria-label="Close" className="text-muted-foreground hover:text-foreground">
-          <XIcon className="size-5" />
-        </Link>
-
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">League Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{league.name}</p>
+        <div className="sticky top-0 z-30 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight">League Settings</h1>
+            <p className="mt-1 truncate text-sm text-muted-foreground">{league.name}</p>
+          </div>
+          <Link href={closeHref} aria-label="Close" className="shrink-0 text-muted-foreground hover:text-foreground">
+            <XIcon className="size-5" />
+          </Link>
         </div>
 
         <LeagueMembersSection
@@ -102,6 +118,9 @@ export default async function LeagueSettingsPage({
           leagueName={league.name}
           inviteCode={league.invite_code}
           canEdit={isCommissioner}
+          canResetDraft={
+            (scoringSettings?.judges_score_category_enabled ?? true) && league.draft_status !== "not_started"
+          }
         />
         <LeagueModulesForm
           leagueId={id}
@@ -111,6 +130,8 @@ export default async function LeagueSettingsPage({
           seasonEpisodes={seasonEpisodes ?? []}
           seasonNumber={seasonNumber}
           effectiveHardDeadlineWeek={effectiveHardDeadlineWeek ?? null}
+          totalCouples={totalCouples ?? 12}
+          exitHref={closeHref}
         />
       </div>
     </div>

@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { computeGrandFinalePoints, computeWeeklyScores, type GrandFinaleMethod, type Outcome } from "@/lib/scoring";
+import {
+  computeGrandFinalePoints,
+  computeWeeklyScores,
+  type GrandFinaleMethod,
+  type Outcome,
+  type TierPayStyle,
+} from "@/lib/scoring";
 import { participantIdsToPersist, selectableCast } from "@/lib/episode-cast";
 
 const RESOLVING_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn", "winner", "runner_up", "third_place"]);
@@ -377,6 +383,7 @@ async function recomputeWeekScores(
         method: (scoringSettings.bonus_picks_scoring_method as GrandFinaleMethod) ?? "exact_position",
         distancePenalty: scoringSettings.bonus_picks_distance_penalty,
         tierSize: scoringSettings.bonus_picks_tier_size,
+        tierPayStyle: scoringSettings.bonus_picks_tier_pay_style as TierPayStyle,
         pointsPerCorrect: scoringSettings.bonus_picks_points_per_correct,
       });
     }

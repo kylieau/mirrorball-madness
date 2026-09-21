@@ -24,7 +24,7 @@ export async function SiteHeader() {
             Sign in
           </Button>
           <Button render={<Link href="/sign-up" />} nativeButton={false} size="sm">
-            Sign up
+            Sign Up
           </Button>
         </div>
       </div>

@@ -45,7 +45,7 @@ export function DraftManagersCard({
         <CardDescription>
           {isCommissioner
             ? "Put someone who's stepped away on autopilot."
-            : "Green dot means they have the draft open."}
+            : "Green dot means they have the draft open. Auto means the draft picks for them."}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
@@ -57,7 +57,12 @@ export function DraftManagersCard({
                 {m.draft_position}. {m.profiles?.display_name ?? "Unknown"}
               </span>
               {m.draft_autopilot && (
-                <span className="text-xs text-muted-foreground">autopilot</span>
+                <span
+                  title="On autopilot: the draft auto-picks for them"
+                  className="rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  Auto
+                </span>
               )}
             </span>
             {isCommissioner && (

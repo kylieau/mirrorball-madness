@@ -439,7 +439,7 @@ export function ScheduleManager({
               </p>
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Competition week</Label>
+              <Label>Competition Week</Label>
               <Input
                 type="number"
                 min={1}
@@ -459,7 +459,7 @@ export function ScheduleManager({
             </div>
             {parsedWeekNumber != null && (
               <div className="flex flex-col gap-2">
-                <Label>Week label (optional)</Label>
+                <Label>Week Label (Optional)</Label>
                 <Input
                   placeholder="e.g. Premiere"
                   value={weekTheme}

@@ -242,7 +242,24 @@ export function computeWeeklyScores({
   });
 }
 
-export type GrandFinaleMethod = "exact_position" | "distance_based" | "binary_tier";
+export type GrandFinaleMethod = "exact_position" | "distance_based" | "band_tier";
+
+export type TierPayStyle = "equal" | "graded";
+
+const GRADED_BAND_STEP = 0.25;
+const GRADED_BAND_FLOOR = 0.25;
+
+// Position `totalCouples` is the winner and lands in band 0; bands are
+// `tierSize` couples wide, counted down from the winner, so a cast that
+// doesn't divide evenly leaves the smallest band at the bottom.
+export function bandOf(position: number, totalCouples: number, tierSize: number): number {
+  return Math.floor((totalCouples - position) / Math.max(1, tierSize));
+}
+
+export function bandPayoutFraction(bandIndex: number, payStyle: TierPayStyle): number {
+  if (payStyle === "equal") return 1;
+  return Math.max(GRADED_BAND_FLOOR, 1 - GRADED_BAND_STEP * bandIndex);
+}
 
 export type GrandFinalePrediction = {
   managerId: string;
@@ -266,6 +283,7 @@ export function computeGrandFinalePoints({
   method,
   distancePenalty,
   tierSize,
+  tierPayStyle,
   pointsPerCorrect,
 }: {
   predictions: GrandFinalePrediction[];
@@ -274,10 +292,10 @@ export function computeGrandFinalePoints({
   method: GrandFinaleMethod;
   distancePenalty: number | null;
   tierSize: number | null;
+  tierPayStyle: TierPayStyle;
   pointsPerCorrect: number;
 }): Record<string, number> {
   const actualPositionByCouple = new Map(resolvedCouples.map((r) => [r.coupleId, r.actualPosition]));
-  const tierThreshold = totalCouples - (tierSize ?? 0);
 
   const pointsByManager: Record<string, number> = {};
 
@@ -291,10 +309,12 @@ export function computeGrandFinalePoints({
     } else if (method === "distance_based") {
       const distance = Math.abs(p.predictedPosition - actualPosition);
       points = Math.max(0, pointsPerCorrect - distance * (distancePenalty ?? 0));
-    } else if (method === "binary_tier") {
-      const predictedInTier = p.predictedPosition > tierThreshold;
-      const actualInTier = actualPosition > tierThreshold;
-      points = predictedInTier && actualInTier ? pointsPerCorrect : 0;
+    } else if (method === "band_tier") {
+      const width = tierSize ?? 1;
+      const actualBand = bandOf(actualPosition, totalCouples, width);
+      if (bandOf(p.predictedPosition, totalCouples, width) === actualBand) {
+        points = pointsPerCorrect * bandPayoutFraction(actualBand, tierPayStyle);
+      }
     }
 
     pointsByManager[p.managerId] = (pointsByManager[p.managerId] ?? 0) + points;

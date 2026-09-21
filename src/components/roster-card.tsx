@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cn } from "cn";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CoupleNameParts } from "@/lib/couple-display";
@@ -7,6 +8,7 @@ import type { RosterWeeklyTag } from "@/lib/roster-weekly-points";
 type RosterCouple = CoupleNameParts & {
   coupleId: string;
   weeklyPoints: number;
+  totalPoints?: number;
   tag: RosterWeeklyTag;
 };
 
@@ -21,15 +23,18 @@ const TAG_INFO: Record<RosterWeeklyTag, { label: string; className: string }> = 
 export function RosterCard({
   couples,
   totalPoints,
+  carousel,
 }: {
   couples: RosterCouple[];
   totalPoints: number;
+  carousel?: ReactNode;
 }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your roster</CardTitle>
+        <CardTitle>Your Fantasy Roster</CardTitle>
         <CardDescription>{totalPoints} points this season</CardDescription>
+        {carousel}
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5">
         {couples.map((c) => {
@@ -55,7 +60,7 @@ export function RosterCard({
                   {c.weeklyPoints >= 0 ? "+" : ""}
                   {c.weeklyPoints}
                 </span>
-                this wk
+                {c.totalPoints !== undefined ? `${c.totalPoints} total` : "this wk"}
               </div>
             </div>
           );

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { DeadlineStub } from "@/components/deadline-stub";
@@ -7,7 +6,6 @@ import { EpisodeBanner } from "@/components/episode-banner";
 import { SpoilerRevealCallout } from "@/components/spoiler-reveal-callout";
 import type { EpisodeBannerState } from "@/lib/episode-banner";
 import { formatCountdown } from "@/lib/format-countdown";
-import { SettingsIcon } from "lucide-react";
 
 type HomeLeague = {
   id: string;
@@ -63,7 +61,7 @@ export function HomeDashboard({
       )}
 
       <div className="mb-2 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
-        <span>Your leagues</span>
+        <span>Your Leagues</span>
         <span className="font-normal text-muted-foreground">{leagues.length}</span>
       </div>
       <div className="flex flex-col gap-2.5">
@@ -82,18 +80,9 @@ export function HomeDashboard({
                 </div>
               </Link>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
-                <Button
-                  render={<Link href={`/leagues/${l.id}/settings?from=%2Ftoday`} />}
-                  nativeButton={false}
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={`${l.name} settings`}
-                >
-                  <SettingsIcon />
-                </Button>
                 {l.picksDue ? (
                   <span className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
-                    Picks due
+                    Picks Due
                   </span>
                 ) : l.weeksBehind > 0 ? (
                   <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
@@ -117,7 +106,7 @@ export function HomeDashboard({
       {recentActivity.length > 0 && (
         <>
           <div className="mb-2 mt-6 border-t border-border pt-4 text-sm font-semibold text-accent">
-            Recent activity
+            Recent Activity
           </div>
           <Card>
             <CardContent className="flex flex-col py-2">
@@ -138,7 +127,7 @@ export function HomeDashboard({
         href="/leagues"
         className="mt-3 block rounded-xl border border-border py-3 text-center text-sm font-semibold text-accent"
       >
-        See all leagues
+        See All Leagues
       </Link>
     </div>
   );

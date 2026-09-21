@@ -27,8 +27,19 @@ import {
   airsAtToUtcIso,
   utcIsoToLocalInput,
 } from "@/lib/use-browser-time-zone";
-import { explainGrandFinaleMethod } from "@/lib/grand-finale-explainer";
+import {
+  GRAND_FINALE_DEFAULT_DISTANCE_PENALTY,
+  GRAND_FINALE_DEFAULT_METHOD,
+  GRAND_FINALE_DEFAULT_TIER_PAY_STYLE,
+  GRAND_FINALE_DEFAULT_TIER_SIZE,
+  defaultPointsPerCorrect,
+  explainGrandFinaleMethod,
+  type GrandFinaleMethod,
+  type TierPayStyle,
+} from "@/lib/grand-finale-explainer";
 import { formatEpisodeCasual } from "@/lib/format-week";
+import { SCORING_MODULES } from "@/lib/scoring-modules";
+import { BottomNav } from "@/components/bottom-nav";
 import {
   airsAtForWeek,
   explainGrandFinaleDeadline,
@@ -38,7 +49,7 @@ import {
   shouldShowAnchorSyncControl,
 } from "@/lib/season-clock";
 
-type ScoringMethod = "exact_position" | "distance_based" | "binary_tier";
+type ScoringMethod = GrandFinaleMethod;
 type WaiverMode = "locked" | "waivers";
 type WaiverClaimMethod = "reverse_standings" | "fcfs" | "manual";
 type DraftType = "snake" | "linear";
@@ -54,6 +65,7 @@ type ScoringSettings = {
   bonus_picks_scoring_method: string | null;
   bonus_picks_distance_penalty: number | null;
   bonus_picks_tier_size: number | null;
+  bonus_picks_tier_pay_style: string;
   bonus_picks_points_per_correct: number;
   bonus_picks_first_place_points: number;
   bonus_picks_second_place_points: number;
@@ -85,31 +97,30 @@ type League = {
 type SeasonEpisode = { week_number: number; theme: string | null; airs_at: string };
 
 const METHOD_ITEMS: Record<ScoringMethod, string> = {
-  exact_position: "Exact position",
-  distance_based: "Distance-based partial credit",
-  binary_tier: "Binary tier (e.g. top 3)",
+  exact_position: "Exact Position",
+  distance_based: "Distance-Based Partial Credit",
+  band_tier: "Tier bands",
+};
+
+const TIER_PAY_STYLE_ITEMS: Record<TierPayStyle, string> = {
+  equal: "Equal Pay for Every Band",
+  graded: "Graded (Lower Bands Pay Less)",
 };
 
 const WAIVER_MODE_ITEMS: Record<WaiverMode, string> = {
-  locked: "Locked (no Recast)",
-  waivers: "Recast enabled",
+  locked: "Locked (No Recast)",
+  waivers: "Recast Enabled",
 };
 
-export const MODULE_INFO = [
-  { name: "Dance Card", description: "Draft Fantasy" },
-  { name: "Curtain Call", description: "Weekly Pick 'Em" },
-  { name: "Grand Finale", description: "Full-Order Prediction" },
-] as const;
-
 const WAIVER_CLAIM_METHOD_ITEMS: Record<WaiverClaimMethod, string> = {
-  reverse_standings: "Reverse standings",
-  fcfs: "First come, first served",
-  manual: "Manual (commissioner decides)",
+  reverse_standings: "Reverse Standings",
+  fcfs: "First Come, First Served",
+  manual: "Manual (Commissioner Decides)",
 };
 
 const DRAFT_TYPE_ITEMS: Record<DraftType, string> = {
-  snake: "Snake (reverses order each round)",
-  linear: "Linear (same order every round)",
+  snake: "Snake (Reverses Order Each Round)",
+  linear: "Linear (Same Order Every Round)",
 };
 
 export function LeagueModulesForm({
@@ -120,6 +131,8 @@ export function LeagueModulesForm({
   seasonEpisodes,
   seasonNumber,
   effectiveHardDeadlineWeek,
+  totalCouples,
+  exitHref,
 }: {
   leagueId: string;
   league: League;
@@ -132,6 +145,10 @@ export function LeagueModulesForm({
   // Dance Card draft is still open; the Season Clock labels that episode
   // next to its airs_at so the two can't look like a mismatched pair.
   effectiveHardDeadlineWeek: number | null;
+  // Active-season cast size, so the band preview shows real place ranges.
+  totalCouples: number;
+  // Where "Save & exit" lands (the page the settings were opened from).
+  exitHref: string;
 }) {
   const router = useRouter();
   const browserTimeZone = useBrowserTimeZone();
@@ -145,6 +162,13 @@ export function LeagueModulesForm({
   const [bonusEnabled, setBonusEnabled] = useState(
     scoringSettings?.bonus_picks_category_enabled ?? false
   );
+
+  const moduleEnabled = { curtainCall: eliminationsEnabled, danceCard: judgesEnabled, grandFinale: bonusEnabled };
+  const setModuleEnabled = {
+    curtainCall: setEliminationsEnabled,
+    danceCard: setJudgesEnabled,
+    grandFinale: setBonusEnabled,
+  };
 
   const [judgesWeight, setJudgesWeight] = useState(
     scoringSettings?.judges_score_category_weight ?? 1
@@ -196,25 +220,58 @@ export function LeagueModulesForm({
   const draftNotStarted = league.draft_status === "not_started";
 
   const [eliminationPredictionPoints, setEliminationPredictionPoints] = useState(
-    scoringSettings?.elimination_prediction_points ?? 30
+    scoringSettings?.elimination_prediction_points ?? 171
   );
   const [topScorerPredictionPoints, setTopScorerPredictionPoints] = useState(
-    scoringSettings?.top_scorer_prediction_points ?? 20
+    scoringSettings?.top_scorer_prediction_points ?? 114
   );
   const [predictionLockHoursBeforeAir, setPredictionLockHoursBeforeAir] = useState(
     league.prediction_lock_hours_before_air
   );
 
   const [bonusMethod, setBonusMethod] = useState<ScoringMethod>(
-    (scoringSettings?.bonus_picks_scoring_method as ScoringMethod) ?? "exact_position"
+    (scoringSettings?.bonus_picks_scoring_method as ScoringMethod) ?? GRAND_FINALE_DEFAULT_METHOD
   );
   const [bonusDistancePenalty, setBonusDistancePenalty] = useState(
-    scoringSettings?.bonus_picks_distance_penalty ?? 2
+    scoringSettings?.bonus_picks_distance_penalty ?? GRAND_FINALE_DEFAULT_DISTANCE_PENALTY
   );
-  const [bonusTierSize, setBonusTierSize] = useState(scoringSettings?.bonus_picks_tier_size ?? 3);
+  const [bonusTierSize, setBonusTierSize] = useState(
+    scoringSettings?.bonus_picks_tier_size ?? GRAND_FINALE_DEFAULT_TIER_SIZE
+  );
+  const [bonusTierPayStyle, setBonusTierPayStyle] = useState<TierPayStyle>(
+    (scoringSettings?.bonus_picks_tier_pay_style as TierPayStyle) ?? GRAND_FINALE_DEFAULT_TIER_PAY_STYLE
+  );
   const [bonusPicksPointsPerCorrect, setBonusPicksPointsPerCorrect] = useState(
-    scoringSettings?.bonus_picks_points_per_correct ?? 50
+    scoringSettings?.bonus_picks_points_per_correct ??
+      defaultPointsPerCorrect(GRAND_FINALE_DEFAULT_METHOD, GRAND_FINALE_DEFAULT_TIER_PAY_STYLE)
   );
+  // Switching method/pay style re-applies that option's calibrated base, but
+  // never overwrites a number the commissioner typed themselves.
+  const [pointsPerCorrectEdited, setPointsPerCorrectEdited] = useState(false);
+
+  function changeBonusMethod(method: ScoringMethod) {
+    setBonusMethod(method);
+    if (!pointsPerCorrectEdited) {
+      setBonusPicksPointsPerCorrect(defaultPointsPerCorrect(method, bonusTierPayStyle));
+    }
+  }
+
+  function changeTierPayStyle(style: TierPayStyle) {
+    setBonusTierPayStyle(style);
+    if (!pointsPerCorrectEdited) {
+      setBonusPicksPointsPerCorrect(defaultPointsPerCorrect(bonusMethod, style));
+    }
+  }
+
+  const explainMethod = () =>
+    explainGrandFinaleMethod({
+      method: bonusMethod,
+      pointsPerCorrect: bonusPicksPointsPerCorrect,
+      distancePenalty: bonusDistancePenalty,
+      tierSize: bonusTierSize,
+      tierPayStyle: bonusTierPayStyle,
+      totalCouples,
+    });
   const [bonusPicksFirstPlacePoints, setBonusPicksFirstPlacePoints] = useState(
     scoringSettings?.bonus_picks_first_place_points ?? 106
   );
@@ -265,7 +322,7 @@ export function LeagueModulesForm({
   });
   const showAnchorSync = shouldShowAnchorSyncControl(canEdit, judgesStartsWeek, lockWeek);
 
-  async function handleSave() {
+  async function handleSave(exitAfter = false) {
     setError(null);
     setSyncError(null);
     setSuccess(false);
@@ -297,7 +354,8 @@ export function LeagueModulesForm({
       judgesScoreStartsWeek: judgesStartsWeek,
       bonusPicksScoringMethod: bonusEnabled ? bonusMethod : null,
       bonusPicksDistancePenalty: bonusEnabled && bonusMethod === "distance_based" ? bonusDistancePenalty : null,
-      bonusPicksTierSize: bonusEnabled && bonusMethod === "binary_tier" ? bonusTierSize : null,
+      bonusPicksTierSize: bonusEnabled && bonusMethod === "band_tier" ? bonusTierSize : null,
+      bonusPicksTierPayStyle: bonusTierPayStyle,
       judgesScoreMultiplier,
       survivalPoints,
       firstPlacePoints,
@@ -330,9 +388,15 @@ export function LeagueModulesForm({
     ]);
 
     const combinedError = scoringResult.error || leagueResult.error;
-    if (combinedError) setError(combinedError);
-    else setSuccess(true);
-    setSubmitting(false);
+    if (combinedError) {
+      setError(combinedError);
+      setSubmitting(false);
+    } else if (exitAfter) {
+      router.push(exitHref);
+    } else {
+      setSuccess(true);
+      setSubmitting(false);
+    }
   }
 
   async function handleSyncAnchor() {
@@ -361,7 +425,7 @@ export function LeagueModulesForm({
             <CardDescription>Which modules this league runs.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col">
-            {MODULE_INFO.map((m, i) => (
+            {SCORING_MODULES.map((m) => (
               <div
                 key={m.name}
                 className="grid grid-cols-[1fr_1fr_auto] items-center gap-4 border-b border-border py-2 text-sm last:border-b-0"
@@ -369,7 +433,7 @@ export function LeagueModulesForm({
                 <span className="font-medium">{m.name}</span>
                 <span className="text-muted-foreground">{m.description}</span>
                 <span className="font-medium">
-                  {[judgesEnabled, eliminationsEnabled, bonusEnabled][i] ? "On" : "Off"}
+                  {moduleEnabled[m.key] ? "On" : "Off"}
                 </span>
               </div>
             ))}
@@ -382,9 +446,9 @@ export function LeagueModulesForm({
             <CardDescription>Your league&apos;s Hard Deadline — the one week everything else locks around.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col">
-            <SettingRow label="Anchor week" value={formatEpisodeCasual(judgesStartsWeek)} />
+            <SettingRow label="Anchor Week" value={formatEpisodeCasual(judgesStartsWeek)} />
             <SettingRow
-              label="Currently locks"
+              label="Currently Locks"
               value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}
             />
             <p className="pt-2 text-sm text-muted-foreground">{seasonClockCopy}</p>
@@ -397,11 +461,25 @@ export function LeagueModulesForm({
             <CardDescription>How much each active module counts toward Standings.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col">
-            {judgesEnabled && <SettingRow label="Dance Card" value={judgesWeight} />}
             {eliminationsEnabled && <SettingRow label="Curtain Call" value={eliminationsWeight} />}
+            {judgesEnabled && <SettingRow label="Dance Card" value={judgesWeight} />}
             {bonusEnabled && <SettingRow label="Grand Finale" value={bonusWeight} />}
           </CardContent>
         </Card>
+
+        {eliminationsEnabled && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Curtain Call</CardTitle>
+              <CardDescription>Weekly elimination and top-scorer picks.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col">
+              <SettingRow label="Elimination Prediction Points" value={eliminationPredictionPoints} />
+              <SettingRow label="Top Scorer Prediction Points" value={topScorerPredictionPoints} />
+              <SettingRow label="Pick 'Em Lock" value={`${predictionLockHoursBeforeAir}h before air`} />
+            </CardContent>
+          </Card>
+        )}
 
         {judgesEnabled && (
           <Card>
@@ -430,20 +508,6 @@ export function LeagueModulesForm({
           </Card>
         )}
 
-        {eliminationsEnabled && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Curtain Call</CardTitle>
-              <CardDescription>Weekly elimination and top-scorer picks.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col">
-              <SettingRow label="Elimination Prediction Points" value={eliminationPredictionPoints} />
-              <SettingRow label="Top Scorer Prediction Points" value={topScorerPredictionPoints} />
-              <SettingRow label="Pick 'Em Lock" value={`${predictionLockHoursBeforeAir}h before air`} />
-            </CardContent>
-          </Card>
-        )}
-
         {bonusEnabled && (
           <Card>
             <CardHeader>
@@ -455,17 +519,18 @@ export function LeagueModulesForm({
                 label="Deadline"
                 value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}
               />
-              <SettingRow label="Points per correctly-placed couple" value={bonusPicksPointsPerCorrect} />
-              <SettingRow label="Scoring method" value={METHOD_ITEMS[bonusMethod]} />
+              <SettingRow label="Points per Correctly-Placed Couple" value={bonusPicksPointsPerCorrect} />
+              <SettingRow label="Scoring Method" value={METHOD_ITEMS[bonusMethod]} />
               {bonusMethod === "distance_based" && (
-                <SettingRow label="Points docked per position off" value={bonusDistancePenalty} />
+                <SettingRow label="Points Lost per Spot Off" value={bonusDistancePenalty} />
               )}
-              {bonusMethod === "binary_tier" && (
-                <SettingRow label="Tier size" value={`Top ${bonusTierSize}`} />
+              {bonusMethod === "band_tier" && (
+                <>
+                  <SettingRow label="Couples per Band" value={bonusTierSize} />
+                  <SettingRow label="Band Pay" value={TIER_PAY_STYLE_ITEMS[bonusTierPayStyle]} />
+                </>
               )}
-              <p className="pt-2 text-sm text-muted-foreground">
-                {explainGrandFinaleMethod(bonusMethod, bonusDistancePenalty, bonusTierSize, bonusPicksPointsPerCorrect)}
-              </p>
+              <p className="pt-2 text-sm text-muted-foreground">{explainMethod()}</p>
               <SettingRow label="1st Place Bonus" value={bonusPicksFirstPlacePoints} />
               <SettingRow label="2nd Place Bonus" value={bonusPicksSecondPlacePoints} />
               <SettingRow label="3rd Place Bonus" value={bonusPicksThirdPlacePoints} />
@@ -494,26 +559,20 @@ export function LeagueModulesForm({
             </p>
           )}
           <div className="flex flex-col">
-            {(
-              [
-                [judgesEnabled, setJudgesEnabled],
-                [eliminationsEnabled, setEliminationsEnabled],
-                [bonusEnabled, setBonusEnabled],
-              ] as const
-            ).map(([checked, setChecked], i) => (
+            {SCORING_MODULES.map((m) => (
               <label
-                key={MODULE_INFO[i].name}
+                key={m.key}
                 className="grid grid-cols-[1fr_1fr] items-center gap-4 border-b border-border py-2 text-sm last:border-b-0"
               >
                 <span className="flex items-center gap-2 font-medium">
                   <input
                     type="checkbox"
-                    checked={checked}
-                    onChange={(e) => setChecked(e.target.checked)}
+                    checked={moduleEnabled[m.key]}
+                    onChange={(e) => setModuleEnabled[m.key](e.target.checked)}
                   />
-                  {MODULE_INFO[i].name}
+                  {m.name}
                 </span>
-                <span className="text-muted-foreground">{MODULE_INFO[i].description}</span>
+                <span className="text-muted-foreground">{m.description}</span>
               </label>
             ))}
           </div>
@@ -528,7 +587,7 @@ export function LeagueModulesForm({
         <CardContent className="flex flex-col gap-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="judgesStartsWeek">Anchor week</Label>
+              <Label htmlFor="judgesStartsWeek">Anchor Week</Label>
               <Select
                 items={startsWeekItems}
                 value={String(judgesStartsWeek)}
@@ -547,7 +606,7 @@ export function LeagueModulesForm({
               </Select>
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Currently locks</Label>
+              <Label>Currently Locks</Label>
               <p className="flex min-h-8 items-center text-sm">{lockDisplay}</p>
             </div>
           </div>
@@ -576,19 +635,6 @@ export function LeagueModulesForm({
           <CardDescription>How much each active module counts toward Standings.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {judgesEnabled && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="judgesWeight">Dance Card</Label>
-              <Input
-                id="judgesWeight"
-                type="number"
-                step="0.1"
-                min={0}
-                value={judgesWeight}
-                onChange={(e) => setJudgesWeight(Number(e.target.value))}
-              />
-            </div>
-          )}
           {eliminationsEnabled && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="eliminationsWeight">Curtain Call</Label>
@@ -599,6 +645,19 @@ export function LeagueModulesForm({
                 min={0}
                 value={eliminationsWeight}
                 onChange={(e) => setEliminationsWeight(Number(e.target.value))}
+              />
+            </div>
+          )}
+          {judgesEnabled && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="judgesWeight">Dance Card</Label>
+              <Input
+                id="judgesWeight"
+                type="number"
+                step="0.1"
+                min={0}
+                value={judgesWeight}
+                onChange={(e) => setJudgesWeight(Number(e.target.value))}
               />
             </div>
           )}
@@ -617,6 +676,50 @@ export function LeagueModulesForm({
           )}
         </CardContent>
       </Card>
+
+      {eliminationsEnabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Curtain Call</CardTitle>
+            <CardDescription>Weekly elimination and top-scorer picks.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="predictionLockHoursBeforeAir">Pick &apos;Em Lock (Hours Before Air)</Label>
+                <Input
+                  id="predictionLockHoursBeforeAir"
+                  type="number"
+                  step="0.5"
+                  min={0}
+                  value={predictionLockHoursBeforeAir}
+                  onChange={(e) => setPredictionLockHoursBeforeAir(Number(e.target.value))}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="eliminationPredictionPoints">Elimination Prediction Points</Label>
+                <Input
+                  id="eliminationPredictionPoints"
+                  type="number"
+                  min={0}
+                  value={eliminationPredictionPoints}
+                  onChange={(e) => setEliminationPredictionPoints(Number(e.target.value))}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="topScorerPredictionPoints">Top Scorer Prediction Points</Label>
+                <Input
+                  id="topScorerPredictionPoints"
+                  type="number"
+                  min={0}
+                  value={topScorerPredictionPoints}
+                  onChange={(e) => setTopScorerPredictionPoints(Number(e.target.value))}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {judgesEnabled && (
         <Card>
@@ -718,8 +821,8 @@ export function LeagueModulesForm({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="locked">Locked (no Recast)</SelectItem>
-                      <SelectItem value="waivers">Recast enabled</SelectItem>
+                      <SelectItem value="locked">Locked (No Recast)</SelectItem>
+                      <SelectItem value="waivers">Recast Enabled</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -745,9 +848,9 @@ export function LeagueModulesForm({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="reverse_standings">Reverse standings</SelectItem>
-                        <SelectItem value="fcfs">First come, first served</SelectItem>
-                        <SelectItem value="manual">Manual (commissioner decides)</SelectItem>
+                        <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
+                        <SelectItem value="fcfs">First Come, First Served</SelectItem>
+                        <SelectItem value="manual">Manual (Commissioner Decides)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -800,50 +903,6 @@ export function LeagueModulesForm({
         </Card>
       )}
 
-      {eliminationsEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Curtain Call</CardTitle>
-            <CardDescription>Weekly elimination and top-scorer picks.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="predictionLockHoursBeforeAir">Pick &apos;Em Lock (Hours Before Air)</Label>
-                <Input
-                  id="predictionLockHoursBeforeAir"
-                  type="number"
-                  step="0.5"
-                  min={0}
-                  value={predictionLockHoursBeforeAir}
-                  onChange={(e) => setPredictionLockHoursBeforeAir(Number(e.target.value))}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="eliminationPredictionPoints">Elimination Prediction Points</Label>
-                <Input
-                  id="eliminationPredictionPoints"
-                  type="number"
-                  min={0}
-                  value={eliminationPredictionPoints}
-                  onChange={(e) => setEliminationPredictionPoints(Number(e.target.value))}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="topScorerPredictionPoints">Top Scorer Prediction Points</Label>
-                <Input
-                  id="topScorerPredictionPoints"
-                  type="number"
-                  min={0}
-                  value={topScorerPredictionPoints}
-                  onChange={(e) => setTopScorerPredictionPoints(Number(e.target.value))}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {bonusEnabled && (
         <Card>
           <CardHeader>
@@ -858,21 +917,24 @@ export function LeagueModulesForm({
                 <p className="text-xs text-muted-foreground">{grandFinaleDeadlineCopy}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="bonusPicksPointsPerCorrect">Points per correctly-placed couple</Label>
+                <Label htmlFor="bonusPicksPointsPerCorrect">Points per Correctly-Placed Couple</Label>
                 <Input
                   id="bonusPicksPointsPerCorrect"
                   type="number"
                   min={0}
                   value={bonusPicksPointsPerCorrect}
-                  onChange={(e) => setBonusPicksPointsPerCorrect(Number(e.target.value))}
+                  onChange={(e) => {
+                    setPointsPerCorrectEdited(true);
+                    setBonusPicksPointsPerCorrect(Number(e.target.value));
+                  }}
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="bonusMethod">Scoring method</Label>
+                <Label htmlFor="bonusMethod">Scoring Method</Label>
                 <Select
                   items={METHOD_ITEMS}
                   value={bonusMethod}
-                  onValueChange={(v) => setBonusMethod((v as ScoringMethod) ?? "exact_position")}
+                  onValueChange={(v) => changeBonusMethod((v as ScoringMethod) ?? GRAND_FINALE_DEFAULT_METHOD)}
                 >
                   <SelectTrigger id="bonusMethod" className="w-full">
                     <SelectValue />
@@ -888,7 +950,7 @@ export function LeagueModulesForm({
               </div>
               {bonusMethod === "distance_based" && (
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="bonusDistancePenalty">Points docked per position off</Label>
+                  <Label htmlFor="bonusDistancePenalty">Points Lost per Spot Off</Label>
                   <Input
                     id="bonusDistancePenalty"
                     type="number"
@@ -898,22 +960,44 @@ export function LeagueModulesForm({
                   />
                 </div>
               )}
-              {bonusMethod === "binary_tier" && (
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="bonusTierSize">Tier size (top N)</Label>
-                  <Input
-                    id="bonusTierSize"
-                    type="number"
-                    min={1}
-                    value={bonusTierSize}
-                    onChange={(e) => setBonusTierSize(Number(e.target.value))}
-                  />
-                </div>
+              {bonusMethod === "band_tier" && (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="bonusTierSize">Couples per Band</Label>
+                    <Input
+                      id="bonusTierSize"
+                      type="number"
+                      min={1}
+                      max={totalCouples}
+                      value={bonusTierSize}
+                      onChange={(e) =>
+                        setBonusTierSize(Math.min(totalCouples, Math.max(1, Math.round(Number(e.target.value)))))
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="bonusTierPayStyle">Band Pay</Label>
+                    <Select
+                      items={TIER_PAY_STYLE_ITEMS}
+                      value={bonusTierPayStyle}
+                      onValueChange={(v) => changeTierPayStyle((v as TierPayStyle) ?? GRAND_FINALE_DEFAULT_TIER_PAY_STYLE)}
+                    >
+                      <SelectTrigger id="bonusTierPayStyle" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(TIER_PAY_STYLE_ITEMS) as TierPayStyle[]).map((style) => (
+                          <SelectItem key={style} value={style}>
+                            {TIER_PAY_STYLE_ITEMS[style]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
-              {explainGrandFinaleMethod(bonusMethod, bonusDistancePenalty, bonusTierSize, bonusPicksPointsPerCorrect)}
-            </p>
+            <p className="text-sm text-muted-foreground">{explainMethod()}</p>
 
             <div className="border-t border-border pt-4">
               <p className="pb-2 text-sm font-medium">Placement Bonus</p>
@@ -978,13 +1062,28 @@ export function LeagueModulesForm({
         </Card>
       )}
 
-      <div className="flex flex-col gap-2">
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        {success && <p className="text-sm text-muted-foreground">Settings saved.</p>}
-        <Button onClick={handleSave} disabled={submitting || syncingAnchor} className="self-start">
-          {submitting ? "Saving..." : "Save settings"}
-        </Button>
-      </div>
+      <BottomNav>
+        <div className="flex flex-col gap-2 py-3">
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          {success && (
+            <p
+              role="status"
+              className="flex items-center gap-2 rounded-md bg-emerald/20 px-3 py-2 text-sm font-medium text-emerald-text"
+            >
+              <span aria-hidden>✓</span>
+              Settings saved
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => handleSave()} disabled={submitting || syncingAnchor}>
+              {submitting ? "Saving..." : "Save"}
+            </Button>
+            <Button variant="outline" onClick={() => handleSave(true)} disabled={submitting || syncingAnchor}>
+              Save &amp; Exit
+            </Button>
+          </div>
+        </div>
+      </BottomNav>
     </div>
   );
 }

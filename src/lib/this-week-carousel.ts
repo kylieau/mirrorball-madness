@@ -59,6 +59,12 @@ export function thisWeekHref(episodeId: string): string {
   return `/this-week?week=${episodeId}`;
 }
 
-export function pastPicksHref(leagueId: string, episodeId: string): string {
-  return `/leagues/${leagueId}?tab=yourpicks&week=${episodeId}`;
+// Your Picks hosts two independent week carousels (Curtain Call on `week`,
+// Your roster on `rosterWeek`); each link keeps the other's position.
+export function pastPicksHref(leagueId: string, episodeId: string, rosterWeekId?: string | null): string {
+  return `/leagues/${leagueId}?tab=yourpicks&week=${episodeId}${rosterWeekId ? `&rosterWeek=${rosterWeekId}` : ""}`;
+}
+
+export function rosterWeekHref(leagueId: string, rosterWeekId: string, curtainWeekId?: string | null): string {
+  return `/leagues/${leagueId}?tab=yourpicks&rosterWeek=${rosterWeekId}${curtainWeekId ? `&week=${curtainWeekId}` : ""}`;
 }

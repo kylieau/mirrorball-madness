@@ -1,3 +1,5 @@
+import { SCORING_MODULES } from "@/lib/scoring-modules";
+
 type MemberBreakdown = {
   managerId: string;
   displayName: string;
@@ -17,11 +19,8 @@ export function StandingsModuleBreakdown({
   curtainCallOn: boolean;
   grandFinaleOn: boolean;
 }) {
-  const columns = [
-    danceCardOn && { key: "danceCard" as const, label: "Dance Card" },
-    curtainCallOn && { key: "curtainCall" as const, label: "Curtain Call" },
-    grandFinaleOn && { key: "grandFinale" as const, label: "Grand Finale" },
-  ].filter((c): c is { key: "danceCard" | "curtainCall" | "grandFinale"; label: string } => !!c);
+  const enabled = { curtainCall: curtainCallOn, danceCard: danceCardOn, grandFinale: grandFinaleOn };
+  const columns = SCORING_MODULES.filter((m) => enabled[m.key]).map((m) => ({ key: m.key, label: m.name }));
 
   if (columns.length < 2) return null;
 

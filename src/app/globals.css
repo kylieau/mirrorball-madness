@@ -52,31 +52,6 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-@theme {
-  --animate-live-pulse: live-pulse 1.4s ease-in-out infinite;
-  --animate-dot-glow: dot-glow 1.6s ease-in-out infinite;
-
-  @keyframes live-pulse {
-    0%,
-    100% {
-      box-shadow: 0 0 0 0 rgba(255, 77, 94, 0.7);
-    }
-    50% {
-      box-shadow: 0 0 0 6px rgba(255, 77, 94, 0);
-    }
-  }
-
-  @keyframes dot-glow {
-    0%,
-    100% {
-      box-shadow: 0 0 0 3px rgba(230, 197, 111, 0.22), 0 0 10px rgba(255, 220, 130, 0.4);
-    }
-    50% {
-      box-shadow: 0 0 0 5px rgba(230, 197, 111, 0.12), 0 0 20px rgba(255, 220, 130, 0.85);
-    }
-  }
-}
-
 @layer base {
   /*
    * Mirrorball Madness's one and only theme: dark curtain + gold mirrorball

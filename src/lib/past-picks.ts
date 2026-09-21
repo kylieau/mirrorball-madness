@@ -17,7 +17,7 @@ export type PastPicksDisplayRow =
   | { kind: "nailed"; coupleIds: string[] }
   | { kind: "miss"; pickIds: string[]; actualIds: string[] };
 
-// Layout A for hits: one "Nailed it" line so the couple isn't printed twice.
+// Layout A for hits: one "Nailed It" line so the couple isn't printed twice.
 // Layout 2 for misses: one strike→actual line per slot (no stacked Actual row).
 // Double-elim slots collapse independently, in slot order.
 export function collapsePickRows(picks: PickMatch[], actualIds: string[]): PastPicksDisplayRow[] {

@@ -78,7 +78,7 @@ export default async function DraftPage({
       .eq("season_id", activeSeasonId ?? ""),
     supabase
       .from("draft_picks")
-      .select("id, couple_id, manager_id, round, pick_number, picked_at, is_auto, auto_source")
+      .select("id, couple_id, manager_id, round, pick_number, picked_at")
       .eq("league_id", id)
       .order("pick_number"),
     supabase
@@ -112,10 +112,7 @@ export default async function DraftPage({
       }))}
       couples={flatCouples}
       coupleDisplayNames={coupleDisplayNames}
-      initialPicks={(picks ?? []).map((p) => ({
-        ...p,
-        is_auto: p.is_auto ?? false,
-      }))}
+      initialPicks={picks ?? []}
       initialQueue={queue?.couple_ids ?? []}
       currentUserId={user.id}
       closeHref={closeHref}

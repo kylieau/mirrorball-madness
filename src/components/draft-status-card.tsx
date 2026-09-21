@@ -71,14 +71,18 @@ export function DraftStatusCard({
               : "Waiting for your commissioner to start the draft."}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col items-start gap-3">
+          <p className="text-sm text-muted-foreground">
+            Can&apos;t be there live? Rank your auto-pick queue and turn on autopilot before it starts
+            and the draft won&apos;t wait on you. You can still jump in and pick yourself.
+          </p>
           <Button
             render={<Link href={`/leagues/${leagueId}/draft`} />}
             nativeButton={false}
             variant={isCommissioner ? "default" : "outline"}
             size="sm"
           >
-            {isCommissioner ? "Set up draft" : "View draft order"}
+            {isCommissioner ? "Set up draft" : "View draft order & set auto-picks"}
           </Button>
         </CardContent>
       </Card>

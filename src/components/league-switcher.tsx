@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDownIcon, CheckIcon, SettingsIcon } from "lucide-react";
+import { ChevronDownIcon, CheckIcon } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
-import { Button } from "@/components/ui/button";
 import { cn } from "cn";
 
 export type SwitcherLeague = {
@@ -40,7 +39,7 @@ export function LeagueSwitcher({
       </SheetTrigger>
       <SheetContent side="top" showCloseButton={false} className="mx-auto max-w-md rounded-b-2xl border-x">
         <SheetHeader>
-          <SheetTitle>Your leagues</SheetTitle>
+          <SheetTitle>Your Leagues</SheetTitle>
         </SheetHeader>
         <div className="flex flex-col px-4">
           {leagues.map((l) => {
@@ -58,24 +57,11 @@ export function LeagueSwitcher({
                   </p>
                 </Link>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  <Button
-                    render={
-                      <Link
-                        href={`/leagues/${l.id}/settings?from=${encodeURIComponent(`/leagues/${currentLeagueId}?tab=${activeTab}`)}`}
-                      />
-                    }
-                    nativeButton={false}
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={`${l.name} settings`}
-                  >
-                    <SettingsIcon />
-                  </Button>
                   {isCurrent ? (
                     <CheckIcon className="size-4 text-accent" aria-hidden />
                   ) : l.picksDue ? (
                     <span className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
-                      Picks due
+                      Picks Due
                     </span>
                   ) : (
                     <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">

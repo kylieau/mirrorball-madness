@@ -14,9 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { MODULE_INFO } from "@/components/league-modules-form";
-
-const MODULE_FIELD_NAMES = ["danceCardEnabled", "curtainCallEnabled", "grandFinaleEnabled"] as const;
+import { SCORING_MODULES } from "@/lib/scoring-modules";
 
 function SubmitButton({ idleLabel, pendingLabel }: { idleLabel: string; pendingLabel: string }) {
   const { pending } = useFormStatus();
@@ -47,13 +45,13 @@ export function CreateJoinLeagueDialogs() {
             <div className="flex flex-col gap-1">
               <Label>Scoring Modules</Label>
               <div className="flex flex-col">
-                {MODULE_INFO.map((m, i) => (
+                {SCORING_MODULES.map((m) => (
                   <label
-                    key={m.name}
+                    key={m.key}
                     className="grid grid-cols-[1fr_1fr] items-center gap-4 border-b border-border py-2 text-sm last:border-b-0"
                   >
                     <span className="flex items-center gap-2 font-medium">
-                      <input type="checkbox" name={MODULE_FIELD_NAMES[i]} defaultChecked />
+                      <input type="checkbox" name={m.createField} defaultChecked />
                       {m.name}
                     </span>
                     <span className="text-muted-foreground">{m.description}</span>
@@ -72,7 +70,7 @@ export function CreateJoinLeagueDialogs() {
       </Dialog>
 
       <Dialog>
-        <DialogTrigger render={<Button variant="outline" />}>Join with code</DialogTrigger>
+        <DialogTrigger render={<Button variant="outline" />}>Join with Code</DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Join a League</DialogTitle>
@@ -92,7 +90,7 @@ export function CreateJoinLeagueDialogs() {
               />
             </div>
             <DialogFooter>
-              <SubmitButton idleLabel="Join league" pendingLabel="Joining..." />
+              <SubmitButton idleLabel="Join League" pendingLabel="Joining..." />
             </DialogFooter>
           </form>
         </DialogContent>

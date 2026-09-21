@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { renameLeague, deleteLeague } from "@/app/leagues/[id]/settings/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettingRow } from "@/components/setting-row";
 import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
+import { ResetDraftDialog } from "@/components/reset-draft-dialog";
 import {
   Dialog,
   DialogClose,
@@ -24,12 +26,17 @@ export function LeagueInfoSection({
   leagueName,
   inviteCode,
   canEdit,
+  canResetDraft,
 }: {
   leagueId: string;
   leagueName: string;
   inviteCode: string;
   canEdit: boolean;
+  // Dance Card on and a draft under way or finished — the only time there's
+  // anything to reset.
+  canResetDraft: boolean;
 }) {
+  const [draftWasReset, setDraftWasReset] = useState(false);
   const [name, setName] = useState(leagueName);
   const [savingName, setSavingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -106,41 +113,59 @@ export function LeagueInfoSection({
 
         <div className="flex flex-col gap-2 border-t border-border pt-4">
           <p className="text-sm font-medium text-destructive">Danger zone</p>
-          <Dialog>
-            <DialogTrigger render={<Button variant="destructive" className="self-start" />}>
-              Delete league
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete {leagueName}?</DialogTitle>
-                <DialogDescription>
-                  This permanently deletes the league for every member — roster, draft
-                  history, picks, and all scores. This can&apos;t be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="confirmName">
-                  Type <span className="font-medium text-foreground">{leagueName}</span> to confirm
-                </Label>
-                <Input
-                  id="confirmName"
-                  value={confirmName}
-                  onChange={(e) => setConfirmName(e.target.value)}
-                />
-              </div>
-              {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
-              <DialogFooter>
-                <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-                <Button
-                  variant="destructive"
-                  disabled={confirmName !== leagueName || deleting}
-                  onClick={handleDelete}
-                >
-                  {deleting ? "Deleting..." : "Delete league permanently"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          {draftWasReset && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Draft reset.{" "}
+              <Link href={`/leagues/${leagueId}/draft`} className="font-medium text-foreground underline">
+                Open the draft room
+              </Link>{" "}
+              to start over.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {canResetDraft && (
+              <ResetDraftDialog
+                leagueId={leagueId}
+                leagueName={leagueName}
+                onReset={() => setDraftWasReset(true)}
+              />
+            )}
+            <Dialog>
+              <DialogTrigger render={<Button variant="destructive" />}>
+                Delete league
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete {leagueName}?</DialogTitle>
+                  <DialogDescription>
+                    This permanently deletes the league for every member — roster, draft
+                    history, picks, and all scores. This can&apos;t be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="confirmName">
+                    Type <span className="font-medium text-foreground">{leagueName}</span> to confirm
+                  </Label>
+                  <Input
+                    id="confirmName"
+                    value={confirmName}
+                    onChange={(e) => setConfirmName(e.target.value)}
+                  />
+                </div>
+                {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+                <DialogFooter>
+                  <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+                  <Button
+                    variant="destructive"
+                    disabled={confirmName !== leagueName || deleting}
+                    onClick={handleDelete}
+                  >
+                    {deleting ? "Deleting..." : "Delete league permanently"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardContent>
     </Card>

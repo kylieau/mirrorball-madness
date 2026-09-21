@@ -1,5 +1,50 @@
 # Session Handoff
 
+## 0. Latest (2026-09-21): Grand Finale scoring methods recalibrated — SQL applied live & verified
+
+Built, tsc/eslint/`npm test` (287) clean, `npm run build` passes, committed 2026-09-21. UI mostly not click-tested
+(Reset Draft button in League Settings confirmed visible).
+- Dev gotcha: `__webpack_modules__[moduleId] is not a function` in the Next dev overlay = stale `.next` after many file
+  changes, not a code bug — `rm -rf .next` and restart `next dev`, then hard-reload the browser.
+- Calibration script now scores all three Grand Finale methods (`run.mjs`); defaults: distance 200 /
+  penalty 50, exact 257, band_tier 162 equal / 252 graded.
+- `binary_tier` replaced by `band_tier` (bands of N couples, pay when predicted band == actual band,
+  `bonus_picks_tier_pay_style` equal|graded). Distance-based is now the default method.
+- `supabase/apply-grand-finale-scoring-methods.sql` **applied and verified** (all 6 leagues distance_based/50/200; throwaway-account RPC test passed; `scratch/verify-gf-methods.mjs`): adds the
+  pay-style column, renames the method, resets *every* league to distance_based/50/200, redefines
+  `create_league` and `update_scoring_categories` (new last arg). Live check before writing: no
+  `grand_finale_points` scored yet; 5 of 6 leagues on exact_position @ 50 pts, none on binary_tier.
+- `types.ts` regenerated from the live schema (also picked up `draft_picks.auto_source`, missed by the earlier hand-edit).
+- Files: `scoring.ts(+test)`, `grand-finale-explainer.ts(+test)`, `league-modules-form.tsx`,
+  settings `page.tsx`/`actions.ts`, `results.ts`, `season-clock-sync.ts`, `schema.sql`, `CLAUDE.md`.
+- All-manager "Dance Cards": `league-rosters-card.tsx`, `league-rosters.ts`, `roster-couple-points.ts` (+tests);
+  on the draft-complete page (replaces the old "Your roster" card; adds a "See standings" exit), the
+  Standings tab (`#rosters`, current rosters + season totals, no carousel), and linked from Dance Card on Your Picks. The week carousel lives on Your Picks' "Your roster" card
+  (`?rosterWeek=`, independent of Curtain Call's `week`).
+  Not click-tested.
+- Module order unified to Curtain Call → Dance Card → Grand Finale via `src/lib/scoring-modules.ts`
+  (Settings both views, create dialog, Standings, chips, Picks labels). Not click-tested — check the
+  create-league dialog still maps each toggle to the right module. A live draft is only flagged in the
+  Dance Card section's `DraftStatusCard` (no cue in Today/league header).
+- League Settings (commissioner view): Save / Save & exit live in a fixed `BottomNav` bar so they're always visible; the page header (title, league name, ✕) is sticky; "Save" shows a green "✓ Settings saved" banner; new "Save & exit" saves then goes to
+  `exitHref` (the page Settings was opened from, `closeHref`). Not click-tested.
+- League settings entry moved to Account settings (avatar sheet + /settings): `league-settings-links.tsx`, `leagues` on
+  `getAccountSettingsData`; gear icons removed from Home cards + league switcher. Not click-tested.
+- Reset Draft now also lives in League Settings → League Info → Danger Zone (`canResetDraft` prop; `resetDraft`
+  action revalidates `/leagues/[id]` layout). Not click-tested (never reset a real league without asking).
+- Results-tab couple notes reordered via `coupleLeagueNotes` (`src/lib/couple-league-notes.ts`): "On your Alpha roster",
+  "Your Alpha elimination pick", "Your Alpha top-scorer pick" (multi-league: "Alpha and Beta rosters"). The user clicked
+  through the other new screens and approved them; this one is not click-tested.
+- `scratch/check-gf-settings.mjs` is a read-only live check (untracked scratch).
+- Home `EpisodeBanner`: removed the decorative motion (pulsing red on-air dot, glowing current-week
+  dot) and their `live-pulse` / `dot-glow` keyframes + theme entries in `globals.css`. The sticky bar's
+  slide-in transition was deliberately kept. `tsc` clean; build/lint not run, not viewed in browser.
+- Draft lobby ("Draft hasn't started") now opens with `draft-away-note.tsx`: explains the queue,
+  autopilot (picks the moment you're on the clock), timer-only auto-pick without it, and live
+  override (switch autopilot off in the room; the pick button is disabled while it's on). Not
+  click-tested.
+
+
 ## 1. Current State
 
 **No feature in flight.** This session built and shipped two things for the live draft, both
@@ -35,7 +80,7 @@ the RPC scripts. The user plans to test on 2026-09-22 before real drafts.
 - `src/components/draft-room.tsx`; **new** `draft-managers-card.tsx`, `draft-queue-card.tsx`,
   `reset-draft-dialog.tsx`
 - `src/lib/draft.ts`, `draft.test.ts`; **new** `src/lib/use-debounced-save.ts`
-- `src/lib/supabase/types.ts` (**hand-edited**, see Backlog), `CLAUDE.md`, this file
+- `src/lib/supabase/types.ts` (regenerated 2026-09-21), `CLAUDE.md`, this file
 
 **Not ours** (a parallel session's copy-picks work + a display tweak, already on `main`):
 `src/app/leagues/[id]/page.tsx`, `predictions/actions.ts`, `all-results-view.tsx`,
@@ -89,9 +134,6 @@ first (it cascades), then the user. The user's own account is a co-commissioner 
 
 ## 4. Backlog & Deferred Items
 
-- **Regenerate `src/lib/supabase/types.ts`** once a `SUPABASE_ACCESS_TOKEN` exists (currently
-  hand-edited for `reset_draft`, `set_member_draft_autopilot`, `undo_last_pick`,
-  `set_draft_queue`, `draft_queues`, `draft_picks.auto_source`, `record_draft_pick` args).
 - **Confirm the deploy for `ed045aa` succeeded** on Vercel (past builds broke silently). The
   old deployed UI would call the dropped `undo_last_auto_pick`.
 - **Auto-picks aren't announced** in the UI (dialog/banner cover manual picks only); no timer

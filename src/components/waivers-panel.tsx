@@ -189,7 +189,7 @@ export function WaiversPanel({
 
       {isCommissioner && claimMethod === "reverse_standings" && (
         <Button onClick={handleProcess} disabled={busy}>
-          Process pending recasts
+          Process Pending Recasts
         </Button>
       )}
 

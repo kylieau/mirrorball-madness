@@ -337,7 +337,7 @@ export function AllResultsView({
                 </DialogHeader>
                 <DialogFooter>
                   <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-                  <Button onClick={() => handleCorrect(ep.id)}>Start correction</Button>
+                  <Button onClick={() => handleCorrect(ep.id)}>Start Correction</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -378,10 +378,10 @@ export function AllResultsView({
     <div className="flex flex-col gap-6">
       <div className="flex gap-2">
         <Button size="sm" variant={view === "week" ? "default" : "outline"} onClick={() => setView("week")}>
-          By week
+          By Week
         </Button>
         <Button size="sm" variant={view === "couple" ? "default" : "outline"} onClick={() => setView("couple")}>
-          By couple
+          By Couple
         </Button>
       </div>
 

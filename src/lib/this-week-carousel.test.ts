@@ -3,6 +3,7 @@ import {
   adjacentThisWeekWeeks,
   buildThisWeekCarouselWeeks,
   pastPicksHref,
+  rosterWeekHref,
   selectThisWeekEpisode,
   thisWeekHref,
   type ThisWeekCarouselEpisode,
@@ -114,5 +115,16 @@ describe("thisWeekHref", () => {
 describe("pastPicksHref", () => {
   it("flips Past picks via ?tab=yourpicks&week=", () => {
     expect(pastPicksHref("league-1", "ep-2")).toBe("/leagues/league-1?tab=yourpicks&week=ep-2");
+  });
+});
+
+describe("Your Picks carousel hrefs keep each other's position", () => {
+  it("pastPicksHref carries the roster week when there is one", () => {
+    expect(pastPicksHref("l", "ep-2", "w-1")).toBe("/leagues/l?tab=yourpicks&week=ep-2&rosterWeek=w-1");
+  });
+
+  it("rosterWeekHref carries the Curtain Call week when there is one", () => {
+    expect(rosterWeekHref("l", "w-3")).toBe("/leagues/l?tab=yourpicks&rosterWeek=w-3");
+    expect(rosterWeekHref("l", "w-3", "ep-2")).toBe("/leagues/l?tab=yourpicks&rosterWeek=w-3&week=ep-2");
   });
 });

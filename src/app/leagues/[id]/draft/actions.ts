@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function setDraftOrder(leagueId: string, orderedUserIds: string[]) {
@@ -70,7 +71,11 @@ export async function resetDraft(leagueId: string) {
   const { error } = await supabase.rpc("reset_draft", {
     p_league_id: leagueId,
   });
-  return { error: error?.message ?? null };
+  if (error) return { error: error.message };
+  // Reset is reachable from League Settings too, which has no realtime
+  // channel to notice the draft went back to the lobby.
+  revalidatePath(`/leagues/${leagueId}`, "layout");
+  return { error: null };
 }
 
 export async function setDraftQueue(leagueId: string, coupleIds: string[]) {

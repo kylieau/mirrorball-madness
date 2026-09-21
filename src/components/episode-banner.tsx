@@ -15,7 +15,7 @@ const CURTAIN_FOLDS =
 
 function statusCopy(state: EpisodeBannerState, formattedAirsAt: string) {
   if (state.kind === "on_air") {
-    return { title: "On air now", sub: state.picksModuleOn ? "Picks are locked" : null };
+    return { title: "On Air Now", sub: state.picksModuleOn ? "Picks are locked" : null };
   }
   return {
     title: state.picksModuleOn ? "Picks open" : null,
@@ -39,7 +39,7 @@ function SeasonTrack({ weeksDone, weekNumber }: { weeksDone: number; weekNumber:
               "grid size-4 flex-none place-items-center rounded-full border-[1.5px] text-[8.5px] font-semibold",
               dot.kind === "done" && "border-primary bg-primary text-primary-foreground",
               dot.kind === "current" &&
-                "size-[22px] border-[#fff3c8] bg-primary text-[11px] text-primary-foreground shadow-[0_0_0_3px_rgba(230,197,111,0.22),0_0_14px_rgba(255,220,130,0.6)] animate-dot-glow motion-reduce:animate-none",
+                "size-[22px] border-[#fff3c8] bg-primary text-[11px] text-primary-foreground shadow-[0_0_0_3px_rgba(230,197,111,0.22),0_0_14px_rgba(255,220,130,0.6)]",
               dot.kind === "future" && "border-primary/40 bg-black/30"
             )}
           >
@@ -107,7 +107,7 @@ export function EpisodeBanner({ state, weeksDone }: { state: EpisodeBannerState;
               {title && (
                 <p className="flex items-center text-[13px] font-semibold text-foreground">
                   {onAir && (
-                    <span className="mr-1.5 inline-block size-[7px] rounded-full bg-[#ff4d5e] animate-live-pulse motion-reduce:animate-none" />
+                    <span className="mr-1.5 inline-block size-[7px] rounded-full bg-[#ff4d5e]" />
                   )}
                   {title}
                 </p>
@@ -130,7 +130,7 @@ export function EpisodeBanner({ state, weeksDone }: { state: EpisodeBannerState;
           <div className="absolute inset-0 bg-linear-to-r from-black/5 via-black/55 to-black/5" />
           <p className="relative flex h-10 items-center gap-2 px-4 text-[13px] font-semibold text-foreground">
             {onAir && (
-              <span className="inline-block size-[7px] rounded-full bg-[#ff4d5e] animate-live-pulse motion-reduce:animate-none" />
+              <span className="inline-block size-[7px] rounded-full bg-[#ff4d5e]" />
             )}
             <span className="font-heading text-[15px] font-black text-primary">{weekLabel}</span>
             {title && (

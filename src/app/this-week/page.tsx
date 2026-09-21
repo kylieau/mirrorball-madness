@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
+import { coupleLeagueNotes } from "@/lib/couple-league-notes";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import {
@@ -177,17 +178,11 @@ export default async function ThisWeekPage({
     ...Object.keys(eliminationPickLeaguesByCouple),
     ...Object.keys(topScorerPickLeaguesByCouple),
   ])) {
-    const lines: string[] = [];
-    if (rosterLeaguesByCouple[coupleId]?.length) {
-      lines.push(`On your roster in ${rosterLeaguesByCouple[coupleId].join(", ")}`);
-    }
-    if (eliminationPickLeaguesByCouple[coupleId]?.length) {
-      lines.push(`Your elimination pick in ${eliminationPickLeaguesByCouple[coupleId].join(", ")}`);
-    }
-    if (topScorerPickLeaguesByCouple[coupleId]?.length) {
-      lines.push(`Your top-scorer pick in ${topScorerPickLeaguesByCouple[coupleId].join(", ")}`);
-    }
-    leaguesByCouple[coupleId] = lines;
+    leaguesByCouple[coupleId] = coupleLeagueNotes({
+      rosterLeagues: rosterLeaguesByCouple[coupleId],
+      eliminationPickLeagues: eliminationPickLeaguesByCouple[coupleId],
+      topScorerPickLeagues: topScorerPickLeaguesByCouple[coupleId],
+    });
   }
 
   return (

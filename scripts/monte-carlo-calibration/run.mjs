@@ -67,6 +67,14 @@ const CURRENT = {
 
 const GRAND_FINALE_CAP_FRACTION = 0.6; // spec item 6: 3/5 of a full equal share
 
+// Grand Finale scoring methods other than exact_position (mirrors
+// computeGrandFinalePoints in src/lib/scoring.ts). Each gets its own
+// points-per-correct, solved to the same variance budget as exact_position.
+const DISTANCE_ZERO_AT = 4; // distance_based: credit reaches 0 this many spots off
+const BAND_WIDTH = 3; // band_tier: couples per band (3 = the finale, then 4th-6th, ...)
+const GRADED_BAND_STEP = 0.25; // graded pay: each lower band pays this much less...
+const GRADED_BAND_FLOOR = 0.25; // ...down to this floor
+
 // ============================================================
 // RNG (seeded, for reproducibility)
 // ============================================================
@@ -204,6 +212,9 @@ function simulateSeason(rosterSize) {
   // Grand Finale full-order prediction: guessed order = skill rank + noise.
   const trueSkillRank = [...coupleIds].sort((a, b) => skills[b] - skills[a]); // best skill first
   const bonusPicksByManager = new Array(managerCount).fill(0);
+  const distanceByManager = new Array(managerCount).fill(0);
+  const bandEqualByManager = new Array(managerCount).fill(0);
+  const bandGradedByManager = new Array(managerCount).fill(0);
   const gfPlacementByManager = new Array(managerCount).fill(0);
   const danceCardPlacementByManager = new Array(managerCount).fill(0);
 
@@ -218,8 +229,19 @@ function simulateSeason(rosterSize) {
 
     for (const [id, placement] of finalPlacementOf) {
       const actualPosition = TOTAL_COUPLES - placement + 1;
-      if (predictedPositionOf.get(id) === actualPosition) {
-        bonusPicksByManager[m] += CURRENT.bonusPicksPointsPerCorrect;
+      const predictedPosition = predictedPositionOf.get(id);
+      const base = CURRENT.bonusPicksPointsPerCorrect;
+      if (predictedPosition === actualPosition) bonusPicksByManager[m] += base;
+
+      const distance = Math.abs(predictedPosition - actualPosition);
+      distanceByManager[m] += Math.max(0, base - distance * (base / DISTANCE_ZERO_AT));
+
+      // Position TOTAL_COUPLES = winner = band 0.
+      const predictedBand = Math.floor((TOTAL_COUPLES - predictedPosition) / BAND_WIDTH);
+      const actualBand = Math.floor((TOTAL_COUPLES - actualPosition) / BAND_WIDTH);
+      if (predictedBand === actualBand) {
+        bandEqualByManager[m] += base;
+        bandGradedByManager[m] += base * Math.max(GRADED_BAND_FLOOR, 1 - GRADED_BAND_STEP * actualBand);
       }
     }
 
@@ -238,6 +260,9 @@ function simulateSeason(rosterSize) {
     survivalByManager,
     predictionByManager,
     bonusPicksByManager,
+    distanceByManager,
+    bandEqualByManager,
+    bandGradedByManager,
     gfPlacementByManager,
     danceCardPlacementByManager,
   };
@@ -249,6 +274,9 @@ function simulateMany(rosterSize, n) {
     survival: [],
     prediction: [],
     bonusPicks: [],
+    distance: [],
+    bandEqual: [],
+    bandGraded: [],
     gfPlacement: [],
     danceCardPlacement: [],
   };
@@ -259,6 +287,9 @@ function simulateMany(rosterSize, n) {
       acc.survival.push(s.survivalByManager[m]);
       acc.prediction.push(s.predictionByManager[m]);
       acc.bonusPicks.push(s.bonusPicksByManager[m]);
+      acc.distance.push(s.distanceByManager[m]);
+      acc.bandEqual.push(s.bandEqualByManager[m]);
+      acc.bandGraded.push(s.bandGradedByManager[m]);
       acc.gfPlacement.push(s.gfPlacementByManager[m]);
       acc.danceCardPlacement.push(s.danceCardPlacementByManager[m]);
     }
@@ -324,6 +355,10 @@ const bonusPicksBudget = grandFinaleBudget - gfPlacementBudget;
 const V_bonusPicksRaw = variance(ref.bonusPicks);
 const V_gfPlacementRaw = variance(ref.gfPlacement);
 const bonusPicksScale = Math.sqrt(bonusPicksBudget / V_bonusPicksRaw);
+// Every method's payout is linear in its base, so each solves in closed form.
+const distanceScale = Math.sqrt(bonusPicksBudget / variance(ref.distance));
+const bandEqualScale = Math.sqrt(bonusPicksBudget / variance(ref.bandEqual));
+const bandGradedScale = Math.sqrt(bonusPicksBudget / variance(ref.bandGraded));
 const gfPlacementScale = Math.sqrt(gfPlacementBudget / V_gfPlacementRaw);
 
 console.log("\n--- Global (roster-size-independent) calibrated defaults ---");
@@ -343,7 +378,17 @@ console.log(
 console.log(
   `bonus_picks_first_place_points .. bonus_picks_fifth_place_points (Grand Finale half): ${gfPlacement.map((v) => v.toFixed(1)).join(", ")}`
 );
-console.log(`bonus_picks_points_per_correct: ${bonusPicksPointsPerCorrect.toFixed(1)}`);
+console.log(`bonus_picks_points_per_correct (exact_position): ${bonusPicksPointsPerCorrect.toFixed(1)}`);
+const distancePointsPerCorrect = CURRENT.bonusPicksPointsPerCorrect * distanceScale;
+console.log(
+  `bonus_picks_points_per_correct (distance_based, credit hits 0 at ${DISTANCE_ZERO_AT} spots off): ${distancePointsPerCorrect.toFixed(1)} — bonus_picks_distance_penalty ${(distancePointsPerCorrect / DISTANCE_ZERO_AT).toFixed(1)}`
+);
+console.log(
+  `bonus_picks_points_per_correct (band_tier, width ${BAND_WIDTH}, equal pay): ${(CURRENT.bonusPicksPointsPerCorrect * bandEqualScale).toFixed(1)}`
+);
+console.log(
+  `bonus_picks_points_per_correct (band_tier, width ${BAND_WIDTH}, graded pay): ${(CURRENT.bonusPicksPointsPerCorrect * bandGradedScale).toFixed(1)}`
+);
 console.log(`judges_score_multiplier at roster size ${REFERENCE_ROSTER_SIZE}: ${referenceMultiplier.toFixed(3)}`);
 
 // ============================================================
