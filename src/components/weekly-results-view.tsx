@@ -180,17 +180,12 @@ export function WeeklyResultsView({
               )}
             >
               <div>
-                <span className={cn("inline-block rounded-full px-2 py-0.5 text-[10px] font-bold", tag.className)}>
-                  {tag.label}
-                </span>
-                <p className="text-sm font-semibold">
-                  {r.parts ? <CoupleName {...r.parts} /> : "Unknown"}
-                  {r.danceLabels.map((label, i) => (
-                    <span key={i} className="block text-xs font-normal text-muted-foreground">
-                      {label}
-                    </span>
-                  ))}
-                </p>
+                <p className="text-sm font-semibold">{r.parts ? <CoupleName {...r.parts} /> : "Unknown"}</p>
+                {r.danceLabels.map((label, i) => (
+                  <p key={i} className="mt-0.5 text-xs text-muted-foreground">
+                    {label}
+                  </p>
+                ))}
                 {leaguesByCouple?.[r.couple_id]?.map((line) => (
                   <p key={line} className="mt-0.5 text-xs text-accent">
                     {line}
@@ -198,6 +193,9 @@ export function WeeklyResultsView({
                 ))}
               </div>
               <div className="shrink-0 text-right text-xs text-muted-foreground">
+                <span className={cn("mb-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold", tag.className)}>
+                  {tag.label}
+                </span>
                 <span className="block font-heading text-base font-semibold text-foreground">
                   {r.outcome === "bye" ? "—" : r.total}
                 </span>

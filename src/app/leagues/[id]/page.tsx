@@ -689,7 +689,7 @@ export default async function LeaguePage({
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-8">
+    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
       <LeagueHeader
         leagueId={id}
         inviteCode={league.invite_code}

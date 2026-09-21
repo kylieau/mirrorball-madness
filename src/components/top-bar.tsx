@@ -19,14 +19,33 @@ export function TopBar({
   email: string;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4">
-      <Link href="/today" className="text-xs font-medium text-muted-foreground">
-        🪩 Mirrorball Madness
+    <div className="flex items-center justify-between gap-4">
+      <Link href="/today" className="flex h-7 items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+        <span className="text-lg leading-none">🪩</span>
+        Mirrorball Madness
       </Link>
       <div className="flex gap-2">
         {actionSlot}
         <AccountSettingsSheet email={email} {...accountSettingsData} />
       </div>
+    </div>
+  );
+}
+
+// The pinned single-row version shown by ScrollRevealBar once the full header
+// has scrolled away: a page-specific control on the left, the avatar on the right.
+export function SlimTopBar({
+  left,
+  email,
+  ...accountSettingsData
+}: AccountSettingsData & {
+  left: ReactNode;
+  email: string;
+}) {
+  return (
+    <div className="flex h-12 items-center justify-between gap-3 px-4">
+      <div className="min-w-0 flex-1">{left}</div>
+      <AccountSettingsSheet email={email} {...accountSettingsData} />
     </div>
   );
 }

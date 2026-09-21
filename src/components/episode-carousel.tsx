@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
@@ -8,12 +9,15 @@ import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
 function ArrowSlot({
   href,
   label,
+  compact,
   children,
 }: {
   href: string | null;
   label: string;
+  compact?: boolean;
   children: ReactNode;
 }) {
+  const sizeClass = compact ? "size-8" : "size-10";
   if (href) {
     return (
       <Button
@@ -21,7 +25,7 @@ function ArrowSlot({
         nativeButton={false}
         variant="ghost"
         size="icon-lg"
-        className="size-10 shrink-0 text-muted-foreground"
+        className={cn(sizeClass, "shrink-0 text-muted-foreground")}
         aria-label={label}
       >
         {children}
@@ -30,7 +34,7 @@ function ArrowSlot({
   }
 
   return (
-    <span className="inline-flex size-10 shrink-0 items-center justify-center text-muted-foreground/30" aria-hidden>
+    <span className={cn("inline-flex shrink-0 items-center justify-center text-muted-foreground/30", sizeClass)} aria-hidden>
       {children}
     </span>
   );
@@ -44,27 +48,29 @@ export function EpisodeCarousel({
   nightsLabel,
   prevHref,
   nextHref,
+  compact,
 }: {
   weekNumber: number;
   theme: string | null;
   nightsLabel?: string | null;
   prevHref: string | null;
   nextHref: string | null;
+  compact?: boolean;
 }) {
   const label = formatEpisodeCasualWithTheme(weekNumber, theme);
 
   return (
-    <nav aria-label="Weeks" className="flex items-center justify-center">
-      <ArrowSlot href={prevHref} label="Previous week">
+    <nav aria-label="Weeks" className={cn("flex items-center", compact ? "justify-start" : "justify-center")}>
+      <ArrowSlot href={prevHref} label="Previous week" compact={compact}>
         <ChevronLeftIcon className="size-4" />
       </ArrowSlot>
-      <div className="min-w-0 max-w-[calc(100%-5rem)] text-center">
+      <div className={cn("min-w-0 text-center", compact ? "max-w-[calc(100%-4rem)]" : "max-w-[calc(100%-5rem)]")}>
         <p className="truncate text-sm font-medium">{label}</p>
-        {nightsLabel ? (
+        {nightsLabel && !compact ? (
           <p className="truncate text-[11px] text-muted-foreground">{nightsLabel}</p>
         ) : null}
       </div>
-      <ArrowSlot href={nextHref} label="Next week">
+      <ArrowSlot href={nextHref} label="Next week" compact={compact}>
         <ChevronRightIcon className="size-4" />
       </ArrowSlot>
     </nav>

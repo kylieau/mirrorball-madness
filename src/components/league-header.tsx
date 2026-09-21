@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/page-header";
 import { LeagueSwitcher, type SwitcherLeague } from "@/components/league-switcher";
-import { StickyPageHeader } from "@/components/sticky-page-header";
-import { TopBar } from "@/components/top-bar";
+import { ScrollRevealBar } from "@/components/scroll-reveal-bar";
+import { SlimTopBar, TopBar } from "@/components/top-bar";
 import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
@@ -41,29 +42,45 @@ export function LeagueHeader({
 
   return (
     <>
-      <StickyPageHeader>
-        <TopBar
-          {...accountSettingsData}
-          email={viewerEmail}
-          actionSlot={
-            danceCardOn &&
-            waiversOn && (
-              <Button
-                render={<Link href={`/leagues/${leagueId}/waivers`} />}
-                nativeButton={false}
-                variant="outline"
-                size="sm"
-              >
-                Recast
-              </Button>
-            )
-          }
-        />
-        <h1 className="sr-only">{title}</h1>
-        {switcherLeagues.length > 1 && (
-          <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
-        )}
-      </StickyPageHeader>
+      <TopBar
+        {...accountSettingsData}
+        email={viewerEmail}
+        actionSlot={
+          danceCardOn &&
+          waiversOn && (
+            <Button
+              render={<Link href={`/leagues/${leagueId}/waivers`} />}
+              nativeButton={false}
+              variant="outline"
+              size="sm"
+            >
+              Recast
+            </Button>
+          )
+        }
+      />
+
+      <ScrollRevealBar
+        bar={
+          <SlimTopBar
+            {...accountSettingsData}
+            email={viewerEmail}
+            left={
+              switcherLeagues.length > 1 ? (
+                <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
+              ) : (
+                <span className="font-heading text-lg font-semibold">{title}</span>
+              )
+            }
+          />
+        }
+      >
+        <PageHeader title={title}>
+          {switcherLeagues.length > 1 && (
+            <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
+          )}
+        </PageHeader>
+      </ScrollRevealBar>
 
       {justCreated && canEdit && (
         <Card className="border-primary">

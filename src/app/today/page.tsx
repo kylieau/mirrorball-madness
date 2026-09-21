@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { HomeDashboard } from "@/components/home-dashboard";
-import { StickyPageHeader } from "@/components/sticky-page-header";
-import { TopBar } from "@/components/top-bar";
+import { PageHeader } from "@/components/page-header";
+import { ScrollRevealBar } from "@/components/scroll-reveal-bar";
+import { SlimTopBar, TopBar } from "@/components/top-bar";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
@@ -167,11 +168,21 @@ export default async function TodayPage() {
   ].slice(0, 3);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-8">
-      <StickyPageHeader>
-        <TopBar {...accountSettingsData} email={user.email ?? ""} />
-        <h1 className="sr-only">Home</h1>
-      </StickyPageHeader>
+    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
+      <TopBar {...accountSettingsData} email={user.email ?? ""} />
+
+      <ScrollRevealBar
+        className="-mb-4"
+        bar={
+          <SlimTopBar
+            {...accountSettingsData}
+            email={user.email ?? ""}
+            left={<span className="font-heading text-lg font-semibold">Home</span>}
+          />
+        }
+      >
+        <PageHeader title="Home" />
+      </ScrollRevealBar>
 
       <div className={BOTTOM_NAV_CLEARANCE}>
         <HomeDashboard

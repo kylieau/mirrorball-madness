@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
 import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
-import { StickyPageHeader } from "@/components/sticky-page-header";
-import { TopBar } from "@/components/top-bar";
+import { PageHeader } from "@/components/page-header";
+import { ScrollRevealBar } from "@/components/scroll-reveal-bar";
+import { SlimTopBar, TopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { coupleLeagueNotes } from "@/lib/couple-league-notes";
@@ -186,20 +187,43 @@ export default async function ThisWeekPage({
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-8">
-      <StickyPageHeader>
-        <TopBar {...accountSettingsData} email={user.email ?? ""} />
-        <h1 className="sr-only">Results</h1>
-        {selectedWeek && (
-          <EpisodeCarousel
-            weekNumber={selectedWeek.week_number}
-            theme={selectedWeek.theme}
-            nightsLabel={selectedWeek.nightsLabel}
-            prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
-            nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
+    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
+      <TopBar {...accountSettingsData} email={user.email ?? ""} />
+
+      <ScrollRevealBar
+        className="-mb-4"
+        bar={
+          <SlimTopBar
+            {...accountSettingsData}
+            email={user.email ?? ""}
+            left={
+              selectedWeek ? (
+                <EpisodeCarousel
+                  weekNumber={selectedWeek.week_number}
+                  theme={selectedWeek.theme}
+                  prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
+                  nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
+                  compact
+                />
+              ) : (
+                <span className="font-heading text-lg font-semibold">Results</span>
+              )
+            }
           />
-        )}
-      </StickyPageHeader>
+        }
+      >
+        <PageHeader title="Results">
+          {selectedWeek && (
+            <EpisodeCarousel
+              weekNumber={selectedWeek.week_number}
+              theme={selectedWeek.theme}
+              nightsLabel={selectedWeek.nightsLabel}
+              prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
+              nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
+            />
+          )}
+        </PageHeader>
+      </ScrollRevealBar>
 
       <div className={BOTTOM_NAV_CLEARANCE}>
         {selectedMode === "peek" && selectedWeek ? (
