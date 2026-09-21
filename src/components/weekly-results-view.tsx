@@ -167,7 +167,10 @@ export function WeeklyResultsView({
         </div>
       )}
 
-      <div className="mb-2 text-sm font-semibold text-accent">Leaderboard</div>
+      <div className="mb-2 flex items-center justify-between text-sm font-semibold text-accent">
+        <span>Leaderboard</span>
+        <span className="font-normal text-muted-foreground">Judges&apos; score</span>
+      </div>
       <div className="flex flex-col gap-2.5">
         {outcomes.map((r) => {
           const tag = outcomeTag(r);
@@ -199,7 +202,6 @@ export function WeeklyResultsView({
                 <span className="block font-heading text-base font-semibold text-foreground">
                   {r.outcome === "bye" ? "—" : r.total}
                 </span>
-                judges&apos; pts
               </div>
             </div>
           );
