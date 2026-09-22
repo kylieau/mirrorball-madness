@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { createLeague, joinLeague, joinAsCoManager } from "@/app/leagues/actions";
+import { createLeague, joinWithCode } from "@/app/leagues/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +27,7 @@ function SubmitButton({ idleLabel, pendingLabel }: { idleLabel: string; pendingL
 
 export function CreateJoinLeagueDialogs() {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex gap-2">
       <Dialog>
         <DialogTrigger render={<Button />}>+ Create a League</DialogTrigger>
         <DialogContent>
@@ -75,10 +75,11 @@ export function CreateJoinLeagueDialogs() {
           <DialogHeader>
             <DialogTitle>Join a League</DialogTitle>
             <DialogDescription>
-              Enter the 6-character invite code from your commissioner.
+              Enter the 6-character code you were given — a regular league invite or a
+              co-manager invite both work here.
             </DialogDescription>
           </DialogHeader>
-          <form action={joinLeague} className="flex flex-col gap-4">
+          <form action={joinWithCode} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="inviteCode">Invite Code</Label>
               <Input
@@ -91,34 +92,6 @@ export function CreateJoinLeagueDialogs() {
             </div>
             <DialogFooter>
               <SubmitButton idleLabel="Join League" pendingLabel="Joining..." />
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog>
-        <DialogTrigger render={<Button variant="outline" />}>Join as Co-Manager</DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Join as Co-Manager</DialogTitle>
-            <DialogDescription>
-              Enter the co-manager code someone shared with you — a different code from a
-              regular league invite. You&apos;ll jointly run their team with full parity.
-            </DialogDescription>
-          </DialogHeader>
-          <form action={joinAsCoManager} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="coManagerInviteCode">Co-Manager Code</Label>
-              <Input
-                id="coManagerInviteCode"
-                name="inviteCode"
-                maxLength={6}
-                className="uppercase"
-                required
-              />
-            </div>
-            <DialogFooter>
-              <SubmitButton idleLabel="Join as Co-Manager" pendingLabel="Joining..." />
             </DialogFooter>
           </form>
         </DialogContent>
