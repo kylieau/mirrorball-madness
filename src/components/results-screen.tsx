@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ResultsForm } from "@/components/results-form";
 import { AllResultsView } from "@/components/all-results-view";
-import { ScheduleManager } from "@/components/schedule-manager";
 import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
 import type { CoupleNameParts } from "@/lib/couple-display";
@@ -64,12 +63,12 @@ type Season = {
   season_number: number | null;
 } | null;
 
-type TabValue = "week" | "couple" | "schedule" | "enter";
+type TabValue = "week" | "couple" | "enter";
 
-// Order matches ResultsNav's settings rows (Schedule, Results by Week,
-// Results by Couple) so the two never drift apart again.
+// Order matches ResultsNav's settings rows (Results by Week, Results by
+// Couple) so the two never drift apart again. Schedule lives on its own page
+// (/admin/schedule) now, not as a tab here.
 const SWITCHER_TABS: { value: TabValue; label: string }[] = [
-  { value: "schedule", label: "Schedule" },
   { value: "week", label: "By Week" },
   { value: "couple", label: "By Couple" },
 ];
@@ -122,11 +121,7 @@ export function ResultsScreen({
   // which only a propose-tier viewer can land on.
   const requestedTab = useSearchParams().get("tab");
   const initialTab: TabValue =
-    requestedTab === "enter" && canPropose
-      ? "enter"
-      : requestedTab === "couple" || requestedTab === "schedule"
-        ? requestedTab
-        : "week";
+    requestedTab === "enter" && canPropose ? "enter" : requestedTab === "couple" ? "couple" : "week";
 
   const [tab, setTab] = useState<TabValue>(initialTab);
   // Lifted here so View Results' "Correct Results"/"Continue draft" can
@@ -198,19 +193,6 @@ export function ResultsScreen({
           publishedByNames={publishedByNames}
           onNavigateToEpisode={navigateToEpisode}
           seasonNumber={season?.season_number ?? null}
-        />
-      )}
-
-      {tab === "schedule" && (
-        <ScheduleManager
-          readOnly={!isSuperAdmin}
-          episodes={episodes}
-          weeks={weeks}
-          episodeResults={episodeResults}
-          draftsByEpisode={draftsByEpisode}
-          season={season}
-          seasonCouples={allCouplesWithStatus}
-          participantsByEpisode={participantsByEpisode}
         />
       )}
     </div>
