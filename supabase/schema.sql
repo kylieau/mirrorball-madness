@@ -183,18 +183,29 @@ create unique index league_members_co_manager_invite_code_unique
 -- bonus_picks_category_enabled — see bonus_picks_config_required below for
 -- what "configured" requires per scoring method.
 --
--- Placement bonus (a rostered couple finishing in the finale's top 5) is
--- split into two additive halves so each toggle/weight does what it visibly
--- claims: first_place_points..fifth_place_points is the Dance-Card-half
--- (weighted by judges_score_category_weight, alongside dance score and
--- survival), bonus_picks_first_place_points..bonus_picks_fifth_place_points
--- is the Grand-Finale-half (weighted by bonus_picks_category_weight,
--- alongside the full-order prediction). See computeWeeklyScores in
--- src/lib/scoring.ts. Both halves and every other point value below are
--- ordinary commissioner-editable defaults, calibrated (not hand-set) by
+-- Placement bonus (a rostered couple finishing in the finale's top 5) lives
+-- entirely in Dance Card: first_place_points..fifth_place_points, weighted
+-- by judges_score_category_weight alongside dance score and survival. See
+-- computeWeeklyScores in src/lib/scoring.ts. Grand Finale used to have its
+-- own copy of this bonus (bonus_picks_first_place_points..fifth_place_points)
+-- but it paid out for the same roster-luck event Dance Card already
+-- rewards, not anything Grand Finale's full-order prediction actually
+-- measures — removed. Every point value below is an ordinary
+-- commissioner-editable default, calibrated (not hand-set) by
 -- scripts/monte-carlo-calibration/ — see that script for how, and
 -- judges_score_multiplier_customized below for why judges_score_multiplier
 -- is the one column with special write semantics.
+--
+-- Every commissioner-editable field on this table EXCEPT judges_score_multiplier
+-- (which has its own draft-start auto-calibration, above) locks together the
+-- moment effective_grand_finale_deadline() passes — the same Season Clock
+-- anchor that already starts Judges' Scores counting and locks Grand Finale
+-- predictions, just also now covering the settings that scored them. One
+-- shared trigger, not one per category — a per-category lock would let a
+-- commissioner see one category's real results before finalizing another's
+-- weight, which defeats the point of locking at all. See
+-- update_scoring_categories for the check. locking_exempt grandfathers in
+-- leagues that already existed when this locking behavior shipped.
 create table scoring_settings (
   league_id uuid primary key references leagues(id) on delete cascade,
   judges_score_multiplier numeric not null default 1.0,
@@ -227,15 +238,10 @@ create table scoring_settings (
   bonus_picks_tier_size int, -- couples per band (3 = 1st-3rd, 4th-6th, ...); only used by 'band_tier'
   bonus_picks_tier_pay_style text not null default 'equal' check (bonus_picks_tier_pay_style in ('equal', 'graded')), -- 'graded': lower bands pay 75/50/25% (floor 25%); only used by 'band_tier'
   -- Base value a correctly-placed couple earns. Calibrated per method
-  -- (scripts/monte-carlo-calibration/): exact_position 257, distance_based 200,
-  -- band_tier 162 equal / 252 graded — the column default matches the
+  -- (scripts/monte-carlo-calibration/): exact_position 264, distance_based 207,
+  -- band_tier 166 equal / 259 graded — the column default matches the
   -- distance_based default method.
-  bonus_picks_points_per_correct numeric not null default 200,
-  bonus_picks_first_place_points numeric not null default 106,
-  bonus_picks_second_place_points numeric not null default 53,
-  bonus_picks_third_place_points numeric not null default 28,
-  bonus_picks_fourth_place_points numeric not null default 14,
-  bonus_picks_fifth_place_points numeric not null default 7,
+  bonus_picks_points_per_correct numeric not null default 207,
 
   -- Every new league gets this row with defaults on insert (create_league),
   -- but the commissioner never explicitly reviewed them until they save this
@@ -243,6 +249,11 @@ create table scoring_settings (
   -- Settings until this flips true, so scoring categories are a required
   -- creation step rather than silent defaults nobody looked at.
   scoring_configured boolean not null default false,
+
+  -- Grandfathers in leagues that existed before scoring-settings locking
+  -- shipped — set true for all of them by the live migration, default false
+  -- (i.e. lock applies normally) for every league created afterward.
+  locking_exempt boolean not null default false,
 
   constraint at_least_one_category_enabled check (
     judges_score_category_enabled or eliminations_category_enabled or bonus_picks_category_enabled
@@ -1346,11 +1357,6 @@ create function public.update_scoring_categories(
   p_bonus_picks_points_per_correct numeric,
   p_fourth_place_points numeric,
   p_fifth_place_points numeric,
-  p_bonus_picks_first_place_points numeric,
-  p_bonus_picks_second_place_points numeric,
-  p_bonus_picks_third_place_points numeric,
-  p_bonus_picks_fourth_place_points numeric,
-  p_bonus_picks_fifth_place_points numeric,
   p_bonus_picks_tier_pay_style text
 )
 returns public.scoring_settings
@@ -1359,6 +1365,8 @@ security definer set search_path = ''
 as $$
 declare
   v_settings public.scoring_settings;
+  v_current public.scoring_settings;
+  v_deadline timestamptz;
 begin
   if not public.is_league_commissioner(p_league_id) then
     raise exception 'Only the commissioner can update scoring categories';
@@ -1371,6 +1379,38 @@ begin
     where id = p_league_id and draft_status = 'in_progress'
   ) then
     raise exception 'Dance Card can''t be turned off while the draft is in progress';
+  end if;
+
+  select * into v_current from public.scoring_settings where league_id = p_league_id;
+  if not found then
+    raise exception 'Scoring settings not found for this league';
+  end if;
+
+  -- Everything except judges_score_multiplier locks together the moment the
+  -- Season Clock anchor passes (see the comment above scoring_settings) —
+  -- one shared trigger, not per category, so a commissioner can never see
+  -- one category's real results before finalizing another's weight. A no-op
+  -- resave (every value already matches) still succeeds, since the Settings
+  -- form always round-trips every field regardless of what actually changed.
+  v_deadline := public.effective_grand_finale_deadline(p_league_id);
+  if not v_current.locking_exempt and v_deadline is not null and now() >= v_deadline then
+    if (
+      p_judges_score_category_enabled, p_eliminations_category_enabled, p_bonus_picks_category_enabled,
+      p_judges_score_category_weight, p_eliminations_category_weight, p_bonus_picks_category_weight,
+      p_judges_score_starts_week, p_bonus_picks_scoring_method, p_bonus_picks_distance_penalty,
+      p_bonus_picks_tier_size, p_bonus_picks_tier_pay_style, p_survival_points,
+      p_first_place_points, p_second_place_points, p_third_place_points, p_fourth_place_points, p_fifth_place_points,
+      p_elimination_prediction_points, p_top_scorer_prediction_points, p_bonus_picks_points_per_correct
+    ) is distinct from (
+      v_current.judges_score_category_enabled, v_current.eliminations_category_enabled, v_current.bonus_picks_category_enabled,
+      v_current.judges_score_category_weight, v_current.eliminations_category_weight, v_current.bonus_picks_category_weight,
+      v_current.judges_score_starts_week, v_current.bonus_picks_scoring_method, v_current.bonus_picks_distance_penalty,
+      v_current.bonus_picks_tier_size, v_current.bonus_picks_tier_pay_style, v_current.survival_points,
+      v_current.first_place_points, v_current.second_place_points, v_current.third_place_points, v_current.fourth_place_points, v_current.fifth_place_points,
+      v_current.elimination_prediction_points, v_current.top_scorer_prediction_points, v_current.bonus_picks_points_per_correct
+    ) then
+      raise exception 'Scoring settings are locked for the season — the Grand Finale deadline has passed';
+    end if;
   end if;
 
   update public.scoring_settings
@@ -1402,11 +1442,6 @@ begin
     elimination_prediction_points = p_elimination_prediction_points,
     top_scorer_prediction_points = p_top_scorer_prediction_points,
     bonus_picks_points_per_correct = p_bonus_picks_points_per_correct,
-    bonus_picks_first_place_points = p_bonus_picks_first_place_points,
-    bonus_picks_second_place_points = p_bonus_picks_second_place_points,
-    bonus_picks_third_place_points = p_bonus_picks_third_place_points,
-    bonus_picks_fourth_place_points = p_bonus_picks_fourth_place_points,
-    bonus_picks_fifth_place_points = p_bonus_picks_fifth_place_points,
     scoring_configured = true
   where league_id = p_league_id
   returning * into v_settings;
@@ -1416,9 +1451,9 @@ end;
 $$;
 
 revoke execute on function public.update_league_settings(uuid, text, text, int, numeric) from public;
-revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text) from public;
+revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text) from public;
 grant execute on function public.update_league_settings(uuid, text, text, int, numeric) to authenticated;
-grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text) to authenticated;
+grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text) to authenticated;
 
 -- ============================================================
 -- Draft: couples are global read-only reference data; starting the draft and

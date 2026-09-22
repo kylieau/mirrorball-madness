@@ -67,18 +67,18 @@ export function explainSeasonClock({
   const lock = formatEpisodeCasual(lockWeek);
 
   if (lockWeek !== anchorWeek) {
-    return `The draft is still open, so the lock has moved from ${anchor} to ${lock} — the next unaired week. It freezes there once the draft wraps. Judges' Score still starts counting from ${anchor} until then.`;
+    return `The draft is still open, so the lock has moved from ${anchor} to ${lock} — the next unaired week. It freezes there once the draft wraps. Judges' Score still starts counting from ${anchor} until then, and your scoring settings (weights, point values, modules on/off) lock then too.`;
   }
 
   if (!danceCardEnabled) {
-    return `Grand Finale locks the moment ${anchor} airs.`;
+    return `Grand Finale locks the moment ${anchor} airs, and your scoring settings lock then too.`;
   }
 
   const draftNote =
     draftStatus === "completed"
       ? ""
       : " The draft is expected to finish by then but isn't hard-blocked — if it's still open when this week airs, the deadline pushes to the next one automatically until the draft wraps.";
-  return `Judges' Score starts counting from ${anchor}, and Grand Finale locks the moment this week airs.${draftNote}`;
+  return `Judges' Score starts counting from ${anchor}, and Grand Finale locks the moment this week airs — your scoring settings (weights, point values, modules on/off) lock then too.${draftNote}`;
 }
 
 export function explainGrandFinaleDeadline({

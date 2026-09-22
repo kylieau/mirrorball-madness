@@ -1213,13 +1213,8 @@ export type Database = {
           bonus_picks_category_enabled: boolean
           bonus_picks_category_weight: number
           bonus_picks_distance_penalty: number | null
-          bonus_picks_fifth_place_points: number
-          bonus_picks_first_place_points: number
-          bonus_picks_fourth_place_points: number
           bonus_picks_points_per_correct: number
           bonus_picks_scoring_method: string | null
-          bonus_picks_second_place_points: number
-          bonus_picks_third_place_points: number
           bonus_picks_tier_pay_style: string
           bonus_picks_tier_size: number | null
           elimination_prediction_points: number
@@ -1234,6 +1229,7 @@ export type Database = {
           judges_score_multiplier_customized: boolean
           judges_score_starts_week: number
           league_id: string
+          locking_exempt: boolean
           scoring_configured: boolean
           second_place_points: number
           survival_points: number
@@ -1244,13 +1240,8 @@ export type Database = {
           bonus_picks_category_enabled?: boolean
           bonus_picks_category_weight?: number
           bonus_picks_distance_penalty?: number | null
-          bonus_picks_fifth_place_points?: number
-          bonus_picks_first_place_points?: number
-          bonus_picks_fourth_place_points?: number
           bonus_picks_points_per_correct?: number
           bonus_picks_scoring_method?: string | null
-          bonus_picks_second_place_points?: number
-          bonus_picks_third_place_points?: number
           bonus_picks_tier_pay_style?: string
           bonus_picks_tier_size?: number | null
           elimination_prediction_points?: number
@@ -1265,6 +1256,7 @@ export type Database = {
           judges_score_multiplier_customized?: boolean
           judges_score_starts_week?: number
           league_id: string
+          locking_exempt?: boolean
           scoring_configured?: boolean
           second_place_points?: number
           survival_points?: number
@@ -1275,13 +1267,8 @@ export type Database = {
           bonus_picks_category_enabled?: boolean
           bonus_picks_category_weight?: number
           bonus_picks_distance_penalty?: number | null
-          bonus_picks_fifth_place_points?: number
-          bonus_picks_first_place_points?: number
-          bonus_picks_fourth_place_points?: number
           bonus_picks_points_per_correct?: number
           bonus_picks_scoring_method?: string | null
-          bonus_picks_second_place_points?: number
-          bonus_picks_third_place_points?: number
           bonus_picks_tier_pay_style?: string
           bonus_picks_tier_size?: number | null
           elimination_prediction_points?: number
@@ -1296,6 +1283,7 @@ export type Database = {
           judges_score_multiplier_customized?: boolean
           judges_score_starts_week?: number
           league_id?: string
+          locking_exempt?: boolean
           scoring_configured?: boolean
           second_place_points?: number
           survival_points?: number
@@ -1957,13 +1945,8 @@ export type Database = {
           p_bonus_picks_category_enabled: boolean
           p_bonus_picks_category_weight: number
           p_bonus_picks_distance_penalty: number
-          p_bonus_picks_fifth_place_points: number
-          p_bonus_picks_first_place_points: number
-          p_bonus_picks_fourth_place_points: number
           p_bonus_picks_points_per_correct: number
           p_bonus_picks_scoring_method: string
-          p_bonus_picks_second_place_points: number
-          p_bonus_picks_third_place_points: number
           p_bonus_picks_tier_pay_style: string
           p_bonus_picks_tier_size: number
           p_elimination_prediction_points: number
@@ -1986,13 +1969,8 @@ export type Database = {
           bonus_picks_category_enabled: boolean
           bonus_picks_category_weight: number
           bonus_picks_distance_penalty: number | null
-          bonus_picks_fifth_place_points: number
-          bonus_picks_first_place_points: number
-          bonus_picks_fourth_place_points: number
           bonus_picks_points_per_correct: number
           bonus_picks_scoring_method: string | null
-          bonus_picks_second_place_points: number
-          bonus_picks_third_place_points: number
           bonus_picks_tier_pay_style: string
           bonus_picks_tier_size: number | null
           elimination_prediction_points: number
@@ -2007,6 +1985,7 @@ export type Database = {
           judges_score_multiplier_customized: boolean
           judges_score_starts_week: number
           league_id: string
+          locking_exempt: boolean
           scoring_configured: boolean
           second_place_points: number
           survival_points: number

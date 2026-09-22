@@ -67,11 +67,6 @@ type ScoringSettings = {
   bonus_picks_tier_size: number | null;
   bonus_picks_tier_pay_style: string;
   bonus_picks_points_per_correct: number;
-  bonus_picks_first_place_points: number;
-  bonus_picks_second_place_points: number;
-  bonus_picks_third_place_points: number;
-  bonus_picks_fourth_place_points: number;
-  bonus_picks_fifth_place_points: number;
   judges_score_multiplier: number;
   survival_points: number;
   first_place_points: number;
@@ -132,6 +127,7 @@ export function LeagueModulesForm({
   seasonEpisodes,
   seasonNumber,
   effectiveHardDeadlineWeek,
+  scoringLocked,
   totalCouples,
   exitHref,
 }: {
@@ -146,6 +142,11 @@ export function LeagueModulesForm({
   // Dance Card draft is still open; the Season Clock labels that episode
   // next to its airs_at so the two can't look like a mismatched pair.
   effectiveHardDeadlineWeek: number | null;
+  // Whether update_scoring_categories would reject a real change right now
+  // (past the Season Clock anchor, not grandfathered in). Disables the
+  // module toggles/weights/point-value fields specifically — waiver, draft,
+  // and Pick 'Em-lock settings aren't part of this lock and stay editable.
+  scoringLocked: boolean;
   // Active-season cast size, so the band preview shows real place ranges.
   totalCouples: number;
   // Where "Save & exit" lands (the page the settings were opened from).
@@ -273,22 +274,6 @@ export function LeagueModulesForm({
       tierPayStyle: bonusTierPayStyle,
       totalCouples,
     });
-  const [bonusPicksFirstPlacePoints, setBonusPicksFirstPlacePoints] = useState(
-    scoringSettings?.bonus_picks_first_place_points ?? 106
-  );
-  const [bonusPicksSecondPlacePoints, setBonusPicksSecondPlacePoints] = useState(
-    scoringSettings?.bonus_picks_second_place_points ?? 53
-  );
-  const [bonusPicksThirdPlacePoints, setBonusPicksThirdPlacePoints] = useState(
-    scoringSettings?.bonus_picks_third_place_points ?? 28
-  );
-  const [bonusPicksFourthPlacePoints, setBonusPicksFourthPlacePoints] = useState(
-    scoringSettings?.bonus_picks_fourth_place_points ?? 14
-  );
-  const [bonusPicksFifthPlacePoints, setBonusPicksFifthPlacePoints] = useState(
-    scoringSettings?.bonus_picks_fifth_place_points ?? 7
-  );
-
   const [submitting, setSubmitting] = useState(false);
   const [syncingAnchor, setSyncingAnchor] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -367,11 +352,6 @@ export function LeagueModulesForm({
       eliminationPredictionPoints,
       topScorerPredictionPoints,
       bonusPicksPointsPerCorrect,
-      bonusPicksFirstPlacePoints,
-      bonusPicksSecondPlacePoints,
-      bonusPicksThirdPlacePoints,
-      bonusPicksFourthPlacePoints,
-      bonusPicksFifthPlacePoints,
     };
 
     const leagueInput: LeagueSettingsInput = {
@@ -532,11 +512,6 @@ export function LeagueModulesForm({
                 </>
               )}
               <p className="pt-2 text-sm text-muted-foreground">{explainMethod()}</p>
-              <SettingRow label="1st Place Bonus" value={bonusPicksFirstPlacePoints} />
-              <SettingRow label="2nd Place Bonus" value={bonusPicksSecondPlacePoints} />
-              <SettingRow label="3rd Place Bonus" value={bonusPicksThirdPlacePoints} />
-              <SettingRow label="4th Place Bonus" value={bonusPicksFourthPlacePoints} />
-              <SettingRow label="5th Place Bonus" value={bonusPicksFifthPlacePoints} />
             </CardContent>
           </Card>
         )}
@@ -559,6 +534,12 @@ export function LeagueModulesForm({
               Required — save this before the rest of your league is available.
             </p>
           )}
+          {scoringLocked && (
+            <p className="text-sm text-muted-foreground">
+              Modules, weights, and point values are locked for the season — the Season Clock anchor has
+              passed. Waiver, draft, and Pick &apos;Em-lock settings below are still editable.
+            </p>
+          )}
           <div className="flex flex-col">
             {SCORING_MODULES.map((m) => (
               <label
@@ -570,6 +551,7 @@ export function LeagueModulesForm({
                     type="checkbox"
                     checked={moduleEnabled[m.key]}
                     onChange={(e) => setModuleEnabled[m.key](e.target.checked)}
+                    disabled={scoringLocked}
                   />
                   {m.name}
                 </span>
@@ -593,6 +575,7 @@ export function LeagueModulesForm({
                 items={startsWeekItems}
                 value={String(judgesStartsWeek)}
                 onValueChange={(v) => v && setJudgesStartsWeek(Number(v))}
+                disabled={scoringLocked}
               >
                 <SelectTrigger id="judgesStartsWeek" className="w-full">
                   <SelectValue />
@@ -612,7 +595,7 @@ export function LeagueModulesForm({
             </div>
           </div>
           <p className="text-sm text-muted-foreground">{seasonClockCopy}</p>
-          {showAnchorSync && (
+          {showAnchorSync && !scoringLocked && (
             <div className="flex flex-col gap-2">
               <Button
                 type="button"
@@ -646,6 +629,7 @@ export function LeagueModulesForm({
                 min={0}
                 value={eliminationsWeight}
                 onChange={(e) => setEliminationsWeight(Number(e.target.value))}
+                disabled={scoringLocked}
               />
             </div>
           )}
@@ -659,6 +643,7 @@ export function LeagueModulesForm({
                 min={0}
                 value={judgesWeight}
                 onChange={(e) => setJudgesWeight(Number(e.target.value))}
+                disabled={scoringLocked}
               />
             </div>
           )}
@@ -672,6 +657,7 @@ export function LeagueModulesForm({
                 min={0}
                 value={bonusWeight}
                 onChange={(e) => setBonusWeight(Number(e.target.value))}
+                disabled={scoringLocked}
               />
             </div>
           )}
@@ -705,6 +691,7 @@ export function LeagueModulesForm({
                   min={0}
                   value={eliminationPredictionPoints}
                   onChange={(e) => setEliminationPredictionPoints(Number(e.target.value))}
+                  disabled={scoringLocked}
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -715,6 +702,7 @@ export function LeagueModulesForm({
                   min={0}
                   value={topScorerPredictionPoints}
                   onChange={(e) => setTopScorerPredictionPoints(Number(e.target.value))}
+                  disabled={scoringLocked}
                 />
               </div>
             </div>
@@ -755,6 +743,7 @@ export function LeagueModulesForm({
                   min={0}
                   value={survivalPoints}
                   onChange={(e) => setSurvivalPoints(Number(e.target.value))}
+                  disabled={scoringLocked}
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -765,6 +754,7 @@ export function LeagueModulesForm({
                   min={0}
                   value={firstPlacePoints}
                   onChange={(e) => setFirstPlacePoints(Number(e.target.value))}
+                  disabled={scoringLocked}
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -775,6 +765,7 @@ export function LeagueModulesForm({
                   min={0}
                   value={secondPlacePoints}
                   onChange={(e) => setSecondPlacePoints(Number(e.target.value))}
+                  disabled={scoringLocked}
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -785,6 +776,7 @@ export function LeagueModulesForm({
                   min={0}
                   value={thirdPlacePoints}
                   onChange={(e) => setThirdPlacePoints(Number(e.target.value))}
+                  disabled={scoringLocked}
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -795,6 +787,7 @@ export function LeagueModulesForm({
                   min={0}
                   value={fourthPlacePoints}
                   onChange={(e) => setFourthPlacePoints(Number(e.target.value))}
+                  disabled={scoringLocked}
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -805,6 +798,7 @@ export function LeagueModulesForm({
                   min={0}
                   value={fifthPlacePoints}
                   onChange={(e) => setFifthPlacePoints(Number(e.target.value))}
+                  disabled={scoringLocked}
                 />
               </div>
             </div>
@@ -934,6 +928,7 @@ export function LeagueModulesForm({
                     setPointsPerCorrectEdited(true);
                     setBonusPicksPointsPerCorrect(Number(e.target.value));
                   }}
+                  disabled={scoringLocked}
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -942,6 +937,7 @@ export function LeagueModulesForm({
                   items={METHOD_ITEMS}
                   value={bonusMethod}
                   onValueChange={(v) => changeBonusMethod((v as ScoringMethod) ?? GRAND_FINALE_DEFAULT_METHOD)}
+                  disabled={scoringLocked}
                 >
                   <SelectTrigger id="bonusMethod" className="w-full">
                     <SelectValue />
@@ -964,6 +960,7 @@ export function LeagueModulesForm({
                     min={0}
                     value={bonusDistancePenalty}
                     onChange={(e) => setBonusDistancePenalty(Number(e.target.value))}
+                    disabled={scoringLocked}
                   />
                 </div>
               )}
@@ -980,6 +977,7 @@ export function LeagueModulesForm({
                       onChange={(e) =>
                         setBonusTierSize(Math.min(totalCouples, Math.max(1, Math.round(Number(e.target.value)))))
                       }
+                      disabled={scoringLocked}
                     />
                   </div>
                   <div className="flex flex-col gap-2">
@@ -988,6 +986,7 @@ export function LeagueModulesForm({
                       items={TIER_PAY_STYLE_ITEMS}
                       value={bonusTierPayStyle}
                       onValueChange={(v) => changeTierPayStyle((v as TierPayStyle) ?? GRAND_FINALE_DEFAULT_TIER_PAY_STYLE)}
+                      disabled={scoringLocked}
                     >
                       <SelectTrigger id="bonusTierPayStyle" className="w-full">
                         <SelectValue />
@@ -1005,66 +1004,6 @@ export function LeagueModulesForm({
               )}
             </div>
             <p className="text-sm text-muted-foreground">{explainMethod()}</p>
-
-            <div className="border-t border-border pt-4">
-              <p className="pb-2 text-sm font-medium">Placement Bonus</p>
-              <p className="pb-4 text-sm text-muted-foreground">
-                A separate bonus for a rostered couple actually finishing in the top 5 — on top of the
-                full-order prediction above, and on top of Dance Card&apos;s own placement bonus.
-              </p>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="bonusPicksFirstPlacePoints">1st Place Bonus</Label>
-                  <Input
-                    id="bonusPicksFirstPlacePoints"
-                    type="number"
-                    min={0}
-                    value={bonusPicksFirstPlacePoints}
-                    onChange={(e) => setBonusPicksFirstPlacePoints(Number(e.target.value))}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="bonusPicksSecondPlacePoints">2nd Place Bonus</Label>
-                  <Input
-                    id="bonusPicksSecondPlacePoints"
-                    type="number"
-                    min={0}
-                    value={bonusPicksSecondPlacePoints}
-                    onChange={(e) => setBonusPicksSecondPlacePoints(Number(e.target.value))}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="bonusPicksThirdPlacePoints">3rd Place Bonus</Label>
-                  <Input
-                    id="bonusPicksThirdPlacePoints"
-                    type="number"
-                    min={0}
-                    value={bonusPicksThirdPlacePoints}
-                    onChange={(e) => setBonusPicksThirdPlacePoints(Number(e.target.value))}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="bonusPicksFourthPlacePoints">4th Place Bonus</Label>
-                  <Input
-                    id="bonusPicksFourthPlacePoints"
-                    type="number"
-                    min={0}
-                    value={bonusPicksFourthPlacePoints}
-                    onChange={(e) => setBonusPicksFourthPlacePoints(Number(e.target.value))}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="bonusPicksFifthPlacePoints">5th Place Bonus</Label>
-                  <Input
-                    id="bonusPicksFifthPlacePoints"
-                    type="number"
-                    min={0}
-                    value={bonusPicksFifthPlacePoints}
-                    onChange={(e) => setBonusPicksFifthPlacePoints(Number(e.target.value))}
-                  />
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       )}

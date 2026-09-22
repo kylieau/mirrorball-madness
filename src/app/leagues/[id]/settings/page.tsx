@@ -60,6 +60,7 @@ export default async function LeagueSettingsPage({
     { data: episodeRows },
     { data: activeSeason },
     { data: effectiveHardDeadlineWeek },
+    { data: effectiveGrandFinaleDeadline },
     { count: totalCouples },
   ] =
     await Promise.all([
@@ -74,11 +75,20 @@ export default async function LeagueSettingsPage({
         .eq("season_id", activeSeasonId ?? ""),
       supabase.from("seasons").select("season_number").eq("id", activeSeasonId ?? "").maybeSingle(),
       supabase.rpc("effective_hard_deadline_week", { p_league_id: id }),
+      supabase.rpc("effective_grand_finale_deadline", { p_league_id: id }),
       supabase
         .from("couples")
         .select("id", { count: "exact", head: true })
         .eq("season_id", activeSeasonId ?? ""),
     ]);
+  // Same trigger update_scoring_categories enforces server-side — this is
+  // just a UI hint to avoid a confusing failed-save, not the source of
+  // truth. Computed here (real request-time "now", not a client re-guess)
+  // so no client-side date hydration dance is needed for a plain boolean.
+  const scoringLocked =
+    !(scoringSettings?.locking_exempt ?? false) &&
+    effectiveGrandFinaleDeadline != null &&
+    new Date(effectiveGrandFinaleDeadline).getTime() <= Date.now();
   const seasonNumber = activeSeason?.season_number ?? null;
   const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
   const seasonEpisodes = groupedWeeks.map((week) => ({
@@ -143,6 +153,7 @@ export default async function LeagueSettingsPage({
           seasonEpisodes={seasonEpisodes ?? []}
           seasonNumber={seasonNumber}
           effectiveHardDeadlineWeek={effectiveHardDeadlineWeek ?? null}
+          scoringLocked={scoringLocked}
           totalCouples={totalCouples ?? 12}
           exitHref={closeHref}
         />

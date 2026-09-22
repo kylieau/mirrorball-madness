@@ -113,7 +113,7 @@ describe("explainSeasonClock", () => {
       danceCardEnabled: false,
       draftStatus: "not_started",
     });
-    expect(copy).toBe("Grand Finale locks the moment Week 1 airs.");
+    expect(copy).toBe("Grand Finale locks the moment Week 1 airs, and your scoring settings lock then too.");
     expect(copy).not.toContain("pushes");
   });
 });
