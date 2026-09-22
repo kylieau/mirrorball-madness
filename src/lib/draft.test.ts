@@ -146,7 +146,11 @@ describe("isBenignAutoPickError", () => {
 });
 
 describe("partitionPresence", () => {
-  const members = [{ user_id: "a" }, { user_id: "b" }, { user_id: "c" }];
+  const members = [
+    { user_id: "a", co_manager_id: null },
+    { user_id: "b", co_manager_id: null },
+    { user_id: "c", co_manager_id: null },
+  ];
 
   it("splits members by who is present", () => {
     const { present, absent } = partitionPresence(members, new Set(["a", "c"]));
@@ -162,6 +166,13 @@ describe("partitionPresence", () => {
 
   it("treats everyone as absent when nobody is present", () => {
     expect(partitionPresence(members, new Set()).absent).toHaveLength(3);
+  });
+
+  it("counts a team present when only the co-manager has the draft open", () => {
+    const withCoManager = [{ user_id: "a", co_manager_id: "a2" }, { user_id: "b", co_manager_id: null }];
+    const { present, absent } = partitionPresence(withCoManager, new Set(["a2"]));
+    expect(present.map((m) => m.user_id)).toEqual(["a"]);
+    expect(absent.map((m) => m.user_id)).toEqual(["b"]);
   });
 });
 

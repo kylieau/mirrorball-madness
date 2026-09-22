@@ -6,6 +6,7 @@ import { LeagueInfoSection } from "@/components/league-info-section";
 import { LeagueModulesForm } from "@/components/league-modules-form";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { safeRelativePath } from "@/lib/safe-relative-path";
+import { findOwnMembership } from "@/lib/acting-manager";
 import { XIcon } from "lucide-react";
 
 export default async function LeagueSettingsPage({
@@ -32,7 +33,9 @@ export default async function LeagueSettingsPage({
     supabase.from("scoring_settings").select("*").eq("league_id", id).single(),
     supabase
       .from("league_members")
-      .select("user_id, role, profiles(display_name)")
+      .select(
+        "user_id, role, co_manager_id, co_manager_invite_code, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
+      )
       .eq("league_id", id)
       .order("joined_at"),
   ]);
@@ -44,7 +47,7 @@ export default async function LeagueSettingsPage({
   // Not a league member at all — is_league_member-scoped RLS would already
   // return nothing above, but members is checked explicitly here for a
   // clear redirect rather than rendering a settings page for no one's data.
-  const viewerMembership = (members ?? []).find((m) => m.user_id === user.id);
+  const viewerMembership = findOwnMembership(members ?? [], user.id);
   if (!viewerMembership) {
     redirect("/leagues");
   }
@@ -106,11 +109,21 @@ export default async function LeagueSettingsPage({
 
         <LeagueMembersSection
           leagueId={id}
-          members={(members ?? []).map((m) => ({
-            userId: m.user_id,
-            displayName: m.profiles?.display_name ?? "Unknown",
-            role: m.role,
-          }))}
+          members={(members ?? []).map((m) => {
+            const isOwnRow = m.user_id === user.id || m.co_manager_id === user.id;
+            return {
+              userId: m.user_id,
+              displayName: m.profiles?.display_name ?? "Unknown",
+              role: m.role,
+              coManagerId: m.co_manager_id,
+              coManagerDisplayName: m.co_manager?.display_name ?? null,
+              isOwnRow,
+              // Only the primary who owns this row ever sees its pending
+              // invite code — anyone else in the league can already read
+              // the row via RLS, but the code isn't theirs to use or leak.
+              inviteCode: m.user_id === user.id ? m.co_manager_invite_code : null,
+            };
+          })}
           canEdit={isCommissioner}
         />
         <LeagueInfoSection

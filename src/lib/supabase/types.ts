@@ -902,6 +902,8 @@ export type Database = {
       }
       league_members: {
         Row: {
+          co_manager_id: string | null
+          co_manager_invite_code: string | null
           draft_autopilot: boolean
           draft_position: number | null
           id: string
@@ -911,6 +913,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          co_manager_id?: string | null
+          co_manager_invite_code?: string | null
           draft_autopilot?: boolean
           draft_position?: number | null
           id?: string
@@ -920,6 +924,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          co_manager_id?: string | null
+          co_manager_invite_code?: string | null
           draft_autopilot?: boolean
           draft_position?: number | null
           id?: string
@@ -929,6 +935,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "league_members_co_manager_id_fkey"
+            columns: ["co_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "league_members_league_id_fkey"
             columns: ["league_id"]
@@ -1580,11 +1593,41 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      generate_co_manager_invite_code: {
+        Args: { p_league_id: string }
+        Returns: string
+      }
       is_league_commissioner: {
         Args: { p_league_id: string }
         Returns: boolean
       }
       is_league_member: { Args: { p_league_id: string }; Returns: boolean }
+      join_as_co_manager: {
+        Args: { p_code: string }
+        Returns: {
+          commissioner_id: string
+          created_at: string
+          current_turn_started_at: string | null
+          custom_pick_order: string[] | null
+          draft_scheduled_at: string | null
+          draft_status: string
+          draft_type: string
+          id: string
+          invite_code: string
+          name: string
+          pick_time_limit_seconds: number
+          prediction_lock_hours_before_air: number
+          roster_size: number
+          waiver_claim_method: string | null
+          waiver_mode: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "leagues"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       join_league: {
         Args: { p_invite_code: string }
         Returns: {
@@ -1714,6 +1757,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      remove_co_manager: {
+        Args: { p_league_id: string; p_team_user_id: string }
+        Returns: undefined
+      }
       remove_league_member: {
         Args: { p_league_id: string; p_user_id: string }
         Returns: undefined
@@ -1746,6 +1793,10 @@ export type Database = {
       }
       request_account_deletion: { Args: never; Returns: undefined }
       reset_draft: { Args: { p_league_id: string }; Returns: undefined }
+      resolve_acting_league_member: {
+        Args: { p_league_id: string }
+        Returns: string
+      }
       set_custom_draft_order: {
         Args: { p_league_id: string; p_user_ids: string[] }
         Returns: undefined

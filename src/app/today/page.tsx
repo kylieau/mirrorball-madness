@@ -26,7 +26,7 @@ export default async function TodayPage() {
     supabase
       .from("league_members")
       .select("joined_at, leagues(id, name)")
-      .eq("user_id", user.id)
+      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`)
       .order("joined_at", { ascending: true }),
     getAccountSettingsData(supabase, user.id),
   ]);

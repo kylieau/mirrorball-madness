@@ -132,10 +132,33 @@ create table league_members (
   -- Sit-out / autopilot: when true, make_auto_draft_pick may fire on this
   -- manager's turn without waiting for the pick clock. Does not start a draft.
   draft_autopilot boolean not null default false,
+  -- Co-manager: a second person (max 2 per team) with full parity — either
+  -- person can draft, submit predictions, edit the queue, everything.
+  -- Team-scoped tables (draft_picks, roster_slots, predictions, etc.) keep
+  -- storing user_id (the primary) as the team identity; resolve_acting_
+  -- league_member resolves a co-manager's auth.uid() back to it before every
+  -- write, so no downstream table needs a co-manager column. Self-service:
+  -- the primary mints co_manager_invite_code (generate_co_manager_invite_code)
+  -- and shares it; join_as_co_manager redeems it and clears the code.
+  co_manager_id uuid references profiles(id),
+  co_manager_invite_code text,
   joined_at timestamptz not null default now(),
   unique (league_id, user_id),
-  unique (league_id, draft_position)
+  unique (league_id, draft_position),
+  constraint league_members_co_manager_not_self check (co_manager_id is distinct from user_id)
 );
+
+-- One person can be co-manager of at most one team per league (mirrors
+-- unique(league_id, user_id) for primaries). Deliberately not globally
+-- unique — nothing stops someone co-managing in one league while primary/
+-- co-manager elsewhere, same as primaries aren't restricted that way either.
+create unique index league_members_co_manager_unique
+  on public.league_members (league_id, co_manager_id)
+  where co_manager_id is not null;
+
+create unique index league_members_co_manager_invite_code_unique
+  on public.league_members (co_manager_invite_code)
+  where co_manager_invite_code is not null;
 
 -- judges_score_multiplier..fifth_place_points: per-event point values within
 -- the Judges' Scores category (draft fantasy) and the Eliminations category
@@ -769,12 +792,34 @@ $$;
 -- league handles someone dropping out mid-season. A commissioner can't leave
 -- directly — demote_commissioner to manager first (blocked if they're the
 -- last commissioner), then leave normally.
+--
+-- Co-manager edge case: user_id is the permanent identity six other tables
+-- hang their history off (draft_picks, roster_slots, predictions,
+-- grand_finale_predictions, weekly_manager_scores, draft_queues), so a
+-- primary can't leave while a co-manager is attached — auto-promoting the
+-- co-manager into user_id would either orphan history under the old id or
+-- require rewriting rows across all six tables. Detach via remove_co_manager
+-- first. A co-manager's own "leave" routes through remove_co_manager too,
+-- never this function (it only ever matches user_id) — checked FIRST, before
+-- is_league_commissioner: full parity means a co-manager of a commissioner's
+-- team passes is_league_commissioner too, so checking that first would tell
+-- them "commissioners can't leave" (misleading — they aren't personally the
+-- commissioner) instead of pointing them at the actual right action. Live-
+-- tested and caught by scratch/test-co-manager.mjs's D-is-co-manager-of-
+-- commissioner-A case.
 create function public.leave_league(p_league_id uuid)
 returns void
 language plpgsql
 security definer set search_path = ''
 as $$
 begin
+  if exists (
+    select 1 from public.league_members
+    where league_id = p_league_id and co_manager_id = auth.uid()
+  ) then
+    raise exception 'Use "Leave as co-manager" instead';
+  end if;
+
   if public.is_league_commissioner(p_league_id) then
     raise exception 'Commissioners can''t leave their own league';
   end if;
@@ -786,6 +831,13 @@ begin
     raise exception 'Draft in progress — ask the commissioner to cancel it first';
   end if;
 
+  if exists (
+    select 1 from public.league_members
+    where league_id = p_league_id and user_id = auth.uid() and co_manager_id is not null
+  ) then
+    raise exception 'Detach your co-manager before leaving';
+  end if;
+
   delete from public.league_members
   where league_id = p_league_id and user_id = auth.uid();
 
@@ -794,6 +846,139 @@ begin
   end if;
 end;
 $$;
+
+-- Co-manager invite / join / remove. Self-service: the primary manager mints
+-- a per-team code from their own row (same charset/collision-loop style as
+-- create_league's league-wide invite_code), shares it out-of-band, and the
+-- recipient redeems it. remove_league_member needs no change of its own — it
+-- deletes the whole row, which already detaches both people in one shot.
+create function public.generate_co_manager_invite_code(p_league_id uuid)
+returns text
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_row public.league_members;
+  v_code text;
+  v_chars text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  v_i int;
+begin
+  select * into v_row from public.league_members
+  where league_id = p_league_id and user_id = auth.uid()
+  for update;
+
+  if not found then
+    raise exception 'You are not a member of this league';
+  end if;
+
+  if v_row.co_manager_id is not null then
+    raise exception 'This team already has a co-manager';
+  end if;
+
+  loop
+    v_code := '';
+    for v_i in 1..6 loop
+      v_code := v_code || substr(v_chars, floor(random() * length(v_chars) + 1)::int, 1);
+    end loop;
+    exit when not exists (
+      select 1 from public.league_members where co_manager_invite_code = v_code
+    );
+  end loop;
+
+  update public.league_members set co_manager_invite_code = v_code where id = v_row.id;
+
+  return v_code;
+end;
+$$;
+
+revoke execute on function public.generate_co_manager_invite_code(uuid) from public;
+grant execute on function public.generate_co_manager_invite_code(uuid) to authenticated;
+
+create function public.join_as_co_manager(p_code text)
+returns public.leagues
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_row public.league_members;
+  v_league public.leagues;
+begin
+  select * into v_row from public.league_members
+  where co_manager_invite_code = trim(upper(p_code))
+  for update;
+
+  if not found then
+    raise exception 'Invite code not found';
+  end if;
+
+  if v_row.co_manager_id is not null then
+    raise exception 'This team already has a co-manager';
+  end if;
+
+  if v_row.user_id = auth.uid() then
+    raise exception 'You can''t be your own co-manager';
+  end if;
+
+  if exists (
+    select 1 from public.league_members
+    where league_id = v_row.league_id
+      and (user_id = auth.uid() or co_manager_id = auth.uid())
+  ) then
+    raise exception 'You are already a member of this league';
+  end if;
+
+  select * into v_league from public.leagues where id = v_row.league_id;
+
+  if v_league.draft_status = 'in_progress' then
+    raise exception 'Draft in progress — ask the manager to try again after the draft';
+  end if;
+
+  update public.league_members
+  set co_manager_id = auth.uid(), co_manager_invite_code = null
+  where id = v_row.id;
+
+  return v_league;
+end;
+$$;
+
+revoke execute on function public.join_as_co_manager(text) from public;
+grant execute on function public.join_as_co_manager(text) to authenticated;
+
+-- Callable by the primary (detach their own co-manager), the co-manager
+-- themself (self-service "leave"), or the commissioner (parity with
+-- remove_league_member). No draft-in-progress block — detaching a
+-- co-manager never touches the team's draft-turn rights.
+create function public.remove_co_manager(p_league_id uuid, p_team_user_id uuid)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_row public.league_members;
+begin
+  select * into v_row from public.league_members
+  where league_id = p_league_id and user_id = p_team_user_id;
+
+  if not found or v_row.co_manager_id is null then
+    raise exception 'That team does not have a co-manager to remove';
+  end if;
+
+  if not (
+    public.is_league_commissioner(p_league_id)
+    or auth.uid() = v_row.user_id
+    or auth.uid() = v_row.co_manager_id
+  ) then
+    raise exception 'You are not allowed to remove this co-manager';
+  end if;
+
+  update public.league_members
+  set co_manager_id = null, co_manager_invite_code = null
+  where id = v_row.id;
+end;
+$$;
+
+revoke execute on function public.remove_co_manager(uuid, uuid) from public;
+grant execute on function public.remove_co_manager(uuid, uuid) to authenticated;
 
 -- Commissioner-initiated counterpart to leave_league — same deliberate
 -- non-cascade (roster_slots/predictions/weekly_manager_scores stay intact
@@ -973,12 +1158,35 @@ stable
 as $$
   select exists (
     select 1 from public.league_members
-    where league_id = p_league_id and user_id = auth.uid()
+    where league_id = p_league_id
+      and (user_id = auth.uid() or co_manager_id = auth.uid())
   );
 $$;
 
 revoke execute on function public.is_league_member(uuid) from public;
 grant execute on function public.is_league_member(uuid) to authenticated;
+
+-- Returns the effective (primary) league_members.user_id for whichever of
+-- {user_id, co_manager_id} matches the caller, or null if the caller isn't
+-- on any row for this league. Every write RPC that inserts/compares
+-- auth.uid() directly AS the manager identity routes through this instead,
+-- so a co-manager's actions land on the team's one shared identity rather
+-- than creating a second, orphaned identity under their own uuid.
+create function public.resolve_acting_league_member(p_league_id uuid)
+returns uuid
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select user_id from public.league_members
+  where league_id = p_league_id
+    and (user_id = auth.uid() or co_manager_id = auth.uid())
+  limit 1;
+$$;
+
+revoke execute on function public.resolve_acting_league_member(uuid) from public;
+grant execute on function public.resolve_acting_league_member(uuid) to authenticated;
 
 -- Same rationale as is_league_member above. Every "only the commissioner
 -- can..." check used to compare against leagues.commissioner_id directly,
@@ -997,7 +1205,9 @@ stable
 as $$
   select exists (
     select 1 from public.league_members
-    where league_id = p_league_id and user_id = auth.uid() and role = 'commissioner'
+    where league_id = p_league_id
+      and (user_id = auth.uid() or co_manager_id = auth.uid())
+      and role = 'commissioner'
   );
 $$;
 
@@ -1020,7 +1230,8 @@ using (
   exists (
     select 1 from public.league_members lm1
     join public.league_members lm2 on lm1.league_id = lm2.league_id
-    where lm1.user_id = auth.uid() and lm2.user_id = profiles.id
+    where (lm1.user_id = auth.uid() or lm1.co_manager_id = auth.uid())
+      and (lm2.user_id = profiles.id or lm2.co_manager_id = profiles.id)
   )
 );
 
@@ -1222,7 +1433,14 @@ grant select on public.draft_queues to authenticated;
 
 create policy "draft queues are viewable by their owner"
 on public.draft_queues for select
-using (user_id = (select auth.uid()));
+using (
+  exists (
+    select 1 from public.league_members
+    where league_id = draft_queues.league_id
+      and user_id = draft_queues.user_id
+      and (user_id = auth.uid() or co_manager_id = auth.uid())
+  )
+);
 
 -- Sets (or overwrites) the full draft order before the draft starts. The
 -- client always calls this before start_draft — including for the "random"
@@ -1601,6 +1819,7 @@ security definer set search_path = ''
 as $$
 declare
   v_league public.leagues;
+  v_acting_manager uuid;
 begin
   -- Serialize concurrent picks on this league (same lock auto-pick takes).
   select * into v_league from public.leagues where id = p_league_id for update;
@@ -1608,11 +1827,12 @@ begin
     raise exception 'League not found';
   end if;
 
-  if auth.uid() is null then
+  v_acting_manager := public.resolve_acting_league_member(p_league_id);
+  if v_acting_manager is null then
     raise exception 'It is not your turn to pick';
   end if;
 
-  return public.record_draft_pick(p_league_id, p_couple_id, auth.uid(), null);
+  return public.record_draft_pick(p_league_id, p_couple_id, v_acting_manager, null);
 end;
 $$;
 
@@ -1742,8 +1962,11 @@ returns boolean
 language plpgsql
 security definer set search_path = ''
 as $$
+declare
+  v_acting_manager uuid;
 begin
-  if not public.is_league_member(p_league_id) then
+  v_acting_manager := public.resolve_acting_league_member(p_league_id);
+  if v_acting_manager is null then
     raise exception 'You are not a member of this league';
   end if;
 
@@ -1756,7 +1979,7 @@ begin
 
   update public.league_members
   set draft_autopilot = p_enabled
-  where league_id = p_league_id and user_id = auth.uid();
+  where league_id = p_league_id and user_id = v_acting_manager;
 
   if not found then
     raise exception 'You are not a member of this league';
@@ -1774,8 +1997,11 @@ returns void
 language plpgsql
 security definer set search_path = ''
 as $$
+declare
+  v_acting_manager uuid;
 begin
-  if not public.is_league_member(p_league_id) then
+  v_acting_manager := public.resolve_acting_league_member(p_league_id);
+  if v_acting_manager is null then
     raise exception 'You are not a member of this league';
   end if;
 
@@ -1802,7 +2028,7 @@ begin
   end if;
 
   insert into public.draft_queues (league_id, user_id, couple_ids)
-  values (p_league_id, auth.uid(), p_couple_ids)
+  values (p_league_id, v_acting_manager, p_couple_ids)
   on conflict (league_id, user_id) do update set couple_ids = excluded.couple_ids;
 end;
 $$;
@@ -2210,7 +2436,12 @@ on public.predictions for select
 using (
   public.is_league_member(league_id)
   and (
-    auth.uid() = manager_id
+    exists (
+      select 1 from public.league_members
+      where league_id = predictions.league_id
+        and user_id = predictions.manager_id
+        and (user_id = auth.uid() or co_manager_id = auth.uid())
+    )
     or now() >= public.prediction_lock_at(league_id, week_id)
   )
 );
@@ -2230,8 +2461,10 @@ declare
   v_lock_at timestamptz;
   v_is_double_elim boolean;
   v_prediction public.predictions;
+  v_acting_manager uuid;
 begin
-  if not public.is_league_member(p_league_id) then
+  v_acting_manager := public.resolve_acting_league_member(p_league_id);
+  if v_acting_manager is null then
     raise exception 'You are not a member of this league';
   end if;
 
@@ -2273,7 +2506,7 @@ begin
     predicted_top_scorer_couple_id
   )
   values (
-    p_league_id, auth.uid(), p_week_id,
+    p_league_id, v_acting_manager, p_week_id,
     p_predicted_eliminated_couple_id, p_predicted_eliminated_couple_id_2,
     p_predicted_top_scorer_couple_id
   )
@@ -2305,7 +2538,12 @@ on public.grand_finale_predictions for select
 using (
   public.is_league_member(league_id)
   and (
-    auth.uid() = manager_id
+    exists (
+      select 1 from public.league_members
+      where league_id = grand_finale_predictions.league_id
+        and user_id = grand_finale_predictions.manager_id
+        and (user_id = auth.uid() or co_manager_id = auth.uid())
+    )
     or now() >= public.effective_grand_finale_deadline(league_id)
   )
 );
@@ -2319,8 +2557,10 @@ declare
   v_deadline timestamptz;
   v_season_id uuid;
   v_expected_count int;
+  v_acting_manager uuid;
 begin
-  if not public.is_league_member(p_league_id) then
+  v_acting_manager := public.resolve_acting_league_member(p_league_id);
+  if v_acting_manager is null then
     raise exception 'You are not a member of this league';
   end if;
 
@@ -2355,11 +2595,11 @@ begin
   end if;
 
   delete from public.grand_finale_predictions
-  where league_id = p_league_id and manager_id = auth.uid();
+  where league_id = p_league_id and manager_id = v_acting_manager;
 
   return query
   insert into public.grand_finale_predictions (league_id, manager_id, couple_id, predicted_position)
-  select p_league_id, auth.uid(), c, ordinality
+  select p_league_id, v_acting_manager, c, ordinality
   from unnest(p_couple_ids) with ordinality as t(c, ordinality)
   returning *;
 end;
@@ -2455,8 +2695,10 @@ declare
   v_league public.leagues;
   v_current_week int;
   v_claim public.waiver_claims;
+  v_acting_manager uuid;
 begin
-  if not public.is_league_member(p_league_id) then
+  v_acting_manager := public.resolve_acting_league_member(p_league_id);
+  if v_acting_manager is null then
     raise exception 'You are not a member of this league';
   end if;
 
@@ -2480,7 +2722,7 @@ begin
     select 1 from public.roster_slots rs
     join public.couples c on c.id = rs.couple_id
     where rs.league_id = p_league_id
-      and rs.manager_id = auth.uid()
+      and rs.manager_id = v_acting_manager
       and rs.slot_number = p_slot_number
       and rs.end_week is null
       and c.status in ('eliminated', 'withdrawn')
@@ -2516,7 +2758,7 @@ begin
   ), 0);
 
   insert into public.waiver_claims (league_id, couple_id, manager_id, slot_number, week_number, status)
-  values (p_league_id, p_couple_id, auth.uid(), p_slot_number, v_current_week, 'pending')
+  values (p_league_id, p_couple_id, v_acting_manager, p_slot_number, v_current_week, 'pending')
   returning * into v_claim;
 
   -- FCFS resolves immediately; reverse_standings/manual stay pending for the

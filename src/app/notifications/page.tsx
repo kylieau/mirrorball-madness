@@ -22,7 +22,7 @@ export default async function NotificationsPage() {
     supabase
       .from("league_members")
       .select("leagues(id, name)")
-      .eq("user_id", user.id),
+      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`),
     getAccountSettingsData(supabase, user.id),
   ]);
 

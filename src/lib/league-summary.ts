@@ -18,11 +18,22 @@ export async function computeLeagueSummary(
   league: { id: string; name: string },
   upcomingEpisode: { id: string; week_number: number } | null
 ): Promise<LeagueSummary> {
-  const { data: scoringSettings } = await supabase
-    .from("scoring_settings")
-    .select("eliminations_category_enabled, bonus_picks_category_enabled")
-    .eq("league_id", league.id)
-    .single();
+  const [{ data: scoringSettings }, { data: membership }] = await Promise.all([
+    supabase
+      .from("scoring_settings")
+      .select("eliminations_category_enabled, bonus_picks_category_enabled")
+      .eq("league_id", league.id)
+      .single(),
+    // A co-manager's predictions/grand finale rows live under the primary's
+    // user_id, not their own auth uid.
+    supabase
+      .from("league_members")
+      .select("user_id")
+      .eq("league_id", league.id)
+      .or(`user_id.eq.${userId},co_manager_id.eq.${userId}`)
+      .maybeSingle(),
+  ]);
+  const myTeamId = membership?.user_id ?? userId;
 
   const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
   const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
@@ -46,7 +57,7 @@ export async function computeLeagueSummary(
         .select("manager_id")
         .eq("league_id", league.id)
         .eq("week_id", upcomingEpisode.id)
-        .eq("manager_id", userId)
+        .eq("manager_id", myTeamId)
         .maybeSingle();
       curtainCallPending = !ownPrediction;
     }
@@ -58,7 +69,7 @@ export async function computeLeagueSummary(
       .from("grand_finale_predictions")
       .select("id", { count: "exact", head: true })
       .eq("league_id", league.id)
-      .eq("manager_id", userId);
+      .eq("manager_id", myTeamId);
     grandFinalePending = !count;
   }
 

@@ -35,6 +35,8 @@ import { EpisodeCarousel } from "@/components/episode-carousel";
 import { adjacentThisWeekWeeks, rosterWeekHref } from "@/lib/this-week-carousel";
 import { buildLeagueRosters, orderManagersForRosters } from "@/lib/league-rosters";
 import { judgePointsThroughWeek, slotActiveInWeek } from "@/lib/roster-couple-points";
+import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
+import { formatManagerName } from "@/lib/manager-display";
 import {
   buildCurtainCallWeeks,
   buildPastPicksComparison,
@@ -87,33 +89,40 @@ export default async function LeaguePage({
   // apart — a single-module league goes straight to its content.
   const showSectionLabels = [curtainCallOn, danceCardOn, grandFinaleOn].filter(Boolean).length >= 2;
 
-  const [{ data: members }, { data: allScores }, { data: rosterSlots }, { data: allCouples }] =
-    await Promise.all([
-      supabase
-        .from("league_members")
-        .select("user_id, role, joined_at, draft_position, draft_autopilot, profiles(display_name)")
-        .eq("league_id", id)
-        .order("joined_at"),
-      supabase
-        .from("weekly_manager_scores")
-        .select("week_id, manager_id, roster_points, prediction_points, grand_finale_points, total_points")
-        .eq("league_id", id),
-      supabase
-        .from("roster_slots")
-        .select(
-          "slot_number, couple_id, couples(status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name))"
-        )
-        .eq("league_id", id)
-        .eq("manager_id", user.id)
-        .is("end_week", null),
-      supabase
-        .from("couples")
-        .select(
-          "id, status, season_id, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
-        ),
-    ]);
+  const { data: members } = await supabase
+    .from("league_members")
+    .select(
+      "user_id, role, joined_at, draft_position, draft_autopilot, co_manager_id, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
+    )
+    .eq("league_id", id)
+    .order("joined_at");
 
-  const isCommissioner = (members ?? []).some((m) => m.user_id === user.id && m.role === "commissioner");
+  // A co-manager's auth uid never appears as a team-scoped manager_id (those
+  // stay keyed to the primary's user_id) — every "my team's row" lookup
+  // below resolves through myTeamId instead of the raw viewer id.
+  const myTeamId = findOwnMembership(members ?? [], user.id)?.user_id ?? user.id;
+
+  const [{ data: allScores }, { data: rosterSlots }, { data: allCouples }] = await Promise.all([
+    supabase
+      .from("weekly_manager_scores")
+      .select("week_id, manager_id, roster_points, prediction_points, grand_finale_points, total_points")
+      .eq("league_id", id),
+    supabase
+      .from("roster_slots")
+      .select(
+        "slot_number, couple_id, couples(status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name))"
+      )
+      .eq("league_id", id)
+      .eq("manager_id", myTeamId)
+      .is("end_week", null),
+    supabase
+      .from("couples")
+      .select(
+        "id, status, season_id, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
+      ),
+  ]);
+
+  const isCommissioner = (members ?? []).some((m) => isOwnMembership(m, user.id) && m.role === "commissioner");
   const accountSettingsData = await getAccountSettingsData(supabase, user.id);
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
@@ -198,7 +207,10 @@ export default async function LeaguePage({
 
   const standings = (members ?? []).map((m) => ({
     managerId: m.user_id,
-    displayName: m.profiles?.display_name ?? "Unknown",
+    displayName: formatManagerName({
+      displayName: m.profiles?.display_name ?? "Unknown",
+      coManagerDisplayName: m.co_manager?.display_name,
+    }),
     totalPoints: pointsByManager.get(m.user_id) ?? 0,
   }));
 
@@ -263,15 +275,18 @@ export default async function LeaguePage({
     }));
 
   const nameByManager = Object.fromEntries(
-    (members ?? []).map((m) => [m.user_id, m.profiles?.display_name ?? "Unknown"])
+    (members ?? []).map((m) => [
+      m.user_id,
+      formatManagerName({ displayName: m.profiles?.display_name ?? "Unknown", coManagerDisplayName: m.co_manager?.display_name }),
+    ])
   );
 
   const rank = Math.max(
     1,
-    [...standings].sort((a, b) => b.totalPoints - a.totalPoints).findIndex((s) => s.managerId === user.id) + 1
+    [...standings].sort((a, b) => b.totalPoints - a.totalPoints).findIndex((s) => s.managerId === myTeamId) + 1
   );
 
-  const userPoints = pointsByManager.get(user.id) ?? 0;
+  const userPoints = pointsByManager.get(myTeamId) ?? 0;
   const pointTotals = standings.map((s) => s.totalPoints);
   const maxPoints = Math.max(...pointTotals);
   const minPoints = Math.min(...pointTotals);
@@ -348,7 +363,7 @@ export default async function LeaguePage({
       .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
       .eq("league_id", id)
       .eq("week_id", upcomingEpisode.id)
-      .eq("manager_id", user.id)
+      .eq("manager_id", myTeamId)
       .maybeSingle();
     ownPrediction = data;
 
@@ -387,7 +402,7 @@ export default async function LeaguePage({
       .from("grand_finale_predictions")
       .select("couple_id, predicted_position")
       .eq("league_id", id)
-      .eq("manager_id", user.id)
+      .eq("manager_id", myTeamId)
       .order("predicted_position", { ascending: true });
     grandFinaleOrder = ownGrandFinalePicks && ownGrandFinalePicks.length > 0
       ? ownGrandFinalePicks.map((p) => p.couple_id)
@@ -411,19 +426,19 @@ export default async function LeaguePage({
       curtainCallOn && {
         label: scoringModule("curtainCall").name,
         points: Math.round(
-          (predictionPointsByManager.get(user.id) ?? 0) * (scoringSettings?.eliminations_category_weight ?? 1)
+          (predictionPointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.eliminations_category_weight ?? 1)
         ),
       },
       danceCardOn && {
         label: scoringModule("danceCard").name,
         points: Math.round(
-          (rosterPointsByManager.get(user.id) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
+          (rosterPointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
         ),
       },
       grandFinaleOn && {
         label: scoringModule("grandFinale").name,
         points: Math.round(
-          (grandFinalePointsByManager.get(user.id) ?? 0) * (scoringSettings?.bonus_picks_category_weight ?? 1)
+          (grandFinalePointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.bonus_picks_category_weight ?? 1)
         ),
       },
     ]
@@ -483,7 +498,7 @@ export default async function LeaguePage({
   // and a running total.
   const yourSlotsForWeek = leagueSlotPeriods.filter(
     (slot) =>
-      slot.managerId === user.id &&
+      slot.managerId === myTeamId &&
       (yourRosterWeek ? slotActiveInWeek(slot, yourRosterWeek.week_number) : slot.endWeek === null)
   );
   const yourRosterPoints = yourRosterWeek
@@ -520,7 +535,7 @@ export default async function LeaguePage({
     : undefined;
   const leagueRosters = showLeagueRosters
     ? buildLeagueRosters({
-        managers: orderManagersForRosters(standings, user.id),
+        managers: orderManagersForRosters(standings, myTeamId),
         slots: currentSlotPeriods,
         couples: flatCouples
           .filter((c) => c.season_id === activeSeasonId)
@@ -530,7 +545,7 @@ export default async function LeaguePage({
             eliminationWeek: c.elimination_week,
             names: allDisplayNames.get(c.id) ?? { celebrity: c.celebrity_name, pro: c.pro_name },
           })),
-        viewerId: user.id,
+        viewerId: myTeamId,
         asOfWeek: latestVisibleDanceWeek?.week_number,
         pointsByCoupleId: seasonPointsByCouple
           ? new Map([...seasonPointsByCouple].map(([coupleId, p]) => [coupleId, { total: p.total }]))
@@ -593,15 +608,20 @@ export default async function LeaguePage({
       league.custom_pick_order
     );
     const onTheClock = (members ?? []).find((m) => m.user_id === onTheClockId);
-    onTheClockName = onTheClock?.profiles?.display_name ?? null;
-    isMyTurn = onTheClock?.user_id === user.id;
+    onTheClockName = onTheClock
+      ? formatManagerName({
+          displayName: onTheClock.profiles?.display_name ?? "Unknown",
+          coManagerDisplayName: onTheClock.co_manager?.display_name,
+        })
+      : null;
+    isMyTurn = onTheClock?.user_id === myTeamId;
     onTheClockAutopilot = onTheClock?.draft_autopilot ?? false;
   }
 
   const { data: myMemberships } = await supabase
     .from("league_members")
     .select("leagues(id, name)")
-    .eq("user_id", user.id);
+    .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`);
 
   const RECENT_JOIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
   const joinCutoffMs = Date.now() - RECENT_JOIN_WINDOW_MS;
@@ -664,7 +684,7 @@ export default async function LeaguePage({
         .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
         .eq("league_id", id)
         .eq("week_id", curtainCallEpisode.id)
-        .eq("manager_id", user.id)
+        .eq("manager_id", myTeamId)
         .maybeSingle(),
       recapEpisodeIds.length > 0
         ? supabase.from("episode_results").select("couple_id, outcome").in("episode_id", recapEpisodeIds)
@@ -675,7 +695,7 @@ export default async function LeaguePage({
     ]);
 
     const predictionPoints =
-      (allScores ?? []).find((row) => row.week_id === curtainCallEpisode.id && row.manager_id === user.id)
+      (allScores ?? []).find((row) => row.week_id === curtainCallEpisode.id && row.manager_id === myTeamId)
         ?.prediction_points ?? 0;
 
     pastPicksComparison = buildPastPicksComparison({
@@ -781,7 +801,7 @@ export default async function LeaguePage({
                 {rosterCouples.length > 0 && (
                   <RosterCard
                     couples={rosterCouples}
-                    totalPoints={pointsByManager.get(user.id) ?? 0}
+                    totalPoints={pointsByManager.get(myTeamId) ?? 0}
                     carousel={
                       yourRosterWeek ? (
                         <EpisodeCarousel
@@ -859,7 +879,7 @@ export default async function LeaguePage({
           <div>
             <StandingsTable
               standings={standingsWithChange}
-              currentUserId={user.id}
+              currentUserId={myTeamId}
               latestCompletedWeek={latestCompletedWeek}
               viewerRank={rank}
               viewerTotalPoints={userPoints}

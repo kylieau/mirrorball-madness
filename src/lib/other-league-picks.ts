@@ -38,11 +38,16 @@ export async function loadOtherLeaguePicks(
   const empty: OtherLeaguePicks = { curtainCall: [], grandFinale: [] };
   if (!curtainCallWeekId && !includeGrandFinale) return empty;
 
+  // A co-manager's predictions in another league live under that league's
+  // primary user_id, not the viewer's own auth uid — user_id on the matched
+  // row (whichever side matched) already gives us that team's real id.
   const { data: memberships } = await supabase
     .from("league_members")
-    .select("leagues(id, name)")
-    .eq("user_id", userId);
-  const others = (memberships ?? []).flatMap((m) => (m.leagues && m.leagues.id !== currentLeagueId ? [m.leagues] : []));
+    .select("user_id, leagues(id, name)")
+    .or(`user_id.eq.${userId},co_manager_id.eq.${userId}`);
+  const others = (memberships ?? []).flatMap((m) =>
+    m.leagues && m.leagues.id !== currentLeagueId ? [{ ...m.leagues, teamId: m.user_id }] : []
+  );
   if (others.length === 0) return empty;
 
   const otherIds = others.map((l) => l.id);
@@ -54,14 +59,14 @@ export async function loadOtherLeaguePicks(
 
   const [curtainCall, grandFinale] = await Promise.all([
     curtainCallWeekId
-      ? loadCurtainCall(supabase, userId, curtainCallWeekId, others, settingsByLeague, now)
+      ? loadCurtainCall(supabase, curtainCallWeekId, others, settingsByLeague, now)
       : [],
-    includeGrandFinale ? loadGrandFinale(supabase, userId, others, settingsByLeague, now) : [],
+    includeGrandFinale ? loadGrandFinale(supabase, others, settingsByLeague, now) : [],
   ]);
   return { curtainCall, grandFinale };
 }
 
-type League = { id: string; name: string };
+type League = { id: string; name: string; teamId: string };
 type Settings = Map<
   string,
   { eliminations_category_enabled: boolean; bonus_picks_category_enabled: boolean }
@@ -69,7 +74,6 @@ type Settings = Map<
 
 async function loadCurtainCall(
   supabase: Client,
-  userId: string,
   weekId: string,
   leagues: League[],
   settings: Settings,
@@ -80,7 +84,7 @@ async function loadCurtainCall(
     .select("league_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
     .in("league_id", leagues.map((l) => l.id))
     .eq("week_id", weekId)
-    .eq("manager_id", userId);
+    .in("manager_id", leagues.map((l) => l.teamId));
   const pickByLeague = new Map<string, CurtainCallPick>();
   for (const r of rows ?? []) {
     const pick = {
@@ -117,7 +121,6 @@ async function loadCurtainCall(
 
 async function loadGrandFinale(
   supabase: Client,
-  userId: string,
   leagues: League[],
   settings: Settings,
   now: Date
@@ -126,7 +129,7 @@ async function loadGrandFinale(
     .from("grand_finale_predictions")
     .select("league_id, couple_id, predicted_position")
     .in("league_id", leagues.map((l) => l.id))
-    .eq("manager_id", userId)
+    .in("manager_id", leagues.map((l) => l.teamId))
     .order("predicted_position", { ascending: true });
   const orderByLeague = new Map<string, string[]>();
   for (const r of rows ?? []) orderByLeague.set(r.league_id, [...(orderByLeague.get(r.league_id) ?? []), r.couple_id]);
@@ -163,15 +166,24 @@ export async function loadOtherLeagueQueues(
 ): Promise<DraftQueueDestination[]> {
   const { data: memberships } = await supabase
     .from("league_members")
-    .select("leagues(id, name, draft_status)")
-    .eq("user_id", userId);
-  const others = (memberships ?? []).flatMap((m) => (m.leagues && m.leagues.id !== currentLeagueId ? [m.leagues] : []));
+    .select("user_id, leagues(id, name, draft_status)")
+    .or(`user_id.eq.${userId},co_manager_id.eq.${userId}`);
+  const others = (memberships ?? []).flatMap((m) =>
+    m.leagues && m.leagues.id !== currentLeagueId ? [{ ...m.leagues, teamId: m.user_id }] : []
+  );
   if (others.length === 0) return [];
 
   const otherIds = others.map((l) => l.id);
   const [{ data: settings }, { data: queues }] = await Promise.all([
     supabase.from("scoring_settings").select("league_id, judges_score_category_enabled").in("league_id", otherIds),
-    supabase.from("draft_queues").select("league_id, couple_ids").in("league_id", otherIds).eq("user_id", userId),
+    supabase
+      .from("draft_queues")
+      .select("league_id, couple_ids")
+      .in("league_id", otherIds)
+      .in(
+        "user_id",
+        others.map((l) => l.teamId)
+      ),
   ]);
   const danceCardByLeague = new Map((settings ?? []).map((s) => [s.league_id, s.judges_score_category_enabled]));
   const queueByLeague = new Map(

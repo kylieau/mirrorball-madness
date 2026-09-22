@@ -64,6 +64,36 @@ export async function promoteMember(
   return { error: null };
 }
 
+export async function generateCoManagerInviteCode(
+  leagueId: string
+): Promise<{ error: string | null; code: string | null }> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc("generate_co_manager_invite_code", {
+    p_league_id: leagueId,
+  });
+  if (error) return { error: error.message, code: null };
+
+  return { error: null, code: data };
+}
+
+export async function removeCoManager(
+  leagueId: string,
+  teamUserId: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("remove_co_manager", {
+    p_league_id: leagueId,
+    p_team_user_id: teamUserId,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}/settings`);
+  return { error: null };
+}
+
 export async function demoteMember(
   leagueId: string,
   userId: string

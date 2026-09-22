@@ -27,7 +27,13 @@ export async function getAccountSettingsData(
       .select("display_name, is_super_admin, deletion_requested_at, spoiler_free_mode")
       .eq("id", userId)
       .single(),
-    supabase.from("league_members").select("role, leagues(id, name)").eq("user_id", userId),
+    // A co-manager's auth uid never appears as user_id — it's on
+    // co_manager_id — so both must be checked or a co-manager sees zero
+    // leagues under Account Settings.
+    supabase
+      .from("league_members")
+      .select("role, leagues(id, name)")
+      .or(`user_id.eq.${userId},co_manager_id.eq.${userId}`),
   ]);
 
   return {

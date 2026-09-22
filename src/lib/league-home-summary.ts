@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
 
 export type LeagueHomeSummary = {
   id: string;
@@ -39,9 +40,17 @@ export async function computeLeagueHomeSummary(
       .select("judges_score_category_enabled, eliminations_category_enabled, bonus_picks_category_enabled")
       .eq("league_id", league.id)
       .single(),
-    supabase.from("league_members").select("user_id, joined_at, profiles(display_name)").eq("league_id", league.id),
+    supabase
+      .from("league_members")
+      .select("user_id, co_manager_id, joined_at, profiles!league_members_user_id_fkey(display_name)")
+      .eq("league_id", league.id),
     supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points").eq("league_id", league.id),
   ]);
+
+  // A co-manager's auth uid never matches a manager_id/user_id column
+  // directly — those stay keyed to the primary — so every "my team" lookup
+  // below resolves through myTeamId instead of the raw viewer id.
+  const myTeamId = findOwnMembership(members ?? [], userId)?.user_id ?? userId;
 
   const pointsByManager = new Map<string, number>();
   const previousPointsByManager = new Map<string, number>();
@@ -59,12 +68,12 @@ export async function computeLeagueHomeSummary(
   }));
   const rank = Math.max(
     1,
-    [...standings].sort((a, b) => b.points - a.points).findIndex((s) => s.managerId === userId) + 1
+    [...standings].sort((a, b) => b.points - a.points).findIndex((s) => s.managerId === myTeamId) + 1
   );
   const previousRank = latestCompletedWeekId
     ? Math.max(
         1,
-        [...standings].sort((a, b) => b.previousPoints - a.previousPoints).findIndex((s) => s.managerId === userId) + 1
+        [...standings].sort((a, b) => b.previousPoints - a.previousPoints).findIndex((s) => s.managerId === myTeamId) + 1
       )
     : null;
 
@@ -95,7 +104,7 @@ export async function computeLeagueHomeSummary(
         .select("manager_id")
         .eq("league_id", league.id)
         .eq("week_id", upcomingEpisode.id)
-        .eq("manager_id", userId)
+        .eq("manager_id", myTeamId)
         .maybeSingle();
       curtainCallPicksDue = !ownPrediction;
     }
@@ -107,7 +116,7 @@ export async function computeLeagueHomeSummary(
       .from("grand_finale_predictions")
       .select("manager_id")
       .eq("league_id", league.id)
-      .eq("manager_id", userId)
+      .eq("manager_id", myTeamId)
       .limit(1)
       .maybeSingle();
     grandFinalePicksDue = !ownGrandFinalePick;
@@ -127,14 +136,14 @@ export async function computeLeagueHomeSummary(
     name: league.name,
     rank,
     totalMembers: standings.length,
-    totalPoints: pointsByManager.get(userId) ?? 0,
+    totalPoints: pointsByManager.get(myTeamId) ?? 0,
     picksDue: curtainCallPicksDue || grandFinalePicksDue,
     nextDeadline: deadlineCandidates[0] ?? null,
     danceCardOn,
     curtainCallOn,
     grandFinaleOn,
     recentJoins: (members ?? [])
-      .filter((m) => m.user_id !== userId && new Date(m.joined_at).getTime() >= joinCutoffMs)
+      .filter((m) => !isOwnMembership(m, userId) && new Date(m.joined_at).getTime() >= joinCutoffMs)
       .map((m) => ({ name: m.profiles?.display_name ?? "Someone", joinedAt: m.joined_at })),
     tookLead: previousRank !== null && rank === 1 && previousRank !== 1,
   };

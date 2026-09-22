@@ -1,11 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { formatManagerName } from "@/lib/manager-display";
 
 type Manager = {
   user_id: string;
   draft_position: number | null;
   draft_autopilot: boolean;
+  co_manager_id: string | null;
   profiles: { display_name: string } | null;
+  co_manager: { display_name: string } | null;
 };
 
 export function PresenceDot({ present }: { present: boolean }) {
@@ -52,9 +55,15 @@ export function DraftManagersCard({
         {ordered.map((m) => (
           <div key={m.user_id} className="flex items-center justify-between gap-2 text-sm">
             <span className="flex items-center gap-2">
-              <PresenceDot present={presentIds.has(m.user_id)} />
+              <PresenceDot
+                present={presentIds.has(m.user_id) || (m.co_manager_id !== null && presentIds.has(m.co_manager_id))}
+              />
               <span className={m.user_id === onTheClockUserId ? "font-medium" : undefined}>
-                {m.draft_position}. {m.profiles?.display_name ?? "Unknown"}
+                {m.draft_position}.{" "}
+                {formatManagerName({
+                  displayName: m.profiles?.display_name ?? "Unknown",
+                  coManagerDisplayName: m.co_manager?.display_name,
+                })}
               </span>
               {m.draft_autopilot && (
                 <span
@@ -70,7 +79,7 @@ export function DraftManagersCard({
                 checked={m.draft_autopilot}
                 disabled={pendingUserId === m.user_id}
                 onCheckedChange={(checked) => onToggleAutopilot(m.user_id, checked)}
-                aria-label={`Autopilot for ${m.profiles?.display_name ?? "member"}`}
+                aria-label={`Autopilot for ${formatManagerName({ displayName: m.profiles?.display_name ?? "member", coManagerDisplayName: m.co_manager?.display_name })}`}
               />
             )}
           </div>

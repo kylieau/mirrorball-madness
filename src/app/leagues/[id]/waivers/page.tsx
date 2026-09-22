@@ -36,12 +36,20 @@ export default async function WaiversPage({
       .select("id, name, waiver_mode, waiver_claim_method")
       .eq("id", id)
       .single(),
-    supabase.from("league_members").select("role").eq("league_id", id).eq("user_id", user.id).maybeSingle(),
+    supabase
+      .from("league_members")
+      .select("user_id, role")
+      .eq("league_id", id)
+      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`)
+      .maybeSingle(),
   ]);
 
   if (!league) {
     notFound();
   }
+
+  // A co-manager's roster/claims live under the primary's user_id.
+  const myTeamId = membership?.user_id ?? user.id;
 
   const closeHref = safeRelativePath(from, `/leagues/${id}?tab=yourpicks`);
   const closeLink = (
@@ -104,7 +112,7 @@ export default async function WaiversPage({
       .from("roster_slots")
       .select(`slot_number, couples(${coupleFields})`)
       .eq("league_id", id)
-      .eq("manager_id", user.id)
+      .eq("manager_id", myTeamId)
       .is("end_week", null),
     supabase.from("couples").select(coupleFields).eq("season_id", activeSeasonId ?? ""),
     supabase.from("roster_slots").select("couple_id").eq("league_id", id).is("end_week", null),

@@ -41,6 +41,23 @@ export async function joinLeague(formData: FormData) {
   redirect(`/leagues/${data.id}`);
 }
 
+export async function joinAsCoManager(formData: FormData) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc("join_as_co_manager", {
+    p_code: formData.get("inviteCode") as string,
+  });
+
+  if (error) {
+    redirect(`/leagues?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/leagues", "layout");
+  revalidatePath("/today");
+  revalidatePath("/this-week");
+  redirect(`/leagues/${data.id}`);
+}
+
 export async function leaveLeague(leagueId: string): Promise<{ error: string | null }> {
   const supabase = await createClient();
 

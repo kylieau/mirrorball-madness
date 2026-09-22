@@ -36,8 +36,8 @@ export default async function ThisWeekPage({
   const [{ data: memberships }, accountSettingsData] = await Promise.all([
     supabase
       .from("league_members")
-      .select("joined_at, leagues(id, name)")
-      .eq("user_id", user.id)
+      .select("user_id, joined_at, leagues(id, name)")
+      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`)
       .order("joined_at", { ascending: true }),
     getAccountSettingsData(supabase, user.id),
   ]);
@@ -51,6 +51,9 @@ export default async function ThisWeekPage({
   const firstLeagueId = leagueRefs[0].id;
   const leagueIds = leagueRefs.map((l) => l.id);
   const leagueNameById = new Map(leagueRefs.map((l) => [l.id, l.name]));
+  // Each league's team-scoped data (roster, predictions) is keyed to the
+  // primary's user_id even when the viewer is a co-manager there.
+  const myTeamIds = [...new Set((memberships ?? []).map((m) => m.user_id))];
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
@@ -139,14 +142,14 @@ export default async function ThisWeekPage({
     supabase
       .from("roster_slots")
       .select("league_id, couple_id")
-      .eq("manager_id", user.id)
+      .in("manager_id", myTeamIds)
       .in("league_id", leagueIds)
       .is("end_week", null),
     showResults && selectedWeekId
       ? supabase
           .from("predictions")
           .select("league_id, predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
-          .eq("manager_id", user.id)
+          .in("manager_id", myTeamIds)
           .eq("week_id", selectedWeekId)
           .in("league_id", leagueIds)
       : Promise.resolve({ data: [] }),

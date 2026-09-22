@@ -59,6 +59,8 @@ import { DraftQueueCard } from "@/components/draft-queue-card";
 import { LeagueRostersCard } from "@/components/league-rosters-card";
 import { buildLeagueRosters, orderManagersForRosters } from "@/lib/league-rosters";
 import { ResetDraftDialog } from "@/components/reset-draft-dialog";
+import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
+import { formatManagerName } from "@/lib/manager-display";
 import { XIcon } from "lucide-react";
 
 type League = Database["public"]["Tables"]["leagues"]["Row"];
@@ -67,7 +69,9 @@ type Member = {
   role: string;
   draft_position: number | null;
   draft_autopilot: boolean;
+  co_manager_id: string | null;
   profiles: { display_name: string } | null;
+  co_manager: { display_name: string } | null;
 };
 type Couple = { id: string; status: string; celebrity_name: string; pro_name: string };
 type DraftPick = {
@@ -147,7 +151,9 @@ export function DraftRoom({
     const [{ data: membersData }, { data: picksData }, { data: leagueData }] = await Promise.all([
       supabase
         .from("league_members")
-        .select("user_id, role, draft_position, draft_autopilot, profiles(display_name)")
+        .select(
+          "user_id, role, draft_position, draft_autopilot, co_manager_id, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
+        )
         .eq("league_id", league.id)
         .order("draft_position"),
       supabase
@@ -291,7 +297,8 @@ export function DraftRoom({
     league.custom_pick_order
   );
   const onTheClock = members.find((m) => m.user_id === onTheClockId);
-  const isMyTurn = league.draft_status === "in_progress" && onTheClock?.user_id === currentUserId;
+  const myTeamId = findOwnMembership(members, currentUserId)?.user_id ?? currentUserId;
+  const isMyTurn = league.draft_status === "in_progress" && onTheClock?.user_id === myTeamId;
   const formattedScheduledAt = useFormattedDeadline(league.draft_scheduled_at);
 
   const [now, setNow] = useState(() => Date.now());
@@ -327,8 +334,8 @@ export function DraftRoom({
     return () => window.clearTimeout(timeoutId);
   }, [justDrafted]);
 
-  const isCommissioner = members.some((m) => m.user_id === currentUserId && m.role === "commissioner");
-  const myAutopilot = members.find((m) => m.user_id === currentUserId)?.draft_autopilot ?? false;
+  const isCommissioner = members.some((m) => isOwnMembership(m, currentUserId) && m.role === "commissioner");
+  const myAutopilot = findOwnMembership(members, currentUserId)?.draft_autopilot ?? false;
   const lastPick = picks[picks.length - 1];
 
   function coupleParts(coupleId: string): CoupleNameParts | null {
@@ -338,7 +345,11 @@ export function DraftRoom({
   }
 
   function managerLabel(userId: string) {
-    return members.find((m) => m.user_id === userId)?.profiles?.display_name ?? "Unknown";
+    const m = members.find((m) => m.user_id === userId);
+    return formatManagerName({
+      displayName: m?.profiles?.display_name ?? "Unknown",
+      coManagerDisplayName: m?.co_manager?.display_name,
+    });
   }
 
   const [draftOrder, setLocalDraftOrder] = useState<string[]>(() => {
@@ -480,9 +491,7 @@ export function DraftRoom({
     if (error) {
       setError(error);
     } else {
-      setMembers((prev) =>
-        prev.map((m) => (m.user_id === currentUserId ? { ...m, draft_autopilot: enabled } : m))
-      );
+      setMembers((prev) => prev.map((m) => (m.user_id === myTeamId ? { ...m, draft_autopilot: enabled } : m)));
     }
     setAutopilotPending(false);
   }
@@ -663,7 +672,7 @@ export function DraftRoom({
                 {savedOrder.map((m) => (
                   <p key={m.user_id} className="flex items-center gap-2">
                     <PresenceDot present={presentIds.has(m.user_id)} />
-                    {m.draft_position}. {m.profiles?.display_name}
+                    {m.draft_position}. {managerLabel(m.user_id)}
                   </p>
                 ))}
               </div>
@@ -711,7 +720,7 @@ export function DraftRoom({
                 displayName: managerLabel(m.user_id),
                 totalPoints: 0,
               })),
-              currentUserId
+              myTeamId
             ),
             slots: [...picks]
               .sort((x, y) => x.pick_number - y.pick_number)
@@ -722,7 +731,7 @@ export function DraftRoom({
               eliminationWeek: null,
               names: coupleParts(c.id) ?? { celebrity: c.celebrity_name, pro: c.pro_name },
             })),
-            viewerId: currentUserId,
+            viewerId: myTeamId,
           })}
         />
 
@@ -756,7 +765,7 @@ export function DraftRoom({
         <p className="mt-1 text-sm text-muted-foreground">
           Round {round} · Pick {nextPickNumber} of {totalSlots} —{" "}
           <span className="font-medium text-foreground">
-            {isMyTurn ? "Your turn" : `${onTheClock?.profiles?.display_name ?? "..."}'s turn`}
+            {isMyTurn ? "Your turn" : `${onTheClock ? managerLabel(onTheClock.user_id) : "..."}'s turn`}
           </span>{" "}
           · {pendingAuto ? "Auto-picking…" : `${secondsRemaining}s`}
         </p>

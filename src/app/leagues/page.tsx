@@ -27,8 +27,8 @@ export default async function LeaguesPage({
   const [{ data: memberships }, accountSettingsData] = await Promise.all([
     supabase
       .from("league_members")
-      .select("role, leagues(id, name)")
-      .eq("user_id", user.id),
+      .select("user_id, role, co_manager_id, leagues(id, name)")
+      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`),
     getAccountSettingsData(supabase, user.id),
   ]);
 
@@ -76,6 +76,9 @@ export default async function LeaguesPage({
                       leagueId={league.id}
                       leagueName={league.name}
                       isCommissioner={isCommissioner}
+                      isCoManager={m.user_id !== user.id}
+                      hasCoManager={m.user_id === user.id && m.co_manager_id !== null}
+                      teamUserId={m.user_id}
                     />
                   </CardContent>
                 </Card>

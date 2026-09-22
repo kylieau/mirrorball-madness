@@ -5,6 +5,7 @@ import { DraftRoom } from "@/components/draft-room";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { loadOtherLeagueQueues } from "@/lib/other-league-picks";
 import { safeRelativePath } from "@/lib/safe-relative-path";
+import { findOwnMembership } from "@/lib/acting-manager";
 import { XIcon } from "lucide-react";
 
 export default async function DraftPage({
@@ -65,12 +66,19 @@ export default async function DraftPage({
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
 
-  const [{ data: members }, { data: couples }, { data: picks }, { data: queue }, otherQueues] = await Promise.all([
-    supabase
-      .from("league_members")
-      .select("user_id, role, draft_position, draft_autopilot, profiles(display_name)")
-      .eq("league_id", id)
-      .order("draft_position"),
+  const { data: members } = await supabase
+    .from("league_members")
+    .select(
+      "user_id, role, draft_position, draft_autopilot, co_manager_id, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
+    )
+    .eq("league_id", id)
+    .order("draft_position");
+
+  // The draft queue is shared per team and keyed to the primary's user_id
+  // even when a co-manager is the one editing it.
+  const myTeamId = findOwnMembership(members ?? [], user.id)?.user_id ?? user.id;
+
+  const [{ data: couples }, { data: picks }, { data: queue }, otherQueues] = await Promise.all([
     supabase
       .from("couples")
       .select(
@@ -86,7 +94,7 @@ export default async function DraftPage({
       .from("draft_queues")
       .select("couple_ids")
       .eq("league_id", id)
-      .eq("user_id", user.id)
+      .eq("user_id", myTeamId)
       .maybeSingle(),
     loadOtherLeagueQueues(supabase, { userId: user.id, currentLeagueId: id }),
   ]);
@@ -110,7 +118,9 @@ export default async function DraftPage({
         role: m.role,
         draft_position: m.draft_position,
         draft_autopilot: m.draft_autopilot ?? false,
+        co_manager_id: m.co_manager_id,
         profiles: m.profiles,
+        co_manager: m.co_manager,
       }))}
       couples={flatCouples}
       coupleDisplayNames={coupleDisplayNames}

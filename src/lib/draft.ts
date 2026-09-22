@@ -82,13 +82,18 @@ export function isBenignAutoPickError(message: string | null | undefined): boole
 
 // Presence is advisory only — the server never checks it, so it can't block
 // or break a draft. `presentIds` may include people who are not members.
-export function partitionPresence<T extends { user_id: string }>(
+// A team counts as present if either half of a co-managed pair has the
+// draft room open.
+export function partitionPresence<T extends { user_id: string; co_manager_id: string | null }>(
   members: readonly T[],
   presentIds: ReadonlySet<string>
 ): { present: T[]; absent: T[] } {
   const present: T[] = [];
   const absent: T[] = [];
-  for (const m of members) (presentIds.has(m.user_id) ? present : absent).push(m);
+  for (const m of members) {
+    const isPresent = presentIds.has(m.user_id) || (m.co_manager_id !== null && presentIds.has(m.co_manager_id));
+    (isPresent ? present : absent).push(m);
+  }
   return { present, absent };
 }
 
