@@ -66,10 +66,12 @@ type Season = {
 
 type TabValue = "week" | "couple" | "schedule" | "enter";
 
+// Order matches ResultsNav's settings rows (Schedule, Results by Week,
+// Results by Couple) so the two never drift apart again.
 const SWITCHER_TABS: { value: TabValue; label: string }[] = [
+  { value: "schedule", label: "Schedule" },
   { value: "week", label: "By Week" },
   { value: "couple", label: "By Couple" },
-  { value: "schedule", label: "Schedule" },
 ];
 
 export function ResultsScreen({
