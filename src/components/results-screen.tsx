@@ -65,9 +65,9 @@ type Season = {
 
 type TabValue = "week" | "couple" | "enter";
 
-// Order matches ResultsNav's settings rows (Results by Week, Results by
-// Couple) so the two never drift apart again. Schedule lives on its own page
-// (/admin/schedule) now, not as a tab here.
+// These are the two sub-options under Settings' single "Scores" row — not
+// separate settings rows themselves, so there's no order to keep in sync.
+// Schedule lives on its own page (/admin/schedule), not as a tab here.
 const SWITCHER_TABS: { value: TabValue; label: string }[] = [
   { value: "week", label: "By Week" },
   { value: "couple", label: "By Couple" },
@@ -137,11 +137,11 @@ export function ResultsScreen({
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-8 pb-8">
       <TopBar {...accountSettingsData} email={viewerEmail} />
 
-      <PageHeader title="Results">
+      <PageHeader title="Scores">
         {tab === "enter" ? (
           <Button size="sm" variant="ghost" className="-ml-2" onClick={() => setTab("week")}>
             <ArrowLeftIcon className="size-4" />
-            Back to Results
+            Back to Scores
           </Button>
         ) : (
           <div className="flex gap-2">
