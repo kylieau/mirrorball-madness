@@ -5,20 +5,20 @@ export type { GrandFinaleMethod, TierPayStyle };
 // Points-per-correct is solved per method (and per band pay style) so every
 // option hands Grand Finale the same standings-deciding spread — see
 // scripts/monte-carlo-calibration/. Distance credit reaches 0 at exactly
-// 4 spots off (200 / 50). Re-run the script and re-paste on a re-fit.
+// 4 spots off (207 / 52). Re-run the script and re-paste on a re-fit.
 export const GRAND_FINALE_DEFAULT_METHOD: GrandFinaleMethod = "distance_based";
 export const GRAND_FINALE_DEFAULT_TIER_PAY_STYLE: TierPayStyle = "equal";
-export const GRAND_FINALE_DEFAULT_DISTANCE_PENALTY = 50;
+export const GRAND_FINALE_DEFAULT_DISTANCE_PENALTY = 52;
 export const GRAND_FINALE_DEFAULT_TIER_SIZE = 3;
 
 export function defaultPointsPerCorrect(method: GrandFinaleMethod, tierPayStyle: TierPayStyle): number {
   switch (method) {
     case "exact_position":
-      return 257;
+      return 264;
     case "distance_based":
-      return 200;
+      return 207;
     case "band_tier":
-      return tierPayStyle === "graded" ? 252 : 162;
+      return tierPayStyle === "graded" ? 259 : 166;
   }
 }
 
@@ -93,7 +93,7 @@ export function explainGrandFinaleMethod({
         tierPayStyle === "graded"
           ? `Lower bands pay less: 75%, 50%, then 25% of ${pointsPerCorrect} pts.`
           : `Every band pays the same.`;
-      return `The cast is split into bands of ${width} by finishing place: ${preview}. Earn ${pointsPerCorrect} pts for each couple you place in its correct band — order within a band doesn't matter. ${pay} Separate from the 1st–5th placement bonus below.`;
+      return `The cast is split into bands of ${width} by finishing place: ${preview}. Earn ${pointsPerCorrect} pts for each couple you place in its correct band — order within a band doesn't matter. ${pay}`;
     }
   }
 }

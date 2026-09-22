@@ -215,7 +215,6 @@ function simulateSeason(rosterSize) {
   const distanceByManager = new Array(managerCount).fill(0);
   const bandEqualByManager = new Array(managerCount).fill(0);
   const bandGradedByManager = new Array(managerCount).fill(0);
-  const gfPlacementByManager = new Array(managerCount).fill(0);
   const danceCardPlacementByManager = new Array(managerCount).fill(0);
 
   for (let m = 0; m < managerCount; m++) {
@@ -250,7 +249,6 @@ function simulateSeason(rosterSize) {
       const owner = rosterOf.get(id);
       if (owner !== m) continue;
       danceCardPlacementByManager[m] += CURRENT.placementShape[placement - 1];
-      gfPlacementByManager[m] += CURRENT.placementShape[placement - 1]; // same raw shape pre-calibration
     }
   }
 
@@ -263,7 +261,6 @@ function simulateSeason(rosterSize) {
     distanceByManager,
     bandEqualByManager,
     bandGradedByManager,
-    gfPlacementByManager,
     danceCardPlacementByManager,
   };
 }
@@ -277,7 +274,6 @@ function simulateMany(rosterSize, n) {
     distance: [],
     bandEqual: [],
     bandGraded: [],
-    gfPlacement: [],
     danceCardPlacement: [],
   };
   for (let i = 0; i < n; i++) {
@@ -290,7 +286,6 @@ function simulateMany(rosterSize, n) {
       acc.distance.push(s.distanceByManager[m]);
       acc.bandEqual.push(s.bandEqualByManager[m]);
       acc.bandGraded.push(s.bandGradedByManager[m]);
-      acc.gfPlacement.push(s.gfPlacementByManager[m]);
       acc.danceCardPlacement.push(s.danceCardPlacementByManager[m]);
     }
   }
@@ -317,8 +312,12 @@ function solveMultiplierForTarget(judgeScoreSum, fixedComponent, targetVar) {
 }
 
 // ============================================================
-// Reference run: roster size 3, where Curtain Call / Grand Finale / the
-// Dance-Card-half vs Grand-Finale-half placement split all get solved once.
+// Reference run: roster size 3, where Curtain Call / Grand Finale / Dance
+// Card's placement bonus all get solved once. Grand Finale used to also
+// carve out a placement-bonus slice of its own budget (a duplicate of Dance
+// Card's, since it paid out on the same roster-luck event) — removed; the
+// full-order-prediction methods below now consume the entire Grand Finale
+// budget instead of sharing it with a placement bonus.
 // ============================================================
 console.log(`Simulating ${SEASONS_PER_CONFIG} seasons at roster size ${REFERENCE_ROSTER_SIZE} (reference)...`);
 const ref = simulateMany(REFERENCE_ROSTER_SIZE, SEASONS_PER_CONFIG);
@@ -329,17 +328,20 @@ console.log(`TARGET (Dance Card's own current spread at roster size ${REFERENCE_
 
 const V_dcPlacementRaw = variance(ref.danceCardPlacement);
 const fPlacementDC = V_dcPlacementRaw / TARGET;
-const P = fPlacementDC * TARGET; // total placement-bonus variance-worth, split 50/50 across modules
+const P = fPlacementDC * TARGET; // placement-bonus variance-worth (historically split 50/50 with Grand Finale's now-removed copy)
 console.log(
-  `Placement bonus is currently ${(fPlacementDC * 100).toFixed(1)}% of Dance Card's spread (P=${P.toFixed(1)}) — split 50/50 across Dance Card / Grand Finale per decision.`
+  `Placement bonus is currently ${(fPlacementDC * 100).toFixed(1)}% of Dance Card's spread (P=${P.toFixed(1)}).`
 );
 
-// Dance-Card-half placement: isolated scale (closed form, since it's not
-// combined with anything else being solved).
+// Dance Card's placement bonus: isolated scale (closed form, since it's not
+// combined with anything else being solved). Deliberately still only half of
+// P — Grand Finale no longer claims the other half (see below), but Dance
+// Card's own calibrated values (and the shipped schema.sql defaults they
+// produce) are unchanged by this pass, so this stays as it was.
 const danceCardHalfPlacementScale = Math.sqrt((0.5 * P) / V_dcPlacementRaw);
 
 // Judges' score multiplier at the reference roster size: whatever's left of
-// Dance Card's target budget after carving out its placement half.
+// Dance Card's target budget after carving out its placement bonus.
 const remainingDanceCardTarget = TARGET - 0.5 * P;
 const referenceMultiplier = solveMultiplierForTarget(ref.judgeScoreSum, ref.survival, remainingDanceCardTarget);
 
@@ -347,36 +349,28 @@ const referenceMultiplier = solveMultiplierForTarget(ref.judgeScoreSum, ref.surv
 const V_curtainCallRaw = variance(ref.prediction);
 const curtainCallScale = Math.sqrt(TARGET / V_curtainCallRaw);
 
-// Grand Finale: 3/5 of TARGET, split between the full-order pick and its
-// placement half (which reuses the other 0.5*P from above).
+// Grand Finale: 3/5 of TARGET, entirely on the full-order pick now that
+// there's no placement bonus to share the budget with.
 const grandFinaleBudget = GRAND_FINALE_CAP_FRACTION * TARGET;
-const gfPlacementBudget = 0.5 * P;
-const bonusPicksBudget = grandFinaleBudget - gfPlacementBudget;
 const V_bonusPicksRaw = variance(ref.bonusPicks);
-const V_gfPlacementRaw = variance(ref.gfPlacement);
-const bonusPicksScale = Math.sqrt(bonusPicksBudget / V_bonusPicksRaw);
+const bonusPicksScale = Math.sqrt(grandFinaleBudget / V_bonusPicksRaw);
 // Every method's payout is linear in its base, so each solves in closed form.
-const distanceScale = Math.sqrt(bonusPicksBudget / variance(ref.distance));
-const bandEqualScale = Math.sqrt(bonusPicksBudget / variance(ref.bandEqual));
-const bandGradedScale = Math.sqrt(bonusPicksBudget / variance(ref.bandGraded));
-const gfPlacementScale = Math.sqrt(gfPlacementBudget / V_gfPlacementRaw);
+const distanceScale = Math.sqrt(grandFinaleBudget / variance(ref.distance));
+const bandEqualScale = Math.sqrt(grandFinaleBudget / variance(ref.bandEqual));
+const bandGradedScale = Math.sqrt(grandFinaleBudget / variance(ref.bandGraded));
 
 console.log("\n--- Global (roster-size-independent) calibrated defaults ---");
 const survivalPoints = CURRENT.survivalPoints; // unscaled by design
 const eliminationPredictionPoints = CURRENT.eliminationPredictionPoints * curtainCallScale;
 const topScorerPredictionPoints = CURRENT.topScorerPredictionPoints * curtainCallScale;
 const dcPlacement = CURRENT.placementShape.map((v) => v * danceCardHalfPlacementScale);
-const gfPlacement = CURRENT.placementShape.map((v) => v * gfPlacementScale);
 const bonusPicksPointsPerCorrect = CURRENT.bonusPicksPointsPerCorrect * bonusPicksScale;
 
 console.log(`survival_points: ${survivalPoints} (unchanged)`);
 console.log(`elimination_prediction_points: ${eliminationPredictionPoints.toFixed(1)}`);
 console.log(`top_scorer_prediction_points: ${topScorerPredictionPoints.toFixed(1)}`);
 console.log(
-  `first_place_points .. fifth_place_points (Dance Card half): ${dcPlacement.map((v) => v.toFixed(1)).join(", ")}`
-);
-console.log(
-  `bonus_picks_first_place_points .. bonus_picks_fifth_place_points (Grand Finale half): ${gfPlacement.map((v) => v.toFixed(1)).join(", ")}`
+  `first_place_points .. fifth_place_points (Dance Card placement bonus): ${dcPlacement.map((v) => v.toFixed(1)).join(", ")}`
 );
 console.log(`bonus_picks_points_per_correct (exact_position): ${bonusPicksPointsPerCorrect.toFixed(1)}`);
 const distancePointsPerCorrect = CURRENT.bonusPicksPointsPerCorrect * distanceScale;

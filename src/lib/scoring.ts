@@ -3,19 +3,13 @@ export type ScoringSettings = {
   survivalPoints: number;
   eliminationPredictionPoints: number;
   topScorerPredictionPoints: number;
-  // Placement bonus (a rostered couple finishing in the finale's top 5) is
-  // split into two additive halves so each module's weight/toggle governs
-  // only its own half — see DANCE_CARD_PLACEMENT_KEY / GRAND_FINALE_PLACEMENT_KEY below.
+  // Placement bonus: a rostered couple finishing in the finale's top 5 —
+  // see DANCE_CARD_PLACEMENT_KEY below.
   firstPlacePoints: number;
   secondPlacePoints: number;
   thirdPlacePoints: number;
   fourthPlacePoints: number;
   fifthPlacePoints: number;
-  bonusPicksFirstPlacePoints: number;
-  bonusPicksSecondPlacePoints: number;
-  bonusPicksThirdPlacePoints: number;
-  bonusPicksFourthPlacePoints: number;
-  bonusPicksFifthPlacePoints: number;
 };
 
 export type RosterSlot = { managerId: string; coupleId: string };
@@ -65,24 +59,16 @@ export type CategoryWeights = {
   bonus: number;
 };
 
-// Dance-Card-half and Grand-Finale-half of the placement bonus, keyed by
-// numeric finalPlacement (1..5) rather than by Outcome — a couple's 4th/5th
-// place finish isn't a distinct couples.status value, it's derived from the
-// same elimination-order ranking Grand Finale's full-order prediction
-// already resolves against.
+// Dance Card's placement bonus, keyed by numeric finalPlacement (1..5)
+// rather than by Outcome — a couple's 4th/5th place finish isn't a distinct
+// couples.status value, it's derived from the same elimination-order
+// ranking Grand Finale's full-order prediction already resolves against.
 const DANCE_CARD_PLACEMENT_KEY: Record<number, keyof ScoringSettings> = {
   1: "firstPlacePoints",
   2: "secondPlacePoints",
   3: "thirdPlacePoints",
   4: "fourthPlacePoints",
   5: "fifthPlacePoints",
-};
-const GRAND_FINALE_PLACEMENT_KEY: Record<number, keyof ScoringSettings> = {
-  1: "bonusPicksFirstPlacePoints",
-  2: "bonusPicksSecondPlacePoints",
-  3: "bonusPicksThirdPlacePoints",
-  4: "bonusPicksFourthPlacePoints",
-  5: "bonusPicksFifthPlacePoints",
 };
 
 // Anything else (safe, winner, runner_up, third_place) earns survival points.
@@ -171,7 +157,6 @@ export function computeWeeklyScores({
   const eliminatedCoupleIds = findEliminatedCoupleIds(episodeOutcomes);
 
   const rosterPointsByManager = new Map<string, number>();
-  const finalePlacementBonusByManager = new Map<string, number>();
   for (const { managerId, coupleId } of rosterSlots) {
     let points = (coupleTotalScore.get(coupleId) ?? 0) * scoringSettings.judgesScoreMultiplier;
 
@@ -183,11 +168,6 @@ export function computeWeeklyScores({
     const finalPlacement = finalPlacementByCouple.get(coupleId);
     if (finalPlacement && finalPlacement in DANCE_CARD_PLACEMENT_KEY) {
       points += scoringSettings[DANCE_CARD_PLACEMENT_KEY[finalPlacement]];
-      finalePlacementBonusByManager.set(
-        managerId,
-        (finalePlacementBonusByManager.get(managerId) ?? 0) +
-          scoringSettings[GRAND_FINALE_PLACEMENT_KEY[finalPlacement]]
-      );
     }
 
     points += bonusPointsByCouple.get(coupleId) ?? 0;
@@ -221,14 +201,12 @@ export function computeWeeklyScores({
     ...rosterPointsByManager.keys(),
     ...predictionPointsByManager.keys(),
     ...Object.keys(grandFinalePointsByManager),
-    ...finalePlacementBonusByManager.keys(),
   ]);
 
   return [...managerIds].map((managerId) => {
     const rosterPoints = rosterPointsByManager.get(managerId) ?? 0;
     const predictionPoints = predictionPointsByManager.get(managerId) ?? 0;
-    const grandFinalePoints =
-      (grandFinalePointsByManager[managerId] ?? 0) + (finalePlacementBonusByManager.get(managerId) ?? 0);
+    const grandFinalePoints = grandFinalePointsByManager[managerId] ?? 0;
     return {
       managerId,
       rosterPoints,

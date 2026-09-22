@@ -52,11 +52,6 @@ export async function syncSeasonClockAnchor(
     p_elimination_prediction_points: settings.elimination_prediction_points,
     p_top_scorer_prediction_points: settings.top_scorer_prediction_points,
     p_bonus_picks_points_per_correct: settings.bonus_picks_points_per_correct,
-    p_bonus_picks_first_place_points: settings.bonus_picks_first_place_points,
-    p_bonus_picks_second_place_points: settings.bonus_picks_second_place_points,
-    p_bonus_picks_third_place_points: settings.bonus_picks_third_place_points,
-    p_bonus_picks_fourth_place_points: settings.bonus_picks_fourth_place_points,
-    p_bonus_picks_fifth_place_points: settings.bonus_picks_fifth_place_points,
     p_bonus_picks_tier_pay_style: settings.bonus_picks_tier_pay_style,
   });
   if (error) return { error: error.message, anchorWeek: null };

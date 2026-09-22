@@ -11,11 +11,6 @@ const settings: ScoringSettings = {
   thirdPlacePoints: 25,
   fourthPlacePoints: 12,
   fifthPlacePoints: 6,
-  bonusPicksFirstPlacePoints: 40,
-  bonusPicksSecondPlacePoints: 20,
-  bonusPicksThirdPlacePoints: 10,
-  bonusPicksFourthPlacePoints: 5,
-  bonusPicksFifthPlacePoints: 2,
 };
 
 // Most tests below aren't exercising Curtain Call's couples-remaining
@@ -92,7 +87,7 @@ describe("computeWeeklyScores", () => {
     expect(bob.predictionPoints).toBe(0); // predicted elimination was wrong
   });
 
-  it("awards the split placement bonus (Dance-Card-half in rosterPoints, Grand-Finale-half in grandFinalePoints) for 1st/2nd/3rd", () => {
+  it("awards the Dance Card placement bonus for 1st/2nd/3rd", () => {
     const result = computeWeeklyScores({
       scoringSettings: settings,
       rosterSlots: [
@@ -120,14 +115,14 @@ describe("computeWeeklyScores", () => {
     const carol = result.find((r) => r.managerId === "carol")!;
 
     expect(alice.rosterPoints).toBe(30 + 10 + 100); // dance + survival + Dance Card 1st
-    expect(alice.grandFinalePoints).toBe(40); // Grand Finale half of 1st
+    expect(alice.grandFinalePoints).toBe(0); // Grand Finale has no placement bonus
     expect(bob.rosterPoints).toBe(29 + 10 + 50); // dance + survival + Dance Card 2nd
-    expect(bob.grandFinalePoints).toBe(20); // Grand Finale half of 2nd
+    expect(bob.grandFinalePoints).toBe(0);
     expect(carol.rosterPoints).toBe(28 + 10 + 25); // dance + survival + Dance Card 3rd
-    expect(carol.grandFinalePoints).toBe(10); // Grand Finale half of 3rd
+    expect(carol.grandFinalePoints).toBe(0);
   });
 
-  it("awards the split placement bonus for 4th/5th place too, extending past the podium", () => {
+  it("awards the Dance Card placement bonus for 4th/5th place too, extending past the podium", () => {
     const result = computeWeeklyScores({
       scoringSettings: settings,
       rosterSlots: [
@@ -148,9 +143,9 @@ describe("computeWeeklyScores", () => {
     const bob = result.find((r) => r.managerId === "bob")!;
 
     expect(alice.rosterPoints).toBe(12); // eliminated: no survival, just Dance Card 4th
-    expect(alice.grandFinalePoints).toBe(5); // Grand Finale half of 4th
+    expect(alice.grandFinalePoints).toBe(0);
     expect(bob.rosterPoints).toBe(6); // Dance Card 5th
-    expect(bob.grandFinalePoints).toBe(2); // Grand Finale half of 5th
+    expect(bob.grandFinalePoints).toBe(0);
   });
 
   it("does not award a placement bonus when finalPlacement is omitted, even for a 'winner' outcome", () => {

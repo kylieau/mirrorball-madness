@@ -401,11 +401,6 @@ async function recomputeWeekScores(
         thirdPlacePoints: scoringSettings.third_place_points,
         fourthPlacePoints: scoringSettings.fourth_place_points,
         fifthPlacePoints: scoringSettings.fifth_place_points,
-        bonusPicksFirstPlacePoints: scoringSettings.bonus_picks_first_place_points,
-        bonusPicksSecondPlacePoints: scoringSettings.bonus_picks_second_place_points,
-        bonusPicksThirdPlacePoints: scoringSettings.bonus_picks_third_place_points,
-        bonusPicksFourthPlacePoints: scoringSettings.bonus_picks_fourth_place_points,
-        bonusPicksFifthPlacePoints: scoringSettings.bonus_picks_fifth_place_points,
       },
       rosterSlots: judgesScoreStarted
         ? rosterSlots
