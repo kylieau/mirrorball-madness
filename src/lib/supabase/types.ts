@@ -1597,6 +1597,13 @@ export type Database = {
         Args: { p_league_id: string }
         Returns: string
       }
+      get_co_manager_invite_info: {
+        Args: { p_code: string }
+        Returns: {
+          league_name: string
+          primary_display_name: string
+        }[]
+      }
       is_league_commissioner: {
         Args: { p_league_id: string }
         Returns: boolean

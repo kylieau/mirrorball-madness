@@ -18,14 +18,30 @@ export default async function JoinAsCoManagerPage({
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Only shown once signed in — this schema never grants anon anything, so a
+  // signed-out visitor sees the generic copy below until they sign up/in.
+  const { data: inviteInfo } = user
+    ? await supabase.rpc("get_co_manager_invite_info", { p_code: inviteCode }).maybeSingle()
+    : { data: null };
+
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6 px-4 py-24">
       <Card>
         <CardHeader>
           <CardTitle>You&apos;ve been invited as a co-manager</CardTitle>
           <CardDescription>
-            You&apos;ll jointly run this fantasy team — same picks, same roster, same standings, as the person who
-            invited you.
+            {inviteInfo ? (
+              <>
+                You&apos;ll jointly run <strong className="text-foreground">{inviteInfo.primary_display_name}</strong>
+                &apos;s team in <strong className="text-foreground">{inviteInfo.league_name}</strong> — same picks,
+                same roster, same standings.
+              </>
+            ) : (
+              <>
+                You&apos;ll jointly run this fantasy team — same picks, same roster, same standings, as the person
+                who invited you.
+              </>
+            )}
             <br />
             Invite Code <span className="font-mono font-medium text-foreground">{inviteCode}</span>
           </CardDescription>
