@@ -63,7 +63,7 @@ type Season = {
   season_number: number | null;
 } | null;
 
-function SeasonSettingsCard({ season }: { season: Season }) {
+function SeasonSettingsCard({ season, readOnly }: { season: Season; readOnly: boolean }) {
   const [premiereDate, setPremiereDate] = useState(season?.premiere_date ?? "");
   const [totalEpisodes, setTotalEpisodes] = useState(season?.total_episodes?.toString() ?? "");
   const [finaleDate, setFinaleDate] = useState(season?.finale_date ?? "");
@@ -102,6 +102,7 @@ function SeasonSettingsCard({ season }: { season: Season }) {
               type="date"
               value={premiereDate}
               placeholder="TBD"
+              disabled={readOnly}
               onChange={(e) => {
                 setPremiereDate(e.target.value);
                 setSaved(false);
@@ -115,6 +116,7 @@ function SeasonSettingsCard({ season }: { season: Season }) {
               min={1}
               value={totalEpisodes}
               placeholder="TBD"
+              disabled={readOnly}
               onChange={(e) => {
                 setTotalEpisodes(e.target.value);
                 setSaved(false);
@@ -127,6 +129,7 @@ function SeasonSettingsCard({ season }: { season: Season }) {
               type="date"
               value={finaleDate}
               placeholder="TBD"
+              disabled={readOnly}
               onChange={(e) => {
                 setFinaleDate(e.target.value);
                 setSaved(false);
@@ -134,18 +137,21 @@ function SeasonSettingsCard({ season }: { season: Season }) {
             />
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button size="sm" onClick={handleSave} disabled={submitting}>
-            {submitting ? "Saving..." : "Save"}
-          </Button>
-          {saved && <p className="text-sm text-muted-foreground">Saved.</p>}
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-3">
+            <Button size="sm" onClick={handleSave} disabled={submitting}>
+              {submitting ? "Saving..." : "Save"}
+            </Button>
+            {saved && <p className="text-sm text-muted-foreground">Saved.</p>}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 }
 
 export function ScheduleManager({
+  readOnly,
   episodes,
   weeks,
   episodeResults,
@@ -154,6 +160,9 @@ export function ScheduleManager({
   seasonCouples,
   participantsByEpisode,
 }: {
+  // The schedule is readable by anyone signed in, but scheduling episodes is
+  // season-wide structural config — admin only.
+  readOnly: boolean;
   episodes: Episode[];
   weeks: CompetitionWeek[];
   episodeResults: EpisodeResult[];
@@ -342,10 +351,13 @@ export function ScheduleManager({
       !!draftsByEpisode[e.id]?.hasDraft
     );
     const count = coupleCount(e.id);
+    const Row = readOnly ? "div" : "button";
     return (
-      <button
-        onClick={() => openEditEpisode(e)}
-        className="flex w-full items-center justify-between gap-3 border-b border-border p-4 text-left last:border-b-0 hover:bg-accent/50"
+      <Row
+        onClick={readOnly ? undefined : () => openEditEpisode(e)}
+        className={`flex w-full items-center justify-between gap-3 border-b border-border p-4 text-left last:border-b-0${
+          readOnly ? "" : " hover:bg-accent/50"
+        }`}
       >
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
@@ -366,22 +378,24 @@ export function ScheduleManager({
             {count > 0 && ` · ${count} couple${count === 1 ? "" : "s"} scored`}
           </p>
         </div>
-        <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-      </button>
+        {!readOnly && <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />}
+      </Row>
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <SeasonSettingsCard season={season} />
+      <SeasonSettingsCard season={season} readOnly={readOnly} />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Schedule</CardTitle>
-          <Button size="sm" onClick={openAddEpisode}>
-            <PlusIcon className="size-4" />
-            Add Episode
-          </Button>
+          {!readOnly && (
+            <Button size="sm" onClick={openAddEpisode}>
+              <PlusIcon className="size-4" />
+              Add Episode
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="flex flex-col gap-0 p-0">
           {sortedEpisodes.length === 0 ? (

@@ -9,6 +9,10 @@ export type AccountSettingsData = {
   deletionRequestedAt: string | null;
   spoilerFreeMode: boolean;
   leagues: AccountSettingsLeague[];
+  // The propose tier: can this viewer draft episode results? Derived from the
+  // leagues above rather than a second query — commissioner of any one of them
+  // is enough. Viewing results needs no flag at all; it's open to everyone.
+  canProposeResults: boolean;
 };
 
 // One fetch for everything TopBar's avatar and AccountSettingsSheet need
@@ -36,14 +40,18 @@ export async function getAccountSettingsData(
       .or(`user_id.eq.${userId},co_manager_id.eq.${userId}`),
   ]);
 
+  const isSuperAdmin = data?.is_super_admin ?? false;
+  const leagues = (memberships ?? [])
+    .filter((m) => m.leagues)
+    .map((m) => ({ id: m.leagues!.id, name: m.leagues!.name, isCommissioner: m.role === "commissioner" }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   return {
     displayName: data?.display_name ?? "?",
-    isSuperAdmin: data?.is_super_admin ?? false,
+    isSuperAdmin,
     deletionRequestedAt: data?.deletion_requested_at ?? null,
     spoilerFreeMode: data?.spoiler_free_mode ?? false,
-    leagues: (memberships ?? [])
-      .filter((m) => m.leagues)
-      .map((m) => ({ id: m.leagues!.id, name: m.leagues!.name, isCommissioner: m.role === "commissioner" }))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+    leagues,
+    canProposeResults: isSuperAdmin || leagues.some((league) => league.isCommissioner),
   };
 }

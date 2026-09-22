@@ -24,6 +24,7 @@ import { AccountDataForm } from "@/components/account-data-form";
 import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
 import { ADD_TO_HOME_SCREEN_COPY } from "@/lib/add-to-home-screen";
 import { SiteAdminNav } from "@/components/site-admin-nav";
+import { ResultsNav } from "@/components/results-nav";
 import { LeagueSettingsLinks } from "@/components/league-settings-links";
 import { SettingsSection } from "@/components/settings-section";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
@@ -39,13 +40,16 @@ const ROW_CLASSES =
 // this sheet in place. Notifications stays a plain Link (a scrollable
 // content list, not a settings form — see BACKLOG.md). Add to Home Screen
 // is its own page (`/settings/add-to-home-screen`), not nested under
-// Notifications. Super-admin Site Admin is Results + Accounts.
+// Notifications. Results is its own section, shown to everyone — viewing how
+// scores get entered isn't admin-only — with its Enter Results row gated on
+// the propose tier. Site Admin stays super-admin: Accounts + Show Settings.
 export function AccountSettingsSheet({
   displayName,
   isSuperAdmin,
   deletionRequestedAt,
   spoilerFreeMode,
   leagues,
+  canProposeResults,
   email,
 }: AccountSettingsData & { email: string }) {
   // League settings' Back/✕ returns to wherever this sheet was opened from.
@@ -114,6 +118,8 @@ export function AccountSettingsSheet({
           </SettingsSection>
 
           <LeagueSettingsLinks leagues={leagues} fromHref={currentPath} />
+
+          <ResultsNav canPropose={canProposeResults} />
 
           {isSuperAdmin && <SiteAdminNav />}
 

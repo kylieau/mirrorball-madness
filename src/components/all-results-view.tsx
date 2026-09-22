@@ -68,6 +68,7 @@ type CompetitionWeek = {
 type EpisodeWithStatus = Episode & { resultsStatus: EpisodeResultsStatus };
 
 export function AllResultsView({
+  canPropose,
   episodes,
   weeks,
   danceScores,
@@ -82,6 +83,9 @@ export function AllResultsView({
   onNavigateToEpisode,
   seasonNumber,
 }: {
+  // Starting a correction and continuing a draft are both propose-tier
+  // writes, so a view-only visitor sees the results without those buttons.
+  canPropose: boolean;
   episodes: Episode[];
   weeks: CompetitionWeek[];
   danceScores: DanceScore[];
@@ -299,6 +303,7 @@ export function AllResultsView({
               </p>
             )}
 
+            {canPropose && (
             <Dialog>
               <DialogTrigger
                 render={
@@ -341,6 +346,7 @@ export function AllResultsView({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            )}
           </>
         ) : (
           <>
@@ -348,14 +354,16 @@ export function AllResultsView({
               Unpublished draft — {coupleCount} couple
               {coupleCount === 1 ? "" : "s"} entered so far.
             </p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="self-start"
-              onClick={() => onNavigateToEpisode(ep.id)}
-            >
-              Continue in Enter Results
-            </Button>
+            {canPropose && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="self-start"
+                onClick={() => onNavigateToEpisode(ep.id)}
+              >
+                Continue in Enter Results
+              </Button>
+            )}
           </>
         )}
       </div>

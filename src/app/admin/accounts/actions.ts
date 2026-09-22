@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { clearAccountDeletionRequest } from "@/lib/account-deletions";
 
-// Stricter than results entry: RESULTS_ENTRY_OPEN_TO_ALL must not expose
-// this queue (emails + user ids).
+// Stricter than results entry: neither the view nor the propose tier may
+// reach this queue (emails + user ids) — is_super_admin only.
 async function requireSuperAdmin(): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const {

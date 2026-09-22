@@ -160,6 +160,7 @@ function buildRowsFromDraft(draft: DraftState | undefined, couples: Couple[]): R
 }
 
 export function ResultsForm({
+  canPublish,
   activeCouples,
   allCouplesWithStatus,
   coupleDisplayNames,
@@ -172,6 +173,10 @@ export function ResultsForm({
   forceSelectEpisodeId,
   participantsByEpisode,
 }: {
+  // Commissioners draft results; only is_super_admin publishes them.
+  // Server-side requireAdminAccess is the real gate — this just avoids
+  // showing a button that would 403.
+  canPublish: boolean;
   activeCouples: Couple[];
   allCouplesWithStatus: CoupleWithStatus[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
@@ -929,7 +934,9 @@ export function ResultsForm({
           <div className={`fixed inset-x-0 z-30 ${BOTTOM_NAV_STACK_ABOVE}`}>
             <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="hidden text-xs text-muted-foreground sm:block">
-                Publishing updates Results &amp; Standings across every league immediately.
+                {canPublish
+                  ? "Publishing updates Results & Standings across every league immediately."
+                  : "Your draft is saved for a site admin to review and publish."}
               </p>
               <div className="flex gap-2 sm:w-auto">
                 <Button
@@ -940,9 +947,11 @@ export function ResultsForm({
                 >
                   {savingDraft ? "Saving..." : "Save Draft"}
                 </Button>
-                <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing}>
-                  {publishing ? "Publishing..." : "Publish Results"}
-                </Button>
+                {canPublish && (
+                  <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing}>
+                    {publishing ? "Publishing..." : "Publish Results"}
+                  </Button>
+                )}
               </div>
             </div>
           </div>

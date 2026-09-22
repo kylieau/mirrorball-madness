@@ -30,12 +30,21 @@ export type EntrySubmission = {
   bonusNote: string | null;
 };
 
-// While the league is small, results entry is opened to every signed-in user
-// (RESULTS_ENTRY_OPEN_TO_ALL=true) rather than gated behind is_super_admin, so
-// no single person is stuck updating scores every week. Flip the env var off
-// once that trust assumption stops holding.
-export function resultsEntryOpenToAll(): boolean {
-  return process.env.RESULTS_ENTRY_OPEN_TO_ALL === "true";
+// The "propose" tier: a commissioner of any league can draft results, while
+// only is_super_admin can publish them. Not league-scoped like
+// is_league_commissioner — results entry is cross-league — but it matches the
+// same identity parity, so a co-manager of a commissioner's team qualifies too.
+export async function userIsAnyLeagueCommissioner(
+  admin: SupabaseClient<Database>,
+  userId: string
+): Promise<boolean> {
+  const { data } = await admin
+    .from("league_members")
+    .select("id")
+    .eq("role", "commissioner")
+    .or(`user_id.eq.${userId},co_manager_id.eq.${userId}`)
+    .limit(1);
+  return (data ?? []).length > 0;
 }
 
 async function getActiveSeasonId(
@@ -449,9 +458,9 @@ async function recomputeWeekScores(
 }
 
 // Takes an already-authorized admin (service-role) client — the caller is
-// responsible for verifying access (profiles.is_super_admin or
-// resultsEntryOpenToAll()) first. Kept separate from the 'use server' action
-// so it can be exercised directly in tests without a Next.js request context.
+// responsible for verifying publish access (profiles.is_super_admin) first.
+// Kept separate from the 'use server' action so it can be exercised directly
+// in tests without a Next.js request context.
 export async function applyEpisodeResults(
   admin: SupabaseClient<Database>,
   input: EpisodeResultsInput

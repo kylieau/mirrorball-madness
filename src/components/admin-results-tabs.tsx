@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ResultsForm } from "@/components/results-form";
 import { AllResultsView } from "@/components/all-results-view";
@@ -65,16 +66,19 @@ type Season = {
   season_number: number | null;
 } | null;
 
-const TABS = [
+type TabValue = "enter" | "view" | "schedule" | "manage";
+
+const TABS: { value: TabValue; label: string; icon: typeof PlusCircleIcon }[] = [
   { value: "enter", label: "Enter Results", icon: PlusCircleIcon },
   { value: "view", label: "View Results", icon: ListChecksIcon },
   { value: "schedule", label: "Schedule", icon: CalendarIcon },
-  { value: "manage", label: "Settings", icon: SettingsIcon },
-] as const;
+  { value: "manage", label: "Show Settings", icon: SettingsIcon },
+];
 
 export function AdminResultsTabs({
   accountSettingsData,
   viewerEmail,
+  canPropose,
   activeCouples,
   allCouples,
   allCouplesWithStatus,
@@ -94,6 +98,7 @@ export function AdminResultsTabs({
 }: {
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
+  canPropose: boolean;
   activeCouples: Couple[];
   allCouples: Couple[];
   allCouplesWithStatus: CoupleWithStatus[];
@@ -111,7 +116,24 @@ export function AdminResultsTabs({
   season: Season;
   participantsByEpisode: Record<string, string[]>;
 }) {
-  const [tab, setTab] = useState<(typeof TABS)[number]["value"]>("enter");
+  const { isSuperAdmin } = accountSettingsData;
+  // Everyone signed in gets the two read tabs; entering results needs the
+  // propose tier, and schedule/show-settings editing is admin-only.
+  const visibleTabs = TABS.filter(({ value }) => {
+    if (value === "enter") return canPropose;
+    if (value === "manage") return isSuperAdmin;
+    return true;
+  });
+
+  // Account Settings links straight to a tab (?tab=view, ?tab=schedule, …),
+  // so honour that over the old always-"enter" default — which a view-only
+  // visitor couldn't even see.
+  const requestedTab = useSearchParams().get("tab");
+  const initialTab = visibleTabs.some((t) => t.value === requestedTab)
+    ? (requestedTab as TabValue)
+    : "view";
+
+  const [tab, setTab] = useState<TabValue>(initialTab);
   // Lifted here so View Results' "Correct Results"/"Continue draft" can
   // jump to Enter Results already pointed at the right episode.
   const [forceSelectEpisodeId, setForceSelectEpisodeId] = useState<string | null>(null);
@@ -131,7 +153,7 @@ export function AdminResultsTabs({
 
       <BottomNav>
         <TabsList className={`${BOTTOM_NAV_TABS_CLASS} rounded-none group-data-horizontal/tabs:h-auto`}>
-          {TABS.map(({ value, label, icon: Icon }) => (
+          {visibleTabs.map(({ value, label, icon: Icon }) => (
             <TabsTrigger
               key={value}
               value={value}
@@ -145,8 +167,10 @@ export function AdminResultsTabs({
       </BottomNav>
 
       <div className={`mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pt-6 ${BOTTOM_NAV_CLEARANCE}`}>
+        {canPropose && (
         <TabsContent value="enter">
           <ResultsForm
+            canPublish={isSuperAdmin}
             activeCouples={activeCouples}
             allCouplesWithStatus={allCouplesWithStatus}
             coupleDisplayNames={activeCoupleDisplayNames}
@@ -160,8 +184,10 @@ export function AdminResultsTabs({
             participantsByEpisode={participantsByEpisode}
           />
         </TabsContent>
+        )}
         <TabsContent value="view">
           <AllResultsView
+            canPropose={canPropose}
             episodes={episodes}
             weeks={weeks}
             danceScores={danceScores}
@@ -179,6 +205,7 @@ export function AdminResultsTabs({
         </TabsContent>
         <TabsContent value="schedule">
           <ScheduleManager
+            readOnly={!isSuperAdmin}
             episodes={episodes}
             weeks={weeks}
             episodeResults={episodeResults}
@@ -188,9 +215,11 @@ export function AdminResultsTabs({
             participantsByEpisode={participantsByEpisode}
           />
         </TabsContent>
-        <TabsContent value="manage">
-          <JudgesDanceStylesManager judges={judges} danceStyles={danceStyles} />
-        </TabsContent>
+        {isSuperAdmin && (
+          <TabsContent value="manage">
+            <JudgesDanceStylesManager judges={judges} danceStyles={danceStyles} />
+          </TabsContent>
+        )}
       </div>
     </Tabs>
   );

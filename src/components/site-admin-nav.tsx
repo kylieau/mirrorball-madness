@@ -2,9 +2,12 @@ import Link from "next/link";
 import { ChevronRightIcon } from "lucide-react";
 import { SettingsSection } from "@/components/settings-section";
 
+// Results entry itself lives in the Results section (ResultsNav) — it isn't
+// admin-only. What stays here is strictly is_super_admin: the deletion queue,
+// and the season/judges/dance-styles config behind Show Settings.
 const LINKS = [
-  { href: "/admin/results", label: "Results" },
   { href: "/admin/accounts", label: "Accounts" },
+  { href: "/admin/results?tab=manage", label: "Show Settings" },
 ] as const;
 
 export function SiteAdminNav() {

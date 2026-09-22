@@ -8,6 +8,7 @@ import { ChevronRightIcon, XIcon } from "lucide-react";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
 import { SiteAdminNav } from "@/components/site-admin-nav";
+import { ResultsNav } from "@/components/results-nav";
 import { ADD_TO_HOME_SCREEN_COPY } from "@/lib/add-to-home-screen";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { LeagueSettingsLinks } from "@/components/league-settings-links";
@@ -46,7 +47,8 @@ export default async function SettingsPage({
     redirect("/login");
   }
 
-  const { isSuperAdmin, spoilerFreeMode, leagues } = await getAccountSettingsData(supabase, user.id);
+  const { isSuperAdmin, spoilerFreeMode, leagues, canProposeResults } =
+    await getAccountSettingsData(supabase, user.id);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
@@ -81,6 +83,8 @@ export default async function SettingsPage({
         </SettingsSection>
 
         <LeagueSettingsLinks leagues={leagues} fromHref={backHref} />
+
+        <ResultsNav canPropose={canProposeResults} />
 
         {isSuperAdmin && <SiteAdminNav />}
 

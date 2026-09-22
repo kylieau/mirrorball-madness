@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   applyEpisodeSchedule,
-  resultsEntryOpenToAll,
+  userIsAnyLeagueCommissioner,
   type ScheduleEpisodeInput,
 } from "@/lib/results";
 import {
@@ -20,14 +20,14 @@ import {
 } from "@/lib/results-draft";
 import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
 
-// Returns userId alongside error so callers that need to stamp
+// Both checks return userId alongside error so callers that need to stamp
 // updatedBy/createdBy/publishedBy don't need a second auth round trip.
-async function requireResultsAccess(): Promise<{ error: string | null; userId: string }> {
+async function currentUser(): Promise<{ userId: string; isSuperAdmin: boolean } | null> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Not authenticated", userId: "" };
+  if (!user) return null;
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -35,14 +35,34 @@ async function requireResultsAccess(): Promise<{ error: string | null; userId: s
     .eq("id", user.id)
     .single();
 
-  if (!profile?.is_super_admin && !resultsEntryOpenToAll()) return { error: "Not authorized", userId: "" };
-  return { error: null, userId: user.id };
+  return { userId: user.id, isSuperAdmin: profile?.is_super_admin ?? false };
+}
+
+// Propose tier: drafting results changes nothing live until Publish, so any
+// league's commissioner can do it. Publish itself stays admin-only below.
+async function requireProposeAccess(): Promise<{ error: string | null; userId: string }> {
+  const user = await currentUser();
+  if (!user) return { error: "Not authenticated", userId: "" };
+  if (user.isSuperAdmin) return { error: null, userId: user.userId };
+
+  const isCommissioner = await userIsAnyLeagueCommissioner(createAdminClient(), user.userId);
+  if (!isCommissioner) return { error: "Not authorized", userId: "" };
+  return { error: null, userId: user.userId };
+}
+
+// Admin tier: publishing recomputes scores for every league at once, and
+// schedule/show settings are season-wide structural config.
+async function requireAdminAccess(): Promise<{ error: string | null; userId: string }> {
+  const user = await currentUser();
+  if (!user) return { error: "Not authenticated", userId: "" };
+  if (!user.isSuperAdmin) return { error: "Not authorized", userId: "" };
+  return { error: null, userId: user.userId };
 }
 
 export async function scheduleEpisode(
   input: ScheduleEpisodeInput
 ): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
   const result = await applyEpisodeSchedule(createAdminClient(), input);
@@ -53,7 +73,7 @@ export async function scheduleEpisode(
 export async function saveEpisodeDraft(
   input: Omit<SaveDraftResultsInput, "updatedBy">
 ): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
   const result = await saveDraftResults(createAdminClient(), { ...input, updatedBy: access.userId });
@@ -66,7 +86,7 @@ export async function addEpisodeCustomMoment(input: {
   coupleId: string | null;
   label: string;
 }): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
   const result = await addDraftCustomMoment(createAdminClient(), { ...input, createdBy: access.userId });
@@ -75,7 +95,7 @@ export async function addEpisodeCustomMoment(input: {
 }
 
 export async function removeEpisodeCustomMoment(momentId: string): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
   const result = await removeDraftCustomMoment(createAdminClient(), momentId);
@@ -84,7 +104,7 @@ export async function removeEpisodeCustomMoment(momentId: string): Promise<{ err
 }
 
 export async function publishEpisodeResults(episodeId: string): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
   const result = await publishEpisodeDraft(createAdminClient(), episodeId, access.userId);
@@ -93,7 +113,7 @@ export async function publishEpisodeResults(episodeId: string): Promise<{ error:
 }
 
 export async function startEpisodeCorrection(episodeId: string): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
   const result = await startCorrection(createAdminClient(), episodeId, access.userId);
@@ -102,7 +122,7 @@ export async function startEpisodeCorrection(episodeId: string): Promise<{ error
 }
 
 export async function updateSeasonSettings(input: SeasonSettingsInput): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
   const result = await applySeasonSettings(createAdminClient(), input);
@@ -111,7 +131,7 @@ export async function updateSeasonSettings(input: SeasonSettingsInput): Promise<
 }
 
 export async function addJudge(name: string): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireAdminAccess();
   if (access.error) return access;
 
   const result = await insertScoringJudge(createAdminClient(), name);
@@ -120,7 +140,7 @@ export async function addJudge(name: string): Promise<{ error: string | null }> 
 }
 
 export async function archiveJudge(personId: string): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireAdminAccess();
   if (access.error) return access;
 
   const result = await setJudgeArchived(createAdminClient(), personId, true);
@@ -129,7 +149,7 @@ export async function archiveJudge(personId: string): Promise<{ error: string | 
 }
 
 export async function restoreJudge(personId: string): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireAdminAccess();
   if (access.error) return access;
 
   const result = await setJudgeArchived(createAdminClient(), personId, false);
@@ -138,7 +158,7 @@ export async function restoreJudge(personId: string): Promise<{ error: string | 
 }
 
 export async function renameJudge(personId: string, name: string): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireAdminAccess();
   if (access.error) return access;
 
   const result = await renameScoringJudge(createAdminClient(), personId, name);
@@ -147,7 +167,7 @@ export async function renameJudge(personId: string, name: string): Promise<{ err
 }
 
 export async function addDanceStyle(name: string): Promise<{ error: string | null }> {
-  const access = await requireResultsAccess();
+  const access = await requireAdminAccess();
   if (access.error) return access;
 
   const trimmed = name.trim();

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminResultsTabs } from "@/components/admin-results-tabs";
-import { resultsEntryOpenToAll } from "@/lib/results";
+import { userIsAnyLeagueCommissioner } from "@/lib/results";
 import { loadDraftForEpisode, type DraftState } from "@/lib/results-draft";
 import { buildCoupleDisplayNames, sortJudgesForDisplay } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
@@ -19,9 +19,12 @@ export default async function AdminResultsPage() {
 
   const accountSettingsData = await getAccountSettingsData(supabase, user.id);
 
-  if (!accountSettingsData.isSuperAdmin && !resultsEntryOpenToAll()) {
-    redirect("/");
-  }
+  // No access gate beyond being signed in — the view tier is open to everyone
+  // so anyone can see how scores and outcomes get entered. What a viewer can
+  // *do* is decided per-tab below and re-checked server-side in actions.ts.
+  const canPropose =
+    accountSettingsData.isSuperAdmin ||
+    (await userIsAnyLeagueCommissioner(createAdminClient(), user.id));
 
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
 
@@ -128,6 +131,7 @@ export default async function AdminResultsPage() {
     <AdminResultsTabs
       accountSettingsData={accountSettingsData}
       viewerEmail={user.email ?? ""}
+      canPropose={canPropose}
       activeCouples={activeCouples}
       allCouples={allCouples}
       allCouplesWithStatus={allCouplesWithStatus}
