@@ -187,7 +187,7 @@ export function ResultsForm({
   weeks: CompetitionWeek[];
   draftsByEpisode: Record<string, DraftState>;
   // Set by AllResultsView's "Correct Results" button (lifted up into
-  // AdminResultsTabs) to jump here already pointed at that episode, once
+  // ResultsScreen) to jump here already pointed at that episode, once
   // startEpisodeCorrection has seeded a fresh draft for it.
   forceSelectEpisodeId?: string | null;
   participantsByEpisode: Record<string, string[]>;

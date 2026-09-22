@@ -8,6 +8,8 @@ import {
   type TierPayStyle,
 } from "@/lib/scoring";
 import { participantIdsToPersist, selectableCast } from "@/lib/episode-cast";
+import { sortJudgesForDisplay } from "@/lib/couple-display";
+import type { ScoringJudge } from "@/lib/scoring-judges";
 
 const RESOLVING_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn", "winner", "runner_up", "third_place"]);
 
@@ -45,6 +47,28 @@ export async function userIsAnyLeagueCommissioner(
     .or(`user_id.eq.${userId},co_manager_id.eq.${userId}`)
     .limit(1);
   return (data ?? []).length > 0;
+}
+
+// Shared by /admin/results (needs the data for score entry/display) and
+// /admin/show-settings (needs it for the judges/dance-styles management UI)
+// so the query shape can't drift between the two.
+export async function loadJudgesAndDanceStyles(
+  supabase: SupabaseClient<Database>
+): Promise<{
+  judges: ScoringJudge[];
+  danceStyles: { id: string; name: string }[];
+}> {
+  const [{ data: judges }, { data: danceStyles }] = await Promise.all([
+    supabase.from("people").select("id, name, archived_at").eq("role", "judge").order("name"),
+    supabase.from("dance_styles").select("id, name").order("name"),
+  ]);
+
+  return {
+    judges: sortJudgesForDisplay(
+      (judges ?? []).map((j) => ({ id: j.id, name: j.name, archivedAt: j.archived_at }))
+    ),
+    danceStyles: danceStyles ?? [],
+  };
 }
 
 async function getActiveSeasonId(

@@ -68,6 +68,7 @@ type CompetitionWeek = {
 type EpisodeWithStatus = Episode & { resultsStatus: EpisodeResultsStatus };
 
 export function AllResultsView({
+  view,
   canPropose,
   episodes,
   weeks,
@@ -83,6 +84,9 @@ export function AllResultsView({
   onNavigateToEpisode,
   seasonNumber,
 }: {
+  // Switcher lives one level up now (results-screen.tsx's PageHeader), as a
+  // peer of Schedule rather than nested inside this component.
+  view: "week" | "couple";
   // Starting a correction and continuing a draft are both propose-tier
   // writes, so a view-only visitor sees the results without those buttons.
   canPropose: boolean;
@@ -100,7 +104,6 @@ export function AllResultsView({
   onNavigateToEpisode: (episodeId: string) => void;
   seasonNumber: number | null;
 }) {
-  const [view, setView] = useState<"week" | "couple">("week");
   const [correctingId, setCorrectingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -384,15 +387,6 @@ export function AllResultsView({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex gap-2">
-        <Button size="sm" variant={view === "week" ? "default" : "outline"} onClick={() => setView("week")}>
-          By Week
-        </Button>
-        <Button size="sm" variant={view === "couple" ? "default" : "outline"} onClick={() => setView("couple")}>
-          By Couple
-        </Button>
-      </div>
-
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {view === "week" ? (

@@ -7,7 +7,7 @@ import { SettingsSection } from "@/components/settings-section";
 // and the season/judges/dance-styles config behind Show Settings.
 const LINKS = [
   { href: "/admin/accounts", label: "Accounts" },
-  { href: "/admin/results?tab=manage", label: "Show Settings" },
+  { href: "/admin/show-settings", label: "Show Settings" },
 ] as const;
 
 export function SiteAdminNav() {

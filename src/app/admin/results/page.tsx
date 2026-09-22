@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AdminResultsTabs } from "@/components/admin-results-tabs";
-import { userIsAnyLeagueCommissioner } from "@/lib/results";
+import { ResultsScreen } from "@/components/results-screen";
+import { loadJudgesAndDanceStyles, userIsAnyLeagueCommissioner } from "@/lib/results";
 import { loadDraftForEpisode, type DraftState } from "@/lib/results-draft";
-import { buildCoupleDisplayNames, sortJudgesForDisplay } from "@/lib/couple-display";
+import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 
 export default async function AdminResultsPage() {
@@ -40,8 +40,7 @@ export default async function AdminResultsPage() {
   const [
     { data: activeCouplesRaw },
     { data: allCouplesRaw },
-    { data: judges },
-    { data: danceStyles },
+    { judges, danceStyles },
     { data: episodes },
     { data: weeks },
     { data: danceScores },
@@ -58,8 +57,7 @@ export default async function AdminResultsPage() {
       .from("couples")
       .select(`${coupleFields}, status, elimination_week`)
       .eq("season_id", activeSeasonId ?? ""),
-    supabase.from("people").select("id, name, archived_at").eq("role", "judge").order("name"),
-    supabase.from("dance_styles").select("id, name").order("name"),
+    loadJudgesAndDanceStyles(supabase),
     supabase
       .from("episodes")
       .select(
@@ -128,7 +126,7 @@ export default async function AdminResultsPage() {
   }
 
   return (
-    <AdminResultsTabs
+    <ResultsScreen
       accountSettingsData={accountSettingsData}
       viewerEmail={user.email ?? ""}
       canPropose={canPropose}
@@ -137,10 +135,8 @@ export default async function AdminResultsPage() {
       allCouplesWithStatus={allCouplesWithStatus}
       activeCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(activeCouples))}
       allCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(allCouples))}
-      judges={sortJudgesForDisplay(
-        (judges ?? []).map((j) => ({ id: j.id, name: j.name, archivedAt: j.archived_at }))
-      )}
-      danceStyles={danceStyles ?? []}
+      judges={judges}
+      danceStyles={danceStyles}
       episodes={episodes ?? []}
       weeks={weeks ?? []}
       danceScores={danceScores ?? []}
