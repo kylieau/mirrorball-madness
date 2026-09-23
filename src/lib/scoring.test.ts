@@ -286,7 +286,7 @@ describe("computeWeeklyScores", () => {
     expect(alice.rosterPoints).toBe(30); // 20 dance + 10 survival, unweighted
     expect(alice.predictionPoints).toBe(15); // unweighted
     expect(alice.grandFinalePoints).toBe(10); // unweighted
-    expect(alice.totalPoints).toBe(30 * 2 + 15 * 0.5 + 10 * 1);
+    expect(alice.totalPoints).toBe(Math.round(30 * 2 + 15 * 0.5 + 10 * 1)); // 77.5 rounds to 78
   });
 
   it("defaults totalPoints to a flat sum when no weights/grand-finale points are passed", () => {
@@ -347,8 +347,9 @@ describe("computeWeeklyScores — couples-remaining scaling", () => {
     });
 
     const alice = result.find((r) => r.managerId === "alice")!;
-    // eliminationPredictionPoints=20, topScorerPredictionPoints=15, both at ratio 4/8 = 0.5
-    expect(alice.predictionPoints).toBe(20 * 0.5 + 15 * 0.5);
+    // eliminationPredictionPoints=20 at ratio 0.5 rounds to 10; topScorerPredictionPoints=15
+    // at ratio 0.5 rounds to 8 (7.5 → 8); summed and rounded again is a no-op at 18.
+    expect(alice.predictionPoints).toBe(18);
   });
 
   it("scales both double-elimination guesses by the same ratio", () => {

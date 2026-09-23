@@ -475,7 +475,7 @@ export function LeagueModulesForm({
               <CardDescription>Draft, roster, Recast, and judges&apos; score points.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col">
-              <SettingRow label="Judges' Score Multiplier" value={judgesScoreMultiplier} />
+              <SettingRow label="Judges' Score Multiplier" value={judgesScoreMultiplier.toFixed(2)} />
               <SettingRow label="Survival Points" value={survivalPoints} />
               <SettingRow label="1st Place Bonus" value={firstPlacePoints} />
               <SettingRow label="2nd Place Bonus" value={secondPlacePoints} />

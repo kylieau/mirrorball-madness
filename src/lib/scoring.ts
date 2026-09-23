@@ -195,7 +195,7 @@ export function resolveCurtainCallGuess(
   exactPayout: number,
   nearMissEnabled: boolean
 ): { verdict: CurtainCallVerdict; points: number } {
-  if (verdict === "exact") return { verdict: "exact", points: exactPayout };
+  if (verdict === "exact") return { verdict: "exact", points: Math.round(exactPayout) };
   if (verdict === "near_miss" && nearMissEnabled) {
     return { verdict: "near_miss", points: curtainCallNearMissPoints(exactPayout) };
   }
@@ -323,18 +323,19 @@ export function computeWeeklyScores({
   ]);
 
   return [...managerIds].map((managerId) => {
-    const rosterPoints = rosterPointsByManager.get(managerId) ?? 0;
-    const predictionPoints = predictionPointsByManager.get(managerId) ?? 0;
-    const grandFinalePoints = grandFinalePointsByManager[managerId] ?? 0;
+    const rosterPoints = Math.round(rosterPointsByManager.get(managerId) ?? 0);
+    const predictionPoints = Math.round(predictionPointsByManager.get(managerId) ?? 0);
+    const grandFinalePoints = Math.round(grandFinalePointsByManager[managerId] ?? 0);
     return {
       managerId,
       rosterPoints,
       predictionPoints,
       grandFinalePoints,
-      totalPoints:
+      totalPoints: Math.round(
         rosterPoints * categoryWeights.judges +
-        predictionPoints * categoryWeights.eliminations +
-        grandFinalePoints * categoryWeights.bonus,
+          predictionPoints * categoryWeights.eliminations +
+          grandFinalePoints * categoryWeights.bonus
+      ),
     };
   });
 }
@@ -415,6 +416,10 @@ export function computeGrandFinalePoints({
     }
 
     pointsByManager[p.managerId] = (pointsByManager[p.managerId] ?? 0) + points;
+  }
+
+  for (const managerId in pointsByManager) {
+    pointsByManager[managerId] = Math.round(pointsByManager[managerId]);
   }
 
   return pointsByManager;
