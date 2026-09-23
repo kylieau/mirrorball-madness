@@ -55,6 +55,7 @@ export type ResultsPageData = {
   } | null;
   participantsByEpisode: Record<string, string[]>;
   roundTypesByEpisode: Record<string, string[]>;
+  inJeopardyByEpisode: Record<string, string[]>;
 };
 
 // Shared by /admin/results (By Week / By Couple / Enter Results) and
@@ -88,6 +89,7 @@ export async function loadResultsPageData(
     { data: episodeResults },
     { data: episodeParticipants },
     { data: episodeRoundTypes },
+    { data: inJeopardyRows },
   ] = await Promise.all([
     supabase
       .from("couples")
@@ -122,6 +124,7 @@ export async function loadResultsPageData(
       ),
     supabase.from("episode_participants").select("episode_id, couple_id"),
     supabase.from("episode_round_types").select("episode_id, round_types(name)"),
+    supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id"),
   ]);
 
   const flatten = (rows: typeof activeCouplesRaw) =>
@@ -179,6 +182,11 @@ export async function loadResultsPageData(
     names.sort((a, b) => a.localeCompare(b));
   }
 
+  const inJeopardyByEpisode: Record<string, string[]> = {};
+  for (const row of inJeopardyRows ?? []) {
+    (inJeopardyByEpisode[row.episode_id] ??= []).push(row.couple_id);
+  }
+
   return {
     activeCouples,
     allCouples,
@@ -196,5 +204,6 @@ export async function loadResultsPageData(
     season,
     participantsByEpisode,
     roundTypesByEpisode,
+    inJeopardyByEpisode,
   };
 }

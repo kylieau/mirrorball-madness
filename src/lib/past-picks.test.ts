@@ -9,7 +9,15 @@ import {
   matchTopScorerPick,
   selectCurtainCallWeek,
   selectPastPicksEpisode,
+  type PickMatch,
 } from "./past-picks";
+
+function exactPick(pickId: string, points = 20): PickMatch {
+  return { pickId, verdict: "exact", points };
+}
+function missPick(pickId: string | null): PickMatch {
+  return { pickId, verdict: "miss", points: 0 };
+}
 
 const e01 = { id: "ep-1", week_number: 1 };
 const e02 = { id: "ep-2", week_number: 2 };
@@ -137,6 +145,8 @@ describe("isPastPicksLocked", () => {
   });
 });
 
+const payout = { exactPayout: 20, nearMissEnabled: true };
+
 describe("matchEliminationPicks", () => {
   it("marks a single-elim hit, miss, and empty pick", () => {
     expect(
@@ -145,8 +155,9 @@ describe("matchEliminationPicks", () => {
         predictedEliminatedCoupleId2: null,
         isDoubleElimination: false,
         eliminatedCoupleIds: ["a"],
+        ...payout,
       })
-    ).toEqual([{ pickId: "a", correct: true }]);
+    ).toEqual([{ pickId: "a", verdict: "exact", points: 20 }]);
 
     expect(
       matchEliminationPicks({
@@ -154,8 +165,9 @@ describe("matchEliminationPicks", () => {
         predictedEliminatedCoupleId2: null,
         isDoubleElimination: false,
         eliminatedCoupleIds: ["a"],
+        ...payout,
       })
-    ).toEqual([{ pickId: "b", correct: false }]);
+    ).toEqual([{ pickId: "b", verdict: "miss", points: 0 }]);
 
     expect(
       matchEliminationPicks({
@@ -163,8 +175,9 @@ describe("matchEliminationPicks", () => {
         predictedEliminatedCoupleId2: null,
         isDoubleElimination: false,
         eliminatedCoupleIds: ["a"],
+        ...payout,
       })
-    ).toEqual([{ pickId: null, correct: false }]);
+    ).toEqual([{ pickId: null, verdict: "miss", points: 0 }]);
   });
 
   it("scores each double-elim slot independently and ignores the second slot on a normal week", () => {
@@ -174,10 +187,12 @@ describe("matchEliminationPicks", () => {
         predictedEliminatedCoupleId2: "c",
         isDoubleElimination: true,
         eliminatedCoupleIds: ["a", "b"],
+        inJeopardyCoupleIds: ["c"],
+        ...payout,
       })
     ).toEqual([
-      { pickId: "a", correct: true },
-      { pickId: "c", correct: false },
+      { pickId: "a", verdict: "exact", points: 20 },
+      { pickId: "c", verdict: "near_miss", points: 5 },
     ]);
 
     expect(
@@ -186,94 +201,128 @@ describe("matchEliminationPicks", () => {
         predictedEliminatedCoupleId2: "b",
         isDoubleElimination: false,
         eliminatedCoupleIds: ["a", "b"],
+        inJeopardyCoupleIds: ["b"],
+        ...payout,
       })
-    ).toEqual([{ pickId: "a", correct: true }]);
+    ).toEqual([{ pickId: "a", verdict: "exact", points: 20 }]);
+  });
+
+  it("does not award In Jeopardy when the league has it off", () => {
+    expect(
+      matchEliminationPicks({
+        predictedEliminatedCoupleId: "c",
+        predictedEliminatedCoupleId2: null,
+        isDoubleElimination: false,
+        eliminatedCoupleIds: ["a"],
+        inJeopardyCoupleIds: ["c"],
+        exactPayout: 20,
+        nearMissEnabled: false,
+      })
+    ).toEqual([{ pickId: "c", verdict: "miss", points: 0 }]);
   });
 });
 
 describe("matchTopScorerPick", () => {
-  it("hits when the pick is in the tied top-scorer set", () => {
-    expect(matchTopScorerPick("a", ["a", "b"])).toEqual({ pickId: "a", correct: true });
-    expect(matchTopScorerPick("c", ["a", "b"])).toEqual({ pickId: "c", correct: false });
-    expect(matchTopScorerPick(null, ["a"])).toEqual({ pickId: null, correct: false });
+  const dances = [
+    { coupleId: "a", totalScore: 30 },
+    { coupleId: "b", totalScore: 30 },
+    { coupleId: "c", totalScore: 29 },
+  ];
+
+  it("hits when the pick is in the tied top-scorer set, and near-misses within 1", () => {
+    expect(
+      matchTopScorerPick({
+        predictedTopScorerCoupleId: "a",
+        danceScores: dances,
+        ...payout,
+      })
+    ).toEqual({ pickId: "a", verdict: "exact", points: 20 });
+    expect(
+      matchTopScorerPick({
+        predictedTopScorerCoupleId: "c",
+        danceScores: dances,
+        ...payout,
+      })
+    ).toEqual({ pickId: "c", verdict: "near_miss", points: 5 });
+    expect(
+      matchTopScorerPick({
+        predictedTopScorerCoupleId: null,
+        danceScores: dances,
+        ...payout,
+      })
+    ).toEqual({ pickId: null, verdict: "miss", points: 0 });
   });
 });
 
 describe("collapsePickRows", () => {
   it("collapses a hit into a single Nailed it row, without a duplicate Actual", () => {
-    expect(collapsePickRows([{ pickId: "a", correct: true }], ["a"])).toEqual([
-      { kind: "nailed", coupleIds: ["a"] },
-    ]);
+    expect(collapsePickRows([exactPick("a")], ["a"])).toEqual([{ kind: "nailed", coupleIds: ["a"] }]);
   });
 
   it("puts a miss on one strike→actual line, not a stacked Actual row", () => {
-    expect(collapsePickRows([{ pickId: "b", correct: false }], ["a"])).toEqual([
+    expect(collapsePickRows([missPick("b")], ["a"])).toEqual([
       { kind: "miss", pickIds: ["b"], actualIds: ["a"] },
     ]);
-    expect(collapsePickRows([{ pickId: null, correct: false }], ["a"])).toEqual([
+    expect(collapsePickRows([missPick(null)], ["a"])).toEqual([
       { kind: "miss", pickIds: [], actualIds: ["a"] },
     ]);
   });
 
-  it("collapses each double-elim slot independently, in slot order", () => {
+  it("shows an In Jeopardy guess with its floored points, still naming who went home", () => {
     expect(
       collapsePickRows(
         [
-          { pickId: "a", correct: true },
-          { pickId: "b", correct: true },
+          exactPick("a"),
+          { pickId: "c", verdict: "near_miss", points: 5 },
         ],
         ["a", "b"]
       )
     ).toEqual([
+      { kind: "nailed", coupleIds: ["a"] },
+      { kind: "in_jeopardy", pickIds: ["c"], actualIds: ["b"], points: 5 },
+    ]);
+
+    expect(
+      collapsePickRows(
+        [
+          { pickId: "c", verdict: "near_miss", points: 5 },
+          { pickId: "d", verdict: "near_miss", points: 5 },
+        ],
+        ["a", "b"]
+      )
+    ).toEqual([
+      { kind: "in_jeopardy", pickIds: ["c"], actualIds: ["a"], points: 5 },
+      { kind: "in_jeopardy", pickIds: ["d"], actualIds: ["b"], points: 5 },
+    ]);
+  });
+
+  it("collapses each double-elim slot independently, in slot order", () => {
+    expect(collapsePickRows([exactPick("a"), exactPick("b")], ["a", "b"])).toEqual([
       { kind: "nailed", coupleIds: ["a"] },
       { kind: "nailed", coupleIds: ["b"] },
     ]);
 
-    expect(
-      collapsePickRows(
-        [
-          { pickId: "a", correct: true },
-          { pickId: "c", correct: false },
-        ],
-        ["a", "b"]
-      )
-    ).toEqual([
+    expect(collapsePickRows([exactPick("a"), missPick("c")], ["a", "b"])).toEqual([
       { kind: "nailed", coupleIds: ["a"] },
       { kind: "miss", pickIds: ["c"], actualIds: ["b"] },
     ]);
 
-    expect(
-      collapsePickRows(
-        [
-          { pickId: "c", correct: false },
-          { pickId: "d", correct: false },
-        ],
-        ["a", "b"]
-      )
-    ).toEqual([
+    expect(collapsePickRows([missPick("c"), missPick("d")], ["a", "b"])).toEqual([
       { kind: "miss", pickIds: ["c"], actualIds: ["a"] },
       { kind: "miss", pickIds: ["d"], actualIds: ["b"] },
     ]);
 
-    expect(
-      collapsePickRows(
-        [
-          { pickId: "a", correct: true },
-          { pickId: "a", correct: true },
-        ],
-        ["a", "b"]
-      )
-    ).toEqual([{ kind: "nailed", coupleIds: ["a"] }]);
-  });
-
-  it("on a top-scorer hit, does not also list tied partners as Actual", () => {
-    expect(collapsePickRows([{ pickId: "a", correct: true }], ["a", "b"])).toEqual([
+    expect(collapsePickRows([exactPick("a"), exactPick("a")], ["a", "b"])).toEqual([
       { kind: "nailed", coupleIds: ["a"] },
     ]);
   });
 
+  it("on a top-scorer hit, does not also list tied partners as Actual", () => {
+    expect(collapsePickRows([exactPick("a")], ["a", "b"])).toEqual([{ kind: "nailed", coupleIds: ["a"] }]);
+  });
+
   it("on a miss, lists every actual including ties on that same line", () => {
-    expect(collapsePickRows([{ pickId: "c", correct: false }], ["a", "b"])).toEqual([
+    expect(collapsePickRows([missPick("c")], ["a", "b"])).toEqual([
       { kind: "miss", pickIds: ["c"], actualIds: ["a", "b"] },
     ]);
   });
@@ -295,10 +344,13 @@ describe("buildPastPicksComparison", () => {
         { coupleId: "elim", totalScore: 18 },
       ],
       predictionPoints: 50,
+      nearMissEnabled: true,
+      eliminationExactPayout: 20,
+      topScorerExactPayout: 15,
     });
 
-    expect(comparison.eliminationPicks[0]).toEqual({ pickId: "elim", correct: true });
-    expect(comparison.topScorer).toEqual({ pickId: "top", correct: true });
+    expect(comparison.eliminationPicks[0]).toEqual({ pickId: "elim", verdict: "exact", points: 20 });
+    expect(comparison.topScorer).toEqual({ pickId: "top", verdict: "exact", points: 15 });
     expect(comparison.actualEliminatedIds).toEqual(["elim"]);
     expect(comparison.actualTopScorerIds).toEqual(["top"]);
     expect(comparison.predictionPoints).toBe(50);
@@ -316,10 +368,13 @@ describe("buildPastPicksComparison", () => {
       ],
       danceScores: [{ coupleId: "c", totalScore: 27 }],
       predictionPoints: null,
+      nearMissEnabled: true,
+      eliminationExactPayout: 20,
+      topScorerExactPayout: 15,
     });
 
-    expect(comparison.eliminationPicks.every((p) => p.correct)).toBe(true);
-    expect(comparison.topScorer.correct).toBe(true);
+    expect(comparison.eliminationPicks.every((p) => p.verdict === "exact")).toBe(true);
+    expect(comparison.topScorer.verdict).toBe("exact");
     expect(comparison.predictionPoints).toBe(0);
   });
 });

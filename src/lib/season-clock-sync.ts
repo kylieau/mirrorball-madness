@@ -53,6 +53,7 @@ export async function syncSeasonClockAnchor(
     p_top_scorer_prediction_points: settings.top_scorer_prediction_points,
     p_bonus_picks_points_per_correct: settings.bonus_picks_points_per_correct,
     p_bonus_picks_tier_pay_style: settings.bonus_picks_tier_pay_style,
+    p_curtain_call_near_miss_enabled: settings.curtain_call_near_miss_enabled,
   });
   if (error) return { error: error.message, anchorWeek: null };
   return { error: null, anchorWeek: lockWeek };

@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { bandOf, bandPayoutFraction, computeGrandFinalePoints, computeWeeklyScores, curtainCallPayout, type ScoringSettings } from "./scoring";
+import {
+  bandOf,
+  bandPayoutFraction,
+  classifyEliminationGuess,
+  classifyTopScorerGuess,
+  computeGrandFinalePoints,
+  computeWeeklyScores,
+  curtainCallNearMissPoints,
+  curtainCallPayout,
+  curtainCallPreviewCopy,
+  resolveCurtainCallGuess,
+  sumDanceScoresByCouple,
+  type ScoringSettings,
+} from "./scoring";
 
 const settings: ScoringSettings = {
   judgesScoreMultiplier: 1,
@@ -11,6 +24,7 @@ const settings: ScoringSettings = {
   thirdPlacePoints: 25,
   fourthPlacePoints: 12,
   fifthPlacePoints: 6,
+  curtainCallNearMissEnabled: true,
 };
 
 // Most tests below aren't exercising Curtain Call's couples-remaining
@@ -477,6 +491,219 @@ describe("computeWeeklyScores — double elimination", () => {
     });
 
     expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(20);
+  });
+});
+
+describe("Curtain Call In Jeopardy", () => {
+  const safe = (coupleId: string) => ({
+    coupleId,
+    outcome: "safe" as const,
+    bonusPoints: 0,
+    finalPlacement: null,
+  });
+  const eliminated = (coupleId: string) => ({
+    coupleId,
+    outcome: "eliminated" as const,
+    bonusPoints: 0,
+    finalPlacement: null,
+  });
+
+  it("floors 25% of the unrounded exact payout to a whole point", () => {
+    expect(curtainCallNearMissPoints(20)).toBe(5);
+    expect(curtainCallNearMissPoints(15)).toBe(3);
+    expect(curtainCallNearMissPoints(10)).toBe(2);
+    // 31 * 5/10 = 15.5; 15.5 * 0.25 = 3.875 → 3, not round-to-4.
+    expect(curtainCallNearMissPoints(curtainCallPayout(31, 5, 10))).toBe(3);
+    expect(curtainCallNearMissPoints(1)).toBe(0);
+  });
+
+  it("pays a floored quarter when the elim guess was marked In Jeopardy", () => {
+    const result = computeWeeklyScores({
+      scoringSettings: settings,
+      rosterSlots: [],
+      danceScores: [],
+      episodeOutcomes: [eliminated("gone"), safe("called-down"), safe("other")],
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: "called-down",
+          predictedEliminatedCoupleId2: null,
+          predictedTopScorerCoupleId: null,
+        },
+      ],
+      isDoubleElimination: false,
+      ...noScaling,
+      inJeopardyCoupleIds: ["called-down"],
+    });
+
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(5);
+  });
+
+  it("lets exact beat In Jeopardy when the guess is both eliminated and marked", () => {
+    const result = computeWeeklyScores({
+      scoringSettings: settings,
+      rosterSlots: [],
+      danceScores: [],
+      episodeOutcomes: [eliminated("gone")],
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: "gone",
+          predictedEliminatedCoupleId2: null,
+          predictedTopScorerCoupleId: null,
+        },
+      ],
+      isDoubleElimination: false,
+      ...noScaling,
+      inJeopardyCoupleIds: ["gone"],
+    });
+
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(20);
+    expect(classifyEliminationGuess("gone", new Set(["gone"]), new Set(["gone"]))).toBe("exact");
+  });
+
+  it("scores each double-elim In Jeopardy guess on its own", () => {
+    const result = computeWeeklyScores({
+      scoringSettings: settings,
+      rosterSlots: [],
+      danceScores: [],
+      episodeOutcomes: [eliminated("gone-1"), eliminated("gone-2"), safe("jeopardy-a"), safe("jeopardy-b")],
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: "jeopardy-a",
+          predictedEliminatedCoupleId2: "jeopardy-b",
+          predictedTopScorerCoupleId: null,
+        },
+      ],
+      isDoubleElimination: true,
+      ...noScaling,
+      inJeopardyCoupleIds: ["jeopardy-a", "jeopardy-b"],
+    });
+
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(5 + 5);
+  });
+
+  it("pays a top scorer within 1 of the high, and not a top-3 finish farther out", () => {
+    const totals = sumDanceScoresByCouple([
+      { coupleId: "high", totalScore: 30 },
+      { coupleId: "within", totalScore: 29 },
+      { coupleId: "third", totalScore: 28 },
+      { coupleId: "fourth", totalScore: 20 },
+    ]);
+    expect(classifyTopScorerGuess("high", totals)).toBe("exact");
+    expect(classifyTopScorerGuess("within", totals)).toBe("near_miss");
+    expect(classifyTopScorerGuess("third", totals)).toBe("miss");
+    expect(classifyTopScorerGuess("fourth", totals)).toBe("miss");
+
+    const result = computeWeeklyScores({
+      scoringSettings: settings,
+      rosterSlots: [],
+      danceScores: [
+        { coupleId: "high", totalScore: 30 },
+        { coupleId: "within", totalScore: 29 },
+        { coupleId: "third", totalScore: 28 },
+      ],
+      episodeOutcomes: [safe("high"), safe("within"), safe("third")],
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: null,
+          predictedEliminatedCoupleId2: null,
+          predictedTopScorerCoupleId: "within",
+        },
+        {
+          managerId: "bob",
+          predictedEliminatedCoupleId: null,
+          predictedEliminatedCoupleId2: null,
+          predictedTopScorerCoupleId: "third",
+        },
+        {
+          managerId: "carol",
+          predictedEliminatedCoupleId: null,
+          predictedEliminatedCoupleId2: null,
+          predictedTopScorerCoupleId: "high",
+        },
+      ],
+      isDoubleElimination: false,
+      ...noScaling,
+    });
+
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(3);
+    expect(result.find((r) => r.managerId === "bob")!.predictionPoints).toBe(0);
+    expect(result.find((r) => r.managerId === "carol")!.predictionPoints).toBe(15);
+  });
+
+  it("treats a tie at the high as exact only, and the score one below as near-miss", () => {
+    const totals = sumDanceScoresByCouple([
+      { coupleId: "a", totalScore: 27 },
+      { coupleId: "b", totalScore: 27 },
+      { coupleId: "c", totalScore: 26 },
+    ]);
+    expect(classifyTopScorerGuess("a", totals)).toBe("exact");
+    expect(classifyTopScorerGuess("b", totals)).toBe("exact");
+    expect(classifyTopScorerGuess("c", totals)).toBe("near_miss");
+  });
+
+  it("does not near-miss a top scorer who has no score row", () => {
+    const totals = sumDanceScoresByCouple([{ coupleId: "high", totalScore: 30 }]);
+    expect(classifyTopScorerGuess("bye", totals)).toBe("miss");
+    expect(resolveCurtainCallGuess("near_miss", 15, false)).toEqual({ verdict: "miss", points: 0 });
+  });
+
+  it("pays nothing for a near-miss when the league has In Jeopardy off", () => {
+    const result = computeWeeklyScores({
+      scoringSettings: { ...settings, curtainCallNearMissEnabled: false },
+      rosterSlots: [],
+      danceScores: [
+        { coupleId: "high", totalScore: 30 },
+        { coupleId: "within", totalScore: 29 },
+      ],
+      episodeOutcomes: [eliminated("gone"), safe("called-down"), safe("high"), safe("within")],
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: "called-down",
+          predictedEliminatedCoupleId2: null,
+          predictedTopScorerCoupleId: "within",
+        },
+      ],
+      isDoubleElimination: false,
+      ...noScaling,
+      inJeopardyCoupleIds: ["called-down"],
+    });
+
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(0);
+  });
+
+  it("previews the floored points, with a qualitative elim caveat", () => {
+    expect(
+      curtainCallPreviewCopy({
+        kind: "elimination",
+        exactDisplayPoints: 30,
+        nearMissPoints: 7,
+        nearMissEnabled: true,
+        couplesRemaining: 12,
+      })
+    ).toBe("Correct elimination: 30 pts · 7 pts if In Jeopardy · 12 couples left");
+    expect(
+      curtainCallPreviewCopy({
+        kind: "top_scorer",
+        exactDisplayPoints: 20,
+        nearMissPoints: 5,
+        nearMissEnabled: true,
+        couplesRemaining: 4,
+      })
+    ).toBe("Correct top scorer: 20 pts · 5 pts if within 1 of the high · 4 couples left");
+    expect(
+      curtainCallPreviewCopy({
+        kind: "elimination",
+        exactDisplayPoints: 30,
+        nearMissPoints: 7,
+        nearMissEnabled: false,
+        couplesRemaining: 1,
+      })
+    ).toBe("Correct elimination: 30 pts · 1 couple left");
   });
 });
 

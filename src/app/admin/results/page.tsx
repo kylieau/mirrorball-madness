@@ -51,6 +51,7 @@ export default async function AdminResultsPage() {
       participantsByEpisode={data.participantsByEpisode}
       roundTypes={data.roundTypes}
       roundTypesByEpisode={data.roundTypesByEpisode}
+      inJeopardyByEpisode={data.inJeopardyByEpisode}
     />
   );
 }
