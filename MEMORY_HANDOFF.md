@@ -1,146 +1,133 @@
 # MEMORY_HANDOFF
 
-_Last updated 2026-09-23 (end of session). Read this first, then `CLAUDE.md`.
-This doc fully supersedes its previous version — that one's open items (the
-In Jeopardy SQL "blocker") turned out to already be resolved before this
-session started; see §3 for the corrected record._
+_Last updated 2026-09-23 (end of session). Read this first, then `CLAUDE.md`._
 
 ## 1. Current State
 
 **No feature is actively in progress. Everything from this session is
-committed and pushed to `main`** (HEAD `11b8b4f`). The one thing flagged as
-"do later" and not started: editing the wording on the Home page's curtain
-banner — see §5.
+committed and pushed to `main` (HEAD `b4222d4`), and the live production
+database has been backfilled to match.** This was a bug-fix session, not a
+feature session: the user spotted decimal scores in the app (e.g. `+43.75
+this wk` on Curtain Call, `179.73200000000003 pts` on the Leaderboard) and
+this session traced it to the scoring calibration layer and fixed it end to
+end, in code and in already-published live data.
 
 ## 2. Changes Made
 
-Source of truth: `git diff --stat 0f6e993..HEAD` (0f6e993 = HEAD at session
-start), 11 files, +514/−304:
+Source of truth: `git diff --stat e236a24..HEAD` (e236a24 = HEAD at session
+start), 3 files, +17/−11:
 
 ```
- CLAUDE.md                              |   4 +-
- MEMORY_HANDOFF.md                      |  95 ++++++--
- src/app/admin/results/page.tsx         |  21 ++
- src/app/leagues/[id]/page.tsx          |  17 +-
- src/components/all-results-view.tsx    | 173 ++++++--------
- src/components/results-form.tsx        | 416 +++++++++++++++++++++------------
- src/components/results-screen.tsx      |   8 +-
- src/components/roster-card.tsx         |  18 +-
- src/components/weekly-results-view.tsx |  15 +-
- src/lib/results-outcome.test.ts        |  27 ++-
- src/lib/results-outcome.ts             |  24 +-
+ src/components/league-modules-form.tsx |  2 +-
+ src/lib/scoring.test.ts                |  7 ++++---
+ src/lib/scoring.ts                     | 19 ++++++++++++-------
 ```
 
-Four commits, all pushed, all with passing typecheck/lint/vitest (323
-tests) and (for the first two) a full `npm run build`:
+One commit, pushed: **`b4222d4`** — Round fantasy scores to whole numbers.
 
-1. **`5523c1b`** — Move Enter Results/Scores to a view-vs-propose split,
-   make In Jeopardy additive. Removed "Correct Results" from Scores
-   (`all-results-view.tsx`); Enter Results now auto-seeds a correction
-   draft itself when you select an already-published episode with no
-   draft yet (`results-form.tsx`, calls `startEpisodeCorrection` from a
-   `useEffect`). Scores always shows Published regardless of an
-   in-progress correction — the "Correcting" badge is Enter Results' own
-   internal indicator now, not shown on Scores. In Jeopardy changed from
-   *replacing* the Safe badge to showing *alongside* it everywhere (This
-   Week, Scores By Couple text, and newly wired into `roster-card.tsx`'s
-   Your Fantasy Roster, which also got a name-before-badge layout swap).
-   New shared helpers: `showInJeopardyBadge` / `IN_JEOPARDY_BADGE` in
-   `src/lib/results-outcome.ts`. Also: Enter Results tab now titles itself
-   "Enter Results" not "Scores"; dropped the redundant West Coast
-   broadcast warning (spoiler mode covers it now).
-2. **`7be1f5f`** — Apply spoiler-free mode to Scores (By Week / By
-   Couple). Real gap found live by the user (not a bug in `/this-week`,
-   which was already correct — the leak was specifically on Settings →
-   Episodes → Scores → By Week, which had never been wired into
-   `resolveSpoilerCutoff` at all). Now gated the same way for every
-   viewer regardless of role (no super-admin exemption). A locked week
-   shows a card (By Week) or masked row (By Couple) with a real
-   `MarkWeekWatchedButton`, mirroring This Week's own pending-reveal
-   treatment.
-3. **`83a8f17`** — Add a "By Couple" mode to Enter Results: a dropdown to
-   jump straight to one couple's row instead of scrolling the full list
-   (user explicitly wanted a dropdown, not Prev/Next stepping — that was
-   my first pass and got corrected).
-4. **`11b8b4f`** — Add a "Leaderboard" mode to Enter Results: couples
-   ranked by current judges' score total, `#1..N` with running points
-   next to the name, still fully editable.
-
-All three Enter Results view modes (All Couples / By Couple / Leaderboard)
-share one extracted `CoupleEntryCard` component in `results-form.tsx` so
-they can't drift out of sync with each other.
-
-**Not committed, left alone on purpose:** `ios/App/App.xcodeproj/project.pbxproj`
-(pre-existing, unrelated, predates this session) and `scratch/` (untracked
-one-off verification scripts, never committed — established convention in
-this repo).
+- `src/lib/scoring.ts`:
+  - `resolveCurtainCallGuess()`: the `"exact"` verdict branch now returns
+    `Math.round(exactPayout)` instead of the raw fractional payout. The
+    `"near_miss"` branch is untouched — `curtainCallNearMissPoints()` still
+    floors the **raw, unrounded** payout, per its existing documented
+    design (a test asserts `curtainCallNearMissPoints(curtainCallPayout(31,
+    5, 10))` is `3`, not `4` — don't "fix" that into rounding first).
+  - `computeGrandFinalePoints()`: rounds each manager's accumulated total
+    before returning (covers fractional `distance_based`/graded `band_tier`
+    payouts).
+  - `computeWeeklyScores()`: rounds `rosterPoints`/`predictionPoints`/
+    `grandFinalePoints` per manager, then rounds the weighted `totalPoints`
+    sum too (category weights like `eliminations: 0.5` can reintroduce a
+    fraction even from whole inputs).
+- `src/lib/scoring.test.ts`: updated the two tests whose expected values
+  were deliberately fractional (`77.5`→`78`, `17.5`→`18`) to match the new
+  rounded output. `src/lib/past-picks.test.ts` needed no changes (its
+  `exactPayout` fixtures were already whole).
+- `src/components/league-modules-form.tsx`: the read-only "Judges' Score
+  Multiplier" `SettingRow` now renders `judgesScoreMultiplier.toFixed(2)`
+  (e.g. `2.36`) instead of the raw stored value (`2.362`). **The editable
+  input and the underlying stored value are untouched** — full calibration
+  precision still drives the actual scoring math.
+- **Live DB backfill (not a code change):** ran a one-off `update` on all
+  25 `weekly_manager_scores` rows (all sharing one `week_id` — only one
+  competition week has been scored so far this season), rounding
+  `roster_points`/`prediction_points`/`grand_finale_points` and
+  recomputing `total_points` from those rounded values using each league's
+  own category weights. Confirmed via a read-only check script:
+  **0 rows with a non-integer column, down from 25/25.** The user ran the
+  SQL themselves via the Supabase SQL editor (handed over per CLAUDE.md's
+  "no bash heredoc for SQL" rule) rather than having Claude execute a live
+  write directly — a write to shared production data was blocked by the
+  harness's auto-mode classifier ("Modify Shared Resources") pending
+  explicit confirmation, and the user chose to run it themselves.
+- **Not committed, left alone on purpose:**
+  `ios/App/App.xcodeproj/project.pbxproj` (pre-existing, unrelated, predates
+  this session) and `scratch/` (untracked one-off verification/backfill
+  scripts — `check-weekly-scores-decimals.mjs`,
+  `backfill-round-weekly-scores.mjs`, `backfill-round-weekly-scores.sql` —
+  never committed, established convention in this repo).
 
 ## 3. Key Decisions & Lessons Learned
 
-- **The previous handoff's "In Jeopardy SQL blocker" was stale.** Verified
-  live at session start: `apply-curtain-call-in-jeopardy.sql` was already
-  run, and `src/lib/supabase/types.ts` already matched the live schema
-  exactly (zero diff on a fresh regen) — both had silently already happened
-  before this session, just never recorded. Don't re-flag this.
-- **`.env.local` in this container DOES have `SUPABASE_SERVICE_ROLE_KEY`
-  and `SUPABASE_ACCESS_TOKEN`**, contradicting CLAUDE.md's "no live
-  database credentials" framing — that line is really about there being no
-  direct Postgres connection string (`psql` is installed but has nothing
-  to connect to), not about REST access. Live read/write queries and
-  `npx supabase gen types` both work directly from here. Left CLAUDE.md's
-  wording as-is (defensible as written) but worth knowing.
-- **Scores' View tier being "open to any signed-in user" is about access,
-  not about overriding a viewer's own spoiler preference.** These are
-  orthogonal and the codebase had only ever reconciled the fan-facing
-  surfaces (This Week, Picks recap, Home banner) with spoiler-free mode.
-  Apply the same reasoning to any *new* admin-adjacent view surface added
-  later — don't assume "admin-visible" implies "spoiler-exempt."
-- **In Jeopardy is additive, never a replacement for Safe** — this was an
-  explicit correction from the user mid-session (an earlier design intent,
-  documented as "supersedes," was reversed). If it reappears anywhere new,
-  show both badges.
-- **Real incident, self-inflicted:** ran `npm run build` (production build)
-  repeatedly this session while the long-running `next dev` server was
-  live on the same `.next` output directory — corrupted the dev cache
-  (`ENOENT .../vendor-chunks/@base-ui.js`, missing webpack chunks) and
-  caused a real Internal Server Error for the user. Fixed by killing the
-  server, `rm -rf .next`, restarting `npm run dev` in the background with
-  output redirected to this session's scratchpad
-  (`/tmp/claude-1000/-workspaces-dwts-fantasy/<session>/scratchpad/devserver.log`).
-  **Lesson: don't run `npm run build` while a dev server is live** — use
-  `npx tsc --noEmit` + `npx eslint` + `npx vitest run` for verification
-  instead; only run a full build when no dev server is running, or accept
-  needing to restart the dev server afterward.
-- **This container cannot run a headless browser** — Playwright has no
-  Chromium build for `debian11-arm64`, and there's no system browser. UI
-  changes are verified via typecheck/lint/tests/(build when safe) plus
-  tracing the actual data flow in code, never a screenshot. The user
-  verifies visually herself through VSCode's auto-forwarded port 3000
-  (Ports tab → open in her own browser) — that's unaffected by the
-  container's own browser limitation.
-- **Dev server is currently running**: pid ~468290 (`next dev`), port
-  3000, logging to this session's scratchpad path above. A fresh session
-  should check for an already-running server (`ss -ltnp | grep 3000`)
-  before starting a new one — starting a second one on the same port will
-  fail or, worse, silently confuse which one is being edited.
+- **Root cause:** the scoring calibration layer (`05173e9`, 2026-09-20)
+  seeded `judges_score_multiplier` with roster-size-keyed decimal defaults
+  (`dance_card_calibration`: 2.362 / 1.618 / 1.332 / 1.168 / 1.072 / 1.053).
+  `computeWeeklyScores()` multiplied by this and never rounded, so the
+  decimal flowed straight into `weekly_manager_scores` (a `numeric` column
+  — the DB never stopped it) and out to every display surface (no
+  `toFixed`/rounding anywhere in `src` before this session). Two display-only
+  helpers (`roster-couple-points.ts`, `roster-weekly-points.ts`, for "Your
+  Fantasy Roster") already rounded this exact arithmetic — the gap was
+  specifically in the real scoring engine, not a project-wide oversight.
+- **Explicit user decision, confirmed via AskUserQuestion after a flagged
+  trade-off:** round every *computed score*, but leave the
+  `judges_score_multiplier` **value** itself at full calibrated precision —
+  it still drives the real math and is still what's stored. Only its
+  *display* in League Settings got cleaned up. Rounding the real value would
+  have collapsed roster sizes 3–6 down to the same multiplier (1) and sizes
+  1–2 to the same multiplier (2), undoing most of the previous session's
+  calibration work. **If this ever gets re-litigated, the answer already
+  given was: display-only, keep full precision internally.**
+- **"Self-heal on next publish" is NOT true for cumulative season
+  totals — this was a real correction mid-session.** Claude initially told
+  the user a live-data backfill was optional because unrounded weeks would
+  "self-heal" the next time they're corrected/republished. That's true
+  per-week, but the Leaderboard's season total is a **live `sum()` over every
+  stored `weekly_manager_scores.total_points` row**
+  (`src/app/leagues/[id]/page.tsx` ~line 190) — already-published weeks
+  that never get individually corrected again would carry their decimal
+  contribution in every manager's total *indefinitely*. The user caught
+  this by screenshotting the Leaderboard showing raw float-drift artifacts
+  (`179.73200000000003`), which is what triggered doing the backfill after
+  all. **Lesson: when a bug's fix only applies going forward, check whether
+  anything downstream aggregates/sums the old values before calling it
+  "self-healing."**
+- **The per-league "module breakdown" display
+  (`src/app/leagues/[id]/page.tsx` ~line 256-276, Dance Card/Curtain
+  Call/Grand Finale by-category numbers) already applied category weights
+  live and rounded with `Math.round` at read time** — this was already
+  correct and untouched. Only the main Leaderboard total (a raw summed
+  `total_points` column) and the Curtain Call weekly recap
+  (`past-picks.ts`'s `buildPastPicksComparison`, which intentionally uses
+  the *stored* `predictionPoints` rather than recomputing it — see the
+  comment at `past-picks.ts:248-250`) were exposed to the stale decimal
+  data.
+- **Live DB writes are gated by the harness even with service-role
+  credentials available.** `MEMORY_HANDOFF`'s earlier note that this
+  container "has direct REST/service-role access" is true for reads and
+  for RPC-authorized writes, but a raw `.update()` across many rows of
+  shared production data still triggered an auto-mode permission block.
+  When that happens, the fallback is the established CLAUDE.md pattern:
+  hand the user a plain SQL statement (not a bash heredoc) to run via the
+  Supabase Dashboard SQL editor themselves, then verify with a read-only
+  script afterward.
 
 ## 4. Backlog & Deferred Items
 
-1. **Home page curtain banner copy** — user wants to edit the wording,
-   not started. See §5 for exactly what to change.
-2. `league-rosters-card.tsx` ("Dance Cards" on Standings) still shows only
-   a bare dimmed "Eliminated" label with no "Safe" badge at all, so it
-   didn't get the same In Jeopardy pill treatment `roster-card.tsx` got
-   this session. Optional future consistency pass, not requested yet.
-3. Carried over from before this session, still low-priority/optional:
-   a mid-season backfill helper for In Jeopardy marks; a commissioner-facing
-   "who got In Jeopardy credit this week" glance on Publish.
-
-## 5. Next Steps
-
-1. **Edit `statusCopy()` in `src/components/episode-banner.tsx`** (around
-   line 16) per whatever new wording the user wants. Current 3(–4) states,
-   for reference:
+1. **Home page curtain banner copy** — carried over from before this
+   session, still not started. Edit `statusCopy()` in
+   `src/components/episode-banner.tsx` (~line 16) per whatever wording the
+   user wants next time it comes up. States, for reference:
    - `on_air` + Curtain Call on somewhere → title **"On Air Now"**, sub
      **"Picks are locked"**.
    - `on_air` + Curtain Call off everywhere → title **"On Air Now"**, no
@@ -149,6 +136,24 @@ this repo).
      **"Airs {date/time}"**.
    - `picks_open` + Curtain Call off → no title at all, just
      **"Airs {date/time}"**.
-   - (Separately, the whole banner doesn't render when there's no live
-     week — that check lives in the parent, not in `statusCopy()`.)
-2. No other work is queued. Check with the user for what's next.
+2. `league-rosters-card.tsx` ("Dance Cards" on Standings) still shows only
+   a bare dimmed "Eliminated" label with no In Jeopardy pill (carried over,
+   optional consistency pass, not requested).
+3. Carried over, still low-priority/optional: a mid-season backfill helper
+   for In Jeopardy marks; a commissioner-facing "who got In Jeopardy credit
+   this week" glance on Publish.
+4. Not investigated this session, worth a glance if it comes up again: the
+   category-weight `SettingRow`s in `league-modules-form.tsx` (Curtain Call
+   / Dance Card weight rows, ~lines 450-451) render their raw values the
+   same way the multiplier used to — if a commissioner sets a fractional
+   category weight (e.g. `0.5`), those would show a decimal too. Not fixed
+   this session because it wasn't what the user flagged, and it's a
+   settings *input* display rather than a *score* — same category as the
+   multiplier's "display only" treatment if it ever comes up.
+
+## 5. Next Steps
+
+No work is queued from this session. The scoring-decimals bug is fully
+closed (code fix + live backfill verified at 0 fractional rows). Check with
+the user for what's next — likely either the Home banner copy (§4.1) or a
+new task entirely.
