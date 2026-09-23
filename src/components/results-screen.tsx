@@ -11,7 +11,7 @@ import type { CoupleNameParts } from "@/lib/couple-display";
 import type { ScoringJudge } from "@/lib/scoring-judges";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 import type { DraftState } from "@/lib/results-draft";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, ChevronRightIcon } from "lucide-react";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type CoupleWithStatus = Couple & {
@@ -63,15 +63,41 @@ type Season = {
   season_number: number | null;
 } | null;
 
-type TabValue = "week" | "couple" | "enter";
+type TabValue = "chooser" | "week" | "couple" | "enter";
 
 // These are the two sub-options under Settings' single "Scores" row — not
 // separate settings rows themselves, so there's no order to keep in sync.
 // Schedule lives on its own page (/admin/schedule), not as a tab here.
-const SWITCHER_TABS: { value: TabValue; label: string }[] = [
-  { value: "week", label: "By Week" },
-  { value: "couple", label: "By Couple" },
+const SWITCHER_TABS: { value: "week" | "couple"; label: string; hint: string }[] = [
+  { value: "week", label: "By Week", hint: "Judges' scores and outcomes, grouped by episode" },
+  { value: "couple", label: "By Couple", hint: "Judges' scores and outcomes, grouped by couple" },
 ];
+
+// The "before opening either page" landing shown when Scores is reached with
+// no specific view requested — e.g. straight from Settings' single "Scores"
+// row, which no longer defaults to By Week. Once one is picked, the compact
+// switcher in the header takes over for flipping between the two.
+function ScoresChooser({ onSelect }: { onSelect: (tab: "week" | "couple") => void }) {
+  return (
+    <div className="rounded-2xl border border-border">
+      {SWITCHER_TABS.map(({ value, label, hint }, i) => (
+        <button
+          key={value}
+          onClick={() => onSelect(value)}
+          className={`flex w-full items-center justify-between px-4 py-4 text-left transition-colors hover:bg-muted ${
+            i > 0 ? "border-t border-border" : ""
+          }`}
+        >
+          <span>
+            <span className="block font-medium">{label}</span>
+            <span className="block text-sm text-muted-foreground">{hint}</span>
+          </span>
+          <ChevronRightIcon className="size-4 text-muted-foreground" />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function ResultsScreen({
   accountSettingsData,
@@ -116,12 +142,16 @@ export function ResultsScreen({
 }) {
   const { isSuperAdmin } = accountSettingsData;
 
-  // Account Settings links straight to a destination (?tab=week, ?tab=enter,
-  // …), so honour that over always landing on By Week — except "enter",
-  // which only a propose-tier viewer can land on.
+  // Account Settings' "Scores" row links with no ?tab= at all, landing on the
+  // chooser below; "enter" (only when propose-tier) and direct ?tab=week/
+  // couple links (e.g. Correct Results elsewhere) still skip straight past it.
   const requestedTab = useSearchParams().get("tab");
   const initialTab: TabValue =
-    requestedTab === "enter" && canPropose ? "enter" : requestedTab === "couple" ? "couple" : "week";
+    requestedTab === "enter" && canPropose
+      ? "enter"
+      : requestedTab === "week" || requestedTab === "couple"
+        ? requestedTab
+        : "chooser";
 
   const [tab, setTab] = useState<TabValue>(initialTab);
   // Lifted here so View Results' "Correct Results"/"Continue draft" can
@@ -143,7 +173,7 @@ export function ResultsScreen({
             <ArrowLeftIcon className="size-4" />
             Back to Scores
           </Button>
-        ) : (
+        ) : tab === "week" || tab === "couple" ? (
           <div className="flex gap-2">
             {SWITCHER_TABS.map(({ value, label }) => (
               <Button
@@ -156,8 +186,10 @@ export function ResultsScreen({
               </Button>
             ))}
           </div>
-        )}
+        ) : null}
       </PageHeader>
+
+      {tab === "chooser" && <ScoresChooser onSelect={setTab} />}
 
       {tab === "enter" && canPropose && (
         <ResultsForm

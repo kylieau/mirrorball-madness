@@ -19,16 +19,17 @@ function Row({ href, label }: { href: string; label: string }) {
 // is open to every signed-in user — it isn't admin-only. Schedule is its own
 // page (/admin/schedule) rather than folded into Scores — it isn't really a
 // "scores view," unlike By Week and By Couple, which are just two lenses on
-// the same data and stay collapsed into one "Scores" row; clicking it lands
-// on the Scores page's own By Week/By Couple switcher (results-screen.tsx)
-// rather than each getting a separate settings row. Entering results needs
-// the propose tier (any league's commissioner); publishing and Show Settings
-// stay admin-only and live under Site Admin.
+// the same data and stay collapsed into one "Scores" row. No ?tab= here on
+// purpose: landing with neither view requested shows results-screen.tsx's
+// chooser (By Week / By Couple) before either page actually opens, rather
+// than silently defaulting to one. Entering results needs the propose tier
+// (any league's commissioner); publishing and Show Settings stay admin-only
+// and live under Site Admin.
 export function ResultsNav({ canPropose }: { canPropose: boolean }) {
   return (
     <SettingsSection title="Episodes">
       <Row href="/admin/schedule" label="Schedule" />
-      <Row href="/admin/results?tab=week" label="Scores" />
+      <Row href="/admin/results" label="Scores" />
       {canPropose && <Row href="/admin/results?tab=enter" label="Enter Results" />}
     </SettingsSection>
   );
