@@ -122,6 +122,10 @@ function danceTotal(dance: RowDance): number {
   }, 0);
 }
 
+function coupleTotal(row: CoupleRow): number {
+  return row.dances.reduce((sum, d) => sum + danceTotal(d), 0);
+}
+
 function isPerfectScore(dance: RowDance, judgeCount: number): boolean {
   const entered = Object.values(dance.scores).filter((v) => v !== "");
   if (entered.length === 0 || entered.length < judgeCount) return false;
@@ -261,7 +265,7 @@ export function ResultsForm({
   const [error, setError] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState(false);
   const [seedingCorrection, setSeedingCorrection] = useState(false);
-  const [coupleViewMode, setCoupleViewMode] = useState<"all" | "byCouple">("all");
+  const [coupleViewMode, setCoupleViewMode] = useState<"all" | "byCouple" | "leaderboard">("all");
   const [byCoupleSelectedId, setByCoupleSelectedId] = useState("");
 
   const [teamSheetOpen, setTeamSheetOpen] = useState(false);
@@ -581,14 +585,16 @@ export function ResultsForm({
 
   // One couple's editable row — shared by the "All Couples" list and the
   // "By Couple" stepper so the two views can never drift apart.
-  function CoupleEntryCard({ c }: { c: Couple }) {
+  function CoupleEntryCard({ c, rank }: { c: Couple; rank?: number }) {
     const row = rows[c.id] ?? emptyRow();
     const canAddDance = row.dances.length < expectedDanceCount;
     return (
       <div className="rounded-xl border border-border p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold">
+            {rank != null && <span className="text-muted-foreground">#{rank}</span>}{" "}
             <CoupleName {...coupleParts(c)} />
+            {rank != null && <span className="ml-1.5 text-muted-foreground">· {coupleTotal(row)} pts</span>}
           </p>
           <Select
             items={STATUS_LABELS}
@@ -891,11 +897,26 @@ export function ResultsForm({
                 >
                   By Couple
                 </Button>
+                <Button
+                  size="sm"
+                  variant={coupleViewMode === "leaderboard" ? "default" : "outline"}
+                  onClick={() => setCoupleViewMode("leaderboard")}
+                >
+                  Leaderboard
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {coupleViewMode === "all" ? (
                 episodeCouples.map((c) => <CoupleEntryCard key={c.id} c={c} />)
+              ) : coupleViewMode === "leaderboard" ? (
+                episodeCouples.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No couples to check for this episode.</p>
+                ) : (
+                  [...episodeCouples]
+                    .sort((a, b) => coupleTotal(rows[b.id] ?? emptyRow()) - coupleTotal(rows[a.id] ?? emptyRow()))
+                    .map((c, i) => <CoupleEntryCard key={c.id} c={c} rank={i + 1} />)
+                )
               ) : episodeCouples.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No couples to check for this episode.</p>
               ) : (
