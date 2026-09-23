@@ -1,112 +1,117 @@
 # Session Handoff
 
-_Last updated 2026-09-22. Read this first, then `CLAUDE.md`._
+_Last updated 2026-09-23. Read this first, then `CLAUDE.md`. This handoff is
+written for a **tool switch** (previous session was Claude Code, ran out of
+usage) — nothing here depends on Claude-Code-specific state, all referenced
+docs are committed files in this repo._
 
 ## 1. Current State
 
-Two scoring changes were designed, implemented, and fully verified (including live) this session. **Neither is
-git-committed yet** — both are sitting in the working tree, ready to commit, awaiting the user's go-ahead.
+`main` is clean and fully pushed — `git status` shows only the pre-existing,
+unrelated `ios/App/App.xcodeproj/project.pbxproj` diff and the untracked
+`scratch/` directory (both long-standing, not from this session, safe to
+ignore or leave alone). Nothing uncommitted, nothing to recover.
 
-- **A. Grand Finale placement bonus removed.** It duplicated Dance Card's own placement bonus for the same
-  roster-luck event (a rostered couple finishing top-5), just weighted under a different setting. Dance Card's own
-  placement bonus is untouched. Grand Finale's full-order-prediction methods were rebalanced (offline Monte Carlo
-  re-run) to absorb the freed budget.
-- **B. Scoring settings now lock at the Season Clock anchor.** All commissioner-editable `scoring_settings` fields
-  (weights, point values, category on/off toggles, `judges_score_starts_week` itself) freeze together the moment
-  `effective_grand_finale_deadline()` passes — reusing the *existing* anchor mechanism, not a new one. Closes a gap
-  where mid-season edits silently produced inconsistent standings (no snapshot of what settings scored a given
-  week existed before this).
+**Shipped and merged this session**: PR #30 (`results-access-tiers` branch,
+10 commits, fast-forward-merged — no merge commit) shipped two things:
 
-Both changes' live DB migrations were run by the user and verified against the real Supabase project (see §2).
-Full rationale + file:line-level implementation detail for both live at
-`/home/node/.claude/plans/thoughts-on-removing-the-lovely-starlight.md` (two superseding plans in one file —
-read it before touching this code further).
+- **Results access split into view/propose/publish tiers**, replacing the
+  old `RESULTS_ENTRY_OPEN_TO_ALL` env toggle (now fully removed). See
+  CLAUDE.md's "Results entry has three access tiers" bullet for the current,
+  accurate description — don't trust anything about `RESULTS_ENTRY_OPEN_TO_ALL`
+  if it shows up anywhere else, that's stale.
+- **A full chrome/navigation redesign** of the admin results surfaces,
+  iterated through several rounds of live-preview feedback: `/admin/results`
+  (titled "Scores") has no bottom nav and a By Week/By Couple switcher in the
+  page header; Schedule split into its own page (`/admin/schedule`); Show
+  Settings (judges/dance styles/season dates) split into its own page
+  (`/admin/show-settings`); Account Settings gained an "Episodes" section
+  with Schedule as its own row and a click-to-expand "Scores" row revealing
+  By Week/By Couple in the sheet itself. See CLAUDE.md's "League settings are
+  reached from Account settings" bullet for the current shape.
+- One small follow-up after merge: the "Commissioner"/"Manager · view only"
+  role hint under each League Settings row was removed — those rows now show
+  just the league name.
+- Two throwaway QA accounts used during this work
+  (`tier-commish@mirrorball-test.local`, `tier-plain@mirrorball-test.local`)
+  were created, used, and **already deleted** — don't assume they exist.
 
-## 2. Changes Made
+**Not started**: Phase 2, a taxonomy addition (round types like Team Dance/
+Trio Dance as a managed list, dance style categories, moving "Dances Per
+Couple" to the Schedule page). **Fully planned** — see
+`PHASE2_TAXONOMY_PLAN.md` in this repo root for the complete, file-by-file
+implementation plan, re-verified against the current post-merge codebase
+(exact line numbers, existing patterns to reuse, a couple of real gaps found
+while re-grounding). That file is self-contained; start there.
 
-Source of truth: `git diff --stat` against the working tree. **This session only touched the files below** — the
-diff also currently shows `src/app/settings/page.tsx`, `src/components/account-settings-sheet.tsx`,
-`src/components/site-admin-nav.tsx`, `src/lib/account-settings-data.ts`, `src/components/results-entry-nav.tsx`
-(untracked), and `ios/App/App.xcodeproj/project.pbxproj` as modified/untracked — **none of those are this
-session's work**. Per `CLAUDE.md`'s concurrent-work warning, that's other in-flight WIP (parallel session or
-earlier leftover) sitting in the same tree; do not stage or commit it as part of this feature without checking
-with the user first.
+## 2. Key Decisions & Lessons Learned (this session)
 
-**This session's files:**
-- `supabase/schema.sql` — both changes' schema edits (column drops/adds, `update_scoring_categories` rewritten
-  twice, comment blocks updated).
-- `supabase/apply-remove-grand-finale-placement-bonus.sql` (new) — change A's live migration, already run.
-- `supabase/apply-lock-scoring-settings.sql` (new) — change B's live migration, already run.
-- `src/lib/scoring.ts` — change A: removed `GRAND_FINALE_PLACEMENT_KEY` and its accumulator logic.
-- `src/lib/results.ts` — change A: removed the five now-gone fields from the `computeWeeklyScores` call.
-- `src/lib/season-clock-sync.ts` — change A: removed the same five fields from its own `update_scoring_categories`
-  call (a second call site missed on the first pass, caught later).
-- `src/app/leagues/[id]/settings/actions.ts` — change A: same five-field removal from `ScoringCategoriesInput`.
-- `src/app/leagues/[id]/settings/page.tsx` — change B: computes `scoringLocked` server-side and passes it down.
-- `src/components/league-modules-form.tsx` — both changes: removed the Grand-Finale-half UI (change A); added
-  `disabled={scoringLocked}` to exactly the locked fields — module toggles, anchor week, category weights, all
-  point values, Grand Finale method settings — while leaving waiver/draft/Pick-'Em-lock inputs editable (change B).
-- `src/lib/grand-finale-explainer.ts` — change A: rebalanced default point values; dropped the now-dead
-  "Separate from the placement bonus below" sentence.
-- `src/lib/season-clock.ts` — change B: `explainSeasonClock`'s three branches now mention the settings lock.
-- `scripts/monte-carlo-calibration/run.mjs` — change A: removed the Grand-Finale-half placement tracking; Grand
-  Finale's methods now solve against the full budget instead of sharing it with a placement bonus.
-- `src/lib/scoring.test.ts`, `src/lib/season-clock.test.ts` — test assertions updated to match.
-- `src/lib/supabase/types.ts` — regenerated twice (once per live migration).
-- `CLAUDE.md` — the Scoring Calibration bullet updated for change A.
-- `MEMORY_HANDOFF.md` — this file.
+- **UX for admin-adjacent pages iterates fast and visually** — the project
+  owner reviews live Vercel previews on her phone rather than describing what
+  she wants in detail up front. Expect several small rounds ("remove this
+  description," "make this click-to-expand instead," "no I meant show it in
+  the settings sheet, not a new page") rather than one big spec. Don't
+  over-build ahead of explicit direction; small, quickly-deployed increments
+  worked well here.
+- **A "Push Pilot" (her name for a Grok-based bot) reviews Vercel previews
+  on her phone before she approves a merge** — this is her own process, not
+  something to chase, verify, or wait on from the assistant side. She says
+  explicitly when it's fine to merge.
+- **This devcontainer environment has no `gh` CLI.** PR creation, status
+  polling, and reading the Vercel preview URL (which is *not* the
+  `target_url` on the commit status — that's the Vercel dashboard link; the
+  real preview URL is in the `vercel[bot]` PR comment body, or the
+  `deployments` API) all went through the GitHub REST API directly via
+  `curl`, authenticated with the token from `git credential fill` (works in
+  VS Code-based devcontainers for both git push and API calls).
+- **A fast-forward merge (`git merge --ff-only`, plain push) is cleaner than
+  the GitHub merge API when the base branch hasn't moved** — preserves every
+  commit individually with no merge commit, matches this repo's established
+  history style, and GitHub still auto-detects and marks the PR merged from
+  the direct push.
+- **This repo has a standing concurrency hazard**: multiple sessions/tools
+  can end up pointed at the same working directory. Mid-session here, another
+  session's uncommitted WIP (`scoring.ts`/`schema.sql`, a Curtain Call
+  near-miss feature) showed up in `git status` unrelated to anything being
+  worked on. It was left completely untouched (never staged, never edited,
+  never stashed) and later resolved on its own. **Always check `git status`
+  before staging/committing, and stage explicit filenames — never
+  `git add -A`** — so unrelated in-flight work never gets swept in.
+- **`npm run build` while a `next dev` server is running breaks the dev
+  server** (overwrites its `.next` directory out from under it) — check
+  `ps aux | grep "next dev"` before running a production build if one might
+  be up.
+- Full architectural rationale for round types vs. dance styles vs. episode-
+  level metadata lives in `PHASE2_TAXONOMY_PLAN.md`'s Context section — worth
+  reading before questioning any of those calls, they were deliberated.
 
-**Verified for both**: 308/308 tests pass, `tsc --noEmit` clean, `npm run build` succeeds (18/18 pages), lint clean
-except 8 pre-existing unrelated `scratch/*.mts` errors. Live: change A's 5 real leagues bulk-updated to rebalanced
-values (confirmed via query); change B's 5 real leagues confirmed `locking_exempt = true`, and a throwaway-account
-RPC test confirmed the lock actually rejects a real change post-deadline while still accepting a no-op resave.
+## 3. Backlog & Deferred Items
 
-## 3. Key Decisions & Lessons Learned
+- **Phase 2 (taxonomy)** — see `PHASE2_TAXONOMY_PLAN.md`. Not started.
+- **Dance Card's ~25% calibration overshoot** — confirmed real in an earlier
+  session, deliberately deferred as a product decision (the rigorous fix
+  would gut the feature: 106/53/28/14/7 → ~14/7/4/2/1). Needs a real
+  conversation about whether the placement bonus should matter this much
+  before any fix.
+- Full Monte Carlo recalibration against real Season 35 data — blocked on
+  live SQL/`SUPABASE_ACCESS_TOKEN` access most containers for this project
+  don't have, and the season isn't over yet regardless.
+- Carried over, untouched from earlier sessions: a human click-through of
+  the custom-draft lobby UI, the dead "not a member" branch in
+  `set_custom_draft_order`, the Settings "✓ Settings saved" banner not
+  clearing on edit.
+- `addTeamDance`/`TeamDanceSheetContent` ("Score a Team Dance" button in
+  Enter Results) is now slightly under-named once Trio Dance exists as a
+  round type too — it's a generic "same dance, multiple couples" bulk-entry
+  mechanic, not team-dance-specific. Noted as a reasonable future cosmetic
+  rename, not urgent.
 
-- **Per-category locking would have created a hindsight-gaming window.** Change B went through three design
-  iterations before landing on "reuse the existing Season Clock anchor for everything" — a per-category lock
-  (each module locks at its own first-score moment) would let a commissioner see one already-locked module's real
-  results before finalizing another still-open module's weight. Reusing one existing shared trigger closes that
-  window entirely, at the cost of a small, explicitly-accepted residual (Curtain Call could have a week or two of
-  results before a deliberately-deferred draft's later anchor — user's call that this is negligible).
-- **An independent fresh-context review agent caught real things** on change A: the two placement-bonus "halves"
-  have correlation of exactly 1.0 by construction (literal same value in two accumulators), not just "highly
-  correlated"; and `season-clock-sync.ts` was a second `update_scoring_categories` call site missed in the first
-  file inventory. One false positive (flagged nonexistent column-level grants) — verify subagent claims against
-  source before acting, don't just trust them.
-- **A missed call site was only caught by the full regenerate-and-typecheck cycle, not by grep** —
-  `league-modules-form.tsx` had its own local `ScoringSettings` type duplicating `scoring.ts`'s, still declaring
-  the removed fields. Only surfaced once `types.ts` was regenerated against the live post-migration schema.
-  Grep-based inventory isn't sufficient verification on its own.
-- **Dance Card's own placement bonus has a real, separate ~25% calibration overshoot** — confirmed genuine (not
-  noise), deliberately left unfixed. A rigorous fix was computed and rejected: it would shrink the bonus from
-  106/53/28/14/7 down to ~14/7/4/2/1, gutting the feature rather than fixing a bug. This is a product tradeoff to
-  revisit deliberately, not a quiet patch — full numbers in the plan file if it comes up again.
-- **Real weight customization changes what game a league is playing, not just emphasis.** One real league has
-  Dance Card weighted 8x (83% of standings influence — the other two modules are close to decorative there);
-  another has Grand Finale weighted highest (43%, inverting the usual default emphasis). Worth knowing before
-  assuming default-weight intuitions hold for any specific league.
-- **"March Madness" payout-curve reshaping was explicitly declined** — user confirmed they only meant the
-  placement-bonus removal, not restructuring how the three Grand Finale methods pay out. Don't reopen unprompted.
-- **Real production leagues existed already** (5, not just the earlier deleted QA league) — checked live data
-  before assuming any existing-row migration question was moot. Don't assume; check.
+## 4. Next Steps
 
-## 4. Backlog & Deferred Items
-
-- **Browser UI check** for both changes (Grand Finale Settings card + the new locked-state rendering) — not yet
-  visually exercised, no browser automation tool available this session.
-- **Dance Card's ~25% calibration overshoot** — confirmed real, deliberately deferred as a product decision, not
-  an engineering bug. Needs a real conversation about whether the placement bonus should matter this much before
-  any fix, since the rigorous fix neuters it.
-- Full Monte Carlo recalibration against real Season 35 data — blocked on live SQL/`SUPABASE_ACCESS_TOKEN` access
-  this container doesn't have, and the season isn't over yet regardless.
-- Carried over, untouched: a human click-through of the custom-draft lobby UI, the dead "not a member" branch in
-  `set_custom_draft_order`, the Settings "✓ Settings saved" banner not clearing on edit, Site Admin page visibility.
-
-## 5. Next Steps
-
-1. Confirm with the user whether to commit change A and change B (likely as two separate commits — they're
-   logically distinct) and push.
-2. If time allows: browser click-through of League Settings (Grand Finale card + locked-state UI) before calling
-   either change fully done.
-3. Otherwise, no queued task — ask what's next. Candidates in §4.
+1. Read `PHASE2_TAXONOMY_PLAN.md` in full before writing any code — it has
+   exact file:line references and reasoning for every call made.
+2. Confirm with the project owner whether Phase 2 should also start as a
+   draft PR awaiting Push Pilot review, matching PR #30's pattern.
+3. Implement per the plan; re-verify line numbers with a fresh grep before
+   editing, since this doc and the plan file may drift from the exact
+   current code by the time this is picked up.
