@@ -5,6 +5,12 @@ written for a **tool switch** (previous session was Claude Code, ran out of
 usage) — nothing here depends on Claude-Code-specific state, all referenced
 docs are committed files in this repo._
 
+**Since the PR #30 session below**: a separate, short session did read-only
+exploration + design for a possible draft-order UI reorg (see backlog item
+below), concluded it wasn't urgent, and made **no code changes** — `git diff
+--stat` is unchanged from what's described here. Phase 2 is still the real
+next task.
+
 ## 1. Current State
 
 `main` is clean and fully pushed — `git status` shows only the pre-existing,
@@ -105,6 +111,28 @@ while re-grounding). That file is self-contained; start there.
   round type too — it's a generic "same dance, multiple couples" bulk-entry
   mechanic, not team-dance-specific. Noted as a reasonable future cosmetic
   rename, not urgent.
+- **Move draft order editing into League Settings** (designed, not built —
+  "not urgent since all drafts have run"). Today `draft_type` (Snake/Linear/
+  Custom) lives in League Settings' Dance Card card, but the actual order
+  (the reorder list + `CustomDraftOrderCard` per-round grid) only lives in
+  the draft lobby (`draft-room.tsx`), with a note in Settings saying "arrange
+  it in the lobby" — a two-hop flow for one setup decision. Design: move
+  order editing (commissioner-only) into `league-modules-form.tsx` next to
+  `draft_type`; keep a **read-only** order view in both the lobby (so
+  managers see it while building their auto-draft queue) and Settings (via
+  the existing read-only-mirror pattern); queue and autopilot stay exactly
+  where they are in the lobby (they're ongoing draft-day tools, not one-time
+  setup). Key design point worth preserving if this gets picked up: the
+  lobby's three effects that guarantee an order exists before `start_draft`
+  can't just move wholesale, since nothing then forces a commissioner to
+  open Settings before clicking Start Draft — resolve by moving the
+  membership-reconcile effects into the new Settings component, and putting
+  a defensive shuffle/reconcile check directly inside `handleStartDraft`
+  (new `resolveCustomSequence` + exported `shuffle` helpers in
+  `src/lib/draft.ts`) so Start Draft never depends on Settings having been
+  opened. No SQL/RPC changes needed — `set_draft_order`/`set_custom_draft_order`
+  are already commissioner + `not_started`-gated server-side regardless of
+  caller.
 
 ## 4. Next Steps
 
