@@ -5,6 +5,7 @@ import { cn } from "cn";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { mergeCoupleOutcomes } from "@/lib/competition-week";
+import { fanOutcomeBadge } from "@/lib/results-outcome";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -30,15 +31,6 @@ type Episode = {
 };
 type ManagerWeekScore = { managerId: string; totalPoints: number };
 
-function outcomeTag(r: EpisodeResult): { label: string; className: string } {
-  if (r.outcome === "eliminated") return { label: "Eliminated", className: "bg-muted text-muted-foreground" };
-  if (r.outcome === "withdrawn") return { label: "Withdrew", className: "bg-muted text-muted-foreground" };
-  if (r.outcome === "winner") return { label: "Winner", className: "bg-primary/15 text-accent" };
-  if (r.outcome === "runner_up") return { label: "Runner-up", className: "bg-primary/15 text-accent" };
-  if (r.outcome === "third_place") return { label: "Third Place", className: "bg-primary/15 text-accent" };
-  if (r.outcome === "bye") return { label: "DND", className: "bg-muted text-muted-foreground" };
-  return { label: "Safe", className: "bg-emerald/20 text-emerald-text" };
-}
 
 export function WeeklyResultsView({
   episodes,
@@ -52,6 +44,7 @@ export function WeeklyResultsView({
   currentUserId,
   leaguesByCouple,
   pendingReveal,
+  inJeopardyCoupleIds,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
@@ -72,7 +65,10 @@ export function WeeklyResultsView({
   // empty-state teaser when nothing is visible yet, or as a catch-up card
   // above older results so the viewer isn't stranded without a mark control.
   pendingReveal?: { weekNumber: number; theme: string | null } | null;
+  // Union of commissioner In Jeopardy ticks for the episodes on screen.
+  inJeopardyCoupleIds?: string[];
 }) {
+  const inJeopardy = new Set(inJeopardyCoupleIds ?? []);
   const episode = episodes[0];
   const pendingCard = pendingReveal ? (
     <Card>
@@ -173,7 +169,7 @@ export function WeeklyResultsView({
       </div>
       <div className="flex flex-col gap-2.5">
         {outcomes.map((r) => {
-          const tag = outcomeTag(r);
+          const tag = fanOutcomeBadge(r.outcome, inJeopardy.has(r.couple_id));
           return (
             <div
               key={r.couple_id}

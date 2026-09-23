@@ -32,7 +32,6 @@ type EpisodeResult = {
   couple_id: string;
   outcome: string;
   saved_by_judges: boolean;
-  was_team_dance: boolean;
   had_immunity: boolean;
   bonus_points: number;
   bonus_note: string | null;
@@ -43,6 +42,7 @@ type Episode = {
   week_id: string | null;
   airs_at: string;
   theme: string | null;
+  expected_dance_count: number;
   status: string;
   results_published_at: string | null;
   results_published_by: string | null;
@@ -95,6 +95,9 @@ export function ResultsScreen({
   publishedByNames,
   season,
   participantsByEpisode,
+  roundTypes,
+  roundTypesByEpisode,
+  inJeopardyByEpisode,
 }: {
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
@@ -115,6 +118,9 @@ export function ResultsScreen({
   publishedByNames: Record<string, string>;
   season: Season;
   participantsByEpisode: Record<string, string[]>;
+  roundTypes: Named[];
+  roundTypesByEpisode: Record<string, string[]>;
+  inJeopardyByEpisode: Record<string, string[]>;
 }) {
   const { isSuperAdmin } = accountSettingsData;
 
@@ -195,6 +201,9 @@ export function ResultsScreen({
           publishedByNames={publishedByNames}
           onNavigateToEpisode={navigateToEpisode}
           seasonNumber={season?.season_number ?? null}
+          roundTypes={roundTypes}
+          roundTypesByEpisode={roundTypesByEpisode}
+          inJeopardyByEpisode={inJeopardyByEpisode}
         />
       )}
     </div>

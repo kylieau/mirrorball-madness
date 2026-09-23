@@ -42,7 +42,6 @@ type EpisodeResult = {
   couple_id: string;
   outcome: string;
   saved_by_judges: boolean;
-  was_team_dance: boolean;
   had_immunity: boolean;
   bonus_points: number;
   bonus_note: string | null;
@@ -83,6 +82,9 @@ export function AllResultsView({
   publishedByNames,
   onNavigateToEpisode,
   seasonNumber,
+  roundTypes,
+  roundTypesByEpisode,
+  inJeopardyByEpisode,
 }: {
   // Switcher lives one level up now (results-screen.tsx's PageHeader), as a
   // peer of Schedule rather than nested inside this component.
@@ -103,7 +105,15 @@ export function AllResultsView({
   publishedByNames: Record<string, string>;
   onNavigateToEpisode: (episodeId: string) => void;
   seasonNumber: number | null;
+  roundTypes: Named[];
+  roundTypesByEpisode: Record<string, string[]>;
+  inJeopardyByEpisode: Record<string, string[]>;
 }) {
+  const inJeopardyKeys = new Set(
+    Object.entries(inJeopardyByEpisode).flatMap(([episodeId, coupleIds]) =>
+      coupleIds.map((coupleId) => `${episodeId}:${coupleId}`)
+    )
+  );
   const [correctingId, setCorrectingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -133,14 +143,19 @@ export function AllResultsView({
     danceScoresByEpisodeCouple.set(key, list);
   }
 
-  function outcomeLabel(outcome: string) {
+  function outcomeLabel(episodeId: string, coupleId: string, outcome: string) {
+    if (outcome === "safe" && inJeopardyKeys.has(`${episodeId}:${coupleId}`)) return "In Jeopardy";
     return outcome === "bye" ? "DND" : outcome.replace("_", " ");
+  }
+
+  function episodeRoundTypeNames(episodeId: string): string[] {
+    const assigned = new Set(roundTypesByEpisode[episodeId] ?? []);
+    return roundTypes.filter((rt) => assigned.has(rt.name)).map((rt) => rt.name);
   }
 
   function noteLabel(r: EpisodeResult) {
     const notes: string[] = [];
     if (r.saved_by_judges) notes.push("judges' save");
-    if (r.was_team_dance) notes.push("team dance");
     if (r.had_immunity) notes.push("immunity");
     if (r.bonus_points) {
       notes.push(`+${r.bonus_points} bonus${r.bonus_note ? ` (${r.bonus_note})` : ""}`);
@@ -244,6 +259,7 @@ export function AllResultsView({
     showTvLabel: boolean;
   }) {
     const results = episodeResultsRows(ep);
+    const roundTypeNames = episodeRoundTypeNames(ep.id);
     const coupleCount = results.length > 0 ? results.length : (draftsByEpisode[ep.id]?.entries.length ?? 0);
     const publishedByName = ep.results_published_by ? publishedByNames[ep.results_published_by] : null;
     const isCorrectingOlderWeek =
@@ -256,6 +272,15 @@ export function AllResultsView({
             {formatEpisodeLabel(ep.episode_number, seasonNumber)}
             {ep.theme ? ` — ${ep.theme}` : ""}
           </p>
+        )}
+        {roundTypeNames.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {roundTypeNames.map((name) => (
+              <Badge key={name} variant="secondary">
+                {name}
+              </Badge>
+            ))}
+          </div>
         )}
         {ep.resultsStatus === "published" ? (
           <>
@@ -281,7 +306,7 @@ export function AllResultsView({
                           {r.parts ? <CoupleName {...r.parts} /> : "Unknown"}
                         </td>
                         <td className="p-2">{r.outcome === "bye" ? "—" : r.total}</td>
-                        <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(r.outcome)}</td>
+                        <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(r.episode_id, r.couple_id, r.outcome)}</td>
                         <td className="p-2 text-muted-foreground">{noteLabel(r) || "—"}</td>
                       </tr>
                       {r.dances.map((d, i) => (
@@ -514,7 +539,7 @@ export function AllResultsView({
                           <tr className={h.dances.length === 0 ? "border-b border-border last:border-b-0" : undefined}>
                             <td className="whitespace-nowrap p-2">{weekLabel}</td>
                             <td className="p-2">{h.outcome === "bye" ? "—" : h.total}</td>
-                            <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(h.outcome)}</td>
+                            <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(h.episode_id, h.couple_id, h.outcome)}</td>
                             <td className="p-2 text-muted-foreground">{noteLabel(h) || "—"}</td>
                           </tr>
                           {h.dances.map((d, j) => (

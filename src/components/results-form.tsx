@@ -56,6 +56,7 @@ type ScheduledEpisode = {
   week_id: string | null;
   airs_at: string;
   theme: string | null;
+  expected_dance_count: number;
   results_published_at: string | null;
 };
 type CompetitionWeek = {
@@ -93,8 +94,8 @@ type RowDance = {
 
 type CoupleRow = {
   outcome: Outcome;
+  inJeopardy: boolean;
   savedByJudges: boolean;
-  wasTeamDance: boolean;
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string;
@@ -104,8 +105,8 @@ type CoupleRow = {
 function emptyRow(): CoupleRow {
   return {
     outcome: "safe",
+    inJeopardy: false,
     savedByJudges: false,
-    wasTeamDance: false,
     hadImmunity: false,
     bonusPoints: 0,
     bonusNote: "",
@@ -127,14 +128,15 @@ function isPerfectScore(dance: RowDance, judgeCount: number): boolean {
 }
 
 function buildRowsFromDraft(draft: DraftState | undefined, couples: Couple[]): Record<string, CoupleRow> {
+  const inJeopardy = new Set(draft?.inJeopardyCoupleIds ?? []);
   const rows: Record<string, CoupleRow> = {};
-  for (const c of couples) rows[c.id] = emptyRow();
+  for (const c of couples) rows[c.id] = { ...emptyRow(), inJeopardy: inJeopardy.has(c.id) };
 
   for (const entry of draft?.entries ?? []) {
     rows[entry.coupleId] = {
       outcome: entry.outcome,
+      inJeopardy: entry.outcome !== "eliminated" && inJeopardy.has(entry.coupleId),
       savedByJudges: entry.savedByJudges,
-      wasTeamDance: entry.wasTeamDance,
       hadImmunity: entry.hadImmunity,
       bonusPoints: entry.bonusPoints,
       bonusNote: entry.bonusNote ?? "",
@@ -213,6 +215,7 @@ export function ResultsForm({
   }, [forceSelectEpisodeId]);
 
   const selectedEpisode = sortedEpisodes.find((e) => e.id === selectedEpisodeId) ?? null;
+  const expectedDanceCount = selectedEpisode?.expected_dance_count ?? 1;
   const selectedWeek = selectedEpisode?.week_id ? (weekById.get(selectedEpisode.week_id) ?? null) : null;
   const isFinale = selectedWeek?.is_finale ?? false;
   const nightsCount = selectedEpisode?.week_id ? (nightsCountByWeek.get(selectedEpisode.week_id) ?? 1) : 1;
@@ -240,7 +243,6 @@ export function ResultsForm({
     .map((id) => couplesById.get(id) ?? activeCouples.find((c) => c.id === id))
     .filter((c): c is Couple => !!c);
 
-  const [expectedDanceCount, setExpectedDanceCount] = useState(1);
   const [judgesSaveAvailable, setJudgesSaveAvailable] = useState(false);
   const [rows, setRows] = useState<Record<string, CoupleRow>>({});
   const [customMoments, setCustomMoments] = useState<DraftState["customMoments"]>([]);
@@ -308,11 +310,6 @@ export function ResultsForm({
     setDraftSavedAt(draft?.updatedAt ?? null);
     setHasDraft(draft?.hasDraft ?? false);
     setError(null);
-    // expectedDanceCount isn't part of the draft tables — it only caps how
-    // many "+ Dance" rows are offered per couple while drafting. Publish
-    // derives the real value from however many dances actually got
-    // entered, so there's nothing to carry over here; default to 1.
-    setExpectedDanceCount(1);
     // Depends on the draft's own updatedAt/hasDraft, not just the episode
     // id, so a fresh draft seeded by "Correct Results" (same episode,
     // brand-new draft rows) still triggers a rehydrate even though the id
@@ -345,12 +342,17 @@ export function ResultsForm({
             })),
           outcome: row.outcome,
           savedByJudges: row.savedByJudges,
-          wasTeamDance: row.wasTeamDance,
           hadImmunity: row.hadImmunity,
           bonusPoints: row.bonusPoints,
           bonusNote: row.bonusNote.trim() || null,
         };
       }),
+      inJeopardyCoupleIds: episodeCouples
+        .filter((c) => {
+          const row = rows[c.id] ?? emptyRow();
+          return row.inJeopardy && row.outcome !== "eliminated";
+        })
+        .map((c) => c.id),
     };
   }
 
@@ -420,7 +422,10 @@ export function ResultsForm({
   }
 
   function setStatus(coupleId: string, value: StatusValue) {
-    updateRow(coupleId, { outcome: value });
+    updateRow(coupleId, {
+      outcome: value,
+      ...(value === "eliminated" ? { inJeopardy: false } : {}),
+    });
   }
 
   function danceCountFor(coupleId: string): number {
@@ -453,7 +458,6 @@ export function ResultsForm({
         const row = next[coupleId] ?? emptyRow();
         next[coupleId] = {
           ...row,
-          wasTeamDance: true,
           dances: [
             ...row.dances,
             { key: `team-${Date.now()}-${Math.random()}-${coupleId}`, danceStyleId, songTitle, scores: { ...scores } },
@@ -628,16 +632,6 @@ export function ResultsForm({
                 <Label className="text-xs text-muted-foreground">Theme</Label>
                 <p className="text-sm">{selectedEpisode.theme ?? "—"}</p>
               </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="danceCount">Dances (Per Couple)</Label>
-                <Input
-                  id="danceCount"
-                  type="number"
-                  min={1}
-                  value={expectedDanceCount}
-                  onChange={(e) => setExpectedDanceCount(Number(e.target.value))}
-                />
-              </div>
               <div className="flex items-center justify-between gap-3 sm:col-span-2">
                 <div>
                   <Label htmlFor="judgesSave">Judges&apos; Save active this episode</Label>
@@ -667,7 +661,13 @@ export function ResultsForm({
           <Card>
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle>Couples &amp; Scores</CardTitle>
+                <div>
+                  <CardTitle>Couples &amp; Scores</CardTitle>
+                  <CardDescription>
+                    Tick In Jeopardy for couples the show called down who stayed. That list is what
+                    Curtain Call uses — it is not taken from the scores.
+                  </CardDescription>
+                </div>
                 <Sheet open={teamSheetOpen} onOpenChange={setTeamSheetOpen}>
                   <SheetTrigger render={<Button variant="outline" size="sm" />}>Score a Team Dance</SheetTrigger>
                   <TeamDanceSheetContent
@@ -793,6 +793,15 @@ export function ResultsForm({
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
+                      <label className="flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={row.inJeopardy}
+                          disabled={row.outcome === "eliminated"}
+                          onChange={(e) => updateRow(c.id, { inJeopardy: e.target.checked })}
+                        />
+                        In Jeopardy
+                      </label>
                       <label className="flex items-center gap-1.5">
                         <input
                           type="checkbox"

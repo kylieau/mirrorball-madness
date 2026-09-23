@@ -1,145 +1,157 @@
-# Session Handoff
+# MEMORY_HANDOFF
 
-_Last updated 2026-09-23. Read this first, then `CLAUDE.md`. This handoff is
-written for a **tool switch** (previous session was Claude Code, ran out of
-usage) — nothing here depends on Claude-Code-specific state, all referenced
-docs are committed files in this repo._
-
-**Since the PR #30 session below**: a separate, short session did read-only
-exploration + design for a possible draft-order UI reorg (see backlog item
-below), concluded it wasn't urgent, and made **no code changes** — `git diff
---stat` is unchanged from what's described here. Phase 2 is still the real
-next task.
+_Last updated 2026-09-23. Read this first, then `CLAUDE.md`. Multiple
+tools/sessions (Claude Code, Cursor/Grok "Push Pilot") have worked this repo
+back-to-back in the same window — this doc merges all of their state into
+one accurate picture. Nothing here depends on any one tool; all referenced
+files are committed to this repo._
 
 ## 1. Current State
 
-`main` is clean and fully pushed — `git status` shows only the pre-existing,
-unrelated `ios/App/App.xcodeproj/project.pbxproj` diff and the untracked
-`scratch/` directory (both long-standing, not from this session, safe to
-ignore or leave alone). Nothing uncommitted, nothing to recover.
+**No feature is actively in progress.** The last three units of work are all
+merged to `main`:
 
-**Shipped and merged this session**: PR #30 (`results-access-tiers` branch,
-10 commits, fast-forward-merged — no merge commit) shipped two things:
+- **PR #30** — results access split into view/propose/publish tiers
+  (replacing the old `RESULTS_ENTRY_OPEN_TO_ALL` toggle, now fully removed)
+  plus a full chrome/nav redesign of the admin surfaces (`/admin/results`
+  titled "Scores", `/admin/schedule`, `/admin/show-settings` as separate
+  pages, Account Settings' "Episodes" section). See CLAUDE.md's "Results
+  entry has three access tiers" and "League settings are reached from
+  Account settings" bullets for the accurate current shape.
+- **PR #31** — Phase 2 taxonomy: managed round types (Team Dance, Trio
+  Dance, Instant Dance, Judges' Choice, Redemption Dance) on Schedule, dance
+  style categories, `expected_dance_count` moved to Schedule. **SQL already
+  applied live.** `PHASE2_TAXONOMY_PLAN.md` is now a historical record of
+  this, not an active plan.
+- **PR #33** — "Curtain Call In Jeopardy" near-miss scoring credit (squash
+  merge `581b85b`). **Code is on `main`, but the live migration
+  (`supabase/apply-curtain-call-in-jeopardy.sql`) has not been run yet** —
+  this is the one open blocker, see §5.
 
-- **Results access split into view/propose/publish tiers**, replacing the
-  old `RESULTS_ENTRY_OPEN_TO_ALL` env toggle (now fully removed). See
-  CLAUDE.md's "Results entry has three access tiers" bullet for the current,
-  accurate description — don't trust anything about `RESULTS_ENTRY_OPEN_TO_ALL`
-  if it shows up anywhere else, that's stale.
-- **A full chrome/navigation redesign** of the admin results surfaces,
-  iterated through several rounds of live-preview feedback: `/admin/results`
-  (titled "Scores") has no bottom nav and a By Week/By Couple switcher in the
-  page header; Schedule split into its own page (`/admin/schedule`); Show
-  Settings (judges/dance styles/season dates) split into its own page
-  (`/admin/show-settings`); Account Settings gained an "Episodes" section
-  with Schedule as its own row and a click-to-expand "Scores" row revealing
-  By Week/By Couple in the sheet itself. See CLAUDE.md's "League settings are
-  reached from Account settings" bullet for the current shape.
-- One small follow-up after merge: the "Commissioner"/"Manager · view only"
-  role hint under each League Settings row was removed — those rows now show
-  just the league name.
-- Two throwaway QA accounts used during this work
-  (`tier-commish@mirrorball-test.local`, `tier-plain@mirrorball-test.local`)
-  were created, used, and **already deleted** — don't assume they exist.
+**PR #32** ("Enter Results UX polish backlog docs") is still open as a
+draft — low-stakes, just queues backlog notes, not blocking anything.
 
-**Not started**: Phase 2, a taxonomy addition (round types like Team Dance/
-Trio Dance as a managed list, dance style categories, moving "Dances Per
-Couple" to the Schedule page). **Fully planned** — see
-`PHASE2_TAXONOMY_PLAN.md` in this repo root for the complete, file-by-file
-implementation plan, re-verified against the current post-merge codebase
-(exact line numbers, existing patterns to reuse, a couple of real gaps found
-while re-grounding). That file is self-contained; start there.
+## 2. Changes Made
 
-## 2. Key Decisions & Lessons Learned (this session)
+Working tree is clean right now (`git diff --stat` shows nothing outside
+this handoff-doc merge and the pre-existing, unrelated
+`ios/App/App.xcodeproj/project.pbxproj` diff — leave that one alone, it
+predates all of this). Recent merged history on `main`:
 
-- **UX for admin-adjacent pages iterates fast and visually** — the project
-  owner reviews live Vercel previews on her phone rather than describing what
-  she wants in detail up front. Expect several small rounds ("remove this
-  description," "make this click-to-expand instead," "no I meant show it in
-  the settings sheet, not a new page") rather than one big spec. Don't
-  over-build ahead of explicit direction; small, quickly-deployed increments
-  worked well here.
-- **A "Push Pilot" (her name for a Grok-based bot) reviews Vercel previews
-  on her phone before she approves a merge** — this is her own process, not
-  something to chase, verify, or wait on from the assistant side. She says
-  explicitly when it's fine to merge.
-- **This devcontainer environment has no `gh` CLI.** PR creation, status
-  polling, and reading the Vercel preview URL (which is *not* the
-  `target_url` on the commit status — that's the Vercel dashboard link; the
-  real preview URL is in the `vercel[bot]` PR comment body, or the
-  `deployments` API) all went through the GitHub REST API directly via
-  `curl`, authenticated with the token from `git credential fill` (works in
-  VS Code-based devcontainers for both git push and API calls).
-- **A fast-forward merge (`git merge --ff-only`, plain push) is cleaner than
-  the GitHub merge API when the base branch hasn't moved** — preserves every
-  commit individually with no merge commit, matches this repo's established
-  history style, and GitHub still auto-detects and marks the PR merged from
-  the direct push.
-- **This repo has a standing concurrency hazard**: multiple sessions/tools
-  can end up pointed at the same working directory. Mid-session here, another
-  session's uncommitted WIP (`scoring.ts`/`schema.sql`, a Curtain Call
-  near-miss feature) showed up in `git status` unrelated to anything being
-  worked on. It was left completely untouched (never staged, never edited,
-  never stashed) and later resolved on its own. **Always check `git status`
-  before staging/committing, and stage explicit filenames — never
-  `git add -A`** — so unrelated in-flight work never gets swept in.
-- **`npm run build` while a `next dev` server is running breaks the dev
-  server** (overwrites its `.next` directory out from under it) — check
-  `ps aux | grep "next dev"` before running a production build if one might
-  be up.
-- Full architectural rationale for round types vs. dance styles vs. episode-
-  level metadata lives in `PHASE2_TAXONOMY_PLAN.md`'s Context section — worth
-  reading before questioning any of those calls, they were deliberated.
+| Commit | PR | Files | Diff |
+|---|---|---|---|
+| `c0b3c21` (FF, 10 commits) | #30 | 21 | +744/−413 |
+| `b134b1c` | #31 | 18 | +873/−185 |
+| `581b85b` (squash) | #33 | 27 | +1185/−180 |
 
-## 3. Backlog & Deferred Items
+Full per-file breakdown lives in each commit itself (`git show --stat <sha>`)
+rather than reproduced here — this doc would drift from it otherwise.
 
-- **Phase 2 (taxonomy)** — see `PHASE2_TAXONOMY_PLAN.md`. Not started.
-- **Dance Card's ~25% calibration overshoot** — confirmed real in an earlier
-  session, deliberately deferred as a product decision (the rigorous fix
-  would gut the feature: 106/53/28/14/7 → ~14/7/4/2/1). Needs a real
-  conversation about whether the placement bonus should matter this much
-  before any fix.
-- Full Monte Carlo recalibration against real Season 35 data — blocked on
-  live SQL/`SUPABASE_ACCESS_TOKEN` access most containers for this project
-  don't have, and the season isn't over yet regardless.
-- Carried over, untouched from earlier sessions: a human click-through of
-  the custom-draft lobby UI, the dead "not a member" branch in
-  `set_custom_draft_order`, the Settings "✓ Settings saved" banner not
-  clearing on edit.
-- `addTeamDance`/`TeamDanceSheetContent` ("Score a Team Dance" button in
-  Enter Results) is now slightly under-named once Trio Dance exists as a
-  round type too — it's a generic "same dance, multiple couples" bulk-entry
-  mechanic, not team-dance-specific. Noted as a reasonable future cosmetic
-  rename, not urgent.
-- **Move draft order editing into League Settings** (designed, not built —
-  "not urgent since all drafts have run"). Today `draft_type` (Snake/Linear/
-  Custom) lives in League Settings' Dance Card card, but the actual order
-  (the reorder list + `CustomDraftOrderCard` per-round grid) only lives in
-  the draft lobby (`draft-room.tsx`), with a note in Settings saying "arrange
-  it in the lobby" — a two-hop flow for one setup decision. Design: move
-  order editing (commissioner-only) into `league-modules-form.tsx` next to
-  `draft_type`; keep a **read-only** order view in both the lobby (so
-  managers see it while building their auto-draft queue) and Settings (via
-  the existing read-only-mirror pattern); queue and autopilot stay exactly
-  where they are in the lobby (they're ongoing draft-day tools, not one-time
-  setup). Key design point worth preserving if this gets picked up: the
-  lobby's three effects that guarantee an order exists before `start_draft`
-  can't just move wholesale, since nothing then forces a commissioner to
-  open Settings before clicking Start Draft — resolve by moving the
-  membership-reconcile effects into the new Settings component, and putting
-  a defensive shuffle/reconcile check directly inside `handleStartDraft`
-  (new `resolveCustomSequence` + exported `shuffle` helpers in
-  `src/lib/draft.ts`) so Start Draft never depends on Settings having been
-  opened. No SQL/RPC changes needed — `set_draft_order`/`set_custom_draft_order`
-  are already commissioner + `not_started`-gated server-side regardless of
-  caller.
+## 3. Key Decisions & Lessons Learned
 
-## 4. Next Steps
+**In Jeopardy product decisions (locked, don't re-litigate):**
+- Elimination near-miss = manual "In Jeopardy" ticks on Enter Results (the
+  TV called-down group), **not** derived from judges' bottom-N.
+- Top-scorer near-miss = within 1 point of the week's high score; ties at
+  the high score are exact-only, not counted as near-miss.
+- Credit = `floor(exactPayout × 0.25)` for both kinds; exact always wins;
+  double-elimination wrongs pay independently.
+- Default on; mid-season backfill OK; not retroactive on
+  `weekly_manager_scores`. In Jeopardy overrides "Safe" in Results display
+  for a marked non-eliminated couple.
+- Dropped during design: auto-detecting bottom-N, a band-size knob, 33%
+  credit, top-3 (vs. top-1) scoring, a longer Settings explainer.
 
-1. Read `PHASE2_TAXONOMY_PLAN.md` in full before writing any code — it has
-   exact file:line references and reasoning for every call made.
-2. Confirm with the project owner whether Phase 2 should also start as a
-   draft PR awaiting Push Pilot review, matching PR #30's pattern.
-3. Implement per the plan; re-verify line numbers with a fresh grep before
-   editing, since this doc and the plan file may drift from the exact
-   current code by the time this is picked up.
+**Process / environment:**
+- The project owner reviews live Vercel previews on her phone before
+  approving a merge ("Push Pilot," her name for this Grok-based review flow)
+  — not something to chase or verify from the assistant side, she says
+  explicitly when it's fine to merge. She also iterates in many small, fast
+  UX rounds rather than one big spec — expect several corrections in a row.
+- **No `gh` CLI in the Claude Code devcontainer.** PR creation/status/preview-URL
+  reading went through the GitHub REST API via `curl`, authenticated with
+  the token from `git credential fill`. The Vercel preview URL is *not* the
+  commit status `target_url` (that's the dashboard link) — it's in the
+  `vercel[bot]` PR comment body or the `deployments` API.
+- A fast-forward merge (`git merge --ff-only` + push) beats the GitHub merge
+  API when the base hasn't moved — no merge commit, GitHub still
+  auto-detects and marks the PR merged.
+- Types touched by a live-SQL-pending PR get **hand-updated** first (no
+  `SUPABASE_ACCESS_TOKEN` in every environment) — always regenerate for real
+  once the SQL actually runs:
+  `npx supabase gen types typescript --project-id wssbwgtsejamlbvfofvu --schema public > src/lib/supabase/types.ts`
+- **This repo has a real, recurring concurrency hazard** — multiple
+  sessions/tools land on the same working directory back-to-back, sometimes
+  overlapping. Hit three times now: another session's uncommitted
+  `scoring.ts`/`schema.sql` WIP appeared mid-session (left untouched,
+  resolved itself); a local push got rejected because `main` had moved
+  under it (resolved via merge, not force-push); this very doc had been
+  edited on disk by a separate short exploration session between reads.
+  **Always `git status`/`git fetch` before assuming local state is current,
+  stage explicit filenames, never `git add -A`, never force-push.**
+- Dance Card's own placement-bonus calibration has a confirmed ~25%
+  overshoot (real, not noise) — a rigorous fix would gut the feature
+  (106/53/28/14/7 → ~14/7/4/2/1 points), so it's deliberately left as a
+  product decision to revisit, not a bug to quietly patch.
+
+## 4. Backlog & Deferred Items
+
+1. **Run `supabase/apply-curtain-call-in-jeopardy.sql`** — see §5, the one
+   real blocker.
+2. **Spoiler-free + In Jeopardy badge hardening** — designed, not built. In
+   Jeopardy is episode-level marks, not `couples.status`, so roster Safe/Elim
+   tags must clamp to Safe for unwatched weeks (reuse
+   `resolveSpoilerCutoff`/`spoilerSafeCoupleStatus`, same pattern already
+   used elsewhere). Open questions: does the roster show In Jeopardy after a
+   week is watched (parity with Results) or stay Results-only; callout strip
+   vs. badge-only.
+3. **Move draft order editing into League Settings** (designed, not built,
+   "not urgent since all drafts have run"). Today `draft_type` lives in
+   League Settings' Dance Card card, but the actual order (reorder list +
+   `CustomDraftOrderCard`'s per-round grid) only lives in the draft lobby
+   (`draft-room.tsx`) — a two-hop flow for a one-time setup decision. Design:
+   move order editing (commissioner-only) into `league-modules-form.tsx`
+   next to `draft_type`; keep a **read-only** mirror in the lobby (so
+   managers see it while building their auto-draft queue); queue/autopilot
+   stay in the lobby (ongoing draft-day tools, not setup). The one real
+   wrinkle if this gets picked up: the lobby's effects that guarantee an
+   order exists before `start_draft` can't just move wholesale, since
+   nothing would then force a commissioner to open Settings before clicking
+   Start Draft — resolve by moving the membership-reconcile effects into the
+   new Settings component and adding a defensive shuffle/reconcile check
+   directly inside `handleStartDraft` (new `resolveCustomSequence` +
+   exported `shuffle` helpers in `src/lib/draft.ts`). No SQL/RPC changes
+   needed — `set_draft_order`/`set_custom_draft_order` are already
+   commissioner + `not_started`-gated server-side regardless of caller.
+4. **Enter Results UX polish** — top product backlog after In Jeopardy is
+   live/usable (see PR #32, still open/draft).
+5. **Equal-EV / neutral fair scoring defaults** — parked behind #4.
+6. `addTeamDance`/`TeamDanceSheetContent` ("Score a Team Dance" button) is
+   now slightly under-named since Trio Dance exists as a round type too —
+   it's a generic same-dance/multiple-couples bulk-entry mechanic, not
+   team-dance-specific. Reasonable future cosmetic rename, not urgent.
+7. Dance Card's ~25% calibration overshoot (see §3) — needs a real product
+   conversation before any fix, not a quiet patch.
+8. Full Monte Carlo recalibration against real Season 35 data — blocked on
+   live SQL/`SUPABASE_ACCESS_TOKEN` access, and the season isn't over yet.
+9. Carried over, untouched: a human click-through of the custom-draft lobby
+   UI, the dead "not a member" branch in `set_custom_draft_order`, the
+   Settings "✓ Settings saved" banner not clearing on edit.
+10. Mid-season backfill of In Jeopardy marks; a commissioner-facing "did
+    anyone get In Jeopardy credit?" glance on publish — both optional,
+    low-priority.
+
+## 5. Next Steps
+
+1. **Owner: run `supabase/apply-curtain-call-in-jeopardy.sql`** in the
+   Supabase Dashboard SQL Editor — blocking for Enter Results/Results/league
+   queries against the new In Jeopardy tables.
+2. Regenerate `src/lib/supabase/types.ts` for real afterward (command in §3)
+   — it's currently hand-updated as a stand-in.
+3. Smoke-test: Enter Results (tick In Jeopardy) → publish → confirm Results
+   badges + past-picks/Pick 'Em preview render correctly on a Vercel
+   prod/preview build.
+4. Then pick up whichever of §4's items the owner greenlights next —
+   spoiler-free badge hardening and Enter Results UX polish are the two
+   nearest-term candidates; the draft-order reorg is fully designed whenever
+   it becomes worth doing.

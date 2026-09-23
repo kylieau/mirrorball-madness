@@ -55,7 +55,8 @@ merged PR #30 — this plan builds *inside* that shape.
 - `was_team_dance` (`schema.sql:516` on `episode_results`, `:2298` on
   `draft_episode_results`) is threaded through: `src/lib/results.ts:29`
   (`EntrySubmission.wasTeamDance`) and `:596` (write); `src/lib/results-draft.ts`
-  (`:19`, `:45` types, `:135`/`:181`/`:290`/`:396` read/write); `results-form.tsx`
+  (`:19`, `:45` types, `:135`/`:181`/`:290`/`:396` read/write);
+  `results-form.tsx`
   (`:97` field, `:108`/`:137`/`:348` plumbing, `:456` — see below);
   `all-results-view.tsx:45` (type) and `:143` (`noteLabel`'s per-couple "team
   dance" string); `results-page-data.ts:41` (type) and `:118` (select).

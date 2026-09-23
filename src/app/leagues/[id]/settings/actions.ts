@@ -167,6 +167,7 @@ export type ScoringCategoriesInput = {
   eliminationPredictionPoints: number;
   topScorerPredictionPoints: number;
   bonusPicksPointsPerCorrect: number;
+  curtainCallNearMissEnabled: boolean;
 };
 
 export async function updateScoringCategories(
@@ -200,6 +201,7 @@ export async function updateScoringCategories(
     p_top_scorer_prediction_points: input.topScorerPredictionPoints,
     p_bonus_picks_points_per_correct: input.bonusPicksPointsPerCorrect,
     p_bonus_picks_tier_pay_style: input.bonusPicksTierPayStyle,
+    p_curtain_call_near_miss_enabled: input.curtainCallNearMissEnabled,
   });
 
   if (error) return { error: error.message };

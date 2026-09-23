@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import type { Outcome } from "@/lib/scoring";
-import { applyEpisodeResults, type EntrySubmission } from "@/lib/results";
+import { inJeopardyIdsToPersist, type Outcome } from "@/lib/scoring";
+import { applyEpisodeResults, replaceInJeopardyCouples, type EntrySubmission } from "@/lib/results";
 
 export type DraftJudgeScoreInput = { judgeId: string; score: number };
 
@@ -16,7 +16,6 @@ export type DraftEntryInput = {
   dances: DraftDanceInput[];
   outcome: Outcome;
   savedByJudges: boolean;
-  wasTeamDance: boolean;
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string | null;
@@ -27,6 +26,7 @@ export type SaveDraftResultsInput = {
   guestJudgeName: string | null;
   judgesSaveAvailable: boolean;
   entries: DraftEntryInput[];
+  inJeopardyCoupleIds: string[];
   updatedBy: string;
 };
 
@@ -42,7 +42,6 @@ export type DraftEntryState = {
   coupleId: string;
   outcome: Outcome;
   savedByJudges: boolean;
-  wasTeamDance: boolean;
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string | null;
@@ -58,6 +57,7 @@ export type DraftState = {
   dances: DraftDanceState[];
   entries: DraftEntryState[];
   customMoments: DraftCustomMoment[];
+  inJeopardyCoupleIds: string[];
 };
 
 const EMPTY_DRAFT_STATE: DraftState = {
@@ -68,6 +68,7 @@ const EMPTY_DRAFT_STATE: DraftState = {
   dances: [],
   entries: [],
   customMoments: [],
+  inJeopardyCoupleIds: [],
 };
 
 // Autosave path — cheap and draft-only. Does NOT touch couples.status or
@@ -132,7 +133,6 @@ export async function saveDraftResults(
     couple_id: e.coupleId,
     outcome: e.outcome,
     saved_by_judges: e.savedByJudges,
-    was_team_dance: e.wasTeamDance,
     had_immunity: e.hadImmunity,
     bonus_points: e.bonusPoints,
     bonus_note: e.bonusNote,
@@ -142,6 +142,14 @@ export async function saveDraftResults(
     if (error) return { error: error.message };
   }
 
+  const jeopardyErr = await replaceInJeopardyCouples(
+    admin,
+    "draft_episode_in_jeopardy_couples",
+    input.episodeId,
+    inJeopardyIdsToPersist(input.inJeopardyCoupleIds, input.entries)
+  );
+  if (jeopardyErr) return { error: jeopardyErr };
+
   return { error: null };
 }
 
@@ -149,7 +157,7 @@ export async function loadDraftForEpisode(
   admin: SupabaseClient<Database>,
   episodeId: string
 ): Promise<DraftState> {
-  const [{ data: override }, { data: draftDances }, { data: draftResults }, { data: customMoments }] =
+  const [{ data: override }, { data: draftDances }, { data: draftResults }, { data: customMoments }, { data: jeopardy }] =
     await Promise.all([
       admin.from("draft_episode_overrides").select("*").eq("episode_id", episodeId).maybeSingle(),
       admin
@@ -158,6 +166,7 @@ export async function loadDraftForEpisode(
         .eq("episode_id", episodeId),
       admin.from("draft_episode_results").select("*").eq("episode_id", episodeId),
       admin.from("draft_episode_custom_moments").select("id, couple_id, label").eq("episode_id", episodeId),
+      admin.from("draft_episode_in_jeopardy_couples").select("couple_id").eq("episode_id", episodeId),
     ]);
 
   if (!override) return EMPTY_DRAFT_STATE;
@@ -178,12 +187,12 @@ export async function loadDraftForEpisode(
       coupleId: r.couple_id,
       outcome: r.outcome as Outcome,
       savedByJudges: r.saved_by_judges,
-      wasTeamDance: r.was_team_dance,
       hadImmunity: r.had_immunity,
       bonusPoints: r.bonus_points,
       bonusNote: r.bonus_note,
     })),
     customMoments: (customMoments ?? []).map((m) => ({ id: m.id, coupleId: m.couple_id, label: m.label })),
+    inJeopardyCoupleIds: (jeopardy ?? []).map((row) => row.couple_id),
   };
 }
 
@@ -243,14 +252,16 @@ async function deleteAllDraftRows(admin: SupabaseClient<Database>, episodeId: st
   await admin.from("draft_dance_scores").delete().eq("episode_id", episodeId);
   await admin.from("draft_episode_results").delete().eq("episode_id", episodeId);
   await admin.from("draft_episode_custom_moments").delete().eq("episode_id", episodeId);
+  await admin.from("draft_episode_in_jeopardy_couples").delete().eq("episode_id", episodeId);
 }
 
-// Builds an EpisodeResultsInput from the draft tables and calls the
-// existing, unmodified-in-signature applyEpisodeResults — the scoring/
-// prediction/Grand-Finale logic is never forked for drafts. On success,
-// promotes the episode-level fields and custom moments into the live
-// tables and deletes every draft row; on error, returns it and leaves all
-// draft rows intact so nothing gets promoted.
+// Builds an EpisodeResultsInput from the draft tables and calls
+// applyEpisodeResults — the scoring/prediction/Grand-Finale logic is never
+// forked for drafts. On success, promotes the episode-level fields and
+// custom moments into the live tables and deletes every draft row; on
+// error, returns it and leaves all draft rows intact so nothing gets
+// promoted. expected_dance_count is not derived here: Schedule owns it,
+// and publish must not clobber it.
 export async function publishEpisodeDraft(
   admin: SupabaseClient<Database>,
   episodeId: string,
@@ -273,11 +284,6 @@ export async function publishEpisodeDraft(
     dancesByCouple.set(d.coupleId, list);
   }
 
-  // Derived from what was actually entered, not separately tracked — the
-  // form's "Dances (Per Couple)" field only caps how many rows you can add
-  // per couple while drafting, it isn't itself persisted anywhere.
-  const expectedDanceCount = Math.max(1, ...[...dancesByCouple.values()].map((list) => list.length));
-
   const entries: EntrySubmission[] = draft.entries.map((e) => ({
     coupleId: e.coupleId,
     dances: (dancesByCouple.get(e.coupleId) ?? []).map((d) => ({
@@ -287,7 +293,6 @@ export async function publishEpisodeDraft(
     })),
     outcome: e.outcome,
     savedByJudges: e.savedByJudges,
-    wasTeamDance: e.wasTeamDance,
     hadImmunity: e.hadImmunity,
     bonusPoints: e.bonusPoints,
     bonusNote: e.bonusNote,
@@ -295,8 +300,8 @@ export async function publishEpisodeDraft(
 
   const result = await applyEpisodeResults(admin, {
     episodeId,
-    expectedDanceCount,
     entries,
+    inJeopardyCoupleIds: draft.inJeopardyCoupleIds,
   });
   if (result.error) return result;
 
@@ -337,16 +342,22 @@ export async function startCorrection(
   episodeId: string,
   startedBy: string
 ): Promise<{ error: string | null }> {
-  const [{ data: episode, error: episodeErr }, { data: liveDances }, { data: liveResults }, { data: liveMoments }] =
-    await Promise.all([
-      admin.from("episodes").select("guest_judge_name, judges_save_available").eq("id", episodeId).single(),
-      admin
-        .from("dance_scores")
-        .select("couple_id, dance_style_id, song_title, total_score, judge_scores(judge_id, score)")
-        .eq("episode_id", episodeId),
-      admin.from("episode_results").select("*").eq("episode_id", episodeId),
-      admin.from("episode_custom_moments").select("couple_id, label").eq("episode_id", episodeId),
-    ]);
+  const [
+    { data: episode, error: episodeErr },
+    { data: liveDances },
+    { data: liveResults },
+    { data: liveMoments },
+    { data: liveJeopardy },
+  ] = await Promise.all([
+    admin.from("episodes").select("guest_judge_name, judges_save_available").eq("id", episodeId).single(),
+    admin
+      .from("dance_scores")
+      .select("couple_id, dance_style_id, song_title, total_score, judge_scores(judge_id, score)")
+      .eq("episode_id", episodeId),
+    admin.from("episode_results").select("*").eq("episode_id", episodeId),
+    admin.from("episode_custom_moments").select("couple_id, label").eq("episode_id", episodeId),
+    admin.from("episode_in_jeopardy_couples").select("couple_id").eq("episode_id", episodeId),
+  ]);
   if (episodeErr || !episode) return { error: episodeErr?.message ?? "Episode not found" };
 
   await deleteAllDraftRows(admin, episodeId);
@@ -393,13 +404,19 @@ export async function startCorrection(
         couple_id: r.couple_id,
         outcome: r.outcome,
         saved_by_judges: r.saved_by_judges,
-        was_team_dance: r.was_team_dance,
         had_immunity: r.had_immunity,
         bonus_points: r.bonus_points,
         bonus_note: r.bonus_note,
       }))
     );
     if (resultsErr) return { error: resultsErr.message };
+  }
+
+  if ((liveJeopardy ?? []).length > 0) {
+    const { error: jeopardyErr } = await admin.from("draft_episode_in_jeopardy_couples").insert(
+      liveJeopardy!.map((row) => ({ episode_id: episodeId, couple_id: row.couple_id }))
+    );
+    if (jeopardyErr) return { error: jeopardyErr.message };
   }
 
   if ((liveMoments ?? []).length > 0) {

@@ -1,8 +1,18 @@
-import { findEliminatedCoupleIds, findTopScorerCoupleIds, type DanceScore } from "./scoring";
+import {
+  classifyEliminationGuess,
+  classifyTopScorerGuess,
+  findEliminatedCoupleIds,
+  findTopScorerCoupleIds,
+  resolveCurtainCallGuess,
+  sumDanceScoresByCouple,
+  type CurtainCallVerdict,
+  type DanceScore,
+} from "./scoring";
 
 export type PickMatch = {
   pickId: string | null;
-  correct: boolean;
+  verdict: CurtainCallVerdict;
+  points: number;
 };
 
 export type PastPicksComparison = {
@@ -15,31 +25,36 @@ export type PastPicksComparison = {
 
 export type PastPicksDisplayRow =
   | { kind: "nailed"; coupleIds: string[] }
+  | { kind: "in_jeopardy"; pickIds: string[]; actualIds: string[]; points: number }
   | { kind: "miss"; pickIds: string[]; actualIds: string[] };
 
 // Layout A for hits: one "Nailed It" line so the couple isn't printed twice.
 // Layout 2 for misses: one strike→actual line per slot (no stacked Actual row).
 // Double-elim slots collapse independently, in slot order.
+function isExact(pick: PickMatch): boolean {
+  return pick.verdict === "exact" && !!pick.pickId;
+}
+
 export function collapsePickRows(picks: PickMatch[], actualIds: string[]): PastPicksDisplayRow[] {
   const hitIds: string[] = [];
   for (const pick of picks) {
-    if (pick.correct && pick.pickId && !hitIds.includes(pick.pickId)) {
-      hitIds.push(pick.pickId);
+    if (isExact(pick) && !hitIds.includes(pick.pickId!)) {
+      hitIds.push(pick.pickId!);
     }
   }
 
   const remainingActuals = actualIds.filter((id) => !hitIds.includes(id));
-  const missCount = picks.filter((p) => !(p.correct && p.pickId)).length;
+  const missCount = picks.filter((p) => !isExact(p)).length;
   const rows: PastPicksDisplayRow[] = [];
   let missIndex = 0;
   let actualCursor = 0;
 
   for (const pick of picks) {
-    if (pick.correct && pick.pickId) {
+    if (isExact(pick)) {
       if (rows.some((row) => row.kind === "nailed" && row.coupleIds[0] === pick.pickId)) {
         continue;
       }
-      rows.push({ kind: "nailed", coupleIds: [pick.pickId] });
+      rows.push({ kind: "nailed", coupleIds: [pick.pickId!] });
       continue;
     }
 
@@ -50,11 +65,12 @@ export function collapsePickRows(picks: PickMatch[], actualIds: string[]): PastP
       : remainingActuals.slice(actualCursor, actualCursor + 1);
     if (!isLastMiss) actualCursor += assigned.length;
 
-    rows.push({
-      kind: "miss",
-      pickIds: pick.pickId ? [pick.pickId] : [],
-      actualIds: assigned,
-    });
+    const pickIds = pick.pickId ? [pick.pickId] : [];
+    if (pick.verdict === "near_miss") {
+      rows.push({ kind: "in_jeopardy", pickIds, actualIds: assigned, points: pick.points });
+      continue;
+    }
+    rows.push({ kind: "miss", pickIds, actualIds: assigned });
   }
 
   return rows;
@@ -118,41 +134,70 @@ export function isPastPicksLocked(episodeId: string, allowedEpisodeIds: Set<stri
   return !allowedEpisodeIds.has(episodeId);
 }
 
+function scoredGuess(
+  pickId: string | null,
+  verdict: CurtainCallVerdict,
+  exactPayout: number,
+  nearMissEnabled: boolean
+): PickMatch {
+  const resolved = resolveCurtainCallGuess(verdict, exactPayout, nearMissEnabled);
+  return { pickId, verdict: resolved.verdict, points: resolved.points };
+}
+
 export function matchEliminationPicks({
   predictedEliminatedCoupleId,
   predictedEliminatedCoupleId2,
   isDoubleElimination,
   eliminatedCoupleIds,
+  inJeopardyCoupleIds = [],
+  exactPayout,
+  nearMissEnabled,
 }: {
   predictedEliminatedCoupleId: string | null;
   predictedEliminatedCoupleId2: string | null;
   isDoubleElimination: boolean;
   eliminatedCoupleIds: Iterable<string>;
+  inJeopardyCoupleIds?: Iterable<string>;
+  exactPayout: number;
+  nearMissEnabled: boolean;
 }): PickMatch[] {
   const actual = eliminatedCoupleIds instanceof Set ? eliminatedCoupleIds : new Set(eliminatedCoupleIds);
-  const first: PickMatch = {
-    pickId: predictedEliminatedCoupleId,
-    correct: !!predictedEliminatedCoupleId && actual.has(predictedEliminatedCoupleId),
-  };
+  const inJeopardy = inJeopardyCoupleIds instanceof Set ? inJeopardyCoupleIds : new Set(inJeopardyCoupleIds);
+  const first = scoredGuess(
+    predictedEliminatedCoupleId,
+    classifyEliminationGuess(predictedEliminatedCoupleId, actual, inJeopardy),
+    exactPayout,
+    nearMissEnabled
+  );
   if (!isDoubleElimination) return [first];
   return [
     first,
-    {
-      pickId: predictedEliminatedCoupleId2,
-      correct: !!predictedEliminatedCoupleId2 && actual.has(predictedEliminatedCoupleId2),
-    },
+    scoredGuess(
+      predictedEliminatedCoupleId2,
+      classifyEliminationGuess(predictedEliminatedCoupleId2, actual, inJeopardy),
+      exactPayout,
+      nearMissEnabled
+    ),
   ];
 }
 
-export function matchTopScorerPick(
-  predictedTopScorerCoupleId: string | null,
-  topScorerCoupleIds: Iterable<string>
-): PickMatch {
-  const actual = topScorerCoupleIds instanceof Set ? topScorerCoupleIds : new Set(topScorerCoupleIds);
-  return {
-    pickId: predictedTopScorerCoupleId,
-    correct: !!predictedTopScorerCoupleId && actual.has(predictedTopScorerCoupleId),
-  };
+export function matchTopScorerPick({
+  predictedTopScorerCoupleId,
+  danceScores,
+  exactPayout,
+  nearMissEnabled,
+}: {
+  predictedTopScorerCoupleId: string | null;
+  danceScores: DanceScore[];
+  exactPayout: number;
+  nearMissEnabled: boolean;
+}): PickMatch {
+  return scoredGuess(
+    predictedTopScorerCoupleId,
+    classifyTopScorerGuess(predictedTopScorerCoupleId, sumDanceScoresByCouple(danceScores)),
+    exactPayout,
+    nearMissEnabled
+  );
 }
 
 export function buildPastPicksComparison({
@@ -163,6 +208,10 @@ export function buildPastPicksComparison({
   episodeOutcomes,
   danceScores,
   predictionPoints,
+  inJeopardyCoupleIds = [],
+  nearMissEnabled,
+  eliminationExactPayout,
+  topScorerExactPayout,
 }: {
   isDoubleElimination: boolean;
   predictedEliminatedCoupleId: string | null;
@@ -171,6 +220,10 @@ export function buildPastPicksComparison({
   episodeOutcomes: { coupleId: string; outcome: string }[];
   danceScores: DanceScore[];
   predictionPoints: number | null;
+  inJeopardyCoupleIds?: Iterable<string>;
+  nearMissEnabled: boolean;
+  eliminationExactPayout: number;
+  topScorerExactPayout: number;
 }): PastPicksComparison {
   const eliminatedCoupleIds = findEliminatedCoupleIds(episodeOutcomes);
   const topScorerCoupleIds = findTopScorerCoupleIds(danceScores);
@@ -180,10 +233,20 @@ export function buildPastPicksComparison({
       predictedEliminatedCoupleId2,
       isDoubleElimination,
       eliminatedCoupleIds,
+      inJeopardyCoupleIds,
+      exactPayout: eliminationExactPayout,
+      nearMissEnabled,
     }),
     actualEliminatedIds: [...eliminatedCoupleIds],
-    topScorer: matchTopScorerPick(predictedTopScorerCoupleId, topScorerCoupleIds),
+    topScorer: matchTopScorerPick({
+      predictedTopScorerCoupleId,
+      danceScores,
+      exactPayout: topScorerExactPayout,
+      nearMissEnabled,
+    }),
     actualTopScorerIds: [...topScorerCoupleIds],
+    // Stored week total — not recomputed here. In Jeopardy credit lands in
+    // this number on the next publish, not on historical rows by itself.
     predictionPoints: predictionPoints ?? 0,
   };
 }

@@ -218,6 +218,15 @@ create table scoring_settings (
   survival_points numeric not null default 15,
   elimination_prediction_points numeric not null default 171, -- 0 disables
   top_scorer_prediction_points numeric not null default 114, -- 0 disables
+  -- Curtain Call In Jeopardy. On for every league (including ones that already
+  -- exist when the column is added). A wrong elimination guess of a couple in
+  -- episode_in_jeopardy_couples, or a wrong top-scorer guess whose weekly
+  -- judges total is in [high−1, high), pays floor(exact payout × 0.25).
+  -- The fraction is hardcoded in src/lib/scoring.ts (curtainCallNearMissPoints);
+  -- this column is only the on/off switch and locks with the other Season
+  -- Clock fields in update_scoring_categories. Turning it on does not rewrite
+  -- historical weekly_manager_scores — the next publish/correct recomputes.
+  curtain_call_near_miss_enabled boolean not null default true,
   first_place_points numeric not null default 106,
   second_place_points numeric not null default 53,
   third_place_points numeric not null default 28,
@@ -433,7 +442,10 @@ create table episodes (
   week_id uuid references competition_weeks(id) on delete restrict,
   airs_at timestamptz not null, -- actual real-world air date/time; set per episode, not assumed weekly-regular
   theme text, -- e.g. "Night One", "Villains Night" — free text, not a managed list
-  expected_dance_count int not null default 1, -- informational only, doesn't gate how many dances a couple can actually submit
+  -- Set on Schedule. A soft cap for how many dances Enter Results offers per
+  -- couple (the finale is not uniform), not a hard limit. Publish does not
+  -- overwrite it.
+  expected_dance_count int not null default 1,
   status text not null default 'upcoming' check (status in ('upcoming', 'locked', 'completed')),
   -- guest_judge_name is a leftover caption, not a people(role='judge') row.
   -- It is not shown anywhere and is no longer editable in Enter Results —
@@ -460,8 +472,30 @@ create index idx_episodes_week on episodes(week_id);
 create table dance_styles (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
+  -- Closed set (ballroom / latin / show). Null until categorized in Show
+  -- Settings — category is chosen on the row after adding, not at add time.
+  category text check (category in ('ballroom', 'latin', 'show')),
   created_at timestamptz not null default now()
 );
+
+-- Round types (Team Dance, Trio Dance, Instant Dance, …) are not dance
+-- styles. A round type is round-wide — on a team-dance night the whole cast
+-- does one — so it belongs on the episode, declared when the night is
+-- scheduled, not as a per-couple flag. Managed like dance_styles because the
+-- list grows season to season; a per-dance format column and availability
+-- windows were deliberately not added.
+create table round_types (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  created_at timestamptz not null default now()
+);
+
+insert into round_types (name) values
+  ('Team Dance'),
+  ('Trio Dance'),
+  ('Instant Dance'),
+  ('Judges'' Choice'),
+  ('Redemption Dance');
 
 -- One row per couple per dance, so multi-dance weeks (finals, team dances) just
 -- add rows. total_score is the sum of that dance's judge_scores rows, computed
@@ -494,7 +528,7 @@ create table judge_scores (
 -- insert two 'eliminated' rows that week — no special flag needed) and
 -- no-elimination weeks (insert zero 'eliminated' rows — see competition_weeks.is_elimination_week
 -- for the week-level version of this). was_bottom_two/was_bottom_three/
--- saved_by_judges/was_team_dance/had_immunity are independent flags, not
+-- saved_by_judges/had_immunity are independent flags, not
 -- mutually exclusive with each other or with outcome — a couple can be Safe,
 -- in the Bottom 2, and saved by judges all in the same week.
 --
@@ -513,7 +547,6 @@ create table episode_results (
   was_bottom_two boolean not null default false,
   was_bottom_three boolean not null default false,
   saved_by_judges boolean not null default false,
-  was_team_dance boolean not null default false,
   had_immunity boolean not null default false,
   bonus_points numeric not null default 0,
   bonus_note text,
@@ -1357,7 +1390,8 @@ create function public.update_scoring_categories(
   p_bonus_picks_points_per_correct numeric,
   p_fourth_place_points numeric,
   p_fifth_place_points numeric,
-  p_bonus_picks_tier_pay_style text
+  p_bonus_picks_tier_pay_style text,
+  p_curtain_call_near_miss_enabled boolean
 )
 returns public.scoring_settings
 language plpgsql
@@ -1400,14 +1434,16 @@ begin
       p_judges_score_starts_week, p_bonus_picks_scoring_method, p_bonus_picks_distance_penalty,
       p_bonus_picks_tier_size, p_bonus_picks_tier_pay_style, p_survival_points,
       p_first_place_points, p_second_place_points, p_third_place_points, p_fourth_place_points, p_fifth_place_points,
-      p_elimination_prediction_points, p_top_scorer_prediction_points, p_bonus_picks_points_per_correct
+      p_elimination_prediction_points, p_top_scorer_prediction_points, p_bonus_picks_points_per_correct,
+      p_curtain_call_near_miss_enabled
     ) is distinct from (
       v_current.judges_score_category_enabled, v_current.eliminations_category_enabled, v_current.bonus_picks_category_enabled,
       v_current.judges_score_category_weight, v_current.eliminations_category_weight, v_current.bonus_picks_category_weight,
       v_current.judges_score_starts_week, v_current.bonus_picks_scoring_method, v_current.bonus_picks_distance_penalty,
       v_current.bonus_picks_tier_size, v_current.bonus_picks_tier_pay_style, v_current.survival_points,
       v_current.first_place_points, v_current.second_place_points, v_current.third_place_points, v_current.fourth_place_points, v_current.fifth_place_points,
-      v_current.elimination_prediction_points, v_current.top_scorer_prediction_points, v_current.bonus_picks_points_per_correct
+      v_current.elimination_prediction_points, v_current.top_scorer_prediction_points, v_current.bonus_picks_points_per_correct,
+      v_current.curtain_call_near_miss_enabled
     ) then
       raise exception 'Scoring settings are locked for the season — the Grand Finale deadline has passed';
     end if;
@@ -1442,6 +1478,7 @@ begin
     elimination_prediction_points = p_elimination_prediction_points,
     top_scorer_prediction_points = p_top_scorer_prediction_points,
     bonus_picks_points_per_correct = p_bonus_picks_points_per_correct,
+    curtain_call_near_miss_enabled = p_curtain_call_near_miss_enabled,
     scoring_configured = true
   where league_id = p_league_id
   returning * into v_settings;
@@ -1451,9 +1488,9 @@ end;
 $$;
 
 revoke execute on function public.update_league_settings(uuid, text, text, int, numeric) from public;
-revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text) from public;
+revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text, boolean) from public;
 grant execute on function public.update_league_settings(uuid, text, text, int, numeric) to authenticated;
-grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text) to authenticated;
+grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text, boolean) to authenticated;
 
 -- ============================================================
 -- Draft: couples are global read-only reference data; starting the draft and
@@ -2295,12 +2332,22 @@ create table draft_episode_results (
   was_bottom_two boolean not null default false,
   was_bottom_three boolean not null default false,
   saved_by_judges boolean not null default false,
-  was_team_dance boolean not null default false,
   had_immunity boolean not null default false,
   bonus_points numeric not null default 0,
   bonus_note text,
   unique (episode_id, couple_id)
 );
+
+-- Draft copy of episode_in_jeopardy_couples. Same trust boundary as the other
+-- draft_* tables: no grants, service-role only, deleted on publish.
+create table draft_episode_in_jeopardy_couples (
+  episode_id uuid not null references episodes(id) on delete cascade,
+  couple_id uuid not null references couples(id),
+  created_at timestamptz not null default now(),
+  primary key (episode_id, couple_id)
+);
+
+create index idx_draft_episode_in_jeopardy_episode on draft_episode_in_jeopardy_couples(episode_id);
 
 -- draft_episode_overrides' presence/absence for an episode is itself the
 -- "has a draft been started" signal (see deriveResultsStatus in
@@ -2327,6 +2374,11 @@ using (true);
 grant select on public.dance_styles to authenticated;
 create policy "dance styles are viewable by all authenticated users"
 on public.dance_styles for select
+using (true);
+
+grant select on public.round_types to authenticated;
+create policy "round types are viewable by all authenticated users"
+on public.round_types for select
 using (true);
 
 grant select on public.dance_scores to authenticated;
@@ -2378,9 +2430,45 @@ create table episode_participants (
 
 create index idx_episode_participants_episode on episode_participants(episode_id);
 
+-- Which round types this airing uses. Mirrors episode_participants: composite
+-- PK, cascade from the episode, readable by every authenticated user, written
+-- only by the service-role schedule path (applyEpisodeSchedule).
+create table episode_round_types (
+  episode_id uuid not null references episodes(id) on delete cascade,
+  round_type_id uuid not null references round_types(id),
+  created_at timestamptz not null default now(),
+  primary key (episode_id, round_type_id)
+);
+
+create index idx_episode_round_types_episode on episode_round_types(episode_id);
+
 grant select on public.episode_participants to authenticated;
 create policy "episode participants are viewable by all authenticated users"
 on public.episode_participants for select
+using (true);
+
+grant select on public.episode_round_types to authenticated;
+create policy "episode round types are viewable by all authenticated users"
+on public.episode_round_types for select
+using (true);
+
+-- Couples the show called down who were not eliminated. Source of truth for
+-- Curtain Call's elimination near-miss — not inferred from judges scores.
+-- Written only by the service-role results path (delete-then-reinsert, same
+-- shape as episode_participants). A couple who is actually eliminated is not
+-- stored here; exact credit wins.
+create table episode_in_jeopardy_couples (
+  episode_id uuid not null references episodes(id) on delete cascade,
+  couple_id uuid not null references couples(id),
+  created_at timestamptz not null default now(),
+  primary key (episode_id, couple_id)
+);
+
+create index idx_episode_in_jeopardy_episode on episode_in_jeopardy_couples(episode_id);
+
+grant select on public.episode_in_jeopardy_couples to authenticated;
+create policy "episode in jeopardy couples are viewable by all authenticated users"
+on public.episode_in_jeopardy_couples for select
 using (true);
 
 grant select on public.weekly_manager_scores to authenticated;

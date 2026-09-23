@@ -49,6 +49,9 @@ export default async function AdminResultsPage() {
       publishedByNames={data.publishedByNames}
       season={data.season}
       participantsByEpisode={data.participantsByEpisode}
+      roundTypes={data.roundTypes}
+      roundTypesByEpisode={data.roundTypesByEpisode}
+      inJeopardyByEpisode={data.inJeopardyByEpisode}
     />
   );
 }

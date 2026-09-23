@@ -269,16 +269,19 @@ export type Database = {
       }
       dance_styles: {
         Row: {
+          category: string | null
           created_at: string
           id: string
           name: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           id?: string
           name: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -386,6 +389,39 @@ export type Database = {
           },
         ]
       }
+      draft_episode_in_jeopardy_couples: {
+        Row: {
+          couple_id: string
+          created_at: string
+          episode_id: string
+        }
+        Insert: {
+          couple_id: string
+          created_at?: string
+          episode_id: string
+        }
+        Update: {
+          couple_id?: string
+          created_at?: string
+          episode_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_episode_in_jeopardy_couples_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_episode_in_jeopardy_couples_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       draft_episode_overrides: {
         Row: {
           episode_id: string
@@ -437,7 +473,6 @@ export type Database = {
           saved_by_judges: boolean
           was_bottom_three: boolean
           was_bottom_two: boolean
-          was_team_dance: boolean
         }
         Insert: {
           bonus_note?: string | null
@@ -450,7 +485,6 @@ export type Database = {
           saved_by_judges?: boolean
           was_bottom_three?: boolean
           was_bottom_two?: boolean
-          was_team_dance?: boolean
         }
         Update: {
           bonus_note?: string | null
@@ -463,7 +497,6 @@ export type Database = {
           saved_by_judges?: boolean
           was_bottom_three?: boolean
           was_bottom_two?: boolean
-          was_team_dance?: boolean
         }
         Relationships: [
           {
@@ -658,6 +691,39 @@ export type Database = {
           },
         ]
       }
+      episode_in_jeopardy_couples: {
+        Row: {
+          couple_id: string
+          created_at: string
+          episode_id: string
+        }
+        Insert: {
+          couple_id: string
+          created_at?: string
+          episode_id: string
+        }
+        Update: {
+          couple_id?: string
+          created_at?: string
+          episode_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_in_jeopardy_couples_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_in_jeopardy_couples_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       episode_participants: {
         Row: {
           couple_id: string
@@ -703,7 +769,6 @@ export type Database = {
           saved_by_judges: boolean
           was_bottom_three: boolean
           was_bottom_two: boolean
-          was_team_dance: boolean
         }
         Insert: {
           bonus_note?: string | null
@@ -716,7 +781,6 @@ export type Database = {
           saved_by_judges?: boolean
           was_bottom_three?: boolean
           was_bottom_two?: boolean
-          was_team_dance?: boolean
         }
         Update: {
           bonus_note?: string | null
@@ -729,7 +793,6 @@ export type Database = {
           saved_by_judges?: boolean
           was_bottom_three?: boolean
           was_bottom_two?: boolean
-          was_team_dance?: boolean
         }
         Relationships: [
           {
@@ -744,6 +807,39 @@ export type Database = {
             columns: ["episode_id"]
             isOneToOne: false
             referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      episode_round_types: {
+        Row: {
+          created_at: string
+          episode_id: string
+          round_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          episode_id: string
+          round_type_id: string
+        }
+        Update: {
+          created_at?: string
+          episode_id?: string
+          round_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_round_types_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_round_types_round_type_id_fkey"
+            columns: ["round_type_id"]
+            isOneToOne: false
+            referencedRelation: "round_types"
             referencedColumns: ["id"]
           },
         ]
@@ -1208,6 +1304,24 @@ export type Database = {
           },
         ]
       }
+      round_types: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       scoring_settings: {
         Row: {
           bonus_picks_category_enabled: boolean
@@ -1217,6 +1331,7 @@ export type Database = {
           bonus_picks_scoring_method: string | null
           bonus_picks_tier_pay_style: string
           bonus_picks_tier_size: number | null
+          curtain_call_near_miss_enabled: boolean
           elimination_prediction_points: number
           eliminations_category_enabled: boolean
           eliminations_category_weight: number
@@ -1244,6 +1359,7 @@ export type Database = {
           bonus_picks_scoring_method?: string | null
           bonus_picks_tier_pay_style?: string
           bonus_picks_tier_size?: number | null
+          curtain_call_near_miss_enabled?: boolean
           elimination_prediction_points?: number
           eliminations_category_enabled?: boolean
           eliminations_category_weight?: number
@@ -1271,6 +1387,7 @@ export type Database = {
           bonus_picks_scoring_method?: string | null
           bonus_picks_tier_pay_style?: string
           bonus_picks_tier_size?: number | null
+          curtain_call_near_miss_enabled?: boolean
           elimination_prediction_points?: number
           eliminations_category_enabled?: boolean
           eliminations_category_weight?: number
@@ -1949,6 +2066,7 @@ export type Database = {
           p_bonus_picks_scoring_method: string
           p_bonus_picks_tier_pay_style: string
           p_bonus_picks_tier_size: number
+          p_curtain_call_near_miss_enabled: boolean
           p_elimination_prediction_points: number
           p_eliminations_category_enabled: boolean
           p_eliminations_category_weight: number
@@ -1973,6 +2091,7 @@ export type Database = {
           bonus_picks_scoring_method: string | null
           bonus_picks_tier_pay_style: string
           bonus_picks_tier_size: number | null
+          curtain_call_near_miss_enabled: boolean
           elimination_prediction_points: number
           eliminations_category_enabled: boolean
           eliminations_category_weight: number

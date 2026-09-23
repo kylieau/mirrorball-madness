@@ -3,6 +3,8 @@ import type { Database } from "@/lib/supabase/types";
 import {
   computeGrandFinalePoints,
   computeWeeklyScores,
+  couplesRemainingAtWeek,
+  inJeopardyIdsToPersist,
   type GrandFinaleMethod,
   type Outcome,
   type TierPayStyle,
@@ -26,7 +28,6 @@ export type EntrySubmission = {
   dances: DanceSubmission[];
   outcome: Outcome;
   savedByJudges: boolean;
-  wasTeamDance: boolean;
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string | null;
@@ -49,18 +50,20 @@ export async function userIsAnyLeagueCommissioner(
   return (data ?? []).length > 0;
 }
 
-// Shared by /admin/results (needs the data for score entry/display) and
-// /admin/show-settings (needs it for the judges/dance-styles management UI)
-// so the query shape can't drift between the two.
-export async function loadJudgesAndDanceStyles(
+// The three small managed lists: scoring judges, dance styles (with category),
+// and round types. Shared by /admin/show-settings (which needs nothing else)
+// and loadResultsPageData (which also joins episode → round type).
+export async function loadResultsTaxonomy(
   supabase: SupabaseClient<Database>
 ): Promise<{
   judges: ScoringJudge[];
-  danceStyles: { id: string; name: string }[];
+  danceStyles: { id: string; name: string; category: string | null }[];
+  roundTypes: { id: string; name: string }[];
 }> {
-  const [{ data: judges }, { data: danceStyles }] = await Promise.all([
+  const [{ data: judges }, { data: danceStyles }, { data: roundTypes }] = await Promise.all([
     supabase.from("people").select("id, name, archived_at").eq("role", "judge").order("name"),
-    supabase.from("dance_styles").select("id, name").order("name"),
+    supabase.from("dance_styles").select("id, name, category").order("name"),
+    supabase.from("round_types").select("id, name").order("name"),
   ]);
 
   return {
@@ -68,6 +71,7 @@ export async function loadJudgesAndDanceStyles(
       (judges ?? []).map((j) => ({ id: j.id, name: j.name, archivedAt: j.archived_at }))
     ),
     danceStyles: danceStyles ?? [],
+    roundTypes: roundTypes ?? [],
   };
 }
 
@@ -162,6 +166,8 @@ export type ScheduleEpisodeInput = {
   // ordinary case. Only populated for a split-broadcast episode (e.g. a
   // two-night premiere where half the cast dances each night).
   participantCoupleIds: string[];
+  roundTypeIds: string[];
+  expectedDanceCount: number;
 };
 
 async function deleteWeekIfEmpty(
@@ -176,9 +182,9 @@ async function deleteWeekIfEmpty(
   return deleteErr?.message ?? null;
 }
 
-// Sets episode number/date/theme/week assignment/participants — everything
-// known ahead of air — leaving expected_dance_count and status untouched on
-// an existing episode, since those are owned by the results-entry flow below.
+// Sets everything known ahead of air: episode number, date, theme, week
+// assignment, who's performing, round types, and dances per couple. Status
+// stays owned by publish.
 export async function applyEpisodeSchedule(
   admin: SupabaseClient<Database>,
   input: ScheduleEpisodeInput
@@ -191,6 +197,9 @@ export async function applyEpisodeSchedule(
   }
   if (input.competitionWeekNumber != null && (input.competitionWeekNumber < 1 || !Number.isInteger(input.competitionWeekNumber))) {
     return { error: "Competition week must be a positive integer, or blank for exhibition." };
+  }
+  if (!Number.isInteger(input.expectedDanceCount) || input.expectedDanceCount < 1) {
+    return { error: "Dances per couple must be a positive integer." };
   }
 
   let weekId: string | null = null;
@@ -232,6 +241,7 @@ export async function applyEpisodeSchedule(
     week_id: weekId,
     airs_at: input.airsAt,
     theme: input.theme,
+    expected_dance_count: input.expectedDanceCount,
   };
 
   const { data: episode, error } = input.episodeId
@@ -264,14 +274,38 @@ export async function applyEpisodeSchedule(
     if (participantsErr) return { error: participantsErr.message };
   }
 
+  const roundTypeIds = [...new Set(input.roundTypeIds)];
+  await admin.from("episode_round_types").delete().eq("episode_id", episode.id);
+  if (roundTypeIds.length > 0) {
+    const { error: roundTypesErr } = await admin.from("episode_round_types").insert(
+      roundTypeIds.map((roundTypeId) => ({ episode_id: episode.id, round_type_id: roundTypeId }))
+    );
+    if (roundTypesErr) return { error: roundTypesErr.message };
+  }
+
   return { error: null };
 }
 
 export type EpisodeResultsInput = {
   episodeId: string;
-  expectedDanceCount: number;
   entries: EntrySubmission[];
+  inJeopardyCoupleIds: string[];
 };
+
+export async function replaceInJeopardyCouples(
+  admin: SupabaseClient<Database>,
+  table: "episode_in_jeopardy_couples" | "draft_episode_in_jeopardy_couples",
+  episodeId: string,
+  coupleIds: string[]
+): Promise<string | null> {
+  const { error: deleteError } = await admin.from(table).delete().eq("episode_id", episodeId);
+  if (deleteError) return deleteError.message;
+  if (coupleIds.length === 0) return null;
+  const { error } = await admin.from(table).insert(
+    coupleIds.map((coupleId) => ({ episode_id: episodeId, couple_id: coupleId }))
+  );
+  return error?.message ?? null;
+}
 
 async function recomputeWeekScores(
   admin: SupabaseClient<Database>,
@@ -365,16 +399,25 @@ async function recomputeWeekScores(
   // live couples.status check) makes this correct regardless of whether
   // this call is entering one of several episodes sharing this week, or
   // correcting a week whose couples.status has already been mutated above.
-  const couplesRemaining =
-    totalCouples -
-    (seasonCouples ?? []).filter(
-      (c) => c.elimination_week !== null && c.elimination_week < week.week_number
-    ).length;
+  const couplesRemaining = couplesRemainingAtWeek(
+    (seasonCouples ?? []).map((c) => ({ eliminationWeek: c.elimination_week })),
+    week.week_number
+  );
 
   const episodeOutcomeInputs = rawOutcomeRows.map((row) => ({
     ...row,
     finalPlacement: finalPlacementByCouple.get(row.coupleId) ?? null,
   }));
+
+  let inJeopardyCoupleIds: string[] = [];
+  if (episodeIds.length > 0) {
+    const { data: jeopardyRows, error: jeopardyErr } = await admin
+      .from("episode_in_jeopardy_couples")
+      .select("couple_id")
+      .in("episode_id", episodeIds);
+    if (jeopardyErr) return jeopardyErr.message;
+    inJeopardyCoupleIds = [...new Set((jeopardyRows ?? []).map((row) => row.couple_id))];
+  }
 
   for (const league of leagues ?? []) {
     const [{ data: scoringSettings }, { data: rosterSlots }, { data: predictions }] = await Promise.all([
@@ -434,6 +477,7 @@ async function recomputeWeekScores(
         thirdPlacePoints: scoringSettings.third_place_points,
         fourthPlacePoints: scoringSettings.fourth_place_points,
         fifthPlacePoints: scoringSettings.fifth_place_points,
+        curtainCallNearMissEnabled: scoringSettings.curtain_call_near_miss_enabled !== false,
       },
       rosterSlots: judgesScoreStarted
         ? rosterSlots
@@ -457,6 +501,7 @@ async function recomputeWeekScores(
         bonus: scoringSettings.bonus_picks_category_weight,
       },
       grandFinalePointsByManager,
+      inJeopardyCoupleIds,
     });
 
     await admin.from("weekly_manager_scores").delete().eq("league_id", league.id).eq("week_id", week.id);
@@ -495,7 +540,6 @@ export async function applyEpisodeResults(
   const { data: episode, error: episodeErr } = await admin
     .from("episodes")
     .update({
-      expected_dance_count: input.expectedDanceCount,
       status: input.entries.length > 0 ? "completed" : "upcoming",
       results_published_at: input.entries.length > 0 ? new Date().toISOString() : null,
     })
@@ -593,7 +637,6 @@ export async function applyEpisodeResults(
     couple_id: e.coupleId,
     outcome: e.outcome,
     saved_by_judges: e.savedByJudges,
-    was_team_dance: e.wasTeamDance,
     had_immunity: e.hadImmunity,
     bonus_points: e.bonusPoints,
     bonus_note: e.bonusNote,
@@ -602,6 +645,14 @@ export async function applyEpisodeResults(
     const { error } = await admin.from("episode_results").insert(outcomeRows);
     if (error) return { error: error.message };
   }
+
+  const jeopardyErr = await replaceInJeopardyCouples(
+    admin,
+    "episode_in_jeopardy_couples",
+    episode.id,
+    inJeopardyIdsToPersist(input.inJeopardyCoupleIds, input.entries)
+  );
+  if (jeopardyErr) return { error: jeopardyErr };
 
   if (week) {
     for (const e of input.entries) {

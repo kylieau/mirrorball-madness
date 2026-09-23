@@ -104,7 +104,7 @@ export default async function ThisWeekPage({
     ? { weekNumber: cutoff.pendingRevealEpisode.week_number, theme: cutoff.pendingRevealEpisode.theme }
     : null;
 
-  const [{ data: danceScores }, { data: episodeResults }, { data: danceStyles }, { data: allCouples }] =
+  const [{ data: danceScores }, { data: episodeResults }, { data: inJeopardyRows }, { data: danceStyles }, { data: allCouples }] =
     await Promise.all([
       showResults && selectedEpisodeIds.length > 0
         ? supabase
@@ -117,7 +117,13 @@ export default async function ThisWeekPage({
             .from("episode_results")
             .select("episode_id, couple_id, outcome")
             .in("episode_id", selectedEpisodeIds)
-        : Promise.resolve({ data: [] }),
+        : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
+      showResults && selectedEpisodeIds.length > 0
+        ? supabase
+            .from("episode_in_jeopardy_couples")
+            .select("couple_id")
+            .in("episode_id", selectedEpisodeIds)
+        : Promise.resolve({ data: [] as { couple_id: string }[] }),
       supabase.from("dance_styles").select("id, name").order("name"),
       supabase
         .from("couples")
@@ -260,6 +266,7 @@ export default async function ThisWeekPage({
                 : []
             }
             episodeResults={episodeResults ?? []}
+            inJeopardyCoupleIds={[...new Set((inJeopardyRows ?? []).map((row) => row.couple_id))]}
             danceScores={danceScores ?? []}
             danceStyles={danceStyles ?? []}
             couples={flatCouples}

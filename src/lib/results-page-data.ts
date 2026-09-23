@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { loadJudgesAndDanceStyles } from "@/lib/results";
+import { loadResultsTaxonomy } from "@/lib/results";
 import { loadDraftForEpisode, type DraftState } from "@/lib/results-draft";
 import type { ScoringJudge } from "@/lib/scoring-judges";
 
@@ -12,13 +12,15 @@ export type ResultsPageData = {
   allCouples: Couple[];
   allCouplesWithStatus: CoupleWithStatus[];
   judges: ScoringJudge[];
-  danceStyles: { id: string; name: string }[];
+  danceStyles: { id: string; name: string; category: string | null }[];
+  roundTypes: { id: string; name: string }[];
   episodes: {
     id: string;
     episode_number: number;
     week_id: string | null;
     airs_at: string;
     theme: string | null;
+    expected_dance_count: number;
     status: string;
     results_published_at: string | null;
     results_published_by: string | null;
@@ -38,7 +40,6 @@ export type ResultsPageData = {
     couple_id: string;
     outcome: string;
     saved_by_judges: boolean;
-    was_team_dance: boolean;
     had_immunity: boolean;
     bonus_points: number;
     bonus_note: string | null;
@@ -53,6 +54,8 @@ export type ResultsPageData = {
     season_number: number | null;
   } | null;
   participantsByEpisode: Record<string, string[]>;
+  roundTypesByEpisode: Record<string, string[]>;
+  inJeopardyByEpisode: Record<string, string[]>;
 };
 
 // Shared by /admin/results (By Week / By Couple / Enter Results) and
@@ -78,13 +81,15 @@ export async function loadResultsPageData(
   const [
     { data: activeCouplesRaw },
     { data: allCouplesRaw },
-    { judges, danceStyles },
+    { judges, danceStyles, roundTypes },
     { data: episodes },
     { data: weeks },
     { data: danceScores },
     { data: judgeScores },
     { data: episodeResults },
     { data: episodeParticipants },
+    { data: episodeRoundTypes },
+    { data: inJeopardyRows },
   ] = await Promise.all([
     supabase
       .from("couples")
@@ -95,11 +100,11 @@ export async function loadResultsPageData(
       .from("couples")
       .select(`${coupleFields}, status, elimination_week`)
       .eq("season_id", activeSeasonId ?? ""),
-    loadJudgesAndDanceStyles(supabase),
+    loadResultsTaxonomy(supabase),
     supabase
       .from("episodes")
       .select(
-        "id, episode_number, week_id, airs_at, theme, status, results_published_at, results_published_by"
+        "id, episode_number, week_id, airs_at, theme, expected_dance_count, status, results_published_at, results_published_by"
       )
       .eq("season_id", activeSeasonId ?? "")
       .order("episode_number"),
@@ -115,9 +120,11 @@ export async function loadResultsPageData(
     supabase
       .from("episode_results")
       .select(
-        "episode_id, couple_id, outcome, saved_by_judges, was_team_dance, had_immunity, bonus_points, bonus_note"
+        "episode_id, couple_id, outcome, saved_by_judges, had_immunity, bonus_points, bonus_note"
       ),
     supabase.from("episode_participants").select("episode_id, couple_id"),
+    supabase.from("episode_round_types").select("episode_id, round_types(name)"),
+    supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id"),
   ]);
 
   const flatten = (rows: typeof activeCouplesRaw) =>
@@ -164,12 +171,29 @@ export async function loadResultsPageData(
     (participantsByEpisode[p.episode_id] ??= []).push(p.couple_id);
   }
 
+  const roundTypesByEpisode: Record<string, string[]> = {};
+  for (const row of episodeRoundTypes ?? []) {
+    const joined = row.round_types;
+    const name = Array.isArray(joined) ? joined[0]?.name : joined?.name;
+    if (!name) continue;
+    (roundTypesByEpisode[row.episode_id] ??= []).push(name);
+  }
+  for (const names of Object.values(roundTypesByEpisode)) {
+    names.sort((a, b) => a.localeCompare(b));
+  }
+
+  const inJeopardyByEpisode: Record<string, string[]> = {};
+  for (const row of inJeopardyRows ?? []) {
+    (inJeopardyByEpisode[row.episode_id] ??= []).push(row.couple_id);
+  }
+
   return {
     activeCouples,
     allCouples,
     allCouplesWithStatus,
     judges,
     danceStyles,
+    roundTypes,
     episodes: episodes ?? [],
     weeks: weeks ?? [],
     danceScores: danceScores ?? [],
@@ -179,5 +203,7 @@ export async function loadResultsPageData(
     publishedByNames,
     season,
     participantsByEpisode,
+    roundTypesByEpisode,
+    inJeopardyByEpisode,
   };
 }
