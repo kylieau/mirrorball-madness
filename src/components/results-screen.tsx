@@ -128,14 +128,15 @@ export function ResultsScreen({
 }) {
   const { isSuperAdmin } = accountSettingsData;
 
-  // Account Settings links straight to a destination (?tab=week, ?tab=enter,
-  // …), so honour that over always landing on By Week — except "enter",
-  // which only a propose-tier viewer can land on.
+  // The URL is the source of truth so Account Settings links (?tab=week,
+  // ?tab=enter, …) work even when tapped while already on this page. "enter"
+  // is only reachable by a propose-tier viewer.
   const requestedTab = useSearchParams().get("tab");
-  const initialTab: TabValue =
+  const tab: TabValue =
     requestedTab === "enter" && canPropose ? "enter" : requestedTab === "couple" ? "couple" : "week";
-
-  const [tab, setTab] = useState<TabValue>(initialTab);
+  // Next syncs native history.replaceState into useSearchParams, so switching
+  // tabs doesn't trigger a server refetch of the page's data.
+  const setTab = (next: TabValue) => window.history.replaceState(null, "", `?tab=${next}`);
   // Lifted here so View Results' "Correct Results"/"Continue draft" can
   // jump to Enter Results already pointed at the right episode.
   const [forceSelectEpisodeId, setForceSelectEpisodeId] = useState<string | null>(null);

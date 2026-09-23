@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { signOut } from "@/app/auth/actions";
@@ -57,8 +58,12 @@ export function AccountSettingsSheet({
   const query = useSearchParams().toString();
   const currentPath = query ? `${pathname}?${query}` : pathname;
 
+  // Links that stay on the same page (e.g. Enter Results while already on
+  // /admin/results) don't unmount the sheet, so close it on any link tap.
+  const [open, setOpen] = useState(false);
+
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
         render={
           <Button size="icon-sm" aria-label="Account settings" className="rounded-full font-bold" />
@@ -66,7 +71,12 @@ export function AccountSettingsSheet({
       >
         {displayName.charAt(0).toUpperCase()}
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto">
+      <SheetContent
+        className="overflow-y-auto"
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("a")) setOpen(false);
+        }}
+      >
         <SheetHeader>
           <SheetTitle>Settings</SheetTitle>
         </SheetHeader>
