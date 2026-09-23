@@ -38,9 +38,11 @@ The owner still needs to run `supabase/apply-round-types-and-style-categories.sq
 - **Dance Card calibration overshoot** (~25%) — still deferred. The rigorous fix would shrink the placement bonus from 106/53/28/14/7 to about 14/7/4/2/1 and gut the feature; that is a product call, not a quiet patch.
 - Owner-run migration, types regen, and the live click-through in `PHASE2_TAXONOMY_PLAN.md`'s Verification section (add a round type, tick it on Schedule, confirm badges, set a dance-style category, confirm dances-per-couple survives publish, confirm schedule/show-settings edits refresh without a manual navigate-away).
 - Per-dance format column and round-type availability windows.
+- **Enter Results UX polish (priority)** — see `BACKLOG.md` → Next up. Owner feedback 2026-09-22: site-admin / propose-tier Enter Results (`/admin/results?tab=enter`) needs a UX pass. Not urgent this week. First after the In Jeopardy near-miss ship. Specific nits TBD on a fresh look — don't invent a redesign.
 
 ## 5. Next Steps
 
 1. Owner runs `supabase/apply-round-types-and-style-categories.sql`, then regenerates `src/lib/supabase/types.ts`.
 2. Leave the PR draft for Push Pilot phone preview before merge, matching PR #30.
 3. Live click-through from the plan's Verification section once the SQL has been applied.
+4. After the In Jeopardy near-miss ship, Enter Results UX polish is first in line (`BACKLOG.md` → Next up). Not this week.
