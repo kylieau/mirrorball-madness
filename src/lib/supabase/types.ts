@@ -269,16 +269,19 @@ export type Database = {
       }
       dance_styles: {
         Row: {
+          category: string | null
           created_at: string
           id: string
           name: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           id?: string
           name: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -437,7 +440,6 @@ export type Database = {
           saved_by_judges: boolean
           was_bottom_three: boolean
           was_bottom_two: boolean
-          was_team_dance: boolean
         }
         Insert: {
           bonus_note?: string | null
@@ -450,7 +452,6 @@ export type Database = {
           saved_by_judges?: boolean
           was_bottom_three?: boolean
           was_bottom_two?: boolean
-          was_team_dance?: boolean
         }
         Update: {
           bonus_note?: string | null
@@ -463,7 +464,6 @@ export type Database = {
           saved_by_judges?: boolean
           was_bottom_three?: boolean
           was_bottom_two?: boolean
-          was_team_dance?: boolean
         }
         Relationships: [
           {
@@ -703,7 +703,6 @@ export type Database = {
           saved_by_judges: boolean
           was_bottom_three: boolean
           was_bottom_two: boolean
-          was_team_dance: boolean
         }
         Insert: {
           bonus_note?: string | null
@@ -716,7 +715,6 @@ export type Database = {
           saved_by_judges?: boolean
           was_bottom_three?: boolean
           was_bottom_two?: boolean
-          was_team_dance?: boolean
         }
         Update: {
           bonus_note?: string | null
@@ -729,7 +727,6 @@ export type Database = {
           saved_by_judges?: boolean
           was_bottom_three?: boolean
           was_bottom_two?: boolean
-          was_team_dance?: boolean
         }
         Relationships: [
           {
@@ -744,6 +741,39 @@ export type Database = {
             columns: ["episode_id"]
             isOneToOne: false
             referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      episode_round_types: {
+        Row: {
+          created_at: string
+          episode_id: string
+          round_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          episode_id: string
+          round_type_id: string
+        }
+        Update: {
+          created_at?: string
+          episode_id?: string
+          round_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_round_types_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_round_types_round_type_id_fkey"
+            columns: ["round_type_id"]
+            isOneToOne: false
+            referencedRelation: "round_types"
             referencedColumns: ["id"]
           },
         ]
@@ -1207,6 +1237,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      round_types: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       scoring_settings: {
         Row: {

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
-import { loadJudgesAndDanceStyles } from "@/lib/results";
+import { loadResultsTaxonomy } from "@/lib/results";
 import { JudgesDanceStylesManager } from "@/components/judges-dance-styles-manager";
 import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
@@ -21,13 +21,13 @@ export default async function ShowSettingsPage() {
     redirect("/");
   }
 
-  const { judges, danceStyles } = await loadJudgesAndDanceStyles(supabase);
+  const { judges, danceStyles, roundTypes } = await loadResultsTaxonomy(supabase);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-8 pb-8">
       <TopBar {...accountSettingsData} email={user.email ?? ""} />
       <PageHeader title="Show Settings" />
-      <JudgesDanceStylesManager judges={judges} danceStyles={danceStyles} />
+      <JudgesDanceStylesManager judges={judges} danceStyles={danceStyles} roundTypes={roundTypes} />
     </div>
   );
 }
