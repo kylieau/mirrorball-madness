@@ -17,34 +17,24 @@ import {
 import { coupleNameNode } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
-import { formatEpisodeCasualShort } from "@/lib/format-week";
-import { pinEliminatedFirst, pinnedEliminatedIds } from "@/lib/grand-finale-pins";
+import { usePersistedState } from "@/lib/use-persisted-state";
+import {
+  nextPredictedElimination,
+  pinEliminatedFirst,
+  pinnedEliminatedIds,
+} from "@/lib/grand-finale-pins";
+import {
+  GrandFinaleOrderList,
+  GrandFinaleScoringExplainer,
+  NextEliminationFrame,
+  PointsTag,
+  grandFinaleRowContext,
+  type GrandFinaleCouple,
+  type GrandFinaleScoring,
+} from "@/components/grand-finale-order-list";
+import { GrandFinaleLeagueList } from "@/components/grand-finale-league-list";
+import type { LeagueGrandFinalePrediction } from "@/lib/grand-finale-predictions";
 import { adaptGrandFinaleOrder, defaultSelection, type GrandFinaleDestination } from "@/lib/copy-picks";
-
-type Couple = {
-  id: string;
-  celebrity_name: string;
-  pro_name: string;
-  status: string;
-  elimination_week: number | null;
-};
-
-function statusLabel(couple: Couple): string {
-  switch (couple.status) {
-    case "winner":
-      return "Won the season";
-    case "runner_up":
-      return "Runner-up";
-    case "third_place":
-      return "Third Place";
-    case "eliminated":
-      return `Eliminated — ${formatEpisodeCasualShort(couple.elimination_week!)}`;
-    case "withdrawn":
-      return `Withdrew — ${formatEpisodeCasualShort(couple.elimination_week!)}`;
-    default:
-      return "Still competing";
-  }
-}
 
 export function GrandFinaleBox({
   leagueId,
@@ -54,16 +44,21 @@ export function GrandFinaleBox({
   deadline,
   isLocked,
   otherLeagues,
+  scoring,
+  leagueGrandFinale,
 }: {
   leagueId: string;
-  couples: Couple[];
+  couples: GrandFinaleCouple[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
   existingOrder: string[] | null;
   deadline: string | null;
   isLocked: boolean;
   otherLeagues: GrandFinaleDestination[];
+  scoring: GrandFinaleScoring;
+  leagueGrandFinale: LeagueGrandFinalePrediction[];
 }) {
   const alphabeticalCouples = [...couples].sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
+  const totalCouples = couples.length;
 
   // Editing an existing prediction skips straight to the reorder step,
   // pre-filled — only a brand-new prediction starts with tap-to-build.
@@ -82,8 +77,13 @@ export function GrandFinaleBox({
   const [otherResults, setOtherResults] = useState<LeagueSaveResult[]>([]);
   const [filledFrom, setFilledFrom] = useState<string | null>(null);
   const formattedDeadline = useFormattedDeadline(deadline);
+  // Only meaningful once locked — collapses the full bracket down to just the
+  // next-predicted-elimination row so the card doesn't dominate the page once
+  // there's a permanent League at a Glance list underneath it.
+  const [collapsed, setCollapsed] = usePersistedState<boolean>(`gf-own-collapsed:${leagueId}`, false);
 
   const coupleById = new Map(couples.map((c) => [c.id, c]));
+  const rowContext = grandFinaleRowContext(couples);
 
   function nameFor(coupleId: string) {
     const c = coupleById.get(coupleId);
@@ -151,6 +151,9 @@ export function GrandFinaleBox({
   // variant and a combined-with-other-modules variant.
   function renderSummary(locked: boolean) {
     const winnerId = order[order.length - 1];
+    const highlightId = nextPredictedElimination(order, couples);
+    const isCollapsed = locked && collapsed;
+
     return (
       <Card>
         <CardHeader>
@@ -167,20 +170,38 @@ export function GrandFinaleBox({
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
           <OtherLeagueSaveSummary results={otherResults} destinations={otherLeagues} />
-          {/* Displayed winner-first (reverse of storage order, which stays
-              elimination-ascending to match what the RPC expects) so "1."
-              lines up with the predicted winner named above, not with
-              whoever's predicted to leave first. */}
-          {[...order].reverse().map((coupleId, i) => (
-            <div key={coupleId} className="flex items-center justify-between border-b border-border py-1 last:border-b-0">
-              <span>
-                {i + 1}. {nameFor(coupleId)}
-              </span>
-              <span className="text-muted-foreground">
-                {coupleById.get(coupleId) ? statusLabel(coupleById.get(coupleId)!) : "Unknown"}
-              </span>
+          <GrandFinaleScoringExplainer scoring={scoring} totalCouples={totalCouples} />
+
+          {isCollapsed ? (
+            <div className="flex flex-col gap-2">
+              {highlightId ? (
+                <NextEliminationFrame>{nameFor(highlightId)}</NextEliminationFrame>
+              ) : (
+                <p className="text-muted-foreground">Nothing left to predict — your bracket&apos;s fully resolved.</p>
+              )}
+              <Button variant="ghost" size="sm" className="self-start" onClick={() => setCollapsed(false)}>
+                Tap to view full bracket
+              </Button>
             </div>
-          ))}
+          ) : (
+            <>
+              <GrandFinaleOrderList
+                order={order}
+                couples={couples}
+                coupleDisplayNames={coupleDisplayNames}
+                scoring={scoring}
+                totalCouples={totalCouples}
+                showStatus
+                showNextEliminationHighlight
+              />
+              {locked && (
+                <Button variant="ghost" size="sm" className="mt-1 self-start" onClick={() => setCollapsed(true)}>
+                  Collapse bracket
+                </Button>
+              )}
+            </>
+          )}
+
           {!locked && (
             <Button variant="outline" size="sm" className="mt-2 self-start" onClick={() => {
                 setOrder(pinEliminatedFirst(order, pinnedIds));
@@ -189,6 +210,14 @@ export function GrandFinaleBox({
               Edit Order
             </Button>
           )}
+
+          {locked && <GrandFinaleLeagueList
+            leagueId={leagueId}
+            managers={leagueGrandFinale}
+            couples={couples}
+            coupleDisplayNames={coupleDisplayNames}
+            scoring={scoring}
+          />}
         </CardContent>
       </Card>
     );
@@ -202,10 +231,17 @@ export function GrandFinaleBox({
             <CardTitle>Your Season Bracket</CardTitle>
             <CardDescription>Predictions are locked.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
               You didn&apos;t submit a Full-Order Prediction before the deadline.
             </p>
+            <GrandFinaleLeagueList
+              leagueId={leagueId}
+              managers={leagueGrandFinale}
+              couples={couples}
+              coupleDisplayNames={coupleDisplayNames}
+              scoring={scoring}
+            />
           </CardContent>
         </Card>
       );
@@ -226,6 +262,8 @@ export function GrandFinaleBox({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          <GrandFinaleScoringExplainer scoring={scoring} totalCouples={totalCouples} />
+
           {order.length === pinnedCount && <UsePicksFrom sources={pickSources} onPick={fillFrom} />}
 
           <p className="text-sm font-medium text-accent">
@@ -239,8 +277,17 @@ export function GrandFinaleBox({
                 Your Order So Far
               </p>
               {order.map((coupleId, i) => (
-                <div key={coupleId} className="text-sm">
-                  {i + 1}. {nameFor(coupleId)}
+                <div key={coupleId} className="flex items-center justify-between gap-2 text-sm">
+                  <span>
+                    {i + 1}. {nameFor(coupleId)}
+                  </span>
+                  <PointsTag
+                    couple={coupleById.get(coupleId)}
+                    predictedPosition={i + 1}
+                    scoring={scoring}
+                    totalCouples={totalCouples}
+                    context={rowContext}
+                  />
                 </div>
               ))}
               {order.length > pinnedCount && (
@@ -290,6 +337,7 @@ export function GrandFinaleBox({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <GrandFinaleScoringExplainer scoring={scoring} totalCouples={totalCouples} />
         {error && <p className="text-sm text-destructive">{error}</p>}
         {filledFrom && (
           <p className="text-xs text-muted-foreground">Filled in from {filledFrom} — review, then save.</p>
@@ -306,12 +354,19 @@ export function GrandFinaleBox({
             return (
               <div
                 key={coupleId}
-                className="flex items-center justify-between rounded-md border border-border px-3 py-1.5 text-sm"
+                className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-1.5 text-sm"
               >
                 <span>
                   {displayIndex + 1}. {nameFor(coupleId)}
                 </span>
-                <span className="flex gap-1">
+                <span className="flex items-center gap-2">
+                  <PointsTag
+                    couple={coupleById.get(coupleId)}
+                    predictedPosition={actualIndex + 1}
+                    scoring={scoring}
+                    totalCouples={totalCouples}
+                    context={rowContext}
+                  />
                   <Button
                     variant="ghost"
                     size="icon-sm"

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatEpisodeCasual,
+  formatEpisodeCasualAbbreviated,
   formatEpisodeCasualShort,
   formatEpisodeCasualWithTheme,
   formatEpisodeLabel,
@@ -33,6 +34,12 @@ describe("formatEpisodeCasual", () => {
 describe("formatEpisodeCasualShort", () => {
   it("uses Week N for tight fan UI (same phrase as the roomy form)", () => {
     expect(formatEpisodeCasualShort(2)).toBe("Week 2");
+  });
+});
+
+describe("formatEpisodeCasualAbbreviated", () => {
+  it("uses Wk N for tight inline spots, no em dash", () => {
+    expect(formatEpisodeCasualAbbreviated(2)).toBe("Wk 2");
   });
 });
 

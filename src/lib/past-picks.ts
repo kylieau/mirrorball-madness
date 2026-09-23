@@ -24,7 +24,7 @@ export type PastPicksComparison = {
 };
 
 export type PastPicksDisplayRow =
-  | { kind: "nailed"; coupleIds: string[] }
+  | { kind: "nailed"; coupleIds: string[]; points: number }
   | { kind: "in_jeopardy"; pickIds: string[]; actualIds: string[]; points: number }
   | { kind: "miss"; pickIds: string[]; actualIds: string[] };
 
@@ -54,7 +54,7 @@ export function collapsePickRows(picks: PickMatch[], actualIds: string[]): PastP
       if (rows.some((row) => row.kind === "nailed" && row.coupleIds[0] === pick.pickId)) {
         continue;
       }
-      rows.push({ kind: "nailed", coupleIds: [pick.pickId!] });
+      rows.push({ kind: "nailed", coupleIds: [pick.pickId!], points: pick.points });
       continue;
     }
 

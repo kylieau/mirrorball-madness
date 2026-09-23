@@ -83,7 +83,6 @@ export function PickEmBox({
   existingPrediction,
   isLocked,
   isDoubleElimination,
-  revealedPredictions,
   otherLeagues,
 }: {
   leagueId: string;
@@ -106,12 +105,6 @@ export function PickEmBox({
   } | null;
   isLocked: boolean;
   isDoubleElimination: boolean;
-  revealedPredictions?: {
-    displayName: string;
-    eliminatedLabel: string | null;
-    eliminatedLabel2: string | null;
-    topScorerLabel: string | null;
-  }[];
   otherLeagues: CurtainCallDestination[];
 }) {
   const [eliminatedId, setEliminatedId] = useState(
@@ -332,17 +325,27 @@ export function PickEmBox({
             </div>
           )
         ) : (
-          <div className="flex flex-col gap-2 text-sm">
-            {revealedPredictions?.map((p, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <span>{p.displayName}</span>
-                <span className="text-muted-foreground">
-                  {p.eliminatedLabel ?? "—"}
-                  {isDoubleElimination && p.eliminatedLabel2 && ` & ${p.eliminatedLabel2}`} /{" "}
-                  {p.topScorerLabel ?? "—"}
-                </span>
-              </div>
-            ))}
+          // Everyone else's picks now live in the League at a Glance list at
+          // the bottom of this same card — this is just the viewer's own.
+          <div className="flex flex-col gap-1.5 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Eliminated</span>
+              <span className="font-medium">
+                {eliminatedId && eliminatedId2 ? (
+                  <>
+                    {nameFor(eliminatedId)} & {nameFor(eliminatedId2)}
+                  </>
+                ) : eliminatedId ? (
+                  nameFor(eliminatedId)
+                ) : (
+                  "No Pick"
+                )}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Top Scorer</span>
+              <span className="font-medium">{topScorerId ? nameFor(topScorerId) : "No Pick"}</span>
+            </div>
           </div>
         )}
     </div>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -10,9 +9,11 @@ import {
 import { StandingsTable } from "@/components/standings-table";
 import { StandingsModuleBreakdown } from "@/components/standings-module-breakdown";
 import { RosterCard } from "@/components/roster-card";
+import { DanceCardLeagueList, type DanceCardLeagueEntry } from "@/components/dance-card-league-list";
 import { CurtainCallCard } from "@/components/curtain-call-card";
 import { PickEmBox } from "@/components/pick-em-box";
 import { PastPicksRecap } from "@/components/past-picks-card";
+import { CurtainCallLeagueList, type CurtainCallLeagueEntry } from "@/components/curtain-call-league-list";
 import { GrandFinaleBox } from "@/components/grand-finale-box";
 import { loadOtherLeaguePicks } from "@/lib/other-league-picks";
 import { DraftStatusCard } from "@/components/draft-status-card";
@@ -43,7 +44,13 @@ import {
   isPastPicksLocked,
   selectCurtainCallWeek,
 } from "@/lib/past-picks";
-import { couplesRemainingAtWeek, curtainCallPayout } from "@/lib/scoring";
+import { couplesRemainingAtWeek, curtainCallPayout, type GrandFinaleMethod, type TierPayStyle } from "@/lib/scoring";
+import {
+  GRAND_FINALE_DEFAULT_METHOD,
+  GRAND_FINALE_DEFAULT_TIER_PAY_STYLE,
+  defaultPointsPerCorrect,
+} from "@/lib/grand-finale-explainer";
+import { buildLeagueGrandFinalePredictions } from "@/lib/grand-finale-predictions";
 
 export default async function LeaguePage({
   params,
@@ -85,6 +92,16 @@ export default async function LeaguePage({
     ? (await supabase.rpc("effective_grand_finale_deadline", { p_league_id: id })).data ?? null
     : null;
   const grandFinaleLocked = !!grandFinaleDeadline && new Date() >= new Date(grandFinaleDeadline);
+  const grandFinaleScoring = {
+    method: (scoringSettings?.bonus_picks_scoring_method as GrandFinaleMethod | null) ?? GRAND_FINALE_DEFAULT_METHOD,
+    pointsPerCorrect:
+      scoringSettings?.bonus_picks_points_per_correct ??
+      defaultPointsPerCorrect(GRAND_FINALE_DEFAULT_METHOD, GRAND_FINALE_DEFAULT_TIER_PAY_STYLE),
+    distancePenalty: scoringSettings?.bonus_picks_distance_penalty ?? null,
+    tierSize: scoringSettings?.bonus_picks_tier_size ?? null,
+    tierPayStyle:
+      (scoringSettings?.bonus_picks_tier_pay_style as TierPayStyle | null) ?? GRAND_FINALE_DEFAULT_TIER_PAY_STYLE,
+  };
   // Section labels (🔮 Curtain Call / 🪩 Dance Card / 🏆 Grand Finale) only
   // earn their keep once there's more than one module on the page to tell
   // apart — a single-module league goes straight to its content.
@@ -342,14 +359,7 @@ export default async function LeaguePage({
   let isLocked = false;
   let lockAt: string | null = null;
   let ownPrediction = null;
-  let revealedPredictions:
-    | {
-        displayName: string;
-        eliminatedLabel: string | null;
-        eliminatedLabel2: string | null;
-        topScorerLabel: string | null;
-      }[]
-    | undefined;
+  let curtainCallPicksEntries: CurtainCallLeagueEntry[] = [];
 
   if (upcomingEpisode && curtainCallOn) {
     const { data: computedLockAt } = await supabase.rpc("prediction_lock_at", {
@@ -377,23 +387,17 @@ export default async function LeaguePage({
         .eq("league_id", id)
         .eq("week_id", upcomingEpisode.id);
 
-      revealedPredictions = (allPredictions ?? []).map((p) => {
-        const eliminatedParts = p.predicted_eliminated_couple_id
-          ? allDisplayNames.get(p.predicted_eliminated_couple_id)
-          : undefined;
-        const eliminatedParts2 = p.predicted_eliminated_couple_id_2
-          ? allDisplayNames.get(p.predicted_eliminated_couple_id_2)
-          : undefined;
-        const topScorerParts = p.predicted_top_scorer_couple_id
-          ? allDisplayNames.get(p.predicted_top_scorer_couple_id)
-          : undefined;
-        return {
+      curtainCallPicksEntries = (allPredictions ?? [])
+        .filter((p) => p.manager_id !== myTeamId)
+        .map((p) => ({
+          managerId: p.manager_id,
           displayName: nameByManager[p.manager_id] ?? "Unknown",
-          eliminatedLabel: eliminatedParts ? formatCoupleName(eliminatedParts) : null,
-          eliminatedLabel2: eliminatedParts2 ? formatCoupleName(eliminatedParts2) : null,
-          topScorerLabel: topScorerParts ? formatCoupleName(topScorerParts) : null,
-        };
-      });
+          eliminatedId: p.predicted_eliminated_couple_id,
+          eliminatedId2: p.predicted_eliminated_couple_id_2,
+          topScorerId: p.predicted_top_scorer_couple_id,
+          comparison: null,
+        }))
+        .sort((a, b) => a.displayName.localeCompare(b.displayName));
     }
   }
 
@@ -408,6 +412,22 @@ export default async function LeaguePage({
     grandFinaleOrder = ownGrandFinalePicks && ownGrandFinalePicks.length > 0
       ? ownGrandFinalePicks.map((p) => p.couple_id)
       : null;
+  }
+
+  // League at a Glance is visible to everyone once the season-wide deadline
+  // has passed, regardless of the viewer's own submission — no manager_id
+  // filter, unlike the query above.
+  let leagueGrandFinale: ReturnType<typeof buildLeagueGrandFinalePredictions> = [];
+  if (grandFinaleOn && grandFinaleLocked) {
+    const { data: allGrandFinalePicks } = await supabase
+      .from("grand_finale_predictions")
+      .select("manager_id, couple_id, predicted_position")
+      .eq("league_id", id);
+    leagueGrandFinale = buildLeagueGrandFinalePredictions({
+      predictions: allGrandFinalePicks ?? [],
+      members: members ?? [],
+      viewerTeamId: myTeamId,
+    });
   }
 
   const otherLeaguePicks = await loadOtherLeaguePicks(supabase, {
@@ -539,6 +559,54 @@ export default async function LeaguePage({
   const yourRosterNeighbors = yourRosterWeek
     ? adjacentThisWeekWeeks(visibleDanceWeeks, yourRosterWeek.id)
     : { prev: null, next: null };
+
+  // Your Picks → League at a Glance: every manager's roster points for this
+  // same selected week, that week's total,
+  // sourced from weekly_manager_scores (already correct across Recast swaps),
+  // not re-derived from current slot ownership like seasonPointsByCouple below.
+  let danceCardLeagueEntries: DanceCardLeagueEntry[] = [];
+  if (showLeagueRosters && yourRosterWeek) {
+    const weekNumberById = new Map(groupedWeeks.map((w) => [w.id, w.week_number]));
+    const weekPointsByManager = new Map<string, number>();
+    for (const row of allScores ?? []) {
+      const weekNumber = weekNumberById.get(row.week_id);
+      if (weekNumber !== yourRosterWeek.week_number) continue;
+      weekPointsByManager.set(row.manager_id, (weekPointsByManager.get(row.manager_id) ?? 0) + row.roster_points);
+    }
+    const categoryWeight = scoringSettings?.judges_score_category_weight ?? 1;
+
+    danceCardLeagueEntries = standings.filter((m) => m.managerId !== myTeamId).map((m) => {
+      const slotsForWeek = leagueSlotPeriods.filter(
+        (slot) => slot.managerId === m.managerId && slotActiveInWeek(slot, yourRosterWeek.week_number)
+      );
+      const points = judgePointsThroughWeek({ ...judgePointsInputs, slots: slotsForWeek, week: yourRosterWeek.week_number });
+      const couples = slotsForWeek.flatMap((slot) => {
+        const couple = flatCouplesById.get(slot.coupleId);
+        if (!couple) return [];
+        const p = points.get(slot.coupleId);
+        const names = allDisplayNames.get(slot.coupleId) ?? { celebrity: couple.celebrity_name, pro: couple.pro_name };
+        const clamped = clampRosterCoupleForWeek(
+          { status: couple.status, eliminationWeek: couple.elimination_week },
+          {
+            cutoffWeek: yourRosterWeek.week_number,
+            finaleWeekNumber,
+            weekNumber: yourRosterWeek.week_number,
+            rawWeeklyPoints: p?.week ?? 0,
+          }
+        );
+        return [{ ...names, coupleId: slot.coupleId, ...clamped }];
+      });
+      return {
+        managerId: m.managerId,
+        displayName: m.displayName,
+        weekPoints: Math.round((weekPointsByManager.get(m.managerId) ?? 0) * categoryWeight),
+        couples,
+      };
+    });
+    danceCardLeagueEntries.sort(
+      (a, b) => b.weekPoints - a.weekPoints || a.displayName.localeCompare(b.displayName)
+    );
+  }
 
   // Standings → Dance Cards: everyone's current roster with season totals.
   const currentSlotPeriods = leagueSlotPeriods.filter((slot) => slot.endWeek === null);
@@ -692,17 +760,18 @@ export default async function LeaguePage({
   );
 
   let pastPicksComparison = null;
+  let curtainCallRecapEntries: CurtainCallLeagueEntry[] = [];
   if (curtainCallMode === "recap" && curtainCallEpisode && !pastPicksLocked) {
     const recapEpisodeIds = curtainCallEpisode.episodeIds;
-    const [{ data: pastPrediction }, { data: pastResults }, { data: pastDanceScores }, { data: pastJeopardy }] =
+    const [{ data: allPastPredictions }, { data: pastResults }, { data: pastDanceScores }, { data: pastJeopardy }] =
       await Promise.all([
       supabase
         .from("predictions")
-        .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
+        .select(
+          "manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
+        )
         .eq("league_id", id)
-        .eq("week_id", curtainCallEpisode.id)
-        .eq("manager_id", myTeamId)
-        .maybeSingle(),
+        .eq("week_id", curtainCallEpisode.id),
       recapEpisodeIds.length > 0
         ? supabase.from("episode_results").select("couple_id, outcome").in("episode_id", recapEpisodeIds)
         : Promise.resolve({ data: [] as { couple_id: string; outcome: string }[] }),
@@ -714,36 +783,64 @@ export default async function LeaguePage({
         : Promise.resolve({ data: [] as { couple_id: string }[] }),
     ]);
 
-    const predictionPoints =
-      (allScores ?? []).find((row) => row.week_id === curtainCallEpisode.id && row.manager_id === myTeamId)
-        ?.prediction_points ?? 0;
-
     const nearMissEnabled = scoringSettings?.curtain_call_near_miss_enabled !== false;
     const remaining = couplesRemainingAtWeek(
       seasonCouples.map((c) => ({ eliminationWeek: c.elimination_week })),
       curtainCallEpisode.week_number
     );
-    pastPicksComparison = buildPastPicksComparison({
-      isDoubleElimination: curtainCallEpisode.is_double_elimination_week,
-      predictedEliminatedCoupleId: pastPrediction?.predicted_eliminated_couple_id ?? null,
-      predictedEliminatedCoupleId2: pastPrediction?.predicted_eliminated_couple_id_2 ?? null,
-      predictedTopScorerCoupleId: pastPrediction?.predicted_top_scorer_couple_id ?? null,
-      episodeOutcomes: (pastResults ?? []).map((r) => ({ coupleId: r.couple_id, outcome: r.outcome })),
-      danceScores: (pastDanceScores ?? []).map((s) => ({ coupleId: s.couple_id, totalScore: Number(s.total_score) })),
-      predictionPoints,
-      inJeopardyCoupleIds: (pastJeopardy ?? []).map((row) => row.couple_id),
-      nearMissEnabled,
-      eliminationExactPayout: curtainCallPayout(
-        scoringSettings?.elimination_prediction_points ?? 17.1,
-        remaining,
-        seasonCouples.length
-      ),
-      topScorerExactPayout: curtainCallPayout(
-        scoringSettings?.top_scorer_prediction_points ?? 11.4,
-        remaining,
-        seasonCouples.length
-      ),
-    });
+    const episodeOutcomes = (pastResults ?? []).map((r) => ({ coupleId: r.couple_id, outcome: r.outcome }));
+    const danceScores = (pastDanceScores ?? []).map((s) => ({ coupleId: s.couple_id, totalScore: Number(s.total_score) }));
+    const inJeopardyCoupleIds = (pastJeopardy ?? []).map((row) => row.couple_id);
+    const eliminationExactPayout = curtainCallPayout(
+      scoringSettings?.elimination_prediction_points ?? 17.1,
+      remaining,
+      seasonCouples.length
+    );
+    const topScorerExactPayout = curtainCallPayout(
+      scoringSettings?.top_scorer_prediction_points ?? 11.4,
+      remaining,
+      seasonCouples.length
+    );
+
+    const comparisonFor = (prediction: {
+      predicted_eliminated_couple_id: string | null;
+      predicted_eliminated_couple_id_2: string | null;
+      predicted_top_scorer_couple_id: string | null;
+    } | undefined, managerId: string) =>
+      buildPastPicksComparison({
+        isDoubleElimination: curtainCallEpisode.is_double_elimination_week,
+        predictedEliminatedCoupleId: prediction?.predicted_eliminated_couple_id ?? null,
+        predictedEliminatedCoupleId2: prediction?.predicted_eliminated_couple_id_2 ?? null,
+        predictedTopScorerCoupleId: prediction?.predicted_top_scorer_couple_id ?? null,
+        episodeOutcomes,
+        danceScores,
+        predictionPoints:
+          (allScores ?? []).find((row) => row.week_id === curtainCallEpisode.id && row.manager_id === managerId)
+            ?.prediction_points ?? 0,
+        inJeopardyCoupleIds,
+        nearMissEnabled,
+        eliminationExactPayout,
+        topScorerExactPayout,
+      });
+
+    const ownPastPrediction = (allPastPredictions ?? []).find((p) => p.manager_id === myTeamId);
+    pastPicksComparison = comparisonFor(ownPastPrediction, myTeamId);
+
+    curtainCallRecapEntries = (allPastPredictions ?? [])
+      .filter((p) => p.manager_id !== myTeamId)
+      .map((p) => ({
+        managerId: p.manager_id,
+        displayName: nameByManager[p.manager_id] ?? "Unknown",
+        eliminatedId: p.predicted_eliminated_couple_id,
+        eliminatedId2: p.predicted_eliminated_couple_id_2,
+        topScorerId: p.predicted_top_scorer_couple_id,
+        comparison: comparisonFor(p, p.manager_id),
+      }))
+      .sort(
+        (a, b) =>
+          (b.comparison?.predictionPoints ?? 0) - (a.comparison?.predictionPoints ?? 0) ||
+          a.displayName.localeCompare(b.displayName)
+      );
   }
 
   return (
@@ -806,7 +903,6 @@ export default async function LeaguePage({
                       existingPrediction={ownPrediction}
                       isLocked={isLocked}
                       isDoubleElimination={upcomingEpisode.is_double_elimination_week}
-                      revealedPredictions={revealedPredictions}
                       otherLeagues={otherLeaguePicks.curtainCall}
                     />
                   ) : curtainCallMode === "recap" && curtainCallEpisode ? (
@@ -817,6 +913,26 @@ export default async function LeaguePage({
                       coupleDisplayNames={Object.fromEntries(allDisplayNames)}
                     />
                   ) : null}
+                  {curtainCallEpisode && isLocked && curtainCallMode === "picks" && (
+                    <CurtainCallLeagueList
+                      leagueId={id}
+                      weekId={curtainCallEpisode.id}
+                      weekNumber={curtainCallEpisode.week_number}
+                      isDoubleElimination={curtainCallEpisode.is_double_elimination_week}
+                      coupleDisplayNames={Object.fromEntries(allDisplayNames)}
+                      entries={curtainCallPicksEntries}
+                    />
+                  )}
+                  {curtainCallMode === "recap" && curtainCallEpisode && !pastPicksLocked && (
+                    <CurtainCallLeagueList
+                      leagueId={id}
+                      weekId={curtainCallEpisode.id}
+                      weekNumber={curtainCallEpisode.week_number}
+                      isDoubleElimination={curtainCallEpisode.is_double_elimination_week}
+                      coupleDisplayNames={Object.fromEntries(allDisplayNames)}
+                      entries={curtainCallRecapEntries}
+                    />
+                  )}
                 </CurtainCallCard>
               </div>
             )}
@@ -859,6 +975,15 @@ export default async function LeaguePage({
                         />
                       ) : undefined
                     }
+                    leagueSection={
+                      yourRosterWeek ? (
+                        <DanceCardLeagueList
+                          leagueId={id}
+                          weekId={yourRosterWeek.id}
+                          entries={danceCardLeagueEntries}
+                        />
+                      ) : undefined
+                    }
                   />
                 )}
                 {waiversOn && (
@@ -873,14 +998,6 @@ export default async function LeaguePage({
                     priorityRank={recastPriorityRank}
                     totalManagers={standings.length}
                   />
-                )}
-                {showLeagueRosters && (
-                  <Link
-                    href={`/leagues/${id}?tab=standings#rosters`}
-                    className="text-sm font-medium text-accent hover:underline"
-                  >
-                    See Everyone&apos;s Dance Cards →
-                  </Link>
                 )}
               </div>
             )}
@@ -897,6 +1014,8 @@ export default async function LeaguePage({
                   deadline={grandFinaleDeadline}
                   isLocked={grandFinaleLocked}
                   otherLeagues={otherLeaguePicks.grandFinale}
+                  scoring={grandFinaleScoring}
+                  leagueGrandFinale={leagueGrandFinale}
                 />
               </div>
             )}

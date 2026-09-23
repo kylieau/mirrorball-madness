@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import {
   computeGrandFinalePoints,
+  eliminationPositionRanges,
   computeWeeklyScores,
   couplesRemainingAtWeek,
   inJeopardyIdsToPersist,
@@ -361,27 +362,8 @@ async function recomputeWeekScores(
   if (seasonCouplesErr) return seasonCouplesErr.message;
 
   const totalCouples = (seasonCouples ?? []).length;
-  const eliminationWeeks = [
-    ...new Set(
-      (seasonCouples ?? [])
-        .filter((c) => c.status === "eliminated" || c.status === "withdrawn")
-        .map((c) => c.elimination_week!)
-    ),
-  ].sort((a, b) => a - b);
-  const rankByWeek = new Map(eliminationWeeks.map((weekNumber, i) => [weekNumber, i + 1]));
-
-  const actualPositionByCouple = new Map<string, number>();
-  for (const couple of seasonCouples ?? []) {
-    if (couple.status === "winner") actualPositionByCouple.set(couple.id, totalCouples);
-    else if (couple.status === "runner_up") actualPositionByCouple.set(couple.id, totalCouples - 1);
-    else if (couple.status === "third_place") actualPositionByCouple.set(couple.id, totalCouples - 2);
-    else if (
-      (couple.status === "eliminated" || couple.status === "withdrawn") &&
-      couple.elimination_week !== null
-    ) {
-      actualPositionByCouple.set(couple.id, rankByWeek.get(couple.elimination_week)!);
-    }
-  }
+  const positionRanges = eliminationPositionRanges(seasonCouples ?? []);
+  const actualPositionByCouple = new Map([...positionRanges].map(([id, range]) => [id, range.start]));
 
   // finalPlacement: 1 = winner .. 5 = fifth place, reusing the same numeric
   // position Grand Finale's full-order prediction already resolves against
@@ -454,7 +436,11 @@ async function recomputeWeekScores(
         })),
         resolvedCouples: newlyResolvedCoupleIds
           .filter((id) => actualPositionByCouple.has(id))
-          .map((id) => ({ coupleId: id, actualPosition: actualPositionByCouple.get(id)! })),
+          .map((id) => ({
+            coupleId: id,
+            actualPosition: positionRanges.get(id)!.start,
+            actualPositionEnd: positionRanges.get(id)!.end,
+          })),
         totalCouples,
         method: (scoringSettings.bonus_picks_scoring_method as GrandFinaleMethod) ?? "exact_position",
         distancePenalty: scoringSettings.bonus_picks_distance_penalty,

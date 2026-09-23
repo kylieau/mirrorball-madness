@@ -54,6 +54,7 @@ function ResultRows({
                 <span className="text-emerald-text" aria-label="Correct">
                   ✓
                 </span>
+                <span className="font-heading font-semibold text-emerald-text">+{row.points}</span>
               </span>
             </div>
           );
@@ -164,7 +165,7 @@ export function PastPicksRecap({
           actualFallback="—"
         />
       </div>
-      <div className="flex items-center justify-between border-t border-border pt-3">
+      <div className="flex items-baseline justify-between border-t border-border pt-1">
         <span className="text-muted-foreground">Curtain Call</span>
         <span className="font-heading text-base font-semibold">
           {comparison.predictionPoints >= 0 ? "+" : ""}

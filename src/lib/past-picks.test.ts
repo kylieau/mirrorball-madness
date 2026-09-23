@@ -256,7 +256,7 @@ describe("matchTopScorerPick", () => {
 
 describe("collapsePickRows", () => {
   it("collapses a hit into a single Nailed it row, without a duplicate Actual", () => {
-    expect(collapsePickRows([exactPick("a")], ["a"])).toEqual([{ kind: "nailed", coupleIds: ["a"] }]);
+    expect(collapsePickRows([exactPick("a")], ["a"])).toEqual([{ kind: "nailed", coupleIds: ["a"], points: 20 }]);
   });
 
   it("puts a miss on one strike→actual line, not a stacked Actual row", () => {
@@ -278,7 +278,7 @@ describe("collapsePickRows", () => {
         ["a", "b"]
       )
     ).toEqual([
-      { kind: "nailed", coupleIds: ["a"] },
+      { kind: "nailed", coupleIds: ["a"], points: 20 },
       { kind: "in_jeopardy", pickIds: ["c"], actualIds: ["b"], points: 5 },
     ]);
 
@@ -298,12 +298,12 @@ describe("collapsePickRows", () => {
 
   it("collapses each double-elim slot independently, in slot order", () => {
     expect(collapsePickRows([exactPick("a"), exactPick("b")], ["a", "b"])).toEqual([
-      { kind: "nailed", coupleIds: ["a"] },
-      { kind: "nailed", coupleIds: ["b"] },
+      { kind: "nailed", coupleIds: ["a"], points: 20 },
+      { kind: "nailed", coupleIds: ["b"], points: 20 },
     ]);
 
     expect(collapsePickRows([exactPick("a"), missPick("c")], ["a", "b"])).toEqual([
-      { kind: "nailed", coupleIds: ["a"] },
+      { kind: "nailed", coupleIds: ["a"], points: 20 },
       { kind: "miss", pickIds: ["c"], actualIds: ["b"] },
     ]);
 
@@ -313,12 +313,12 @@ describe("collapsePickRows", () => {
     ]);
 
     expect(collapsePickRows([exactPick("a"), exactPick("a")], ["a", "b"])).toEqual([
-      { kind: "nailed", coupleIds: ["a"] },
+      { kind: "nailed", coupleIds: ["a"], points: 20 },
     ]);
   });
 
   it("on a top-scorer hit, does not also list tied partners as Actual", () => {
-    expect(collapsePickRows([exactPick("a")], ["a", "b"])).toEqual([{ kind: "nailed", coupleIds: ["a"] }]);
+    expect(collapsePickRows([exactPick("a")], ["a", "b"])).toEqual([{ kind: "nailed", coupleIds: ["a"], points: 20 }]);
   });
 
   it("on a miss, lists every actual including ties on that same line", () => {

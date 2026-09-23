@@ -368,7 +368,102 @@ export type GrandFinalePrediction = {
 export type ResolvedCouple = {
   coupleId: string;
   actualPosition: number;
+  // Last position of a multi-couple elimination week; absent for a single one.
+  actualPositionEnd?: number;
 };
+
+type GrandFinaleScoringParams = {
+  totalCouples: number;
+  method: GrandFinaleMethod;
+  distancePenalty: number | null;
+  tierSize: number | null;
+  tierPayStyle: TierPayStyle;
+  pointsPerCorrect: number;
+};
+
+function grandFinalePointsAt(
+  predictedPosition: number,
+  actualPosition: number,
+  { totalCouples, method, distancePenalty, tierSize, tierPayStyle, pointsPerCorrect }: GrandFinaleScoringParams
+): number {
+  if (method === "exact_position") {
+    return predictedPosition === actualPosition ? pointsPerCorrect : 0;
+  }
+  if (method === "distance_based") {
+    const distance = Math.abs(predictedPosition - actualPosition);
+    return Math.max(0, pointsPerCorrect - distance * (distancePenalty ?? 0));
+  }
+  const width = tierSize ?? 1;
+  const actualBand = bandOf(actualPosition, totalCouples, width);
+  return bandOf(predictedPosition, totalCouples, width) === actualBand
+    ? pointsPerCorrect * bandPayoutFraction(actualBand, tierPayStyle)
+    : 0;
+}
+
+// Positions run 1 = first eliminated .. totalCouples = winner. Couples
+// eliminated the same week share the range of positions that week occupied
+// (a double elimination is 2 positions wide), so a week with no elimination
+// takes none and a double doesn't shift every later couple by one. Podium
+// couples get their fixed top spots. Pass spoiler-clamped statuses and only
+// revealed outcomes resolve.
+export function eliminationPositionRanges(
+  couples: { id: string; status: string; elimination_week: number | null }[]
+): Map<string, { start: number; end: number }> {
+  const total = couples.length;
+  const ranges = new Map<string, { start: number; end: number }>();
+  const outByWeek = new Map<number, string[]>();
+  for (const c of couples) {
+    if ((c.status === "eliminated" || c.status === "withdrawn") && c.elimination_week !== null) {
+      outByWeek.set(c.elimination_week, [...(outByWeek.get(c.elimination_week) ?? []), c.id]);
+    } else if (c.status === "winner") ranges.set(c.id, { start: total, end: total });
+    else if (c.status === "runner_up") ranges.set(c.id, { start: total - 1, end: total - 1 });
+    else if (c.status === "third_place") ranges.set(c.id, { start: total - 2, end: total - 2 });
+  }
+  let before = 0;
+  for (const week of [...outByWeek.keys()].sort((a, b) => a - b)) {
+    const ids = outByWeek.get(week)!;
+    for (const id of ids) ranges.set(id, { start: before + 1, end: before + ids.length });
+    before += ids.length;
+  }
+  return ranges;
+}
+
+// One couple's Grand Finale payout once its actual position is known —
+// shared by the scoring engine and the Picks card. When the couple went out
+// in a multi-couple week the order within that week is unknowable, so the
+// prediction is credited against whichever of those positions suits it best.
+export function grandFinalePredictionPoints({
+  predictedPosition,
+  actualPosition,
+  actualPositionEnd = actualPosition,
+  ...params
+}: GrandFinaleScoringParams & {
+  predictedPosition: number;
+  actualPosition: number;
+  actualPositionEnd?: number;
+}): number {
+  let best = 0;
+  for (let position = actualPosition; position <= actualPositionEnd; position++) {
+    best = Math.max(best, grandFinalePointsAt(predictedPosition, position, params));
+  }
+  return best;
+}
+
+// The most a couple still in the running can pay: it can only finish at or
+// after the next open position, so a prediction for a slot that has already
+// passed can no longer be exact. An upper bound — a double elimination or a
+// no-elimination week changes who lands where, never the best case.
+export function grandFinaleBestCasePoints({
+  predictedPosition,
+  firstOpenPosition,
+  ...params
+}: GrandFinaleScoringParams & { predictedPosition: number; firstOpenPosition: number }): number {
+  let best = 0;
+  for (let position = Math.min(firstOpenPosition, params.totalCouples); position <= params.totalCouples; position++) {
+    best = Math.max(best, grandFinalePointsAt(predictedPosition, position, params));
+  }
+  return best;
+}
 
 // Pure and DB-free, same design as computeWeeklyScores — the caller resolves
 // which couples newly became known this call (see applyEpisodeResults) and
@@ -393,27 +488,25 @@ export function computeGrandFinalePoints({
   tierPayStyle: TierPayStyle;
   pointsPerCorrect: number;
 }): Record<string, number> {
-  const actualPositionByCouple = new Map(resolvedCouples.map((r) => [r.coupleId, r.actualPosition]));
+  const resolvedByCouple = new Map(resolvedCouples.map((r) => [r.coupleId, r]));
 
   const pointsByManager: Record<string, number> = {};
 
   for (const p of predictions) {
-    const actualPosition = actualPositionByCouple.get(p.coupleId);
-    if (actualPosition === undefined) continue;
+    const resolved = resolvedByCouple.get(p.coupleId);
+    if (!resolved) continue;
 
-    let points = 0;
-    if (method === "exact_position") {
-      points = p.predictedPosition === actualPosition ? pointsPerCorrect : 0;
-    } else if (method === "distance_based") {
-      const distance = Math.abs(p.predictedPosition - actualPosition);
-      points = Math.max(0, pointsPerCorrect - distance * (distancePenalty ?? 0));
-    } else if (method === "band_tier") {
-      const width = tierSize ?? 1;
-      const actualBand = bandOf(actualPosition, totalCouples, width);
-      if (bandOf(p.predictedPosition, totalCouples, width) === actualBand) {
-        points = pointsPerCorrect * bandPayoutFraction(actualBand, tierPayStyle);
-      }
-    }
+    const points = grandFinalePredictionPoints({
+      predictedPosition: p.predictedPosition,
+      actualPosition: resolved.actualPosition,
+      actualPositionEnd: resolved.actualPositionEnd,
+      totalCouples,
+      method,
+      distancePenalty,
+      tierSize,
+      tierPayStyle,
+      pointsPerCorrect,
+    });
 
     pointsByManager[p.managerId] = (pointsByManager[p.managerId] ?? 0) + points;
   }

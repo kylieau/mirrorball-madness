@@ -5,6 +5,9 @@ import {
   classifyEliminationGuess,
   classifyTopScorerGuess,
   computeGrandFinalePoints,
+  eliminationPositionRanges,
+  grandFinaleBestCasePoints,
+  grandFinalePredictionPoints,
   computeWeeklyScores,
   curtainCallNearMissPoints,
   curtainCallPayout,
@@ -833,5 +836,78 @@ describe("bandOf / bandPayoutFraction", () => {
   it("graded pay steps down 25% per band and floors at 25%", () => {
     expect([0, 1, 2, 3, 4, 5].map((b) => bandPayoutFraction(b, "graded"))).toEqual([1, 0.75, 0.5, 0.25, 0.25, 0.25]);
     expect(bandPayoutFraction(4, "equal")).toBe(1);
+  });
+});
+
+describe("eliminationPositionRanges", () => {
+  const c = (id: string, status: string, week: number | null) => ({ id, status, elimination_week: week });
+
+  it("gives a double-elimination week a shared range and starts later weeks after it", () => {
+    const ranges = eliminationPositionRanges([
+      c("a", "eliminated", 1),
+      c("b", "eliminated", 1),
+      c("c", "eliminated", 2),
+      c("d", "active", null),
+    ]);
+    expect(ranges.get("a")).toEqual({ start: 1, end: 2 });
+    expect(ranges.get("b")).toEqual({ start: 1, end: 2 });
+    expect(ranges.get("c")).toEqual({ start: 3, end: 3 });
+    expect(ranges.has("d")).toBe(false);
+  });
+
+  it("skips weeks with no elimination and puts the podium at the top", () => {
+    const ranges = eliminationPositionRanges([
+      c("a", "eliminated", 1),
+      c("b", "eliminated", 4),
+      c("w", "winner", null),
+      c("r", "runner_up", null),
+      c("t", "third_place", null),
+    ]);
+    expect(ranges.get("b")).toEqual({ start: 2, end: 2 });
+    expect([ranges.get("w")?.start, ranges.get("r")?.start, ranges.get("t")?.start]).toEqual([5, 4, 3]);
+  });
+});
+
+describe("grandFinalePredictionPoints", () => {
+  const params = {
+    totalCouples: 16,
+    method: "distance_based" as const,
+    distancePenalty: 5,
+    tierSize: null,
+    tierPayStyle: "equal" as const,
+    pointsPerCorrect: 20,
+  };
+
+  it("credits a prediction inside a multi-couple week's range as exact", () => {
+    expect(grandFinalePredictionPoints({ ...params, predictedPosition: 2, actualPosition: 1, actualPositionEnd: 2 })).toBe(20);
+  });
+
+  it("measures from the nearest end of the range otherwise", () => {
+    expect(grandFinalePredictionPoints({ ...params, predictedPosition: 4, actualPosition: 1, actualPositionEnd: 2 })).toBe(10);
+  });
+});
+
+describe("grandFinaleBestCasePoints", () => {
+  const params = {
+    totalCouples: 16,
+    method: "distance_based" as const,
+    distancePenalty: 5,
+    tierSize: null,
+    tierPayStyle: "equal" as const,
+    pointsPerCorrect: 20,
+  };
+
+  it("is the full payout while the predicted slot is still open", () => {
+    expect(grandFinaleBestCasePoints({ ...params, predictedPosition: 5, firstOpenPosition: 4 })).toBe(20);
+  });
+
+  it("drops by the distance once the predicted slot has passed", () => {
+    expect(grandFinaleBestCasePoints({ ...params, predictedPosition: 3, firstOpenPosition: 4 })).toBe(15);
+  });
+
+  it("is 0 for exact_position once the slot has passed", () => {
+    expect(
+      grandFinaleBestCasePoints({ ...params, method: "exact_position", predictedPosition: 3, firstOpenPosition: 4 })
+    ).toBe(0);
   });
 });

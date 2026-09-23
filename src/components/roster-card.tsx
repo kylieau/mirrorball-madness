@@ -26,10 +26,12 @@ export function RosterCard({
   couples,
   totalPoints,
   carousel,
+  leagueSection,
 }: {
   couples: RosterCouple[];
   totalPoints: number;
   carousel?: ReactNode;
+  leagueSection?: ReactNode;
 }) {
   return (
     <Card>
@@ -77,6 +79,7 @@ export function RosterCard({
             </div>
           );
         })}
+        {leagueSection}
       </CardContent>
     </Card>
   );
