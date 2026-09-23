@@ -68,3 +68,17 @@ Fantasy sports app for Dancing with the Stars. Next.js 15 (App Router), TypeScri
 - **Module order is Curtain Call → Dance Card → Grand Finale everywhere** it's listed (Your Picks sections, Standings, Settings, create-league dialog). Defined once in `SCORING_MODULES` (`src/lib/scoring-modules.ts`) — derive any new module list from it.
 - **Capitalization**: anything that names a thing (page/card/section titles, buttons, badges, field/setting labels, dropdown options, nav items) is Title Case. Full phrases and sentences (descriptions, helper text, status/empty messages) stay sentence case. Hidden `aria-label`s are left alone.
 - **Fan/admin tab bars** stay `fixed` to the viewport bottom on every width and span the `max-w-2xl` content column. Shared chrome is `BottomNav`/`FanBottomNav` (`src/components/bottom-nav.tsx`).
+
+## Settled Decisions
+
+Deliberate omissions and naming calls. Code can't record an absence, so these come back as "improvements" otherwise — don't re-propose them.
+
+- **Dance Card is not copyable across leagues** (drafts are per-league); only Curtain Call and Grand Finale are.
+- **No light/dark toggle** — one fixed look by choice. A full theme redo is wanted eventually (BACKLOG.md), not a toggle.
+- **"Bracket"** in Your Season Bracket is deliberate: a full outcome prediction submitted up front and locked, like a March Madness bracket, even though it's one order rather than matchups.
+- **Roster per-couple points are judges' points only** (`judgePointsThroughWeek`); survival/placement bonuses stay manager-level, and the card says so.
+- **Manager order on shared roster cards** is `orderManagersForRosters`: viewer first, then alphabetical, until anyone has scored — then standings order.
+- **Standings' roster card has no week carousel**; flipping weeks lives on Your Fantasy Roster only.
+- **No per-league gear icons** on Home cards or the league switcher; only `league-header.tsx`'s first-run nudges link into settings.
+- **Add to Home Screen is UX guidance only** — no first-visit modal, no push subscribe button, no service worker.
+- **In Jeopardy is manual ticks** on Enter Results (the TV called-down group), never derived from judges' bottom-N. Auto-detection, a band-size knob, and top-3 scoring were all dropped during design.

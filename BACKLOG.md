@@ -122,6 +122,25 @@ The app currently has one deliberate fixed look (dark ballroom + gold, from the 
 
 Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Home Screen, Appearance (coming soon), Account & data. Site Admin and Sign out stay below. No further account-nav edits currently queued.
 
+## Scoring calibration follow-ups
+
+- **Dance Card ~25% calibration overshoot** — known; needs a product conversation before any fix, not a quiet patch.
+- **Full Monte Carlo recalibration against real Season 35 data** — blocked on live SQL / `SUPABASE_ACCESS_TOKEN`, and the season isn't over. Re-running `scripts/monte-carlo-calibration/` already bakes in `POINT_SCALE`.
+- **Equal-EV / neutral fair scoring defaults** — parked behind Enter Results UX polish.
+
+## Draft order editing placement
+
+`draft_type` lives in League Settings' Dance Card card, but the actual order (reorder list + `CustomDraftOrderCard`'s per-round grid) only lives in the draft lobby (`draft-room.tsx`) — two hops for a one-time setup decision. Designed, not built; not urgent since all drafts have run. Design: move order editing (commissioner-only) into `league-modules-form.tsx` next to `draft_type`, keep a **read-only** mirror in the lobby so managers can still build their auto-draft queue, leave queue/autopilot in the lobby. The wrinkle: the lobby effects that guarantee an order exists before `start_draft` can't move wholesale, or nothing forces a commissioner to open Settings first — resolve by moving the membership-reconcile effects into the new Settings component plus a defensive reconcile inside `handleStartDraft`. No SQL needed; `set_draft_order`/`set_custom_draft_order` are already commissioner + `not_started`-gated server-side.
+
+## Parked nits
+
+- **Enter Results UX polish** — top product backlog item. PR #32 was left open as a draft, queuing notes only.
+- `addTeamDance`/`TeamDanceSheetContent` ("Score a Team Dance") is under-named now that Trio Dance is also a round type — it's a generic same-dance/multi-couple bulk entry. Cosmetic rename, not urgent.
+- In Jeopardy: mid-season backfill of marks, and a commissioner-facing "did anyone get In Jeopardy credit?" glance on publish. Both optional.
+- Dead `'You are not a member of this league'` branch in `set_custom_draft_order` (`supabase/schema.sql`) — unreachable, never cleaned up.
+- League Settings' "✓ Settings saved" banner (`league-modules-form.tsx`) doesn't clear when you edit again.
+- A human click-through of the custom-draft lobby UI was never done.
+
 ## Known scoring/data limitations (not bugs, just scoped-out edge cases)
 
 - **Grand Finale late-deadline gap** (Phase B): if a commissioner sets the Grand Finale deadline later than the default (i.e. after some eliminations have already happened), a prediction submitted at that point won't retroactively score the already-resolved couples — only couples resolved *after* submission score. Never comes up with the default deadline (premiere date), since nothing's eliminated yet at that point.
