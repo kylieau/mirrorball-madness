@@ -1,33 +1,33 @@
-# MEMORY_HANDOFF
-
-_Last updated 2026-09-23 (end of session). Read this first, then `CLAUDE.md`._
+# Session Handoff
 
 ## 1. Current State
 
-**No code changes this session.** This was a read-only/investigative session: pulled the user's roster and per-league module weights (live DB reads only), then began designing a "Curtain Call near-miss partial credit" scoring feature in plan mode — before discovering, on a fresh read of this same file, that the feature had already been fully designed, built, and shipped to `main` by a separate tool ("Push Pilot", Grok-based) as PR #33 (commit `581b85b`), several commits after the point-scale-rescale session this file previously described. That shipped design is materially different from what was being planned here (see below) and is already live — verified via a service-role read that all 5 leagues have `curtain_call_near_miss_enabled = true`. No further action was taken; the draft plan was abandoned entirely, no repo files were edited.
+"League at a Glance" on the Picks tab is built, user-reviewed ("looks perfect") and committed to main. It shows every *other* manager's picks at the bottom of the existing Curtain Call, Dance Card and Grand Finale cards. Grand Finale also got a scoring explainer, per-row points, a next-predicted-elimination highlight, and a corrected position/payout rule. Nothing is mid-flight. A week-2 republish in #supportSWEKylie already confirmed the Curtain Call total mismatch was a stale stored score.
 
-## 2. Changes Made
+## 2. Changes Made (commit 03523ee; `git diff --stat` source of truth)
 
-None. Working tree is clean except pre-existing unrelated noise (`ios/App/App.xcodeproj/project.pbxproj` modified, `scratch/`/`claude/` untracked) — not touched this session, per this repo's shared-working-directory convention of leaving other in-progress work alone.
+Modified: `CLAUDE.md`, `src/app/leagues/[id]/page.tsx`, `src/components/grand-finale-box.tsx`, `past-picks-card.tsx`, `pick-em-box.tsx`, `roster-card.tsx`, `src/lib/format-week.ts` (+test), `grand-finale-pins.ts` (+test), `past-picks.ts` (+test), `results.ts`, `scoring.ts` (+test).
+
+Created: `src/components/curtain-call-league-list.tsx`, `dance-card-league-list.tsx`, `grand-finale-league-list.tsx`, `grand-finale-order-list.tsx`, `src/lib/grand-finale-predictions.ts` (+test), `src/lib/use-persisted-state.ts`.
+
+Deleted: none. Not mine and left uncommitted: `ios/App/App.xcodeproj/project.pbxproj`, `account-settings-sheet.tsx` and `results-screen.tsx` (another session's WIP), `scratch/`, and `claude/grand-finale-picks-feedback-brief.md` (stale brief, describes a dropped design).
 
 ## 3. Key Decisions & Lessons Learned
 
-- **Don't re-propose or re-design Curtain Call near-miss scoring — it already shipped.** PR #33 (`581b85b`, "Add Curtain Call In Jeopardy near-miss credit") added: elimination near-miss = commissioner manually ticks a couple "In Jeopardy" on the Enter Results form (mirrors the TV called-down group — deliberately **not** auto-derived from judges' scores); top-scorer near-miss = guessed couple finished within 1 point of the week's high score (ties at the high score itself are exact-only); credit = `floor(exactPayout × 0.25)` for both kinds, hardcoded — no per-league configurable band size or credit fraction; one boolean toggle `curtain_call_near_miss_enabled`, default true, locks with the Season Clock, not retroactive on already-published `weekly_manager_scores`. Actual code: `src/lib/scoring.ts` (`curtainCallNearMissPoints`, `CurtainCallVerdict`), `supabase/schema.sql` (`episode_in_jeopardy_couples` / `draft_episode_in_jeopardy_couples` tables). Full detail in project memory `mirrorball_madness_in_jeopardy_shipped.md`.
-- **A different, more elaborate near-miss design was explored and abandoned this session** before PR #33 was known about: auto-derived "bottom N couples by that week's dance score" for elimination near-miss with a per-league configurable band size, a fixed top-3 band for top-scorer, and a per-league configurable credit fraction. Never implemented in the codebase — do not resurrect it or its "near_miss"-as-user-facing-copy terminology.
-- **A plan-mode violation happened earlier in this same session**: an interrupted `ExitPlanMode` call followed by an ambiguous system message was mistakenly treated as approval, leading to real edits being made to `src/lib/scoring.ts`/`supabase/schema.sql` for the (ultimately abandoned) near-miss design before the user caught it. Edits were reverted. Full detail in feedback memory `feedback_plan_mode_compliance.md` — lesson: an interrupted plan-mode exit is never implicit approval.
-- **This repo has 5+ concurrent Claude Code/tool sessions sharing one working directory** (reconfirmed this session) — always re-check `git status`/`git fetch` immediately before trusting file state, especially for a file like this one that gets wholesale-rewritten by whichever session finishes last.
-- Confirmed live via service-role read (read-only, no schema changes made this session): all 5 leagues (`Test League Explore`, `Pen & Paso (Doble)`, `Carrie Ann's Biggest Fans`, `#supportSWEKylie`, `matt with the stars`) have `curtain_call_near_miss_enabled = true` — the PR #33 migration (`supabase/apply-curtain-call-in-jeopardy.sql`) is fully applied live, nothing pending there.
+- League lists live inside the existing cards, follow each card's carousel week, and exclude the viewer. Managers order by that week's points then name. Carousels were not modified.
+- Grand Finale "next elim" is the couple in the next elimination slot (same slot for every manager), computed against the viewer's spoiler-clamped couples. It falls back to the next couple still in if the slot's couple is already gone.
+- Grand Finale positions: `eliminationPositionRanges` (`scoring.ts`) gives same-week eliminations a shared range, and a prediction inside it is exact. This replaced the engine's rank-of-week rule, which shifted every later couple after a double elimination. Engine and UI share the function. `grandFinaleBestCasePoints` drives the "up to N" ceiling. Old stored points only change when a week is republished.
+- Curtain Call per-pick points are recomputed live; the week total is the stored value, so they disagree until republish after a scoring-setting change.
+- Do not run `npm run build` or `rm -rf .next` while `next dev` is running; it broke the user's dev server ("Cannot find module ./vendor-chunks/@capacitor.js"). Use `npx tsc --noEmit`, lint and vitest instead.
+- Several sessions share this working directory; stage files by name. Mockup wording (e.g. "Unlocked after lock") is not spec; do not rename existing titles from mockups unless asked.
 
 ## 4. Backlog & Deferred Items
 
-Carried over from the prior handoff (point-scale-rescale session), still untouched:
-
-1. Home page curtain banner copy — `statusCopy()` in `src/components/episode-banner.tsx` (~line 16).
-2. `league-rosters-card.tsx` ("Dance Cards" on Standings) still shows only a bare dimmed "Eliminated" label with no In Jeopardy pill (optional consistency pass, not requested).
-3. A mid-season backfill helper for In Jeopardy marks; a commissioner-facing "who got In Jeopardy credit this week" glance on Publish. Low priority.
-4. The legacy league (`6733a961…`) still carries pre-2026-09-20 uncalibrated *relative* point values (e.g. elimination guess worth 2x top-scorer guess) — only its magnitude was rescaled, not its underlying calibration. Flag if it comes up again.
-5. Not investigated: any other UI surface that reads `scoring_settings` point values directly and might assume whole integers post-rescale (decimals like `17.1`, `10.6` are now valid).
+- Weeks published before the scoring change need a republish to correct their Grand Finale points.
+- 4th/5th place bonuses now use the corrected positions; a double elimination in the top five gives both couples the lower placement's bonus. Worth a look before the finale.
+- Only pure functions have unit tests; the `results.ts` wiring of the new position ranges and the new components were checked only by the user in the browser, and no full `npm run build` was run after the first round of changes.
+- Unrelated WIP files listed above are still uncommitted.
 
 ## 5. Next Steps
 
-No work is queued. If Curtain Call scoring comes up again, check the actual shipped code (`src/lib/scoring.ts`, `supabase/schema.sql`) rather than assuming either this handoff doc or the PR #33 shipped-design memory is fully current — both can drift as more sessions/tools layer work on top of this repo.
+Ask the user whether to delete or keep `claude/grand-finale-picks-feedback-brief.md`, and run `npm run build` once the dev server is stopped. Then take whatever Picks or scoring feedback comes next.
