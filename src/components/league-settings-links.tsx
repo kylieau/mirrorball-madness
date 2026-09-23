@@ -4,7 +4,7 @@ import type { AccountSettingsLeague } from "@/lib/account-settings-data";
 import { SettingsSection } from "@/components/settings-section";
 
 // The one way in to a league's own settings. Commissioners edit; everyone
-// else gets the read-only view of the same page, hence the role hint.
+// else gets the read-only view of the same page.
 export function LeagueSettingsLinks({
   leagues,
   fromHref,
@@ -22,12 +22,7 @@ export function LeagueSettingsLinks({
             href={`/leagues/${l.id}/settings?from=${encodeURIComponent(fromHref)}`}
             className="flex w-full items-center justify-between border-t border-border px-4 py-3 text-left text-sm transition-colors first:border-t-0 hover:bg-muted"
           >
-            <span>
-              <span className="block">{l.name}</span>
-              <span className="block text-xs text-muted-foreground">
-                {l.isCommissioner ? "Commissioner" : "Manager · view only"}
-              </span>
-            </span>
+            <span>{l.name}</span>
             <ChevronRightIcon className="size-4 text-muted-foreground" />
           </Link>
       ))}
