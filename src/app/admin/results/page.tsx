@@ -6,6 +6,8 @@ import { userIsAnyLeagueCommissioner } from "@/lib/results";
 import { loadResultsPageData } from "@/lib/results-page-data";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
+import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { groupEpisodesByWeek } from "@/lib/competition-week";
 
 export default async function AdminResultsPage() {
   const supabase = await createClient();
@@ -27,6 +29,23 @@ export default async function AdminResultsPage() {
     (await userIsAnyLeagueCommissioner(createAdminClient(), user.id));
 
   const data = await loadResultsPageData(supabase, createAdminClient());
+
+  // Scores' View tier being open to any signed-in user is about access, not
+  // about overriding the viewer's own spoiler preference — apply the same
+  // cutoff This Week uses, for every viewer regardless of role. Enter
+  // Results (a separate tab/component) stays unguarded, since correcting a
+  // week requires seeing it.
+  const groupedWeeks = groupEpisodesByWeek(data.weeks, data.episodes);
+  const completedWeeksDesc = groupedWeeks
+    .filter((week) => week.status === "completed")
+    .sort((a, b) => b.week_number - a.week_number);
+  const cutoff = await resolveSpoilerCutoff(
+    supabase,
+    user.id,
+    data.season?.id ?? null,
+    accountSettingsData.spoilerFreeMode,
+    completedWeeksDesc
+  );
 
   return (
     <ResultsScreen
@@ -52,6 +71,8 @@ export default async function AdminResultsPage() {
       roundTypes={data.roundTypes}
       roundTypesByEpisode={data.roundTypesByEpisode}
       inJeopardyByEpisode={data.inJeopardyByEpisode}
+      spoilerFreeMode={accountSettingsData.spoilerFreeMode}
+      allowedWeekIds={[...cutoff.allowedEpisodeIds]}
     />
   );
 }

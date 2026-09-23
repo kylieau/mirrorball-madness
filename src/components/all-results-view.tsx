@@ -3,10 +3,11 @@
 import { Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { buildPeopleDisplayNames, type CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
+import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
 import {
   deriveResultsStatus,
   RESULTS_STATUS_BADGE_VARIANT,
@@ -74,6 +75,8 @@ export function AllResultsView({
   roundTypes,
   roundTypesByEpisode,
   inJeopardyByEpisode,
+  spoilerFreeMode,
+  allowedWeekIds,
 }: {
   // Switcher lives one level up now (results-screen.tsx's PageHeader), as a
   // peer of Schedule rather than nested inside this component.
@@ -97,6 +100,13 @@ export function AllResultsView({
   roundTypes: Named[];
   roundTypesByEpisode: Record<string, string[]>;
   inJeopardyByEpisode: Record<string, string[]>;
+  // Your own spoiler_free_mode + last_watched_week, applied here the same
+  // way as This Week — Scores' View tier being open to any signed-in user
+  // is about access, not about defeating your own spoiler preference.
+  // Enter Results (a separate component) stays unguarded since you can't
+  // correct what you can't see.
+  spoilerFreeMode: boolean;
+  allowedWeekIds: Set<string>;
 }) {
   const inJeopardyKeys = new Set(
     Object.entries(inJeopardyByEpisode).flatMap(([episodeId, coupleIds]) =>
@@ -340,6 +350,7 @@ export function AllResultsView({
           <Accordion>
             {weekGroups.map(({ week, episodes: weekEpisodes }) => {
               const status = groupStatus(weekEpisodes);
+              const locked = spoilerFreeMode && status === "published" && !allowedWeekIds.has(week.id);
               const coupleCount = weekEpisodes.reduce((sum, ep) => {
                 const published = episodeResults.filter((r) => r.episode_id === ep.id).length;
                 return sum + (published > 0 ? published : (draftsByEpisode[ep.id]?.entries.length ?? 0));
@@ -353,26 +364,43 @@ export function AllResultsView({
                           {formatEpisodeCasualWithTheme(week.week_number, week.theme)}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {coupleCount} couple{coupleCount === 1 ? "" : "s"} scored
-                          {weekEpisodes.length > 1 &&
-                            ` · ${weekEpisodes.length} nights`}
+                          {locked
+                            ? "🔒 Locked"
+                            : `${coupleCount} couple${coupleCount === 1 ? "" : "s"} scored${
+                                weekEpisodes.length > 1 ? ` · ${weekEpisodes.length} nights` : ""
+                              }`}
                         </p>
                       </div>
-                      <Badge variant={RESULTS_STATUS_BADGE_VARIANT[status]}>
-                        {RESULTS_STATUS_BADGE_LABEL[status]}
+                      <Badge variant={locked ? "outline" : RESULTS_STATUS_BADGE_VARIANT[status]}>
+                        {locked ? "Locked" : RESULTS_STATUS_BADGE_LABEL[status]}
                       </Badge>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <div className="flex flex-col gap-6">
-                      {weekEpisodes.map((ep) => (
-                        <EpisodeResultsBlock
-                          key={ep.id}
-                          ep={ep}
-                          showTvLabel={weekEpisodes.length > 1}
-                        />
-                      ))}
-                    </div>
+                    {locked ? (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>{formatEpisodeCasual(week.week_number)}&apos;s results are ready</CardTitle>
+                          <CardDescription>
+                            {week.theme ? `${week.theme}. ` : ""}Mark it as watched on This Week once you&apos;ve
+                            caught up to see dances, scores, and who went home.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <MarkWeekWatchedButton weekNumber={week.week_number} />
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="flex flex-col gap-6">
+                        {weekEpisodes.map((ep) => (
+                          <EpisodeResultsBlock
+                            key={ep.id}
+                            ep={ep}
+                            showTvLabel={weekEpisodes.length > 1}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
               );
@@ -452,6 +480,19 @@ export function AllResultsView({
                         : h.episode
                           ? `${formatEpisodeLabel(h.episode.episode_number, seasonNumber)} (exhibition)`
                           : "Episode ?";
+                      const locked =
+                        spoilerFreeMode &&
+                        !!h.week &&
+                        !!h.episode?.results_published_at &&
+                        !allowedWeekIds.has(h.week.id);
+                      if (locked) {
+                        return (
+                          <tr key={i} className="border-b border-border last:border-b-0">
+                            <td className="whitespace-nowrap p-2">{weekLabel}</td>
+                            <td colSpan={3} className="p-2 text-muted-foreground">🔒 Locked</td>
+                          </tr>
+                        );
+                      }
                       return (
                         <Fragment key={i}>
                           <tr className={h.dances.length === 0 ? "border-b border-border last:border-b-0" : undefined}>

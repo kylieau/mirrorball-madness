@@ -98,6 +98,8 @@ export function ResultsScreen({
   roundTypes,
   roundTypesByEpisode,
   inJeopardyByEpisode,
+  spoilerFreeMode,
+  allowedWeekIds,
 }: {
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
@@ -121,6 +123,8 @@ export function ResultsScreen({
   roundTypes: Named[];
   roundTypesByEpisode: Record<string, string[]>;
   inJeopardyByEpisode: Record<string, string[]>;
+  spoilerFreeMode: boolean;
+  allowedWeekIds: string[];
 }) {
   const { isSuperAdmin } = accountSettingsData;
 
@@ -204,6 +208,8 @@ export function ResultsScreen({
           roundTypes={roundTypes}
           roundTypesByEpisode={roundTypesByEpisode}
           inJeopardyByEpisode={inJeopardyByEpisode}
+          spoilerFreeMode={spoilerFreeMode}
+          allowedWeekIds={new Set(allowedWeekIds)}
         />
       )}
     </div>
