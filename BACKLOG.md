@@ -2,6 +2,12 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Next up
+
+### Enter Results UX polish (priority)
+
+Site-admin / propose-tier Enter Results (`/admin/results?tab=enter`) needs a UX pass. Owner feedback 2026-09-22: doesn't love a lot of what's happening on that page. Not urgent this week (only she sees it; no heavy results week upcoming), but it should be among the **first** items picked up after Phase 2 taxonomy ([#31](https://github.com/kylieau/mirrorball-madness/pull/31)) and the In Jeopardy near-miss ship. Specific nits are TBD on a fresh look — don't invent a redesign.
+
 ## Results / Picks week carousel
 
 Shared slim ← `Week N — {theme}` → control (`EpisodeCarousel` / `formatEpisodeCasualWithTheme`). Not on Home. `?week=` is `competition_weeks.id`. Multi-episode weeks may show a subtle `Night One + Night Two` under the label.
