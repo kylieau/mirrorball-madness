@@ -1,24 +1,29 @@
 # Session Handoff
 
 ## 1. Current State
-Fixed the "Enter Results" link in the Account Settings sheet not appearing to work when tapped while already on `/admin/results`. Fix is done and confirmed by hand by the user (both cases: sheet → Enter Results from By Week, and from By Couple after using the in-page buttons). **The code changes are uncommitted.**
+Two things landed; only the second is uncommitted:
+- **League at a Glance** (Picks tab: other managers' picks under the Curtain Call, Dance Card and Grand Finale cards, plus Grand Finale explainer/per-row points/next-elim highlight) — done, user-approved, committed (03523ee).
+- **Enter Results link fix** — Account Settings sheet's Enter Results / Scores links now work when tapped while already on `/admin/results`. User confirmed by hand. **Uncommitted.**
 
 ## 2. Changes Made (`git diff --stat`)
-- `src/components/account-settings-sheet.tsx` — sheet is now controlled (`open` state); a click handler on `SheetContent` closes it when any `<a>` inside is tapped.
-- `src/components/results-screen.tsx` — the URL (`?tab=`) is now the source of truth for the active tab; `setTab` calls `window.history.replaceState(null, "", "?tab=…")`. Removed the `useState(initialTab)` copy.
-- `ios/App/App.xcodeproj/project.pbxproj` — modified, NOT part of this session's work (parallel session / Capacitor wrapper). Do not stage it.
-- Untracked `claude/` and `scratch/` — not this session's; leave alone.
+- `src/components/account-settings-sheet.tsx` — sheet is controlled; a click on any `<a>` inside `SheetContent` closes it.
+- `src/components/results-screen.tsx` — `?tab=` in the URL is the source of truth for the tab; `setTab` uses `window.history.replaceState`.
+- `ios/App/App.xcodeproj/project.pbxproj` — not this work (Capacitor/parallel session); don't stage.
+- Untracked, not this work: `scratch/`, `claude/grand-finale-picks-feedback-brief.md` (stale brief for a dropped design).
 
-## 3. Key Decisions & Lessons Learned
-- Root causes: (a) the settings sheet never unmounts on same-page navigation, so it stayed open over the page; (b) `ResultsScreen` read `?tab=` only once into `useState`, so URL changes were ignored.
-- Used `history.replaceState` (Next syncs it into `useSearchParams`) rather than `router.replace`, which would refetch the whole page's server data on every tab switch.
-- No browser is available in this container (Playwright doesn't support debian11-arm64), so UI verification has to be done by hand by the user.
-- Did NOT run `npm run build`: it would clobber `.next` while a `next dev` is listening on port 3000. `tsc --noEmit`, ESLint on both files, and `npm test` (340 passing) were run and clean.
-- The user mentioned "these are separate pages now"; in the repo Scores and Enter Results are still one page switched by `?tab=` (Schedule is the separate page, `/admin/schedule`). Unresolved what they meant; nothing was split.
+## 3. Key Decisions
+- `replaceState` (synced into `useSearchParams` by Next), not `router.replace`, so tab switches don't refetch server data.
+- No browser in this container (Playwright unsupported on debian11-arm64); UI verification is by the user.
+- Never run `npm run build` / `rm -rf .next` while `next dev` is on port 3000 (breaks it). Use `npx tsc --noEmit`, lint, `npm test`.
+- Grand Finale positions use `eliminationPositionRanges` (`scoring.ts`): same-week eliminations share a range; a prediction inside it is exact. Curtain Call per-pick points are live, week total is stored, so they differ until republish.
+- Shared working dir across sessions: stage files by name, never `git add -A`.
 
-## 4. Backlog & Deferred Items
-- If the user is splitting Scores / Enter Results into separate routes, `results-nav.tsx` links and `results-screen.tsx` tab logic would need to change accordingly.
-- `npm run build` still not run for this change (do it only after confirming no dev server is using `.next`).
+## 4. Backlog
+- Weeks published before the scoring change need a republish to fix Grand Finale points.
+- Double elimination in the top five gives both couples the lower placement's 4th/5th bonus — review before the finale.
+- Only pure functions are unit-tested; `results.ts` position-range wiring and new components were checked only in-browser; no full `npm run build` since.
+- User said "these are separate pages now" about Scores/Enter Results; unclear — repo still uses one page with `?tab=`. Ask if it matters.
+- Decide whether to delete `claude/grand-finale-picks-feedback-brief.md`.
 
 ## 5. Next Steps
-Commit the two source files by name (never `git add -A`; exclude `project.pbxproj`, `claude/`, `scratch/`), e.g. `git add src/components/account-settings-sheet.tsx src/components/results-screen.tsx`, if the user approves.
+`git add src/components/account-settings-sheet.tsx src/components/results-screen.tsx` and commit the Enter Results fix (once user OKs), then run `npm run build` when no dev server is running.
