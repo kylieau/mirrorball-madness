@@ -261,6 +261,8 @@ export function ResultsForm({
   const [error, setError] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState(false);
   const [seedingCorrection, setSeedingCorrection] = useState(false);
+  const [coupleViewMode, setCoupleViewMode] = useState<"all" | "byCouple">("all");
+  const [byCoupleSelectedId, setByCoupleSelectedId] = useState("");
 
   const [teamSheetOpen, setTeamSheetOpen] = useState(false);
   const [customMomentLabel, setCustomMomentLabel] = useState("");
@@ -315,6 +317,7 @@ export function ResultsForm({
     if (previousEpisodeId.current !== selectedEpisode.id) {
       previousEpisodeId.current = selectedEpisode.id;
       setJustPublished(false);
+      setByCoupleSelectedId("");
     }
     const wasSelfTriggered = justSavedEpisodeId.current === selectedEpisode.id;
     justSavedEpisodeId.current = null;
@@ -576,6 +579,146 @@ export function ResultsForm({
     .filter((c) => c.elimination_week !== null || c.status === "winner" || c.status === "runner_up" || c.status === "third_place")
     .sort((a, b) => (a.elimination_week ?? 999) - (b.elimination_week ?? 999));
 
+  // One couple's editable row — shared by the "All Couples" list and the
+  // "By Couple" stepper so the two views can never drift apart.
+  function CoupleEntryCard({ c }: { c: Couple }) {
+    const row = rows[c.id] ?? emptyRow();
+    const canAddDance = row.dances.length < expectedDanceCount;
+    return (
+      <div className="rounded-xl border border-border p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold">
+            <CoupleName {...coupleParts(c)} />
+          </p>
+          <Select
+            items={STATUS_LABELS}
+            value={row.outcome}
+            onValueChange={(v) => setStatus(c.id, (v as StatusValue) ?? "safe")}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions(isFinale).map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {STATUS_LABELS[opt]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {row.outcome === "bye" && (
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            For a couple still in the cast tonight who didn&apos;t perform (an
+            odd-couple bye, a mid-competition injury) — stays active, earns no survival
+            bonus this week. For a couple not appearing this broadcast at all, use
+            &quot;Who&apos;s Performing?&quot; under Edit Scheduled Episode instead.
+          </p>
+        )}
+
+        <div className="mt-3 flex flex-col gap-2">
+          {row.dances.map((d) => (
+            <div key={d.key} className="flex flex-col gap-2 rounded-lg bg-muted/50 p-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Select
+                  items={danceStyleItems}
+                  value={d.danceStyleId}
+                  onValueChange={(v) => updateDance(c.id, d.key, { danceStyleId: v ?? "" })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Dance style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {danceStyles.map((ds) => (
+                      <SelectItem key={ds.id} value={ds.id}>
+                        {ds.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Song title"
+                  value={d.songTitle}
+                  onChange={(e) => updateDance(c.id, d.key, { songTitle: e.target.value })}
+                />
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                {judgesForDance(d).map((j) => (
+                  <div key={j.id} className="flex flex-col gap-1">
+                    <Label className="text-xs text-muted-foreground">
+                      {judgeDisplayNames.get(j.id) ?? j.name}
+                    </Label>
+                    <Input
+                      className="w-16"
+                      placeholder="—"
+                      value={d.scores[j.id] ?? ""}
+                      onChange={(e) =>
+                        updateDance(c.id, d.key, { scores: { ...d.scores, [j.id]: e.target.value } })
+                      }
+                    />
+                  </div>
+                ))}
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Total</Label>
+                  <p className="flex h-8 items-center text-sm font-medium">{danceTotal(d)}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive"
+                  onClick={() => removeDance(c.id, d.key)}
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          ))}
+          {canAddDance && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-start"
+              disabled={row.outcome === "bye"}
+              onClick={() => addDance(c.id)}
+            >
+              + Dance
+            </Button>
+          )}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={row.inJeopardy}
+              disabled={row.outcome === "eliminated"}
+              onChange={(e) => updateRow(c.id, { inJeopardy: e.target.checked })}
+            />
+            In Jeopardy
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={row.savedByJudges}
+              disabled={!judgesSaveAvailable}
+              onChange={(e) => updateRow(c.id, { savedByJudges: e.target.checked })}
+            />
+            Judges&apos; Save used
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={row.hadImmunity}
+              onChange={(e) => updateRow(c.id, { hadImmunity: e.target.checked })}
+            />
+            Immunity
+          </label>
+          <BonusDisclosure row={row} onChange={(patch) => updateRow(c.id, patch)} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 pb-24">
       {justPublished && selectedEpisode && (
@@ -733,145 +876,55 @@ export function ResultsForm({
                   />
                 </Sheet>
               </div>
+              <div className="flex gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant={coupleViewMode === "all" ? "default" : "outline"}
+                  onClick={() => setCoupleViewMode("all")}
+                >
+                  All Couples
+                </Button>
+                <Button
+                  size="sm"
+                  variant={coupleViewMode === "byCouple" ? "default" : "outline"}
+                  onClick={() => setCoupleViewMode("byCouple")}
+                >
+                  By Couple
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              {episodeCouples.map((c) => {
-                const row = rows[c.id] ?? emptyRow();
-                const canAddDance = row.dances.length < expectedDanceCount;
-                return (
-                  <div key={c.id} className="rounded-xl border border-border p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold">
-                        <CoupleName {...coupleParts(c)} />
-                      </p>
+              {coupleViewMode === "all" ? (
+                episodeCouples.map((c) => <CoupleEntryCard key={c.id} c={c} />)
+              ) : episodeCouples.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No couples to check for this episode.</p>
+              ) : (
+                (() => {
+                  const current =
+                    episodeCouples.find((c) => c.id === byCoupleSelectedId) ?? episodeCouples[0];
+                  return (
+                    <>
                       <Select
-                        items={STATUS_LABELS}
-                        value={row.outcome}
-                        onValueChange={(v) => setStatus(c.id, (v as StatusValue) ?? "safe")}
+                        items={Object.fromEntries(episodeCouples.map((c) => [c.id, coupleNameNode(coupleParts(c))]))}
+                        value={current.id}
+                        onValueChange={(v) => setByCoupleSelectedId(v ?? "")}
                       >
-                        <SelectTrigger className="w-40">
+                        <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {statusOptions(isFinale).map((opt) => (
-                            <SelectItem key={opt} value={opt}>
-                              {STATUS_LABELS[opt]}
+                          {episodeCouples.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {coupleNameNode(coupleParts(c))}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-                    {row.outcome === "bye" && (
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        For a couple still in the cast tonight who didn&apos;t perform (an
-                        odd-couple bye, a mid-competition injury) — stays active, earns no survival
-                        bonus this week. For a couple not appearing this broadcast at all, use
-                        &quot;Who&apos;s Performing?&quot; under Edit Scheduled Episode instead.
-                      </p>
-                    )}
-
-                    <div className="mt-3 flex flex-col gap-2">
-                      {row.dances.map((d) => (
-                        <div key={d.key} className="flex flex-col gap-2 rounded-lg bg-muted/50 p-2">
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            <Select
-                              items={danceStyleItems}
-                              value={d.danceStyleId}
-                              onValueChange={(v) => updateDance(c.id, d.key, { danceStyleId: v ?? "" })}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Dance style" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {danceStyles.map((ds) => (
-                                  <SelectItem key={ds.id} value={ds.id}>
-                                    {ds.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Input
-                              placeholder="Song title"
-                              value={d.songTitle}
-                              onChange={(e) => updateDance(c.id, d.key, { songTitle: e.target.value })}
-                            />
-                          </div>
-                          <div className="flex flex-wrap items-end gap-2">
-                            {judgesForDance(d).map((j) => (
-                              <div key={j.id} className="flex flex-col gap-1">
-                                <Label className="text-xs text-muted-foreground">
-                                  {judgeDisplayNames.get(j.id) ?? j.name}
-                                </Label>
-                                <Input
-                                  className="w-16"
-                                  placeholder="—"
-                                  value={d.scores[j.id] ?? ""}
-                                  onChange={(e) =>
-                                    updateDance(c.id, d.key, { scores: { ...d.scores, [j.id]: e.target.value } })
-                                  }
-                                />
-                              </div>
-                            ))}
-                            <div className="flex flex-col gap-1">
-                              <Label className="text-xs text-muted-foreground">Total</Label>
-                              <p className="flex h-8 items-center text-sm font-medium">{danceTotal(d)}</p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive"
-                              onClick={() => removeDance(c.id, d.key)}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                      {canAddDance && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="self-start"
-                          disabled={row.outcome === "bye"}
-                          onClick={() => addDance(c.id)}
-                        >
-                          + Dance
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-                      <label className="flex items-center gap-1.5">
-                        <input
-                          type="checkbox"
-                          checked={row.inJeopardy}
-                          disabled={row.outcome === "eliminated"}
-                          onChange={(e) => updateRow(c.id, { inJeopardy: e.target.checked })}
-                        />
-                        In Jeopardy
-                      </label>
-                      <label className="flex items-center gap-1.5">
-                        <input
-                          type="checkbox"
-                          checked={row.savedByJudges}
-                          disabled={!judgesSaveAvailable}
-                          onChange={(e) => updateRow(c.id, { savedByJudges: e.target.checked })}
-                        />
-                        Judges&apos; Save used
-                      </label>
-                      <label className="flex items-center gap-1.5">
-                        <input
-                          type="checkbox"
-                          checked={row.hadImmunity}
-                          onChange={(e) => updateRow(c.id, { hadImmunity: e.target.checked })}
-                        />
-                        Immunity
-                      </label>
-                      <BonusDisclosure row={row} onChange={(patch) => updateRow(c.id, patch)} />
-                    </div>
-                  </div>
-                );
-              })}
+                      <CoupleEntryCard key={current.id} c={current} />
+                    </>
+                  );
+                })()
+              )}
             </CardContent>
           </Card>
 
