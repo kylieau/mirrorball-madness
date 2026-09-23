@@ -7,6 +7,7 @@ import {
   addEpisodeCustomMoment,
   removeEpisodeCustomMoment,
   publishEpisodeResults,
+  startEpisodeCorrection,
 } from "@/app/admin/results/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -206,6 +207,12 @@ export function ResultsForm({
     if (weekA !== weekB) return weekA - weekB;
     return a.episode_number - b.episode_number;
   });
+  const mostRecentPublishedWeekNumber = Math.max(
+    0,
+    ...episodes
+      .filter((e) => e.results_published_at)
+      .map((e) => (e.week_id ? (weekById.get(e.week_id)?.week_number ?? 0) : 0))
+  );
   const router = useRouter();
 
   const [selectedEpisodeId, setSelectedEpisodeId] = useState("");
@@ -253,6 +260,7 @@ export function ResultsForm({
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState(false);
+  const [seedingCorrection, setSeedingCorrection] = useState(false);
 
   const [teamSheetOpen, setTeamSheetOpen] = useState(false);
   const [customMomentLabel, setCustomMomentLabel] = useState("");
@@ -271,6 +279,10 @@ export function ResultsForm({
   // and the effect skips exactly that one self-triggered refresh.
   const justSavedEpisodeId = useRef<string | null>(null);
   const previousEpisodeId = useRef<string | null>(null);
+  // Guards against firing startEpisodeCorrection more than once while its
+  // own revalidatePath round trip is what actually brings the seeded draft
+  // back into draftsByEpisode and re-triggers this effect.
+  const seedingEpisodeId = useRef<string | null>(null);
 
   function coupleParts(c: Couple): CoupleNameParts {
     return (
@@ -290,6 +302,10 @@ export function ResultsForm({
   // Rehydrate from the persisted draft whenever the selected episode
   // changes — this is what fixes the old form's append-only-local-state
   // gap: the form's initial state *is* the persisted draft, not empty.
+  // Selecting an already-published episode with no draft yet transparently
+  // seeds one from live data first (what "Correct Results" used to do as a
+  // separate step on the Scores page) — Enter Results is where corrections
+  // happen now, not a button on a view-only page.
   useEffect(() => {
     if (!selectedEpisode) return;
     // Only a genuine switch to a *different* episode should dismiss the
@@ -304,6 +320,30 @@ export function ResultsForm({
     justSavedEpisodeId.current = null;
     if (wasSelfTriggered) return;
     const draft = draftsByEpisode[selectedEpisode.id];
+
+    if (selectedEpisode.results_published_at != null && !draft?.hasDraft) {
+      if (seedingEpisodeId.current !== selectedEpisode.id) {
+        seedingEpisodeId.current = selectedEpisode.id;
+        setSeedingCorrection(true);
+        setRows({});
+        setCustomMoments([]);
+        setHasDraft(false);
+        setError(null);
+        startEpisodeCorrection(selectedEpisode.id).then((result) => {
+          if (result.error) {
+            seedingEpisodeId.current = null;
+            setSeedingCorrection(false);
+            setError(result.error);
+          }
+          // On success, its revalidatePath brings the seeded draft back
+          // into draftsByEpisode, which re-runs this effect and hydrates
+          // rows from it below.
+        });
+      }
+      return;
+    }
+    seedingEpisodeId.current = null;
+    setSeedingCorrection(false);
     setJudgesSaveAvailable(draft?.judgesSaveAvailable ?? false);
     setRows(buildRowsFromDraft(draft, episodeCouples));
     setCustomMoments(draft?.customMoments ?? []);
@@ -311,10 +351,9 @@ export function ResultsForm({
     setHasDraft(draft?.hasDraft ?? false);
     setError(null);
     // Depends on the draft's own updatedAt/hasDraft, not just the episode
-    // id, so a fresh draft seeded by "Correct Results" (same episode,
-    // brand-new draft rows) still triggers a rehydrate even though the id
-    // didn't change.
-  }, [selectedEpisode?.id, draftsByEpisode[selectedEpisode?.id ?? ""]?.updatedAt, draftsByEpisode[selectedEpisode?.id ?? ""]?.hasDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+    // id, so a fresh draft (whether from a save or the seed above) still
+    // triggers a rehydrate even though the id didn't change.
+  }, [selectedEpisode?.id, selectedEpisode?.results_published_at, draftsByEpisode[selectedEpisode?.id ?? ""]?.updatedAt, draftsByEpisode[selectedEpisode?.id ?? ""]?.hasDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const status: EpisodeResultsStatus | null = selectedEpisode
     ? deriveResultsStatus({ results_published_at: selectedEpisode.results_published_at }, hasDraft)
@@ -539,15 +578,6 @@ export function ResultsForm({
 
   return (
     <div className="flex flex-col gap-6 pb-24">
-      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
-        <p className="font-medium">Wait for the West Coast broadcast</p>
-        <p className="mt-0.5 text-amber-800/90 dark:text-amber-300/90">
-          Don&apos;t enter results until the episode has finished airing live on the West Coast
-          (tape-delayed) — entering results right after the East Coast airing spoils it for
-          Pacific-time players.
-        </p>
-      </div>
-
       {justPublished && selectedEpisode && (
         <div className="rounded-xl border border-emerald/40 bg-emerald/10 px-4 py-3 text-sm text-emerald-text">
           <p className="font-medium">
@@ -573,11 +603,13 @@ export function ResultsForm({
           </div>
           {selectedEpisode && (
             <CardDescription>
-              {savingDraft
-                ? "Saving draft..."
-                : draftSavedAt
-                  ? `Draft saved ${draftSavedAgo}`
-                  : "Not saved yet"}
+              {seedingCorrection
+                ? "Loading published results..."
+                : savingDraft
+                  ? "Saving draft..."
+                  : draftSavedAt
+                    ? `Draft saved ${draftSavedAgo}`
+                    : "Not saved yet"}
             </CardDescription>
           )}
         </CardHeader>
@@ -608,8 +640,24 @@ export function ResultsForm({
         </CardContent>
       </Card>
 
-      {selectedEpisode && (
+      {selectedEpisode && seedingCorrection && (
+        <p className="text-sm text-muted-foreground">Loading this week&apos;s published results…</p>
+      )}
+
+      {selectedEpisode && !seedingCorrection && (
         <>
+          {selectedEpisode.results_published_at &&
+            selectedWeek &&
+            selectedWeek.week_number !== mostRecentPublishedWeekNumber && (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                <p className="font-medium">Correcting an earlier week</p>
+                <p className="mt-0.5 text-amber-800/90 dark:text-amber-300/90">
+                  {formatEpisodeCasual(mostRecentPublishedWeekNumber)} has already been published
+                  after this week — correcting an elimination here won&apos;t recompute that later
+                  week automatically. Double-check it still makes sense afterward.
+                </p>
+              </div>
+            )}
           {selectedWeek?.is_double_elimination_week && (
             <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
               <p className="font-medium">⚡ Double Elimination Week</p>

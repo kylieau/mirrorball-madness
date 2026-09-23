@@ -505,6 +505,13 @@ export default async function LeaguePage({
   const yourRosterPoints = yourRosterWeek
     ? judgePointsThroughWeek({ ...judgePointsInputs, slots: yourSlotsForWeek, week: yourRosterWeek.week_number })
     : undefined;
+  const yourRosterWeekEpisodeIds =
+    groupedWeeks.find((w) => w.id === yourRosterWeek?.id)?.episodes.map((e) => e.id) ?? [];
+  const { data: yourRosterWeekJeopardy } =
+    yourRosterWeekEpisodeIds.length > 0
+      ? await supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", yourRosterWeekEpisodeIds)
+      : { data: [] as { couple_id: string }[] };
+  const yourRosterWeekInJeopardy = new Set((yourRosterWeekJeopardy ?? []).map((row) => row.couple_id));
   const rosterCouples = yourSlotsForWeek.flatMap((slot) => {
     const couple = flatCouplesById.get(slot.coupleId);
     if (!couple) return [];
@@ -519,7 +526,15 @@ export default async function LeaguePage({
         rawWeeklyPoints: points?.week ?? 0,
       }
     );
-    return [{ ...names, coupleId: slot.coupleId, ...clamped, totalPoints: points?.total }];
+    return [
+      {
+        ...names,
+        coupleId: slot.coupleId,
+        ...clamped,
+        totalPoints: points?.total,
+        inJeopardy: yourRosterWeekInJeopardy.has(slot.coupleId),
+      },
+    ];
   });
   const yourRosterNeighbors = yourRosterWeek
     ? adjacentThisWeekWeeks(visibleDanceWeeks, yourRosterWeek.id)

@@ -1,15 +1,21 @@
 # MEMORY_HANDOFF
 
-_Last updated 2026-09-23. Read this first, then `CLAUDE.md`. Multiple
-tools/sessions (Claude Code, Cursor/Grok "Push Pilot") have worked this repo
-back-to-back in the same window — this doc merges all of their state into
-one accurate picture. Nothing here depends on any one tool; all referenced
-files are committed to this repo._
+_Last updated 2026-09-23 (post-smoke-test pass). Read this first, then
+`CLAUDE.md`. Multiple tools/sessions (Claude Code, Cursor/Grok "Push Pilot")
+have worked this repo back-to-back in the same window — this doc merges all
+of their state into one accurate picture. Nothing here depends on any one
+tool; all referenced files are committed to this repo._
 
 ## 1. Current State
 
-**No feature is actively in progress.** The last three units of work are all
-merged to `main`:
+**No feature is actively in progress. PR #33 is now fully done, not just
+merged** — a prior handoff draft believed the live SQL migration was still
+pending; it had actually already been run (by whom/when isn't recorded) and
+`types.ts` was already the real regenerated file, not the hand-updated
+stand-in it claimed to be. Verified this session (see §5 for the method) and
+corrected here so it doesn't get re-flagged as a blocker again.
+
+The last three units of work are all merged to `main` and fully live:
 
 - **PR #30** — results access split into view/propose/publish tiers
   (replacing the old `RESULTS_ENTRY_OPEN_TO_ALL` toggle, now fully removed)
@@ -24,9 +30,11 @@ merged to `main`:
   applied live.** `PHASE2_TAXONOMY_PLAN.md` is now a historical record of
   this, not an active plan.
 - **PR #33** — "Curtain Call In Jeopardy" near-miss scoring credit (squash
-  merge `581b85b`). **Code is on `main`, but the live migration
-  (`supabase/apply-curtain-call-in-jeopardy.sql`) has not been run yet** —
-  this is the one open blocker, see §5.
+  merge `581b85b`). **SQL already applied live** (confirmed:
+  `scoring_settings.curtain_call_near_miss_enabled` and
+  `episode_in_jeopardy_couples` both exist in prod), **`types.ts` already
+  matches live schema exactly** (zero diff on a fresh regen), and **the
+  scoring path is now smoke-tested end to end** — see §5.
 
 **PR #32** ("Enter Results UX polish backlog docs") is still open as a
 draft — low-stakes, just queues backlog notes, not blocking anything.
@@ -96,8 +104,8 @@ rather than reproduced here — this doc would drift from it otherwise.
 
 ## 4. Backlog & Deferred Items
 
-1. **Run `supabase/apply-curtain-call-in-jeopardy.sql`** — see §5, the one
-   real blocker.
+1. ~~Run `supabase/apply-curtain-call-in-jeopardy.sql`~~ — already done, see
+   §1/§5.
 2. **Spoiler-free + In Jeopardy badge hardening** — designed, not built. In
    Jeopardy is episode-level marks, not `couples.status`, so roster Safe/Elim
    tags must clamp to Safe for unwatched weeks (reuse
@@ -143,15 +151,60 @@ rather than reproduced here — this doc would drift from it otherwise.
 
 ## 5. Next Steps
 
-1. **Owner: run `supabase/apply-curtain-call-in-jeopardy.sql`** in the
-   Supabase Dashboard SQL Editor — blocking for Enter Results/Results/league
-   queries against the new In Jeopardy tables.
-2. Regenerate `src/lib/supabase/types.ts` for real afterward (command in §3)
-   — it's currently hand-updated as a stand-in.
-3. Smoke-test: Enter Results (tick In Jeopardy) → publish → confirm Results
-   badges + past-picks/Pick 'Em preview render correctly on a Vercel
-   prod/preview build.
-4. Then pick up whichever of §4's items the owner greenlights next —
+**§5 steps 1-3 from the previous version of this doc are done** (they
+turned out to already be done before this session started, just
+unrecorded — see §1). What actually happened this session, since Publish
+recomputes every league's scores live and Season 35 is mid-air:
+
+1. Verified live DB state directly with the service-role key + access token
+   already sitting in `.env.local` (contradicts the "no live credentials in
+   this container" framing elsewhere — those two tokens are in fact present
+   and usable for read/write REST + `gen types`; there is still no direct
+   Postgres connection string, so DDL/schema changes still have to go
+   through the Dashboard SQL Editor by hand, `psql` is installed but has
+   nothing to connect to).
+2. Ran the existing unit tests (`scoring.test.ts`, `past-picks.test.ts`, 69
+   tests) — pass.
+3. Built a throwaway end-to-end smoke test (`scratch/zztest-in-jeopardy-*.mts`,
+   kept for reuse) that creates a fake week/episode/couple pair + throwaway
+   league directly in the **live, active season** (episodes/weeks/couples
+   are not league-scoped, so full isolation isn't possible — a throwaway
+   *league* alone wouldn't have exercised this), calls `applyEpisodeResults`
+   the same way Publish does, and checks `weekly_manager_scores.prediction_points`
+   against the expected near-miss math. First run "failed" (63 vs. an
+   expected 70) — that was the test's own expected-value bug, not a product
+   bug: `curtainCallPayout` scales by `couplesRemaining / totalCouples`
+   (16/18 that week), which the test's naive expectation didn't account for.
+   Recomputing with the real scaling matched the stored value exactly,
+   confirming both the elimination near-miss and top-scorer near-miss paths
+   compute correctly together through the real `applyEpisodeResults` →
+   `recomputeWeekScores` → `computeWeeklyScores` pipeline.
+4. **Could not get a real browser screenshot** — this devcontainer is
+   `debian11-arm64`, which Playwright doesn't ship a Chromium build for
+   (`ERROR: Playwright does not support chromium on debian11-arm64`), and
+   there's no system Chromium either. Fell back to static verification:
+   traced `inJeopardyCoupleIds` from `episode_in_jeopardy_couples` through
+   `/this-week` (`src/app/this-week/page.tsx`) and the admin by-couple view
+   (`src/components/all-results-view.tsx`) into `fanOutcomeBadge`
+   (`src/lib/results-outcome.ts`, unit-tested — overrides "Safe" with "In
+   Jeopardy" when marked), and traced near-miss credit through
+   `past-picks.ts`'s `near_miss` verdict → `"in_jeopardy"` row kind →
+   `past-picks-card.tsx`'s distinct rendering branch. Wiring is confirmed
+   correct by code inspection + existing unit tests; an actual rendered
+   screenshot was never taken. If a real visual check still matters, it
+   needs either a non-arm64 environment or the owner's own phone/browser
+   pass (per her usual "Push Pilot" review flow).
+5. **Cleanup note for future sessions**: `computeWeeklyScores`/
+   `recomputeWeekScores` loops over *every* league in the app, not just the
+   one being tested — the smoke test's fake week produced a stray
+   `weekly_manager_scores` row (mostly zero) for all ~25 real leagues, which
+   had to be deleted explicitly before the fake `competition_weeks` row
+   could be deleted (FK). All throwaway rows (people, couples, week,
+   episode, those 25 stray score rows, the league, the test auth user) were
+   deleted afterward and verified gone with a follow-up query. Any future
+   live-data smoke test touching episodes/weeks needs to account for this
+   fan-out when planning cleanup.
+6. Next up: pick up whichever of §4's items the owner greenlights —
    spoiler-free badge hardening and Enter Results UX polish are the two
    nearest-term candidates; the draft-order reorg is fully designed whenever
    it becomes worth doing.

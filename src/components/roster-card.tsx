@@ -4,12 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
 import type { RosterWeeklyTag } from "@/lib/roster-weekly-points";
+import { IN_JEOPARDY_BADGE, showInJeopardyBadge } from "@/lib/results-outcome";
 
 type RosterCouple = CoupleNameParts & {
   coupleId: string;
   weeklyPoints: number;
   totalPoints?: number;
   tag: RosterWeeklyTag;
+  inJeopardy: boolean;
 };
 
 // Same tag styling convention as weekly-results-view.tsx's outcomeTag —
@@ -48,12 +50,22 @@ export function RosterCard({
               )}
             >
               <div>
-                <span className={cn("inline-block rounded-full px-2 py-0.5 text-[10px] font-bold", tag.className)}>
-                  {tag.label}
-                </span>
                 <p className="text-sm font-semibold">
                   <CoupleName celebrity={c.celebrity} pro={c.pro} />
                 </p>
+                <span className={cn("inline-block rounded-full px-2 py-0.5 text-[10px] font-bold", tag.className)}>
+                  {tag.label}
+                </span>
+                {showInJeopardyBadge(c.tag, c.inJeopardy) && (
+                  <span
+                    className={cn(
+                      "ml-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold",
+                      IN_JEOPARDY_BADGE.className
+                    )}
+                  >
+                    {IN_JEOPARDY_BADGE.label}
+                  </span>
+                )}
               </div>
               <div className="shrink-0 text-right text-xs text-muted-foreground">
                 <span className="block font-heading text-base font-semibold text-foreground">

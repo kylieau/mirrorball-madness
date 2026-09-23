@@ -1,21 +1,10 @@
 "use client";
 
-import { Fragment, useState } from "react";
-import { startEpisodeCorrection } from "@/app/admin/results/actions";
+import { Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { buildPeopleDisplayNames, type CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
 import {
@@ -114,9 +103,6 @@ export function AllResultsView({
       coupleIds.map((coupleId) => `${episodeId}:${coupleId}`)
     )
   );
-  const [correctingId, setCorrectingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
   const danceStyleById = new Map(danceStyles.map((d) => [d.id, d.name]));
   const judgeById = buildPeopleDisplayNames(judges);
   const couplesById = new Map(couples.map((c) => [c.id, c]));
@@ -144,8 +130,9 @@ export function AllResultsView({
   }
 
   function outcomeLabel(episodeId: string, coupleId: string, outcome: string) {
-    if (outcome === "safe" && inJeopardyKeys.has(`${episodeId}:${coupleId}`)) return "In Jeopardy";
-    return outcome === "bye" ? "DND" : outcome.replace("_", " ");
+    const label = outcome === "bye" ? "DND" : outcome.replace("_", " ");
+    if (outcome === "safe" && inJeopardyKeys.has(`${episodeId}:${coupleId}`)) return `${label} · In Jeopardy`;
+    return label;
   }
 
   function episodeRoundTypeNames(episodeId: string): string[] {
@@ -190,12 +177,16 @@ export function AllResultsView({
     );
   }
 
+  // A published episode always reads as Published here, regardless of a
+  // correction draft quietly in progress in Enter Results — Scores is a
+  // pure view of what's actually live, and a draft has zero live effect
+  // until Publish.
   const relevantEpisodes: EpisodeWithStatus[] = episodes
     .map((e) => ({
       ...e,
       resultsStatus: deriveResultsStatus(
         { results_published_at: e.results_published_at },
-        !!draftsByEpisode[e.id]?.hasDraft
+        e.results_published_at ? false : !!draftsByEpisode[e.id]?.hasDraft
       ),
     }))
     .filter((e) => e.resultsStatus !== "not_started");
@@ -214,26 +205,6 @@ export function AllResultsView({
     .filter((e) => e.week_id == null)
     .sort((a, b) => b.episode_number - a.episode_number);
 
-  const mostRecentPublishedWeekNumber = Math.max(
-    0,
-    ...episodes
-      .filter((e) => e.results_published_at)
-      .map((e) => (e.week_id ? (weekById.get(e.week_id)?.week_number ?? 0) : 0))
-  );
-
-  async function handleCorrect(episodeId: string) {
-    setError(null);
-    setCorrectingId(episodeId);
-    const result = await startEpisodeCorrection(episodeId);
-    if (result.error) {
-      setError(result.error);
-      setCorrectingId(null);
-      return;
-    }
-    onNavigateToEpisode(episodeId);
-    setCorrectingId(null);
-  }
-
   function episodeResultsRows(ep: EpisodeWithStatus) {
     return episodeResults
       .filter((r) => r.episode_id === ep.id)
@@ -251,19 +222,15 @@ export function AllResultsView({
 
   function EpisodeResultsBlock({
     ep,
-    weekNumber,
     showTvLabel,
   }: {
     ep: EpisodeWithStatus;
-    weekNumber: number | null;
     showTvLabel: boolean;
   }) {
     const results = episodeResultsRows(ep);
     const roundTypeNames = episodeRoundTypeNames(ep.id);
     const coupleCount = results.length > 0 ? results.length : (draftsByEpisode[ep.id]?.entries.length ?? 0);
     const publishedByName = ep.results_published_by ? publishedByNames[ep.results_published_by] : null;
-    const isCorrectingOlderWeek =
-      ep.resultsStatus === "published" && weekNumber != null && weekNumber !== mostRecentPublishedWeekNumber;
 
     return (
       <div className="flex flex-col gap-3">
@@ -330,51 +297,6 @@ export function AllResultsView({
                 {publishedByName ? ` by ${publishedByName}` : ""}
               </p>
             )}
-
-            {canPropose && (
-            <Dialog>
-              <DialogTrigger
-                render={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="self-start"
-                    disabled={correctingId === ep.id}
-                  />
-                }
-              >
-                {correctingId === ep.id ? "Starting..." : "Correct Results"}
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>
-                    Correct{" "}
-                    {weekNumber != null
-                      ? formatEpisodeCasual(weekNumber)
-                      : formatEpisodeLabel(ep.episode_number, seasonNumber)}
-                    ?
-                  </DialogTitle>
-                  <DialogDescription>
-                    This discards any unsaved draft edits for this episode and starts a fresh
-                    correction from what&apos;s currently published. Nothing changes for players
-                    until you publish again.
-                    {isCorrectingOlderWeek && (
-                      <span className="mt-2 block text-amber-700 dark:text-amber-400">
-                        {formatEpisodeCasual(mostRecentPublishedWeekNumber)} has already been
-                        published after this week — correcting an elimination here won&apos;t
-                        recompute that later week automatically. Double-check it still makes sense
-                        afterward.
-                      </span>
-                    )}
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-                  <Button onClick={() => handleCorrect(ep.id)}>Start Correction</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            )}
           </>
         ) : (
           <>
@@ -399,7 +321,6 @@ export function AllResultsView({
   }
 
   function groupStatus(groupEpisodes: EpisodeWithStatus[]): EpisodeResultsStatus {
-    if (groupEpisodes.some((e) => e.resultsStatus === "draft_correcting")) return "draft_correcting";
     if (groupEpisodes.some((e) => e.resultsStatus === "draft")) return "draft";
     if (groupEpisodes.every((e) => e.resultsStatus === "published")) return "published";
     return groupEpisodes[0]?.resultsStatus ?? "draft";
@@ -412,8 +333,6 @@ export function AllResultsView({
 
   return (
     <div className="flex flex-col gap-6">
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
       {view === "week" ? (
         weekGroups.length === 0 && exhibitionEpisodes.length === 0 ? (
           <p className="text-sm text-muted-foreground">No results entered yet.</p>
@@ -450,7 +369,6 @@ export function AllResultsView({
                         <EpisodeResultsBlock
                           key={ep.id}
                           ep={ep}
-                          weekNumber={week.week_number}
                           showTvLabel={weekEpisodes.length > 1}
                         />
                       ))}
@@ -475,7 +393,7 @@ export function AllResultsView({
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <EpisodeResultsBlock ep={ep} weekNumber={null} showTvLabel={false} />
+                  <EpisodeResultsBlock ep={ep} showTvLabel={false} />
                 </AccordionContent>
               </AccordionItem>
             ))}

@@ -5,7 +5,7 @@ import { cn } from "cn";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { mergeCoupleOutcomes } from "@/lib/competition-week";
-import { fanOutcomeBadge } from "@/lib/results-outcome";
+import { fanOutcomeBadge, showInJeopardyBadge, IN_JEOPARDY_BADGE } from "@/lib/results-outcome";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -169,7 +169,8 @@ export function WeeklyResultsView({
       </div>
       <div className="flex flex-col gap-2.5">
         {outcomes.map((r) => {
-          const tag = fanOutcomeBadge(r.outcome, inJeopardy.has(r.couple_id));
+          const tag = fanOutcomeBadge(r.outcome);
+          const inJeopardyBadge = showInJeopardyBadge(r.outcome, inJeopardy.has(r.couple_id));
           return (
             <div
               key={r.couple_id}
@@ -195,6 +196,16 @@ export function WeeklyResultsView({
                 <span className={cn("mb-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold", tag.className)}>
                   {tag.label}
                 </span>
+                {inJeopardyBadge && (
+                  <span
+                    className={cn(
+                      "mb-1 ml-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold",
+                      IN_JEOPARDY_BADGE.className
+                    )}
+                  >
+                    {IN_JEOPARDY_BADGE.label}
+                  </span>
+                )}
                 <span className="block font-heading text-base font-semibold text-foreground">
                   {r.outcome === "bye" ? "—" : r.total}
                 </span>

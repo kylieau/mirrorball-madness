@@ -145,7 +145,7 @@ export function ResultsScreen({
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-8 pb-8">
       <TopBar {...accountSettingsData} email={viewerEmail} />
 
-      <PageHeader title="Scores">
+      <PageHeader title={tab === "enter" ? "Enter Results" : "Scores"}>
         {tab === "enter" ? (
           <Button size="sm" variant="ghost" className="-ml-2" onClick={() => setTab("week")}>
             <ArrowLeftIcon className="size-4" />

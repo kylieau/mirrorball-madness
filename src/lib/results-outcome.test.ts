@@ -1,19 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { fanOutcomeBadge } from "./results-outcome";
+import { fanOutcomeBadge, showInJeopardyBadge } from "./results-outcome";
 
 describe("fanOutcomeBadge", () => {
-  it("replaces Safe with In Jeopardy when the couple was marked", () => {
-    expect(fanOutcomeBadge("safe", true).label).toBe("In Jeopardy");
-    expect(fanOutcomeBadge("safe", false).label).toBe("Safe");
+  it("labels a plain outcome regardless of any In Jeopardy mark", () => {
+    expect(fanOutcomeBadge("safe").label).toBe("Safe");
+    expect(fanOutcomeBadge("eliminated").label).toBe("Eliminated");
+    expect(fanOutcomeBadge("bye").label).toBe("DND");
+    expect(fanOutcomeBadge("withdrawn").label).toBe("Withdrew");
+    expect(fanOutcomeBadge("winner").label).toBe("Winner");
+  });
+});
+
+describe("showInJeopardyBadge", () => {
+  it("shows alongside Safe only, additive rather than a replacement", () => {
+    expect(showInJeopardyBadge("safe", true)).toBe(true);
+    expect(showInJeopardyBadge("safe", false)).toBe(false);
   });
 
-  it("keeps Eliminated when a couple is both eliminated and marked", () => {
-    expect(fanOutcomeBadge("eliminated", true).label).toBe("Eliminated");
-  });
-
-  it("does not relabel a bye, withdrawal, or podium finish", () => {
-    expect(fanOutcomeBadge("bye", true).label).toBe("DND");
-    expect(fanOutcomeBadge("withdrawn", true).label).toBe("Withdrew");
-    expect(fanOutcomeBadge("winner", true).label).toBe("Winner");
+  it("never shows for eliminated or any other terminal outcome", () => {
+    expect(showInJeopardyBadge("eliminated", true)).toBe(false);
+    expect(showInJeopardyBadge("bye", true)).toBe(false);
+    expect(showInJeopardyBadge("withdrawn", true)).toBe(false);
+    expect(showInJeopardyBadge("winner", true)).toBe(false);
   });
 });
