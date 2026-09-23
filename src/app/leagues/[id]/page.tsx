@@ -734,12 +734,12 @@ export default async function LeaguePage({
       inJeopardyCoupleIds: (pastJeopardy ?? []).map((row) => row.couple_id),
       nearMissEnabled,
       eliminationExactPayout: curtainCallPayout(
-        scoringSettings?.elimination_prediction_points ?? 171,
+        scoringSettings?.elimination_prediction_points ?? 17.1,
         remaining,
         seasonCouples.length
       ),
       topScorerExactPayout: curtainCallPayout(
-        scoringSettings?.top_scorer_prediction_points ?? 114,
+        scoringSettings?.top_scorer_prediction_points ?? 11.4,
         remaining,
         seasonCouples.length
       ),
@@ -799,8 +799,8 @@ export default async function LeaguePage({
                       lockAt={lockAt}
                       activeCouples={activeCouples}
                       totalCouples={seasonCouples.length}
-                      eliminationPredictionPoints={scoringSettings?.elimination_prediction_points ?? 171}
-                      topScorerPredictionPoints={scoringSettings?.top_scorer_prediction_points ?? 114}
+                      eliminationPredictionPoints={scoringSettings?.elimination_prediction_points ?? 17.1}
+                      topScorerPredictionPoints={scoringSettings?.top_scorer_prediction_points ?? 11.4}
                       nearMissEnabled={scoringSettings?.curtain_call_near_miss_enabled !== false}
                       coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
                       existingPrediction={ownPrediction}

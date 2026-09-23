@@ -215,9 +215,16 @@ create table scoring_settings (
   -- dance_card_calibration below) only overwrites this column while nobody
   -- has customized it yet, never clobbering an intentional pre-draft choice.
   judges_score_multiplier_customized boolean not null default false,
-  survival_points numeric not null default 15,
-  elimination_prediction_points numeric not null default 171, -- 0 disables
-  top_scorer_prediction_points numeric not null default 114, -- 0 disables
+  -- 2026-09-23: every point value below (and dance_card_calibration's
+  -- multipliers) is the scripts/monte-carlo-calibration/ output times a flat
+  -- POINT_SCALE = 0.1 — a pure linear rescale of the whole calibrated system
+  -- (preserves every relative-influence ratio the calibration solved for;
+  -- see run.mjs's POINT_SCALE comment) adopted because the pre-scale
+  -- defaults put a single week's score in the 1000s, unrecognizable next to
+  -- typical fantasy-sports point totals.
+  survival_points numeric not null default 1.5,
+  elimination_prediction_points numeric not null default 17.1, -- 0 disables
+  top_scorer_prediction_points numeric not null default 11.4, -- 0 disables
   -- Curtain Call In Jeopardy. On for every league (including ones that already
   -- exist when the column is added). A wrong elimination guess of a couple in
   -- episode_in_jeopardy_couples, or a wrong top-scorer guess whose weekly
@@ -227,11 +234,11 @@ create table scoring_settings (
   -- Clock fields in update_scoring_categories. Turning it on does not rewrite
   -- historical weekly_manager_scores — the next publish/correct recomputes.
   curtain_call_near_miss_enabled boolean not null default true,
-  first_place_points numeric not null default 106,
-  second_place_points numeric not null default 53,
-  third_place_points numeric not null default 28,
-  fourth_place_points numeric not null default 14,
-  fifth_place_points numeric not null default 7,
+  first_place_points numeric not null default 10.6,
+  second_place_points numeric not null default 5.3,
+  third_place_points numeric not null default 2.8,
+  fourth_place_points numeric not null default 1.4,
+  fifth_place_points numeric not null default 0.7,
 
   judges_score_category_enabled boolean not null default true,
   eliminations_category_enabled boolean not null default true,
@@ -247,10 +254,10 @@ create table scoring_settings (
   bonus_picks_tier_size int, -- couples per band (3 = 1st-3rd, 4th-6th, ...); only used by 'band_tier'
   bonus_picks_tier_pay_style text not null default 'equal' check (bonus_picks_tier_pay_style in ('equal', 'graded')), -- 'graded': lower bands pay 75/50/25% (floor 25%); only used by 'band_tier'
   -- Base value a correctly-placed couple earns. Calibrated per method
-  -- (scripts/monte-carlo-calibration/): exact_position 264, distance_based 207,
-  -- band_tier 166 equal / 259 graded — the column default matches the
-  -- distance_based default method.
-  bonus_picks_points_per_correct numeric not null default 207,
+  -- (scripts/monte-carlo-calibration/, POINT_SCALE-adjusted, see above):
+  -- exact_position 26.4, distance_based 20.7, band_tier 16.6 equal / 25.9
+  -- graded — the column default matches the distance_based default method.
+  bonus_picks_points_per_correct numeric not null default 20.7,
 
   -- Every new league gets this row with defaults on insert (create_league),
   -- but the commissioner never explicitly reviewed them until they save this
@@ -293,12 +300,12 @@ on public.dance_card_calibration for select
 using (true);
 
 insert into public.dance_card_calibration (roster_size, judges_score_multiplier_default) values
-  (1, 2.362),
-  (2, 1.618),
-  (3, 1.332),
-  (4, 1.168),
-  (5, 1.072),
-  (6, 1.053);
+  (1, 0.2362),
+  (2, 0.1618),
+  (3, 0.1332),
+  (4, 0.1168),
+  (5, 0.1072),
+  (6, 0.1053);
 
 -- ============================================================
 -- Couples (global for the active season)
@@ -793,7 +800,7 @@ begin
     p_curtain_call_enabled,
     v_grand_finale_enabled,
     case when v_grand_finale_enabled then 'distance_based' end,
-    case when v_grand_finale_enabled then 50 end,
+    case when v_grand_finale_enabled then 5 end,
     true
   );
 

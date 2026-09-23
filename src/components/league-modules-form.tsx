@@ -192,21 +192,21 @@ export function LeagueModulesForm({
   const [judgesScoreMultiplier, setJudgesScoreMultiplier] = useState(
     scoringSettings?.judges_score_multiplier ?? 1
   );
-  const [survivalPoints, setSurvivalPoints] = useState(scoringSettings?.survival_points ?? 15);
+  const [survivalPoints, setSurvivalPoints] = useState(scoringSettings?.survival_points ?? 1.5);
   const [firstPlacePoints, setFirstPlacePoints] = useState(
-    scoringSettings?.first_place_points ?? 150
+    scoringSettings?.first_place_points ?? 10.6
   );
   const [secondPlacePoints, setSecondPlacePoints] = useState(
-    scoringSettings?.second_place_points ?? 75
+    scoringSettings?.second_place_points ?? 5.3
   );
   const [thirdPlacePoints, setThirdPlacePoints] = useState(
-    scoringSettings?.third_place_points ?? 40
+    scoringSettings?.third_place_points ?? 2.8
   );
   const [fourthPlacePoints, setFourthPlacePoints] = useState(
-    scoringSettings?.fourth_place_points ?? 14
+    scoringSettings?.fourth_place_points ?? 1.4
   );
   const [fifthPlacePoints, setFifthPlacePoints] = useState(
-    scoringSettings?.fifth_place_points ?? 7
+    scoringSettings?.fifth_place_points ?? 0.7
   );
   const [waiverMode, setWaiverMode] = useState<WaiverMode>(
     (league.waiver_mode as WaiverMode) ?? "reverse_standings"
@@ -223,10 +223,10 @@ export function LeagueModulesForm({
   const draftNotStarted = league.draft_status === "not_started";
 
   const [eliminationPredictionPoints, setEliminationPredictionPoints] = useState(
-    scoringSettings?.elimination_prediction_points ?? 171
+    scoringSettings?.elimination_prediction_points ?? 17.1
   );
   const [topScorerPredictionPoints, setTopScorerPredictionPoints] = useState(
-    scoringSettings?.top_scorer_prediction_points ?? 114
+    scoringSettings?.top_scorer_prediction_points ?? 11.4
   );
   const [nearMissEnabled, setNearMissEnabled] = useState(
     scoringSettings?.curtain_call_near_miss_enabled ?? true

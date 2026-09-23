@@ -67,6 +67,17 @@ const CURRENT = {
 
 const GRAND_FINALE_CAP_FRACTION = 0.6; // spec item 6: 3/5 of a full equal share
 
+// Uniform post-solve scale applied to every final output value (including
+// the roster-size sweep). Doesn't touch any solving above — variance ratios
+// between modules are scale-invariant, so this only changes the overall
+// point-total magnitude a manager sees (a 2026-09-23 decision: pre-existing
+// calibrated defaults produced 1000+ points in a single week, which read as
+// unrecognizable next to typical fantasy-sports point scales). Pure linear
+// rescale: totalPoints_new = POINT_SCALE * totalPoints_old for every manager
+// in every scenario, so it preserves every relative-influence ratio the
+// solve above establishes.
+const POINT_SCALE = 0.1;
+
 // Grand Finale scoring methods other than exact_position (mirrors
 // computeGrandFinalePoints in src/lib/scoring.ts). Each gets its own
 // points-per-correct, solved to the same variance budget as exact_position.
@@ -360,30 +371,32 @@ const bandEqualScale = Math.sqrt(grandFinaleBudget / variance(ref.bandEqual));
 const bandGradedScale = Math.sqrt(grandFinaleBudget / variance(ref.bandGraded));
 
 console.log("\n--- Global (roster-size-independent) calibrated defaults ---");
-const survivalPoints = CURRENT.survivalPoints; // unscaled by design
-const eliminationPredictionPoints = CURRENT.eliminationPredictionPoints * curtainCallScale;
-const topScorerPredictionPoints = CURRENT.topScorerPredictionPoints * curtainCallScale;
-const dcPlacement = CURRENT.placementShape.map((v) => v * danceCardHalfPlacementScale);
-const bonusPicksPointsPerCorrect = CURRENT.bonusPicksPointsPerCorrect * bonusPicksScale;
+const survivalPoints = CURRENT.survivalPoints * POINT_SCALE;
+const eliminationPredictionPoints = CURRENT.eliminationPredictionPoints * curtainCallScale * POINT_SCALE;
+const topScorerPredictionPoints = CURRENT.topScorerPredictionPoints * curtainCallScale * POINT_SCALE;
+const dcPlacement = CURRENT.placementShape.map((v) => v * danceCardHalfPlacementScale * POINT_SCALE);
+const bonusPicksPointsPerCorrect = CURRENT.bonusPicksPointsPerCorrect * bonusPicksScale * POINT_SCALE;
 
-console.log(`survival_points: ${survivalPoints} (unchanged)`);
-console.log(`elimination_prediction_points: ${eliminationPredictionPoints.toFixed(1)}`);
-console.log(`top_scorer_prediction_points: ${topScorerPredictionPoints.toFixed(1)}`);
+console.log(`survival_points: ${survivalPoints.toFixed(2)}`);
+console.log(`elimination_prediction_points: ${eliminationPredictionPoints.toFixed(2)}`);
+console.log(`top_scorer_prediction_points: ${topScorerPredictionPoints.toFixed(2)}`);
 console.log(
-  `first_place_points .. fifth_place_points (Dance Card placement bonus): ${dcPlacement.map((v) => v.toFixed(1)).join(", ")}`
+  `first_place_points .. fifth_place_points (Dance Card placement bonus): ${dcPlacement.map((v) => v.toFixed(2)).join(", ")}`
 );
-console.log(`bonus_picks_points_per_correct (exact_position): ${bonusPicksPointsPerCorrect.toFixed(1)}`);
-const distancePointsPerCorrect = CURRENT.bonusPicksPointsPerCorrect * distanceScale;
+console.log(`bonus_picks_points_per_correct (exact_position): ${bonusPicksPointsPerCorrect.toFixed(2)}`);
+const distancePointsPerCorrect = CURRENT.bonusPicksPointsPerCorrect * distanceScale * POINT_SCALE;
 console.log(
-  `bonus_picks_points_per_correct (distance_based, credit hits 0 at ${DISTANCE_ZERO_AT} spots off): ${distancePointsPerCorrect.toFixed(1)} — bonus_picks_distance_penalty ${(distancePointsPerCorrect / DISTANCE_ZERO_AT).toFixed(1)}`
-);
-console.log(
-  `bonus_picks_points_per_correct (band_tier, width ${BAND_WIDTH}, equal pay): ${(CURRENT.bonusPicksPointsPerCorrect * bandEqualScale).toFixed(1)}`
+  `bonus_picks_points_per_correct (distance_based, credit hits 0 at ${DISTANCE_ZERO_AT} spots off): ${distancePointsPerCorrect.toFixed(2)} — bonus_picks_distance_penalty ${(distancePointsPerCorrect / DISTANCE_ZERO_AT).toFixed(2)}`
 );
 console.log(
-  `bonus_picks_points_per_correct (band_tier, width ${BAND_WIDTH}, graded pay): ${(CURRENT.bonusPicksPointsPerCorrect * bandGradedScale).toFixed(1)}`
+  `bonus_picks_points_per_correct (band_tier, width ${BAND_WIDTH}, equal pay): ${(CURRENT.bonusPicksPointsPerCorrect * bandEqualScale * POINT_SCALE).toFixed(2)}`
 );
-console.log(`judges_score_multiplier at roster size ${REFERENCE_ROSTER_SIZE}: ${referenceMultiplier.toFixed(3)}`);
+console.log(
+  `bonus_picks_points_per_correct (band_tier, width ${BAND_WIDTH}, graded pay): ${(CURRENT.bonusPicksPointsPerCorrect * bandGradedScale * POINT_SCALE).toFixed(2)}`
+);
+console.log(
+  `judges_score_multiplier at roster size ${REFERENCE_ROSTER_SIZE}: ${(referenceMultiplier * POINT_SCALE).toFixed(4)}`
+);
 
 // ============================================================
 // Roster-size sweep: solve judges_score_multiplier at every roster size,
@@ -395,14 +408,14 @@ const calibrationRows = [];
 for (const rosterSize of ROSTER_SIZES) {
   const sim =
     rosterSize === REFERENCE_ROSTER_SIZE ? ref : simulateMany(rosterSize, SEASONS_PER_CONFIG);
-  const m = solveMultiplierForTarget(sim.judgeScoreSum, sim.survival, remainingDanceCardTarget);
+  const m = solveMultiplierForTarget(sim.judgeScoreSum, sim.survival, remainingDanceCardTarget) * POINT_SCALE;
   calibrationRows.push({ rosterSize, multiplier: m });
-  console.log(`roster_size ${rosterSize}: ${m.toFixed(3)}`);
+  console.log(`roster_size ${rosterSize}: ${m.toFixed(4)}`);
 }
 
 console.log("\n--- SQL to paste ---\n");
 console.log(
   `insert into public.dance_card_calibration (roster_size, judges_score_multiplier_default) values\n` +
-    calibrationRows.map((r) => `  (${r.rosterSize}, ${r.multiplier.toFixed(3)})`).join(",\n") +
+    calibrationRows.map((r) => `  (${r.rosterSize}, ${r.multiplier.toFixed(4)})`).join(",\n") +
     ";"
 );

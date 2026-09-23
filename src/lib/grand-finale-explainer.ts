@@ -4,21 +4,23 @@ export type { GrandFinaleMethod, TierPayStyle };
 
 // Points-per-correct is solved per method (and per band pay style) so every
 // option hands Grand Finale the same standings-deciding spread — see
-// scripts/monte-carlo-calibration/. Distance credit reaches 0 at exactly
-// 4 spots off (207 / 52). Re-run the script and re-paste on a re-fit.
+// scripts/monte-carlo-calibration/ (values are its POINT_SCALE = 0.1
+// output, matching scoring_settings' schema.sql defaults). Distance credit
+// reaches 0 at exactly 4 spots off (20.7 / 5.2). Re-run the script and
+// re-paste on a re-fit.
 export const GRAND_FINALE_DEFAULT_METHOD: GrandFinaleMethod = "distance_based";
 export const GRAND_FINALE_DEFAULT_TIER_PAY_STYLE: TierPayStyle = "equal";
-export const GRAND_FINALE_DEFAULT_DISTANCE_PENALTY = 52;
+export const GRAND_FINALE_DEFAULT_DISTANCE_PENALTY = 5.2;
 export const GRAND_FINALE_DEFAULT_TIER_SIZE = 3;
 
 export function defaultPointsPerCorrect(method: GrandFinaleMethod, tierPayStyle: TierPayStyle): number {
   switch (method) {
     case "exact_position":
-      return 264;
+      return 26.4;
     case "distance_based":
-      return 207;
+      return 20.7;
     case "band_tier":
-      return tierPayStyle === "graded" ? 259 : 166;
+      return tierPayStyle === "graded" ? 25.9 : 16.6;
   }
 }
 
