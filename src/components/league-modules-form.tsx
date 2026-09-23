@@ -76,6 +76,7 @@ type ScoringSettings = {
   fifth_place_points: number;
   elimination_prediction_points: number;
   top_scorer_prediction_points: number;
+  curtain_call_near_miss_enabled: boolean;
   scoring_configured: boolean;
 };
 
@@ -227,6 +228,9 @@ export function LeagueModulesForm({
   const [topScorerPredictionPoints, setTopScorerPredictionPoints] = useState(
     scoringSettings?.top_scorer_prediction_points ?? 114
   );
+  const [nearMissEnabled, setNearMissEnabled] = useState(
+    scoringSettings?.curtain_call_near_miss_enabled ?? true
+  );
   const [predictionLockHoursBeforeAir, setPredictionLockHoursBeforeAir] = useState(
     league.prediction_lock_hours_before_air
   );
@@ -352,6 +356,7 @@ export function LeagueModulesForm({
       eliminationPredictionPoints,
       topScorerPredictionPoints,
       bonusPicksPointsPerCorrect,
+      curtainCallNearMissEnabled: nearMissEnabled,
     };
 
     const leagueInput: LeagueSettingsInput = {
@@ -457,6 +462,7 @@ export function LeagueModulesForm({
             <CardContent className="flex flex-col">
               <SettingRow label="Elimination Prediction Points" value={eliminationPredictionPoints} />
               <SettingRow label="Top Scorer Prediction Points" value={topScorerPredictionPoints} />
+              <SettingRow label="In Jeopardy" value={nearMissEnabled ? "On" : "Off"} />
               <SettingRow label="Pick 'Em Lock" value={`${predictionLockHoursBeforeAir}h before air`} />
             </CardContent>
           </Card>
@@ -694,6 +700,21 @@ export function LeagueModulesForm({
                   disabled={scoringLocked}
                 />
               </div>
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input
+                  id="inJeopardy"
+                  type="checkbox"
+                  checked={nearMissEnabled}
+                  onChange={(e) => setNearMissEnabled(e.target.checked)}
+                  disabled={scoringLocked}
+                />
+                <span>
+                  <span className="font-medium">In Jeopardy</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    25% credit for a called-down elimination or a top scorer within 1 of the high.
+                  </span>
+                </span>
+              </label>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="topScorerPredictionPoints">Top Scorer Prediction Points</Label>
                 <Input

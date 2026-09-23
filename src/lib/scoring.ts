@@ -10,6 +10,9 @@ export type ScoringSettings = {
   thirdPlacePoints: number;
   fourthPlacePoints: number;
   fifthPlacePoints: number;
+  // On by default. Partial credit is a hardcoded 25% (curtainCallNearMissPoints),
+  // not a commissioner-editable fraction.
+  curtainCallNearMissEnabled: boolean;
 };
 
 export type RosterSlot = { managerId: string; coupleId: string };
@@ -63,7 +66,14 @@ export type CategoryWeights = {
 // rather than by Outcome — a couple's 4th/5th place finish isn't a distinct
 // couples.status value, it's derived from the same elimination-order
 // ranking Grand Finale's full-order prediction already resolves against.
-const DANCE_CARD_PLACEMENT_KEY: Record<number, keyof ScoringSettings> = {
+const DANCE_CARD_PLACEMENT_KEY: Record<
+  number,
+  | "firstPlacePoints"
+  | "secondPlacePoints"
+  | "thirdPlacePoints"
+  | "fourthPlacePoints"
+  | "fifthPlacePoints"
+> = {
   1: "firstPlacePoints",
   2: "secondPlacePoints",
   3: "thirdPlacePoints",
@@ -122,6 +132,96 @@ export function curtainCallPayout(basePoints: number, couplesRemaining: number, 
   return basePoints * (couplesRemaining / totalCouples);
 }
 
+// Hardcoded. Commissioners can turn In Jeopardy off; they cannot change this.
+export const CURTAIN_CALL_NEAR_MISS_FRACTION = 0.25;
+
+export type CurtainCallVerdict = "exact" | "near_miss" | "miss";
+
+// Whole points. Floors the unrounded exact payout (curtainCallPayout), not a
+// rounded display value — 15.5 × 0.25 is 3, not 4.
+export function curtainCallNearMissPoints(exactPayout: number): number {
+  return Math.floor(exactPayout * CURTAIN_CALL_NEAR_MISS_FRACTION);
+}
+
+export function couplesRemainingAtWeek(
+  couples: { eliminationWeek: number | null }[],
+  weekNumber: number
+): number {
+  const alreadyOut = couples.filter(
+    (c) => c.eliminationWeek !== null && c.eliminationWeek < weekNumber
+  ).length;
+  return couples.length - alreadyOut;
+}
+
+// Eliminated couples are exact, never In Jeopardy, even if a tick came along.
+export function inJeopardyIdsToPersist(
+  coupleIds: string[],
+  entries: { coupleId: string; outcome: string }[]
+): string[] {
+  const eliminated = new Set(entries.filter((e) => e.outcome === "eliminated").map((e) => e.coupleId));
+  return [...new Set(coupleIds.filter((id) => !eliminated.has(id)))];
+}
+
+export function classifyEliminationGuess(
+  guessId: string | null,
+  eliminatedIds: Set<string>,
+  inJeopardyIds: Set<string>
+): CurtainCallVerdict {
+  if (!guessId) return "miss";
+  if (eliminatedIds.has(guessId)) return "exact";
+  if (inJeopardyIds.has(guessId)) return "near_miss";
+  return "miss";
+}
+
+// Exact = tied for the week high M (and M > 0). Near-miss = total in [M−1, M).
+// A couple with no dance_scores row is absent from `totals` and cannot near-miss,
+// including a bye. Ties at M are exact only.
+export function classifyTopScorerGuess(
+  guessId: string | null,
+  totals: Map<string, number>
+): CurtainCallVerdict {
+  if (!guessId) return "miss";
+  const topScorerIds = findTopScorerCoupleIdsFromTotals(totals);
+  if (topScorerIds.has(guessId)) return "exact";
+  if (!totals.has(guessId)) return "miss";
+  const high = Math.max(0, ...totals.values());
+  const score = totals.get(guessId)!;
+  if (high > 0 && score >= high - 1 && score < high) return "near_miss";
+  return "miss";
+}
+
+export function resolveCurtainCallGuess(
+  verdict: CurtainCallVerdict,
+  exactPayout: number,
+  nearMissEnabled: boolean
+): { verdict: CurtainCallVerdict; points: number } {
+  if (verdict === "exact") return { verdict: "exact", points: exactPayout };
+  if (verdict === "near_miss" && nearMissEnabled) {
+    return { verdict: "near_miss", points: curtainCallNearMissPoints(exactPayout) };
+  }
+  return { verdict: "miss", points: 0 };
+}
+
+export function curtainCallPreviewCopy({
+  kind,
+  exactDisplayPoints,
+  nearMissPoints,
+  nearMissEnabled,
+  couplesRemaining,
+}: {
+  kind: "elimination" | "top_scorer";
+  exactDisplayPoints: number;
+  nearMissPoints: number;
+  nearMissEnabled: boolean;
+  couplesRemaining: number;
+}): string {
+  const exactLabel = kind === "elimination" ? "Correct elimination" : "Correct top scorer";
+  const nearClause = kind === "elimination" ? "if In Jeopardy" : "if within 1 of the high";
+  const couplesLeft = `${couplesRemaining} couple${couplesRemaining === 1 ? "" : "s"} left`;
+  const near = nearMissEnabled ? ` · ${nearMissPoints} pts ${nearClause}` : "";
+  return `${exactLabel}: ${exactDisplayPoints} pts${near} · ${couplesLeft}`;
+}
+
 // Pure and DB-free by design: the caller is responsible for fetching
 // already-week-scoped data (e.g. only roster_slots active this week) — this
 // function just does the arithmetic, which is what makes it unit-testable
@@ -137,6 +237,7 @@ export function computeWeeklyScores({
   totalCouples,
   categoryWeights = { judges: 1, eliminations: 1, bonus: 1 },
   grandFinalePointsByManager = {},
+  inJeopardyCoupleIds = [],
 }: {
   scoringSettings: ScoringSettings;
   rosterSlots: RosterSlot[];
@@ -148,13 +249,27 @@ export function computeWeeklyScores({
   totalCouples: number;
   categoryWeights?: CategoryWeights;
   grandFinalePointsByManager?: Record<string, number>;
+  // Commissioner ticks on Enter Results, unioned across the week's episodes.
+  // Not inferred from judges scores.
+  inJeopardyCoupleIds?: string[];
 }): WeeklyManagerScore[] {
   const coupleTotalScore = sumDanceScoresByCouple(danceScores);
   const outcomeByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.outcome]));
   const bonusPointsByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.bonusPoints]));
   const finalPlacementByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.finalPlacement]));
-  const topScorerCoupleIds = findTopScorerCoupleIdsFromTotals(coupleTotalScore);
   const eliminatedCoupleIds = findEliminatedCoupleIds(episodeOutcomes);
+  const inJeopardyIds = new Set(inJeopardyCoupleIds);
+  const nearMissEnabled = scoringSettings.curtainCallNearMissEnabled;
+  const eliminationExact = curtainCallPayout(
+    scoringSettings.eliminationPredictionPoints,
+    couplesRemaining,
+    totalCouples
+  );
+  const topScorerExact = curtainCallPayout(
+    scoringSettings.topScorerPredictionPoints,
+    couplesRemaining,
+    totalCouples
+  );
 
   const rosterPointsByManager = new Map<string, number>();
   for (const { managerId, coupleId } of rosterSlots) {
@@ -178,19 +293,23 @@ export function computeWeeklyScores({
   const predictionPointsByManager = new Map<string, number>();
   for (const p of predictions) {
     let points = 0;
-    if (p.predictedEliminatedCoupleId && eliminatedCoupleIds.has(p.predictedEliminatedCoupleId)) {
-      points += curtainCallPayout(scoringSettings.eliminationPredictionPoints, couplesRemaining, totalCouples);
+    points += resolveCurtainCallGuess(
+      classifyEliminationGuess(p.predictedEliminatedCoupleId, eliminatedCoupleIds, inJeopardyIds),
+      eliminationExact,
+      nearMissEnabled
+    ).points;
+    if (isDoubleElimination) {
+      points += resolveCurtainCallGuess(
+        classifyEliminationGuess(p.predictedEliminatedCoupleId2, eliminatedCoupleIds, inJeopardyIds),
+        eliminationExact,
+        nearMissEnabled
+      ).points;
     }
-    if (
-      isDoubleElimination &&
-      p.predictedEliminatedCoupleId2 &&
-      eliminatedCoupleIds.has(p.predictedEliminatedCoupleId2)
-    ) {
-      points += curtainCallPayout(scoringSettings.eliminationPredictionPoints, couplesRemaining, totalCouples);
-    }
-    if (p.predictedTopScorerCoupleId && topScorerCoupleIds.has(p.predictedTopScorerCoupleId)) {
-      points += curtainCallPayout(scoringSettings.topScorerPredictionPoints, couplesRemaining, totalCouples);
-    }
+    points += resolveCurtainCallGuess(
+      classifyTopScorerGuess(p.predictedTopScorerCoupleId, coupleTotalScore),
+      topScorerExact,
+      nearMissEnabled
+    ).points;
     predictionPointsByManager.set(
       p.managerId,
       (predictionPointsByManager.get(p.managerId) ?? 0) + points

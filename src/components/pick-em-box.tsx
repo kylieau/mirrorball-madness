@@ -18,7 +18,7 @@ import {
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { coupleNameNode } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
-import { curtainCallPayout } from "@/lib/scoring";
+import { curtainCallNearMissPoints, curtainCallPayout, curtainCallPreviewCopy } from "@/lib/scoring";
 import { adaptCurtainCallPick, defaultSelection, type CurtainCallDestination } from "@/lib/copy-picks";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -78,6 +78,7 @@ export function PickEmBox({
   totalCouples,
   eliminationPredictionPoints,
   topScorerPredictionPoints,
+  nearMissEnabled = true,
   coupleDisplayNames,
   existingPrediction,
   isLocked,
@@ -96,6 +97,7 @@ export function PickEmBox({
   totalCouples: number;
   eliminationPredictionPoints: number;
   topScorerPredictionPoints: number;
+  nearMissEnabled?: boolean;
   coupleDisplayNames: Record<string, CoupleNameParts>;
   existingPrediction: {
     predicted_eliminated_couple_id: string | null;
@@ -200,13 +202,22 @@ export function PickEmBox({
   // spoiler-shy manager never sees a preview that reveals more than their
   // own picker does.
   const couplesRemaining = activeCouples.length;
-  const eliminationPreview = Math.round(
-    curtainCallPayout(eliminationPredictionPoints, couplesRemaining, totalCouples)
-  );
-  const topScorerPreview = Math.round(
-    curtainCallPayout(topScorerPredictionPoints, couplesRemaining, totalCouples)
-  );
-  const couplesLeftLabel = `${couplesRemaining} couple${couplesRemaining === 1 ? "" : "s"} left`;
+  const eliminationExact = curtainCallPayout(eliminationPredictionPoints, couplesRemaining, totalCouples);
+  const topScorerExact = curtainCallPayout(topScorerPredictionPoints, couplesRemaining, totalCouples);
+  const eliminationPreview = curtainCallPreviewCopy({
+    kind: "elimination",
+    exactDisplayPoints: Math.round(eliminationExact),
+    nearMissPoints: curtainCallNearMissPoints(eliminationExact),
+    nearMissEnabled,
+    couplesRemaining,
+  });
+  const topScorerPreview = curtainCallPreviewCopy({
+    kind: "top_scorer",
+    exactDisplayPoints: Math.round(topScorerExact),
+    nearMissPoints: curtainCallNearMissPoints(topScorerExact),
+    nearMissEnabled,
+    couplesRemaining,
+  });
   const pickSources = otherLeagues.filter((l) => l.pick);
 
   return (
@@ -229,9 +240,7 @@ export function PickEmBox({
                   Filled in from {filledFrom} — review, then save.
                 </p>
               )}
-              <p className="text-xs text-muted-foreground">
-                Correct elimination: {eliminationPreview} pts · {couplesLeftLabel}
-              </p>
+              <p className="text-xs text-muted-foreground">{eliminationPreview}</p>
               {isDoubleElimination ? (
                 <>
                   <CoupleSelect
@@ -263,9 +272,7 @@ export function PickEmBox({
                   nameFor={nameFor}
                 />
               )}
-              <p className="text-xs text-muted-foreground">
-                Correct top scorer: {topScorerPreview} pts · {couplesLeftLabel}
-              </p>
+              <p className="text-xs text-muted-foreground">{topScorerPreview}</p>
               <CoupleSelect
                 id="top-scorer"
                 label="Who scores highest?"

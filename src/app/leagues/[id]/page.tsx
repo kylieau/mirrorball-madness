@@ -43,6 +43,7 @@ import {
   isPastPicksLocked,
   selectCurtainCallWeek,
 } from "@/lib/past-picks";
+import { couplesRemainingAtWeek, curtainCallPayout } from "@/lib/scoring";
 
 export default async function LeaguePage({
   params,
@@ -678,7 +679,8 @@ export default async function LeaguePage({
   let pastPicksComparison = null;
   if (curtainCallMode === "recap" && curtainCallEpisode && !pastPicksLocked) {
     const recapEpisodeIds = curtainCallEpisode.episodeIds;
-    const [{ data: pastPrediction }, { data: pastResults }, { data: pastDanceScores }] = await Promise.all([
+    const [{ data: pastPrediction }, { data: pastResults }, { data: pastDanceScores }, { data: pastJeopardy }] =
+      await Promise.all([
       supabase
         .from("predictions")
         .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
@@ -688,24 +690,44 @@ export default async function LeaguePage({
         .maybeSingle(),
       recapEpisodeIds.length > 0
         ? supabase.from("episode_results").select("couple_id, outcome").in("episode_id", recapEpisodeIds)
-        : Promise.resolve({ data: [] }),
+        : Promise.resolve({ data: [] as { couple_id: string; outcome: string }[] }),
       recapEpisodeIds.length > 0
         ? supabase.from("dance_scores").select("couple_id, total_score").in("episode_id", recapEpisodeIds)
-        : Promise.resolve({ data: [] }),
+        : Promise.resolve({ data: [] as { couple_id: string; total_score: number }[] }),
+      recapEpisodeIds.length > 0
+        ? supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", recapEpisodeIds)
+        : Promise.resolve({ data: [] as { couple_id: string }[] }),
     ]);
 
     const predictionPoints =
       (allScores ?? []).find((row) => row.week_id === curtainCallEpisode.id && row.manager_id === myTeamId)
         ?.prediction_points ?? 0;
 
+    const nearMissEnabled = scoringSettings?.curtain_call_near_miss_enabled !== false;
+    const remaining = couplesRemainingAtWeek(
+      seasonCouples.map((c) => ({ eliminationWeek: c.elimination_week })),
+      curtainCallEpisode.week_number
+    );
     pastPicksComparison = buildPastPicksComparison({
       isDoubleElimination: curtainCallEpisode.is_double_elimination_week,
       predictedEliminatedCoupleId: pastPrediction?.predicted_eliminated_couple_id ?? null,
       predictedEliminatedCoupleId2: pastPrediction?.predicted_eliminated_couple_id_2 ?? null,
       predictedTopScorerCoupleId: pastPrediction?.predicted_top_scorer_couple_id ?? null,
       episodeOutcomes: (pastResults ?? []).map((r) => ({ coupleId: r.couple_id, outcome: r.outcome })),
-      danceScores: (pastDanceScores ?? []).map((s) => ({ coupleId: s.couple_id, totalScore: s.total_score })),
+      danceScores: (pastDanceScores ?? []).map((s) => ({ coupleId: s.couple_id, totalScore: Number(s.total_score) })),
       predictionPoints,
+      inJeopardyCoupleIds: (pastJeopardy ?? []).map((row) => row.couple_id),
+      nearMissEnabled,
+      eliminationExactPayout: curtainCallPayout(
+        scoringSettings?.elimination_prediction_points ?? 171,
+        remaining,
+        seasonCouples.length
+      ),
+      topScorerExactPayout: curtainCallPayout(
+        scoringSettings?.top_scorer_prediction_points ?? 114,
+        remaining,
+        seasonCouples.length
+      ),
     });
   }
 
@@ -764,6 +786,7 @@ export default async function LeaguePage({
                       totalCouples={seasonCouples.length}
                       eliminationPredictionPoints={scoringSettings?.elimination_prediction_points ?? 171}
                       topScorerPredictionPoints={scoringSettings?.top_scorer_prediction_points ?? 114}
+                      nearMissEnabled={scoringSettings?.curtain_call_near_miss_enabled !== false}
                       coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
                       existingPrediction={ownPrediction}
                       isLocked={isLocked}

@@ -84,6 +84,7 @@ export function AllResultsView({
   seasonNumber,
   roundTypes,
   roundTypesByEpisode,
+  inJeopardyByEpisode,
 }: {
   // Switcher lives one level up now (results-screen.tsx's PageHeader), as a
   // peer of Schedule rather than nested inside this component.
@@ -106,7 +107,13 @@ export function AllResultsView({
   seasonNumber: number | null;
   roundTypes: Named[];
   roundTypesByEpisode: Record<string, string[]>;
+  inJeopardyByEpisode: Record<string, string[]>;
 }) {
+  const inJeopardyKeys = new Set(
+    Object.entries(inJeopardyByEpisode).flatMap(([episodeId, coupleIds]) =>
+      coupleIds.map((coupleId) => `${episodeId}:${coupleId}`)
+    )
+  );
   const [correctingId, setCorrectingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,7 +143,8 @@ export function AllResultsView({
     danceScoresByEpisodeCouple.set(key, list);
   }
 
-  function outcomeLabel(outcome: string) {
+  function outcomeLabel(episodeId: string, coupleId: string, outcome: string) {
+    if (outcome === "safe" && inJeopardyKeys.has(`${episodeId}:${coupleId}`)) return "In Jeopardy";
     return outcome === "bye" ? "DND" : outcome.replace("_", " ");
   }
 
@@ -298,7 +306,7 @@ export function AllResultsView({
                           {r.parts ? <CoupleName {...r.parts} /> : "Unknown"}
                         </td>
                         <td className="p-2">{r.outcome === "bye" ? "—" : r.total}</td>
-                        <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(r.outcome)}</td>
+                        <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(r.episode_id, r.couple_id, r.outcome)}</td>
                         <td className="p-2 text-muted-foreground">{noteLabel(r) || "—"}</td>
                       </tr>
                       {r.dances.map((d, i) => (
@@ -531,7 +539,7 @@ export function AllResultsView({
                           <tr className={h.dances.length === 0 ? "border-b border-border last:border-b-0" : undefined}>
                             <td className="whitespace-nowrap p-2">{weekLabel}</td>
                             <td className="p-2">{h.outcome === "bye" ? "—" : h.total}</td>
-                            <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(h.outcome)}</td>
+                            <td className="whitespace-nowrap p-2 capitalize">{outcomeLabel(h.episode_id, h.couple_id, h.outcome)}</td>
                             <td className="p-2 text-muted-foreground">{noteLabel(h) || "—"}</td>
                           </tr>
                           {h.dances.map((d, j) => (

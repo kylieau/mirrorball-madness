@@ -218,6 +218,15 @@ create table scoring_settings (
   survival_points numeric not null default 15,
   elimination_prediction_points numeric not null default 171, -- 0 disables
   top_scorer_prediction_points numeric not null default 114, -- 0 disables
+  -- Curtain Call In Jeopardy. On for every league (including ones that already
+  -- exist when the column is added). A wrong elimination guess of a couple in
+  -- episode_in_jeopardy_couples, or a wrong top-scorer guess whose weekly
+  -- judges total is in [high−1, high), pays floor(exact payout × 0.25).
+  -- The fraction is hardcoded in src/lib/scoring.ts (curtainCallNearMissPoints);
+  -- this column is only the on/off switch and locks with the other Season
+  -- Clock fields in update_scoring_categories. Turning it on does not rewrite
+  -- historical weekly_manager_scores — the next publish/correct recomputes.
+  curtain_call_near_miss_enabled boolean not null default true,
   first_place_points numeric not null default 106,
   second_place_points numeric not null default 53,
   third_place_points numeric not null default 28,
@@ -1381,7 +1390,8 @@ create function public.update_scoring_categories(
   p_bonus_picks_points_per_correct numeric,
   p_fourth_place_points numeric,
   p_fifth_place_points numeric,
-  p_bonus_picks_tier_pay_style text
+  p_bonus_picks_tier_pay_style text,
+  p_curtain_call_near_miss_enabled boolean
 )
 returns public.scoring_settings
 language plpgsql
@@ -1424,14 +1434,16 @@ begin
       p_judges_score_starts_week, p_bonus_picks_scoring_method, p_bonus_picks_distance_penalty,
       p_bonus_picks_tier_size, p_bonus_picks_tier_pay_style, p_survival_points,
       p_first_place_points, p_second_place_points, p_third_place_points, p_fourth_place_points, p_fifth_place_points,
-      p_elimination_prediction_points, p_top_scorer_prediction_points, p_bonus_picks_points_per_correct
+      p_elimination_prediction_points, p_top_scorer_prediction_points, p_bonus_picks_points_per_correct,
+      p_curtain_call_near_miss_enabled
     ) is distinct from (
       v_current.judges_score_category_enabled, v_current.eliminations_category_enabled, v_current.bonus_picks_category_enabled,
       v_current.judges_score_category_weight, v_current.eliminations_category_weight, v_current.bonus_picks_category_weight,
       v_current.judges_score_starts_week, v_current.bonus_picks_scoring_method, v_current.bonus_picks_distance_penalty,
       v_current.bonus_picks_tier_size, v_current.bonus_picks_tier_pay_style, v_current.survival_points,
       v_current.first_place_points, v_current.second_place_points, v_current.third_place_points, v_current.fourth_place_points, v_current.fifth_place_points,
-      v_current.elimination_prediction_points, v_current.top_scorer_prediction_points, v_current.bonus_picks_points_per_correct
+      v_current.elimination_prediction_points, v_current.top_scorer_prediction_points, v_current.bonus_picks_points_per_correct,
+      v_current.curtain_call_near_miss_enabled
     ) then
       raise exception 'Scoring settings are locked for the season — the Grand Finale deadline has passed';
     end if;
@@ -1466,6 +1478,7 @@ begin
     elimination_prediction_points = p_elimination_prediction_points,
     top_scorer_prediction_points = p_top_scorer_prediction_points,
     bonus_picks_points_per_correct = p_bonus_picks_points_per_correct,
+    curtain_call_near_miss_enabled = p_curtain_call_near_miss_enabled,
     scoring_configured = true
   where league_id = p_league_id
   returning * into v_settings;
@@ -1475,9 +1488,9 @@ end;
 $$;
 
 revoke execute on function public.update_league_settings(uuid, text, text, int, numeric) from public;
-revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text) from public;
+revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text, boolean) from public;
 grant execute on function public.update_league_settings(uuid, text, text, int, numeric) to authenticated;
-grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text) to authenticated;
+grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text, boolean) to authenticated;
 
 -- ============================================================
 -- Draft: couples are global read-only reference data; starting the draft and
@@ -2325,6 +2338,17 @@ create table draft_episode_results (
   unique (episode_id, couple_id)
 );
 
+-- Draft copy of episode_in_jeopardy_couples. Same trust boundary as the other
+-- draft_* tables: no grants, service-role only, deleted on publish.
+create table draft_episode_in_jeopardy_couples (
+  episode_id uuid not null references episodes(id) on delete cascade,
+  couple_id uuid not null references couples(id),
+  created_at timestamptz not null default now(),
+  primary key (episode_id, couple_id)
+);
+
+create index idx_draft_episode_in_jeopardy_episode on draft_episode_in_jeopardy_couples(episode_id);
+
 -- draft_episode_overrides' presence/absence for an episode is itself the
 -- "has a draft been started" signal (see deriveResultsStatus in
 -- src/lib/results-status.ts), and its updated_at drives "Draft saved N
@@ -2426,6 +2450,25 @@ using (true);
 grant select on public.episode_round_types to authenticated;
 create policy "episode round types are viewable by all authenticated users"
 on public.episode_round_types for select
+using (true);
+
+-- Couples the show called down who were not eliminated. Source of truth for
+-- Curtain Call's elimination near-miss — not inferred from judges scores.
+-- Written only by the service-role results path (delete-then-reinsert, same
+-- shape as episode_participants). A couple who is actually eliminated is not
+-- stored here; exact credit wins.
+create table episode_in_jeopardy_couples (
+  episode_id uuid not null references episodes(id) on delete cascade,
+  couple_id uuid not null references couples(id),
+  created_at timestamptz not null default now(),
+  primary key (episode_id, couple_id)
+);
+
+create index idx_episode_in_jeopardy_episode on episode_in_jeopardy_couples(episode_id);
+
+grant select on public.episode_in_jeopardy_couples to authenticated;
+create policy "episode in jeopardy couples are viewable by all authenticated users"
+on public.episode_in_jeopardy_couples for select
 using (true);
 
 grant select on public.weekly_manager_scores to authenticated;

@@ -1,46 +1,33 @@
 # Session Handoff
 
-_Last updated 2026-09-23. Read this first, then `CLAUDE.md` and `PHASE2_TAXONOMY_PLAN.md`._
+_Last updated 2026-09-23. Read this first, then `CLAUDE.md`._
 
 ## 1. Current State
 
-`main` is clean after PR #30 merged: results entry is three access tiers (view / propose / publish), and the admin chrome is Scores (`/admin/results`), Schedule (`/admin/schedule`), and Show Settings (`/admin/show-settings`). This branch does not change those tiers or that page split.
+Curtain Call **In Jeopardy** is implemented on this branch and opened as a draft PR. It is not merged, and it is not live until the owner runs `supabase/apply-curtain-call-in-jeopardy.sql`.
 
-Phase 2 Show Settings taxonomy is specified in `PHASE2_TAXONOMY_PLAN.md`. This PR implements it:
-
-- Round types are a managed `round_types` table (seeded with Team Dance, Trio Dance, Instant Dance, Judges' Choice, Redemption Dance), assigned on the episode from Schedule via `episode_round_types`.
-- `was_team_dance` is migrated onto an episode-level Team Dance row, then dropped from `episode_results` and `draft_episode_results`.
-- `dance_styles.category` is a closed nullable check (`ballroom` / `latin` / `show`), set per row in Show Settings after the style is added.
-- `episodes.expected_dance_count` ("Dances (Per Couple)") is owned by Schedule. Publish no longer writes it.
-
-The owner still needs to run `supabase/apply-round-types-and-style-categories.sql` in the Supabase SQL Editor. `src/lib/supabase/types.ts` in this PR is hand-updated to match that schema — this environment has no `SUPABASE_ACCESS_TOKEN`, and the live project does not have the new tables until the SQL runs. Regenerate types afterward.
-
-`tier-commish` / `tier-plain` QA accounts are already deleted.
+`src/lib/supabase/types.ts` is hand-updated to match that SQL. This environment has no `SUPABASE_ACCESS_TOKEN`, and the live project does not have the new column or tables until the SQL runs. Regenerate types afterward.
 
 ## 2. Changes Made
 
-- `supabase/schema.sql` and `supabase/apply-round-types-and-style-categories.sql`.
-- `loadJudgesAndDanceStyles` renamed to `loadResultsTaxonomy` (`src/lib/results.ts`); `loadResultsPageData` joins episode → round type names and selects `expected_dance_count` and dance-style `category`.
-- `applyEpisodeSchedule` writes round types (delete-then-reinsert, same shape as `episode_participants`) and `expected_dance_count`. `applyEpisodeResults` / `publishEpisodeDraft` no longer touch that column or `was_team_dance`.
-- Show Settings: `DanceStylesCard` (per-row category `Select`) and a Round Types `NamedItemsCard`. Schedule's episode sheet ticks round types and sets dances per couple; episode rows and Scores → By Week show round-type badges.
-- `scheduleEpisode`, `updateSeasonSettings`, and `publishEpisodeResults` also `revalidatePath("/admin/schedule")`. Judge, dance-style, and round-type actions also `revalidatePath("/admin/show-settings")`.
+- `scoring_settings.curtain_call_near_miss_enabled` (default true, backfills existing leagues). Folded into `update_scoring_categories` and the Season Clock lock. Fraction is hardcoded 0.25 in `curtainCallNearMissPoints` — no settings dial.
+- `episode_in_jeopardy_couples` and `draft_episode_in_jeopardy_couples`, delete-then-reinsert like participants. Eliminated couples are dropped before insert.
+- `computeWeeklyScores` / past picks / the pick-em preview share `classifyEliminationGuess`, `classifyTopScorerGuess`, and `resolveCurtainCallGuess`.
+- Enter Results ticks, fan Results badges (In Jeopardy replaces Safe), Scores outcome text, past-picks tri-state with floored points, Curtain Call settings toggle.
+- Not retroactive: the apply script does not rewrite `weekly_manager_scores`. The next publish or correction recomputes that week.
 
 ## 3. Key Decisions
 
-- Round types are episode-level because a round type is round-wide. Per-couple storage was the same boolean repeated, not extra information.
-- Category is a check constraint, not its own table — that list is closed. Round types are a table because the list is not.
-- `addTeamDance` / `TeamDanceSheetContent` stay. Only the `wasTeamDance: true` flag line was removed. Renaming the sheet is a later cosmetic, out of scope.
-- Per-dance `dance_scores.format` and round-type availability windows were not built.
+- Elim near-miss is only the manual tick set. Top-scorer near-miss is weekly judges total in `[M−1, M)`. Ties at `M` are exact. A couple absent from the score map cannot top-scorer near-miss.
+- Exact always wins. Double-elim guesses are independent, each floored on its own.
+- Past-picks footer stays the stored `prediction_points`. Per-guess In Jeopardy points are what the rule pays; standings pick them up on the next publish.
 
 ## 4. Backlog & Deferred Items
 
-- **Equal-EV scoring** — still deferred.
-- **Dance Card calibration overshoot** (~25%) — still deferred. The rigorous fix would shrink the placement bonus from 106/53/28/14/7 to about 14/7/4/2/1 and gut the feature; that is a product call, not a quiet patch.
-- Owner-run migration, types regen, and the live click-through in `PHASE2_TAXONOMY_PLAN.md`'s Verification section (add a round type, tick it on Schedule, confirm badges, set a dance-style category, confirm dances-per-couple survives publish, confirm schedule/show-settings edits refresh without a manual navigate-away).
-- Per-dance format column and round-type availability windows.
+- Equal-EV scoring defaults, Monte Carlo recalibration, and Lotus stay out of scope.
+- Owner-run SQL, types regen, and a live click-through after the SQL is applied (tick In Jeopardy, publish, confirm the badge, a within-1 top scorer, and the settings toggle freezing with the Season Clock).
 
 ## 5. Next Steps
 
-1. Owner runs `supabase/apply-round-types-and-style-categories.sql`, then regenerates `src/lib/supabase/types.ts`.
-2. Leave the PR draft for Push Pilot phone preview before merge, matching PR #30.
-3. Live click-through from the plan's Verification section once the SQL has been applied.
+1. Owner runs `supabase/apply-curtain-call-in-jeopardy.sql`, then regenerates `src/lib/supabase/types.ts`.
+2. Leave the PR draft until that SQL has run and the click-through above is done. Do not merge before the SQL.
