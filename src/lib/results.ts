@@ -26,7 +26,6 @@ export type EntrySubmission = {
   dances: DanceSubmission[];
   outcome: Outcome;
   savedByJudges: boolean;
-  wasTeamDance: boolean;
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string | null;
@@ -49,18 +48,20 @@ export async function userIsAnyLeagueCommissioner(
   return (data ?? []).length > 0;
 }
 
-// Shared by /admin/results (needs the data for score entry/display) and
-// /admin/show-settings (needs it for the judges/dance-styles management UI)
-// so the query shape can't drift between the two.
-export async function loadJudgesAndDanceStyles(
+// The three small managed lists: scoring judges, dance styles (with category),
+// and round types. Shared by /admin/show-settings (which needs nothing else)
+// and loadResultsPageData (which also joins episode → round type).
+export async function loadResultsTaxonomy(
   supabase: SupabaseClient<Database>
 ): Promise<{
   judges: ScoringJudge[];
-  danceStyles: { id: string; name: string }[];
+  danceStyles: { id: string; name: string; category: string | null }[];
+  roundTypes: { id: string; name: string }[];
 }> {
-  const [{ data: judges }, { data: danceStyles }] = await Promise.all([
+  const [{ data: judges }, { data: danceStyles }, { data: roundTypes }] = await Promise.all([
     supabase.from("people").select("id, name, archived_at").eq("role", "judge").order("name"),
-    supabase.from("dance_styles").select("id, name").order("name"),
+    supabase.from("dance_styles").select("id, name, category").order("name"),
+    supabase.from("round_types").select("id, name").order("name"),
   ]);
 
   return {
@@ -68,6 +69,7 @@ export async function loadJudgesAndDanceStyles(
       (judges ?? []).map((j) => ({ id: j.id, name: j.name, archivedAt: j.archived_at }))
     ),
     danceStyles: danceStyles ?? [],
+    roundTypes: roundTypes ?? [],
   };
 }
 
@@ -162,6 +164,8 @@ export type ScheduleEpisodeInput = {
   // ordinary case. Only populated for a split-broadcast episode (e.g. a
   // two-night premiere where half the cast dances each night).
   participantCoupleIds: string[];
+  roundTypeIds: string[];
+  expectedDanceCount: number;
 };
 
 async function deleteWeekIfEmpty(
@@ -176,9 +180,9 @@ async function deleteWeekIfEmpty(
   return deleteErr?.message ?? null;
 }
 
-// Sets episode number/date/theme/week assignment/participants — everything
-// known ahead of air — leaving expected_dance_count and status untouched on
-// an existing episode, since those are owned by the results-entry flow below.
+// Sets everything known ahead of air: episode number, date, theme, week
+// assignment, who's performing, round types, and dances per couple. Status
+// stays owned by publish.
 export async function applyEpisodeSchedule(
   admin: SupabaseClient<Database>,
   input: ScheduleEpisodeInput
@@ -191,6 +195,9 @@ export async function applyEpisodeSchedule(
   }
   if (input.competitionWeekNumber != null && (input.competitionWeekNumber < 1 || !Number.isInteger(input.competitionWeekNumber))) {
     return { error: "Competition week must be a positive integer, or blank for exhibition." };
+  }
+  if (!Number.isInteger(input.expectedDanceCount) || input.expectedDanceCount < 1) {
+    return { error: "Dances per couple must be a positive integer." };
   }
 
   let weekId: string | null = null;
@@ -232,6 +239,7 @@ export async function applyEpisodeSchedule(
     week_id: weekId,
     airs_at: input.airsAt,
     theme: input.theme,
+    expected_dance_count: input.expectedDanceCount,
   };
 
   const { data: episode, error } = input.episodeId
@@ -264,12 +272,20 @@ export async function applyEpisodeSchedule(
     if (participantsErr) return { error: participantsErr.message };
   }
 
+  const roundTypeIds = [...new Set(input.roundTypeIds)];
+  await admin.from("episode_round_types").delete().eq("episode_id", episode.id);
+  if (roundTypeIds.length > 0) {
+    const { error: roundTypesErr } = await admin.from("episode_round_types").insert(
+      roundTypeIds.map((roundTypeId) => ({ episode_id: episode.id, round_type_id: roundTypeId }))
+    );
+    if (roundTypesErr) return { error: roundTypesErr.message };
+  }
+
   return { error: null };
 }
 
 export type EpisodeResultsInput = {
   episodeId: string;
-  expectedDanceCount: number;
   entries: EntrySubmission[];
 };
 
@@ -495,7 +511,6 @@ export async function applyEpisodeResults(
   const { data: episode, error: episodeErr } = await admin
     .from("episodes")
     .update({
-      expected_dance_count: input.expectedDanceCount,
       status: input.entries.length > 0 ? "completed" : "upcoming",
       results_published_at: input.entries.length > 0 ? new Date().toISOString() : null,
     })
@@ -593,7 +608,6 @@ export async function applyEpisodeResults(
     couple_id: e.coupleId,
     outcome: e.outcome,
     saved_by_judges: e.savedByJudges,
-    was_team_dance: e.wasTeamDance,
     had_immunity: e.hadImmunity,
     bonus_points: e.bonusPoints,
     bonus_note: e.bonusNote,

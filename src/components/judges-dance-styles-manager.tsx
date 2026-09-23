@@ -1,15 +1,42 @@
 "use client";
 
-import { useState } from "react";
-import { addJudge, addDanceStyle, archiveJudge, restoreJudge, renameJudge } from "@/app/admin/results/actions";
+import { useEffect, useState } from "react";
+import {
+  addJudge,
+  addDanceStyle,
+  addRoundType,
+  archiveJudge,
+  restoreJudge,
+  renameJudge,
+  setDanceStyleCategory,
+} from "@/app/admin/results/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { isJudgeArchived, type ScoringJudge } from "@/lib/scoring-judges";
 import { PlusIcon } from "lucide-react";
 
 type Named = { id: string; name: string };
+type DanceStyle = Named & { category: string | null };
+type DanceStyleCategory = "ballroom" | "latin" | "show";
+
+const DANCE_STYLE_CATEGORY_ITEMS: Record<DanceStyleCategory, string> = {
+  ballroom: "Ballroom",
+  latin: "Latin",
+  show: "Show",
+};
+
+function isDanceStyleCategory(value: string | null): value is DanceStyleCategory {
+  return value === "ballroom" || value === "latin" || value === "show";
+}
 
 function NamedItemsCard({
   title,
@@ -269,23 +296,117 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
   );
 }
 
+function DanceStylesCard({ danceStyles }: { danceStyles: DanceStyle[] }) {
+  const [newName, setNewName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Record<string, string | null>>(() =>
+    Object.fromEntries(danceStyles.map((style) => [style.id, style.category]))
+  );
+
+  useEffect(() => {
+    setCategories(Object.fromEntries(danceStyles.map((style) => [style.id, style.category])));
+  }, [danceStyles]);
+
+  async function handleAdd() {
+    setError(null);
+    setBusy(true);
+    const result = await addDanceStyle(newName);
+    if (result.error) setError(result.error);
+    else setNewName("");
+    setBusy(false);
+  }
+
+  async function handleCategory(styleId: string, category: DanceStyleCategory | null) {
+    const previous = categories[styleId] ?? null;
+    setCategories((prev) => ({ ...prev, [styleId]: category }));
+    setError(null);
+    setPendingId(styleId);
+    const result = await setDanceStyleCategory(styleId, category);
+    if (result.error) {
+      setError(result.error);
+      setCategories((prev) => ({ ...prev, [styleId]: previous }));
+    }
+    setPendingId(null);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Dance Styles</CardTitle>
+        <CardDescription>
+          What was danced. Pick a category on the row after adding the style.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {danceStyles.length > 0 ? (
+          <ul className="flex flex-col gap-2">
+            {danceStyles.map((style) => (
+              <li key={style.id} className="flex items-center justify-between gap-3">
+                <span className="min-w-0 truncate text-sm font-medium">{style.name}</span>
+                <Select
+                  items={DANCE_STYLE_CATEGORY_ITEMS}
+                  value={categories[style.id] ?? null}
+                  disabled={pendingId === style.id}
+                  onValueChange={(value) => {
+                    void handleCategory(style.id, isDanceStyleCategory(value) ? value : null);
+                  }}
+                >
+                  <SelectTrigger className="w-36" aria-label={`Category for ${style.name}`}>
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(DANCE_STYLE_CATEGORY_ITEMS) as DanceStyleCategory[]).map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {DANCE_STYLE_CATEGORY_ITEMS[value]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">None yet.</p>
+        )}
+        <div className="flex gap-2">
+          <Input
+            placeholder="New Dance Style"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+          <Button onClick={handleAdd} disabled={busy || !newName.trim()}>
+            <PlusIcon className="size-4" />
+            Add Dance Style
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function JudgesDanceStylesManager({
   judges,
   danceStyles,
+  roundTypes,
 }: {
   judges: ScoringJudge[];
-  danceStyles: Named[];
+  danceStyles: DanceStyle[];
+  roundTypes: Named[];
 }) {
   return (
     <div className="flex flex-col gap-6">
       <ScoringJudgesCard judges={judges} />
-
+      <DanceStylesCard danceStyles={danceStyles} />
       <NamedItemsCard
-        title="Dance Styles"
-        items={danceStyles}
-        placeholder="New Dance Style"
-        addLabel="Add dance style"
-        onAdd={addDanceStyle}
+        title="Round Types"
+        description="The format a night is built around. Assign them on the episode in Schedule."
+        items={roundTypes}
+        placeholder="New Round Type"
+        addLabel="Add Round Type"
+        onAdd={addRoundType}
       />
     </div>
   );

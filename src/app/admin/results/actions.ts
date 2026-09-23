@@ -66,7 +66,10 @@ export async function scheduleEpisode(
   if (access.error) return { error: access.error };
 
   const result = await applyEpisodeSchedule(createAdminClient(), input);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) {
+    revalidatePath("/admin/results");
+    revalidatePath("/admin/schedule");
+  }
   return result;
 }
 
@@ -108,7 +111,10 @@ export async function publishEpisodeResults(episodeId: string): Promise<{ error:
   if (access.error) return { error: access.error };
 
   const result = await publishEpisodeDraft(createAdminClient(), episodeId, access.userId);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) {
+    revalidatePath("/admin/results");
+    revalidatePath("/admin/schedule");
+  }
   return result;
 }
 
@@ -126,7 +132,10 @@ export async function updateSeasonSettings(input: SeasonSettingsInput): Promise<
   if (access.error) return { error: access.error };
 
   const result = await applySeasonSettings(createAdminClient(), input);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) {
+    revalidatePath("/admin/results");
+    revalidatePath("/admin/schedule");
+  }
   return result;
 }
 
@@ -135,7 +144,10 @@ export async function addJudge(name: string): Promise<{ error: string | null }> 
   if (access.error) return access;
 
   const result = await insertScoringJudge(createAdminClient(), name);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) {
+    revalidatePath("/admin/results");
+    revalidatePath("/admin/show-settings");
+  }
   return result;
 }
 
@@ -144,7 +156,10 @@ export async function archiveJudge(personId: string): Promise<{ error: string | 
   if (access.error) return access;
 
   const result = await setJudgeArchived(createAdminClient(), personId, true);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) {
+    revalidatePath("/admin/results");
+    revalidatePath("/admin/show-settings");
+  }
   return result;
 }
 
@@ -153,7 +168,10 @@ export async function restoreJudge(personId: string): Promise<{ error: string | 
   if (access.error) return access;
 
   const result = await setJudgeArchived(createAdminClient(), personId, false);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) {
+    revalidatePath("/admin/results");
+    revalidatePath("/admin/show-settings");
+  }
   return result;
 }
 
@@ -162,7 +180,10 @@ export async function renameJudge(personId: string, name: string): Promise<{ err
   if (access.error) return access;
 
   const result = await renameScoringJudge(createAdminClient(), personId, name);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) {
+    revalidatePath("/admin/results");
+    revalidatePath("/admin/show-settings");
+  }
   return result;
 }
 
@@ -177,5 +198,46 @@ export async function addDanceStyle(name: string): Promise<{ error: string | nul
   if (error) return { error: error.message };
 
   revalidatePath("/admin/results");
+  revalidatePath("/admin/show-settings");
+  return { error: null };
+}
+
+const DANCE_STYLE_CATEGORIES = ["ballroom", "latin", "show"] as const;
+type DanceStyleCategory = (typeof DANCE_STYLE_CATEGORIES)[number];
+
+export async function addRoundType(name: string): Promise<{ error: string | null }> {
+  const access = await requireAdminAccess();
+  if (access.error) return access;
+
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Round type name is required" };
+
+  const { error } = await createAdminClient().from("round_types").insert({ name: trimmed });
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/results");
+  revalidatePath("/admin/show-settings");
+  return { error: null };
+}
+
+export async function setDanceStyleCategory(
+  styleId: string,
+  category: DanceStyleCategory | null
+): Promise<{ error: string | null }> {
+  const access = await requireAdminAccess();
+  if (access.error) return access;
+
+  if (category !== null && !DANCE_STYLE_CATEGORIES.includes(category)) {
+    return { error: "Category must be Ballroom, Latin, or Show." };
+  }
+
+  const { error } = await createAdminClient()
+    .from("dance_styles")
+    .update({ category })
+    .eq("id", styleId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/results");
+  revalidatePath("/admin/show-settings");
   return { error: null };
 }

@@ -433,7 +433,10 @@ create table episodes (
   week_id uuid references competition_weeks(id) on delete restrict,
   airs_at timestamptz not null, -- actual real-world air date/time; set per episode, not assumed weekly-regular
   theme text, -- e.g. "Night One", "Villains Night" — free text, not a managed list
-  expected_dance_count int not null default 1, -- informational only, doesn't gate how many dances a couple can actually submit
+  -- Set on Schedule. A soft cap for how many dances Enter Results offers per
+  -- couple (the finale is not uniform), not a hard limit. Publish does not
+  -- overwrite it.
+  expected_dance_count int not null default 1,
   status text not null default 'upcoming' check (status in ('upcoming', 'locked', 'completed')),
   -- guest_judge_name is a leftover caption, not a people(role='judge') row.
   -- It is not shown anywhere and is no longer editable in Enter Results —
@@ -460,8 +463,30 @@ create index idx_episodes_week on episodes(week_id);
 create table dance_styles (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
+  -- Closed set (ballroom / latin / show). Null until categorized in Show
+  -- Settings — category is chosen on the row after adding, not at add time.
+  category text check (category in ('ballroom', 'latin', 'show')),
   created_at timestamptz not null default now()
 );
+
+-- Round types (Team Dance, Trio Dance, Instant Dance, …) are not dance
+-- styles. A round type is round-wide — on a team-dance night the whole cast
+-- does one — so it belongs on the episode, declared when the night is
+-- scheduled, not as a per-couple flag. Managed like dance_styles because the
+-- list grows season to season; a per-dance format column and availability
+-- windows were deliberately not added.
+create table round_types (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  created_at timestamptz not null default now()
+);
+
+insert into round_types (name) values
+  ('Team Dance'),
+  ('Trio Dance'),
+  ('Instant Dance'),
+  ('Judges'' Choice'),
+  ('Redemption Dance');
 
 -- One row per couple per dance, so multi-dance weeks (finals, team dances) just
 -- add rows. total_score is the sum of that dance's judge_scores rows, computed
@@ -494,7 +519,7 @@ create table judge_scores (
 -- insert two 'eliminated' rows that week — no special flag needed) and
 -- no-elimination weeks (insert zero 'eliminated' rows — see competition_weeks.is_elimination_week
 -- for the week-level version of this). was_bottom_two/was_bottom_three/
--- saved_by_judges/was_team_dance/had_immunity are independent flags, not
+-- saved_by_judges/had_immunity are independent flags, not
 -- mutually exclusive with each other or with outcome — a couple can be Safe,
 -- in the Bottom 2, and saved by judges all in the same week.
 --
@@ -513,7 +538,6 @@ create table episode_results (
   was_bottom_two boolean not null default false,
   was_bottom_three boolean not null default false,
   saved_by_judges boolean not null default false,
-  was_team_dance boolean not null default false,
   had_immunity boolean not null default false,
   bonus_points numeric not null default 0,
   bonus_note text,
@@ -2295,7 +2319,6 @@ create table draft_episode_results (
   was_bottom_two boolean not null default false,
   was_bottom_three boolean not null default false,
   saved_by_judges boolean not null default false,
-  was_team_dance boolean not null default false,
   had_immunity boolean not null default false,
   bonus_points numeric not null default 0,
   bonus_note text,
@@ -2327,6 +2350,11 @@ using (true);
 grant select on public.dance_styles to authenticated;
 create policy "dance styles are viewable by all authenticated users"
 on public.dance_styles for select
+using (true);
+
+grant select on public.round_types to authenticated;
+create policy "round types are viewable by all authenticated users"
+on public.round_types for select
 using (true);
 
 grant select on public.dance_scores to authenticated;
@@ -2378,9 +2406,26 @@ create table episode_participants (
 
 create index idx_episode_participants_episode on episode_participants(episode_id);
 
+-- Which round types this airing uses. Mirrors episode_participants: composite
+-- PK, cascade from the episode, readable by every authenticated user, written
+-- only by the service-role schedule path (applyEpisodeSchedule).
+create table episode_round_types (
+  episode_id uuid not null references episodes(id) on delete cascade,
+  round_type_id uuid not null references round_types(id),
+  created_at timestamptz not null default now(),
+  primary key (episode_id, round_type_id)
+);
+
+create index idx_episode_round_types_episode on episode_round_types(episode_id);
+
 grant select on public.episode_participants to authenticated;
 create policy "episode participants are viewable by all authenticated users"
 on public.episode_participants for select
+using (true);
+
+grant select on public.episode_round_types to authenticated;
+create policy "episode round types are viewable by all authenticated users"
+on public.episode_round_types for select
 using (true);
 
 grant select on public.weekly_manager_scores to authenticated;

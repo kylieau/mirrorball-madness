@@ -56,6 +56,7 @@ type ScheduledEpisode = {
   week_id: string | null;
   airs_at: string;
   theme: string | null;
+  expected_dance_count: number;
   results_published_at: string | null;
 };
 type CompetitionWeek = {
@@ -94,7 +95,6 @@ type RowDance = {
 type CoupleRow = {
   outcome: Outcome;
   savedByJudges: boolean;
-  wasTeamDance: boolean;
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string;
@@ -105,7 +105,6 @@ function emptyRow(): CoupleRow {
   return {
     outcome: "safe",
     savedByJudges: false,
-    wasTeamDance: false,
     hadImmunity: false,
     bonusPoints: 0,
     bonusNote: "",
@@ -134,7 +133,6 @@ function buildRowsFromDraft(draft: DraftState | undefined, couples: Couple[]): R
     rows[entry.coupleId] = {
       outcome: entry.outcome,
       savedByJudges: entry.savedByJudges,
-      wasTeamDance: entry.wasTeamDance,
       hadImmunity: entry.hadImmunity,
       bonusPoints: entry.bonusPoints,
       bonusNote: entry.bonusNote ?? "",
@@ -213,6 +211,7 @@ export function ResultsForm({
   }, [forceSelectEpisodeId]);
 
   const selectedEpisode = sortedEpisodes.find((e) => e.id === selectedEpisodeId) ?? null;
+  const expectedDanceCount = selectedEpisode?.expected_dance_count ?? 1;
   const selectedWeek = selectedEpisode?.week_id ? (weekById.get(selectedEpisode.week_id) ?? null) : null;
   const isFinale = selectedWeek?.is_finale ?? false;
   const nightsCount = selectedEpisode?.week_id ? (nightsCountByWeek.get(selectedEpisode.week_id) ?? 1) : 1;
@@ -240,7 +239,6 @@ export function ResultsForm({
     .map((id) => couplesById.get(id) ?? activeCouples.find((c) => c.id === id))
     .filter((c): c is Couple => !!c);
 
-  const [expectedDanceCount, setExpectedDanceCount] = useState(1);
   const [judgesSaveAvailable, setJudgesSaveAvailable] = useState(false);
   const [rows, setRows] = useState<Record<string, CoupleRow>>({});
   const [customMoments, setCustomMoments] = useState<DraftState["customMoments"]>([]);
@@ -308,11 +306,6 @@ export function ResultsForm({
     setDraftSavedAt(draft?.updatedAt ?? null);
     setHasDraft(draft?.hasDraft ?? false);
     setError(null);
-    // expectedDanceCount isn't part of the draft tables — it only caps how
-    // many "+ Dance" rows are offered per couple while drafting. Publish
-    // derives the real value from however many dances actually got
-    // entered, so there's nothing to carry over here; default to 1.
-    setExpectedDanceCount(1);
     // Depends on the draft's own updatedAt/hasDraft, not just the episode
     // id, so a fresh draft seeded by "Correct Results" (same episode,
     // brand-new draft rows) still triggers a rehydrate even though the id
@@ -345,7 +338,6 @@ export function ResultsForm({
             })),
           outcome: row.outcome,
           savedByJudges: row.savedByJudges,
-          wasTeamDance: row.wasTeamDance,
           hadImmunity: row.hadImmunity,
           bonusPoints: row.bonusPoints,
           bonusNote: row.bonusNote.trim() || null,
@@ -453,7 +445,6 @@ export function ResultsForm({
         const row = next[coupleId] ?? emptyRow();
         next[coupleId] = {
           ...row,
-          wasTeamDance: true,
           dances: [
             ...row.dances,
             { key: `team-${Date.now()}-${Math.random()}-${coupleId}`, danceStyleId, songTitle, scores: { ...scores } },
@@ -627,16 +618,6 @@ export function ResultsForm({
               <div className="flex flex-col gap-1">
                 <Label className="text-xs text-muted-foreground">Theme</Label>
                 <p className="text-sm">{selectedEpisode.theme ?? "—"}</p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="danceCount">Dances (Per Couple)</Label>
-                <Input
-                  id="danceCount"
-                  type="number"
-                  min={1}
-                  value={expectedDanceCount}
-                  onChange={(e) => setExpectedDanceCount(Number(e.target.value))}
-                />
               </div>
               <div className="flex items-center justify-between gap-3 sm:col-span-2">
                 <div>

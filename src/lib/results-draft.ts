@@ -16,7 +16,6 @@ export type DraftEntryInput = {
   dances: DraftDanceInput[];
   outcome: Outcome;
   savedByJudges: boolean;
-  wasTeamDance: boolean;
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string | null;
@@ -42,7 +41,6 @@ export type DraftEntryState = {
   coupleId: string;
   outcome: Outcome;
   savedByJudges: boolean;
-  wasTeamDance: boolean;
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string | null;
@@ -132,7 +130,6 @@ export async function saveDraftResults(
     couple_id: e.coupleId,
     outcome: e.outcome,
     saved_by_judges: e.savedByJudges,
-    was_team_dance: e.wasTeamDance,
     had_immunity: e.hadImmunity,
     bonus_points: e.bonusPoints,
     bonus_note: e.bonusNote,
@@ -178,7 +175,6 @@ export async function loadDraftForEpisode(
       coupleId: r.couple_id,
       outcome: r.outcome as Outcome,
       savedByJudges: r.saved_by_judges,
-      wasTeamDance: r.was_team_dance,
       hadImmunity: r.had_immunity,
       bonusPoints: r.bonus_points,
       bonusNote: r.bonus_note,
@@ -245,12 +241,13 @@ async function deleteAllDraftRows(admin: SupabaseClient<Database>, episodeId: st
   await admin.from("draft_episode_custom_moments").delete().eq("episode_id", episodeId);
 }
 
-// Builds an EpisodeResultsInput from the draft tables and calls the
-// existing, unmodified-in-signature applyEpisodeResults — the scoring/
-// prediction/Grand-Finale logic is never forked for drafts. On success,
-// promotes the episode-level fields and custom moments into the live
-// tables and deletes every draft row; on error, returns it and leaves all
-// draft rows intact so nothing gets promoted.
+// Builds an EpisodeResultsInput from the draft tables and calls
+// applyEpisodeResults — the scoring/prediction/Grand-Finale logic is never
+// forked for drafts. On success, promotes the episode-level fields and
+// custom moments into the live tables and deletes every draft row; on
+// error, returns it and leaves all draft rows intact so nothing gets
+// promoted. expected_dance_count is not derived here: Schedule owns it,
+// and publish must not clobber it.
 export async function publishEpisodeDraft(
   admin: SupabaseClient<Database>,
   episodeId: string,
@@ -273,11 +270,6 @@ export async function publishEpisodeDraft(
     dancesByCouple.set(d.coupleId, list);
   }
 
-  // Derived from what was actually entered, not separately tracked — the
-  // form's "Dances (Per Couple)" field only caps how many rows you can add
-  // per couple while drafting, it isn't itself persisted anywhere.
-  const expectedDanceCount = Math.max(1, ...[...dancesByCouple.values()].map((list) => list.length));
-
   const entries: EntrySubmission[] = draft.entries.map((e) => ({
     coupleId: e.coupleId,
     dances: (dancesByCouple.get(e.coupleId) ?? []).map((d) => ({
@@ -287,7 +279,6 @@ export async function publishEpisodeDraft(
     })),
     outcome: e.outcome,
     savedByJudges: e.savedByJudges,
-    wasTeamDance: e.wasTeamDance,
     hadImmunity: e.hadImmunity,
     bonusPoints: e.bonusPoints,
     bonusNote: e.bonusNote,
@@ -295,7 +286,6 @@ export async function publishEpisodeDraft(
 
   const result = await applyEpisodeResults(admin, {
     episodeId,
-    expectedDanceCount,
     entries,
   });
   if (result.error) return result;
@@ -393,7 +383,6 @@ export async function startCorrection(
         couple_id: r.couple_id,
         outcome: r.outcome,
         saved_by_judges: r.saved_by_judges,
-        was_team_dance: r.was_team_dance,
         had_immunity: r.had_immunity,
         bonus_points: r.bonus_points,
         bonus_note: r.bonus_note,
