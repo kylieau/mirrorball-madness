@@ -132,6 +132,28 @@ Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Hom
 
 `draft_type` lives in League Settings' Dance Card card, but the actual order (reorder list + `CustomDraftOrderCard`'s per-round grid) only lives in the draft lobby (`draft-room.tsx`) — two hops for a one-time setup decision. Designed, not built; not urgent since all drafts have run. Design: move order editing (commissioner-only) into `league-modules-form.tsx` next to `draft_type`, keep a **read-only** mirror in the lobby so managers can still build their auto-draft queue, leave queue/autopilot in the lobby. The wrinkle: the lobby effects that guarantee an order exists before `start_draft` can't move wholesale, or nothing forces a commissioner to open Settings first — resolve by moving the membership-reconcile effects into the new Settings component plus a defensive reconcile inside `handleStartDraft`. No SQL needed; `set_draft_order`/`set_custom_draft_order` are already commissioner + `not_started`-gated server-side.
 
+## Standings points breakdown (design in progress)
+
+Players can't tell how anyone's points are tallied on Standings. Being designed in a separate session with third-party mockups; concepts on the table: explainer tiles with a tap-for-rules sheet, expandable leaderboard rows with a per-module split, a weekly ledger. Current pieces: `StandingsTable`, `StandingsModuleBreakdown` (Points by Module), `categoryBreakdown` / `moduleBreakdownMembers` in `src/app/leagues/[id]/page.tsx`. Open question: quote this league's live point values in the copy, or keep it generic. Note the Curtain Call payout-scaling wording now lives in League Settings, not on the Picks lines.
+
+## Scoring display follow-ups
+
+- Stored `weekly_manager_scores` rows written before the 2-decimal rounding change stay whole numbers until the next results publish recomputes them; no backfill was done.
+- Scores > By Week now hides unscheduled nights via `episode_participants`, but the fan-facing `/this-week` view (`weekly-results-view.tsx`) was deliberately not changed; it merges a week's nights per couple, so it looks unaffected. Confirm on real split-night data.
+- The League at a Glance design pack's mocks show a "You" row at the top of the Curtain Call and Grand Finale peer lists; not built. The mocks live on branch `origin/cursor/league-at-a-glance-assets-233e` (`docs/design/league-at-a-glance/`).
+- The draft-complete screen ("Draft complete!", roster card with "Not Drafted") has no entry point in the UI; it is only reachable at `/leagues/<id>/draft` for a league whose draft is completed. Not manually verified after the Dance Cards `unrostered` prop change.
+
+## Grand Finale / Dance Card review items
+
+- Weeks published before the Grand Finale scoring change need a republish to correct their points (unverified: all leagues' `weekly_manager_scores` were recomputed 2026-09-23 ~22:26, likely after `03523ee`, but that was not confirmed).
+- Double elimination in the top five gives both couples the lower placement's 4th/5th bonus; review before the finale.
+
+## Housekeeping
+
+- Full `npm run build` is still owed (last one predates League at a Glance and this session's changes); needs the dev server on port 3000 stopped first.
+- Decide whether to delete `claude/grand-finale-picks-feedback-brief.md` (stale brief for a dropped design) and `scratch/recovered-docs/` (recovered pre-cut CLAUDE.md/handoff copies).
+- The user said "these are separate pages now" about Scores / Enter Results, but the repo still uses one page (`/admin/results`) with `?tab=`.
+
 ## Parked nits
 
 - **Enter Results UX polish** — top product backlog item. PR #32 was left open as a draft, queuing notes only.
