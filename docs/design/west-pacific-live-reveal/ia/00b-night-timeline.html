@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>00b · Night timeline + data states — West live reveal</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #120C14;
+    --gold: #D4AF37;
+    --gold-b: #E8C547;
+    --gold-dim: #C5A04E;
+    --text: #F3EAF2;
+    --muted: #9A8798;
+    --muted-dim: #6E5A6C;
+    --line: rgba(243,234,242,0.10);
+    --coral: #E07A5F;
+    --coral-b: #F0A08A;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1400px;
+    height: 900px;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 100%, #2A1520 0%, transparent 50%),
+      var(--bg);
+    color: var(--text);
+    font-family: Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #shot {
+    width: 1400px;
+    height: 900px;
+    padding: 18px 26px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .hdr {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .hdr h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .hdr .sub {
+    margin-top: 3px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .hdr .sub strong { color: var(--gold-b); }
+  .hdr-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gold-b);
+    background: rgba(212,175,55,0.10);
+    border: 1px solid rgba(212,175,55,0.32);
+    padding: 5px 10px;
+    border-radius: 999px;
+  }
+  .legend {
+    display: flex;
+    gap: 10px;
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend .sw {
+    width: 14px; height: 10px; border-radius: 2px;
+  }
+  .legend .ex { color: var(--muted); }
+  .legend .ex .sw { border: 1.5px dashed rgba(154,135,152,0.5); }
+  .legend .nw { color: var(--gold-b); }
+  .legend .nw .sw { border: 1.5px solid var(--gold); background: rgba(212,175,55,0.15); }
+  .legend .code { color: var(--coral-b); }
+  .legend .code .sw { border: 1.5px solid var(--coral); background: rgba(224,122,95,0.2); }
+
+  .timeline-card {
+    background: rgba(26,18,30,0.85);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 18px 12px;
+    flex-shrink: 0;
+  }
+  .tl-title {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 12px;
+  }
+  .rail {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    padding-top: 6px;
+  }
+  .rail::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 8%;
+    right: 8%;
+    height: 2px;
+    background: linear-gradient(90deg,
+      rgba(212,175,55,0.55) 0%,
+      rgba(212,175,55,0.55) 40%,
+      rgba(154,135,152,0.35) 70%,
+      rgba(154,135,152,0.2) 100%);
+    z-index: 0;
+  }
+  .node {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 5px;
+  }
+  .dot {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    background: #1A121E;
+    border: 2px solid rgba(154,135,152,0.4);
+    color: var(--muted);
+  }
+  .node.active .dot {
+    background: rgba(212,175,55,0.22);
+    border-color: var(--gold);
+    color: var(--gold-b);
+    box-shadow: 0 0 0 4px rgba(212,175,55,0.15);
+  }
+  .node.done .dot {
+    background: rgba(212,175,55,0.18);
+    border-color: var(--gold-dim);
+    color: var(--gold);
+  }
+  .node.after .dot {
+    border-color: rgba(154,135,152,0.3);
+    color: var(--muted-dim);
+  }
+  .ntime { font-size: 12.5px; font-weight: 700; color: #fff; }
+  .nlabel {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gold-b);
+    line-height: 1.25;
+    max-width: 200px;
+  }
+  .nmeta {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.3;
+    max-width: 210px;
+  }
+  .ntag {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 999px;
+  }
+  .ntag.ex {
+    color: var(--muted);
+    border: 1px solid rgba(154,135,152,0.35);
+    background: rgba(154,135,152,0.1);
+  }
+  .ntag.nw {
+    color: #1A121E;
+    background: var(--gold);
+  }
+  .ntag.chg {
+    color: var(--gold-b);
+    border: 1px solid rgba(212,175,55,0.45);
+    background: rgba(212,175,55,0.12);
+  }
+
+  .bottom {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 12px;
+    min-height: 0;
+  }
+  .panel {
+    background: rgba(26,18,30,0.85);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .panel h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--gold);
+  }
+
+  .states {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-top: 2px;
+  }
+  .state {
+    flex: 1;
+    background: rgba(20,14,22,0.7);
+    border: 1.5px solid rgba(154,135,152,0.35);
+    border-radius: 10px;
+    padding: 11px 11px;
+    position: relative;
+  }
+  .state.revealed {
+    border-color: rgba(212,175,55,0.55);
+    background: rgba(212,175,55,0.07);
+  }
+  .state.final {
+    border-color: rgba(212,175,55,0.7);
+    background: rgba(212,175,55,0.12);
+  }
+  .state-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+  .state.revealed .state-name,
+  .state.final .state-name { color: var(--gold-b); }
+  .state-who {
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .state-body {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+  .state-code {
+    margin-top: 6px;
+    font-size: 10px;
+    font-weight: 650;
+    color: var(--coral-b);
+    background: rgba(224,122,95,0.12);
+    border: 1px solid rgba(224,122,95,0.35);
+    border-radius: 5px;
+    padding: 4px 6px;
+    line-height: 1.3;
+  }
+  .state-code.goldish {
+    color: var(--gold-b);
+    background: rgba(212,175,55,0.1);
+    border-color: rgba(212,175,55,0.4);
+  }
+  .arrow-between {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    flex-shrink: 0;
+    gap: 2px;
+  }
+  .arrow-between .a {
+    font-size: 20px;
+    color: var(--gold-b);
+    line-height: 1;
+    font-weight: 700;
+  }
+  .arrow-between .lab {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--gold);
+    text-align: center;
+    letter-spacing: 0.02em;
+    line-height: 1.15;
+  }
+
+  .undo-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: rgba(224,122,95,0.12);
+    border: 1.5px solid rgba(224,122,95,0.45);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-top: 2px;
+  }
+  .undo-row .verb {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #FFD0C4;
+    white-space: nowrap;
+    background: rgba(224,122,95,0.25);
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+  .undo-row .desc {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.35;
+  }
+  .undo-row .desc em { font-style: normal; color: var(--gold-dim); font-weight: 600; }
+  .undo-row .desc .code-tag {
+    color: var(--coral-b);
+    font-weight: 700;
+  }
+
+  .fant-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    flex: 1;
+  }
+  .fant {
+    border-radius: 10px;
+    padding: 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .fant.on-reveal {
+    background: rgba(212,175,55,0.08);
+    border: 1.5px solid rgba(212,175,55,0.5);
+  }
+  .fant.on-final {
+    background: rgba(20,14,22,0.6);
+    border: 1.5px dashed rgba(212,175,55,0.4);
+  }
+  .fant-when {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .fant-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .fant-body {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+  .fant-code {
+    margin-top: auto;
+    font-size: 10px;
+    font-weight: 650;
+    color: var(--coral-b);
+    background: rgba(224,122,95,0.12);
+    border: 1px solid rgba(224,122,95,0.35);
+    border-radius: 5px;
+    padding: 4px 6px;
+    line-height: 1.3;
+  }
+  .ops {
+    margin-top: auto;
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.35;
+    padding: 9px 11px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 8px;
+    border: 1px solid var(--line);
+  }
+  .ops strong { color: var(--gold-dim); font-weight: 600; }
+
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: var(--muted-dim);
+  }
+</style>
+</head>
+<body>
+<div id="shot">
+  <div class="hdr">
+    <div>
+      <h1>Night timeline · Pacific wall clock + data states</h1>
+      <div class="sub">
+        App <strong>lags</strong> Pacific delayed feed · never leads · manual reveal · admin often ~30 min late
+        · annotated with <strong style="color:var(--coral-b)">CODE</strong> gaps from Push Pilot
+      </div>
+    </div>
+    <div class="hdr-right">
+      <span class="badge">Board B · Timeline + states</span>
+      <div class="legend">
+        <span class="ex"><span class="sw"></span> EXISTING</span>
+        <span class="nw"><span class="sw"></span> NEW</span>
+        <span class="code"><span class="sw"></span> CODE GAP</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-card">
+    <div class="tl-title">Timeline · PT (fixed Pacific wall clock)</div>
+    <div class="rail">
+      <div class="node done">
+        <div class="dot">1</div>
+        <div class="ntime">~5pm PT</div>
+        <div class="nlabel">East live / admin drafts</div>
+        <div class="nmeta">Draft all couples · autosave ALL · existing Enter Results</div>
+        <span class="ntag ex">Existing</span>
+      </div>
+      <div class="node active">
+        <div class="dot">2</div>
+        <div class="ntime">8:00pm PT</div>
+        <div class="nlabel">Pacific feed at 8pm</div>
+        <div class="nmeta">Etiquette curtain · Spoilers can wait · feed may start ~30 min late</div>
+        <span class="ntag ex">Existing</span>
+      </div>
+      <div class="node active">
+        <div class="dot">3</div>
+        <div class="ntime">8–10pm+</div>
+        <div class="nlabel">West Coast is watching</div>
+        <div class="nmeta">Progressive reveals · Up next + Reveal per couple</div>
+        <span class="ntag nw">New + CODE</span>
+      </div>
+      <div class="node">
+        <div class="dot">4</div>
+        <div class="ntime">When ready</div>
+        <div class="nlabel">Final publish</div>
+        <div class="nmeta">Ends live · safe / elim · elim pts · split from scores</div>
+        <span class="ntag chg">Behavior + CODE</span>
+      </div>
+      <div class="node after">
+        <div class="dot">5</div>
+        <div class="ntime">After</div>
+        <div class="nlabel">Results in</div>
+        <div class="nmeta">Progressive ends · SF-on still needs Mark watched</div>
+        <span class="ntag ex">Existing</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="panel">
+      <h2>Data states · one couple / score</h2>
+      <div class="states">
+        <div class="state">
+          <div class="state-name">Draft</div>
+          <div class="state-who">Admin only · exists</div>
+          <div class="state-body">Score entered · not visible to players · episode-wide draft sandbox · waiting on Reveal</div>
+          <div class="state-code goldish">EXISTS · draft | draft_correcting</div>
+        </div>
+        <div class="arrow-between">
+          <div class="a">→</div>
+          <div class="lab">reveal<br/><span style="color:var(--coral-b)">NEW</span></div>
+        </div>
+        <div class="state revealed">
+          <div class="state-name">Revealed</div>
+          <div class="state-who">SF-off visible</div>
+          <div class="state-body">Judges score on Home / Activity (SF-off) · Dance Card / judges pts · elim still pending</div>
+          <div class="state-code">CODE · Revealed state = NEW in DB · no per-couple flag today</div>
+        </div>
+        <div class="arrow-between">
+          <div class="a">→</div>
+          <div class="lab">final<br/>publish</div>
+        </div>
+        <div class="state final">
+          <div class="state-name">Final</div>
+          <div class="state-who">Safe / elim</div>
+          <div class="state-body">Safe or eliminated · elim pts · live ends · today = single results_published_at</div>
+          <div class="state-code">CODE · need scores_revealed vs outcomes_final</div>
+        </div>
+      </div>
+
+      <div class="undo-row">
+        <div class="verb">UNDO 30s · CODE</div>
+        <div class="desc">
+          <em>Revealed → Draft</em> · re-hides for SF-off · rolls Dance Card / judges pts back ·
+          soft window only · <span class="code-tag">no publish undo today (#4)</span> ·
+          <span class="code-tag">startCorrection must not fight progressive/undo (#8)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Fantasy scoring timing</h2>
+      <div class="fant-grid">
+        <div class="fant on-reveal">
+          <div class="fant-when">On reveal · NEW</div>
+          <div class="fant-title">Judges · Dance Card</div>
+          <div class="fant-body">Pts tick per couple · provisional · “Elim pts pending” · <strong style="color:var(--gold-b)">no LIVE noise chip</strong></div>
+          <div class="fant-code">CODE · partial recompute / provisional week totals = NEW engine (#2)</div>
+        </div>
+        <div class="fant on-final">
+          <div class="fant-when">On final only</div>
+          <div class="fant-title">Elimination pts</div>
+          <div class="fant-body">Elim pts only when Publish finalizes safe/elim · then clear provisional chrome</div>
+          <div class="fant-code">CODE · today applyEpisodeResults does full recomputeWeekScores at once</div>
+        </div>
+      </div>
+      <div class="ops">
+        <strong>Ops:</strong> No ABC API · manual · lags West ·
+        scores appear as posted — never dance-sync · may run past 10pm PT ·
+        <strong>Realtime today = Draft Room only</strong> (#6 Home / Activity) ·
+        <strong>no watching-live session</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>Mirrorball Madness · Board B · Night timeline + data states · CODE = eng gap (coral)</div>
+    <div>Companion to Board A · Board C = Exists | New matrix</div>
+  </div>
+</div>
+</body>
+</html>

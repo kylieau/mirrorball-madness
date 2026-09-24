@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>01 · How live scores work (plain English)</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #120C14;
+    --gold: #D4AF37;
+    --gold-b: #E8C547;
+    --gold-dim: #C5A04E;
+    --text: #F3EAF2;
+    --muted: #9A8798;
+    --line: rgba(243,234,242,0.10);
+    --card: rgba(26,18,30,0.92);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1400px;
+    height: 900px;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 100%, #2A1520 0%, transparent 50%),
+      var(--bg);
+    color: var(--text);
+    font-family: Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #shot {
+    width: 1400px;
+    height: 900px;
+    padding: 28px 36px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .hdr h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+  }
+  .hdr .sub {
+    margin-top: 6px;
+    font-size: 16px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 22px;
+    min-height: 0;
+  }
+  .steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 16px;
+    align-content: start;
+  }
+  .step {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px 14px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .num {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(212,175,55,0.14);
+    border: 1.5px solid rgba(212,175,55,0.45);
+    color: var(--gold-b);
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .step-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .step-body .who {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 4px;
+  }
+  .step-body p {
+    font-size: 16.5px;
+    font-weight: 550;
+    line-height: 1.35;
+    color: #fff;
+  }
+  .step-body .hint {
+    margin-top: 5px;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-weight: 450;
+    line-height: 1.35;
+  }
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .callout {
+    background: rgba(212,175,55,0.07);
+    border: 1.5px solid rgba(212,175,55,0.32);
+    border-radius: 14px;
+    padding: 18px 18px 16px;
+  }
+  .callout h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--gold-b);
+    margin-bottom: 10px;
+  }
+  .callout ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .callout li {
+    font-size: 14.5px;
+    font-weight: 550;
+    color: var(--text);
+    line-height: 1.35;
+    padding-left: 18px;
+    position: relative;
+  }
+  .callout li::before {
+    content: "×";
+    position: absolute;
+    left: 0;
+    color: var(--gold);
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .key {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    flex: 1;
+  }
+  .key h3 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .key p {
+    font-size: 14.5px;
+    line-height: 1.45;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .key strong { color: var(--gold-b); }
+  .footer {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 450;
+    text-align: center;
+    padding-top: 2px;
+  }
+  .footer em { color: var(--gold-dim); font-style: normal; font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="shot">
+  <div class="hdr">
+    <h1>How live scores work (plain English)</h1>
+    <div class="sub">The night in order · two viewer paths only · locked Sep 24 2026</div>
+  </div>
+
+  <div class="main">
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <div class="step-body">
+          <div class="who">You · after East</div>
+          <p>Draft scores in Enter Results — they stay hidden.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <div class="step-body">
+          <div class="who">Pacific feed night</div>
+          <p>Curtain says West Coast is watching.</p>
+          <div class="hint">Chip: Pacific feed · 8pm PT wall clock</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div class="step-body">
+          <div class="who">You · Enter Results</div>
+          <p>Reveal each couple as they dance on your feed.</p>
+          <div class="hint">Confirm · ~30s undo · one at a time</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">4</div>
+        <div class="step-body">
+          <div class="who">Fans · Spoiler-Free off</div>
+          <p>Scores appear on Home as you post.</p>
+          <div class="hint">Recent Activity shows score posts · provisional pts tick</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">5</div>
+        <div class="step-body">
+          <div class="who">Fans · Spoiler-Free on</div>
+          <p>Stay hidden until Mark week watched.</p>
+          <div class="hint">No auto-unlock · no live sheet · no session</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">6</div>
+        <div class="step-body">
+          <div class="who">Fantasy points</div>
+          <p>Judges points tick as posted · elim points wait.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">7</div>
+        <div class="step-body">
+          <div class="who">You · end of night</div>
+          <p>Publish safe/elim — progressive mode ends.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">8</div>
+        <div class="step-body">
+          <div class="who">Anyone still Spoiler-Free</div>
+          <p>Mark week watched to see everything.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="callout">
+        <h3>Won’t ship</h3>
+        <ul>
+          <li>Watching-live session</li>
+          <li>Show live scores sheet</li>
+          <li>Live scores strip</li>
+          <li>Follow live toggle</li>
+          <li>Mark each dance</li>
+          <li>Reveal on Home</li>
+        </ul>
+      </div>
+      <div class="key">
+        <h3>Remember</h3>
+        <p><strong>Spoiler-Free</strong> is the only standing preference. SF off = auto see reveals. SF on = Mark week watched. No third path.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">Companion to <em>02-sf-ooo</em> (two-column OOO) · Dense eng map = Boards A–C</div>
+</div>
+</body>
+</html>

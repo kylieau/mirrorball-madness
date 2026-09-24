@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>02 · Order of operations · Spoiler-Free off vs on</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #120C14;
+    --gold: #D4AF37;
+    --gold-b: #E8C547;
+    --gold-dim: #C5A04E;
+    --text: #F3EAF2;
+    --muted: #9A8798;
+    --line: rgba(243,234,242,0.10);
+    --card: rgba(26,18,30,0.94);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px;
+    height: 980px;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 65% 45% at 50% 100%, #2A1520 0%, transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #shot {
+    width: 1600px;
+    height: 980px;
+    padding: 26px 30px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .hdr {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .hdr h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+  }
+  .hdr .sub {
+    margin-top: 6px;
+    font-size: 15.5px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .hdr-tag {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gold-b);
+    background: rgba(212,175,55,0.12);
+    border: 1px solid rgba(212,175,55,0.35);
+    border-radius: 999px;
+    padding: 8px 14px;
+    margin-bottom: 4px;
+  }
+
+  .cols {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    min-height: 0;
+  }
+  .col {
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: 18px;
+    padding: 18px 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+  }
+  .col.off { border-color: rgba(154,135,152,0.22); }
+  .col.on { border-color: rgba(212,175,55,0.38); box-shadow: 0 0 0 1px rgba(212,175,55,0.08); }
+
+  .col-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .col-head h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .col-head .badge {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: rgba(243,234,242,0.06);
+    border-radius: 8px;
+    padding: 5px 10px;
+  }
+  .col.on .col-head .badge {
+    color: var(--gold-b);
+    background: rgba(212,175,55,0.12);
+  }
+
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    flex: 1;
+  }
+  .step {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .num {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(212,175,55,0.14);
+    border: 1.5px solid rgba(212,175,55,0.45);
+    color: var(--gold-b);
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 16px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+  .step p {
+    font-size: 16px;
+    font-weight: 550;
+    line-height: 1.38;
+    color: #fff;
+  }
+  .step p strong { color: var(--gold-b); font-weight: 700; }
+  .step .hint {
+    margin-top: 3px;
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 500;
+    line-height: 1.35;
+  }
+
+  .footer-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 0.9fr;
+    gap: 14px;
+  }
+  .box {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 16px 13px;
+  }
+  .box.gold {
+    background: rgba(212,175,55,0.07);
+    border-color: rgba(212,175,55,0.32);
+  }
+  .box h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--gold-b);
+    margin-bottom: 8px;
+  }
+  .box h3.plain {
+    font-family: Inter, system-ui, sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .box p, .box li {
+    font-size: 13.5px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--text);
+  }
+  .box ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .box li {
+    padding-left: 14px;
+    position: relative;
+  }
+  .box.gold li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: var(--gold);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .box.wont li::before {
+    content: "×";
+    position: absolute;
+    left: 0;
+    color: var(--gold);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .foot {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 450;
+    text-align: center;
+  }
+  .foot em { color: var(--gold-dim); font-style: normal; font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="shot">
+  <div class="hdr">
+    <div>
+      <h1>Order of operations · Spoiler-Free off vs on</h1>
+      <div class="sub">Viewer Home during Pacific / West window · two paths only · no watching-live session</div>
+    </div>
+    <div class="hdr-tag">Locked · Sep 24 2026</div>
+  </div>
+
+  <div class="cols">
+    <!-- LEFT: SF OFF -->
+    <div class="col off">
+      <div class="col-head">
+        <h2>Spoiler-Free OFF</h2>
+        <span class="badge">Auto see reveals</span>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <div>
+            <p>Opens Home during Pacific/West window</p>
+            <div class="hint">Curtain: West Coast is watching · Pacific feed chip</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <div>
+            <p><strong>No sheet / no prompt</strong></p>
+            <div class="hint">Standing preference already allows scores</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <div>
+            <p>When admin reveals a couple → <strong>Recent Activity</strong> shows score posts</p>
+            <div class="hint">e.g. Ava scored 27 on Waltz · scores appear on Home</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <div>
+            <p>Each later reveal → Activity updates; Dance Card / judges pts tick; <strong>elim pts still pending</strong></p>
+            <div class="hint">League rows without LIVE noise chips · no Live scores strip</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">5</div>
+          <div>
+            <p>Admin final-publishes safe/elim → Results in; full week visible (SF already off)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: SF ON -->
+    <div class="col on">
+      <div class="col-head">
+        <h2>Spoiler-Free ON</h2>
+        <span class="badge">Hidden until Mark watched</span>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <div>
+            <p>Opens Home during Pacific/West window · SF on · scores still hidden</p>
+            <div class="hint">Same curtain etiquette · Spoilers can wait</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <div>
+            <p><strong>Through progressive reveals:</strong> Home stays spoiler-safe</p>
+            <div class="hint">Empty / quiet Activity · no live prompt · no Show live scores sheet</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <div>
+            <p><strong>Mark week watched</strong> anytime → unlocks everything posted so far</p>
+            <div class="hint">Catch-up · no auto-unlock when reveals start</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <div>
+            <p>If they never Mark watched during the night → stay hidden through final publish</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">5</div>
+          <div>
+            <p>After final → still need <strong>Mark week watched</strong> to see results</p>
+            <div class="hint">SF preference stays on · Mark watched is the unlock</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-row">
+    <div class="box gold">
+      <h3>Locked lean</h3>
+      <ul>
+        <li>SF = only standing preference</li>
+        <li>SF off → progressive visibility via Activity</li>
+        <li>SF on → Mark week watched only</li>
+        <li>Curtain etiquette for everyone</li>
+      </ul>
+    </div>
+    <div class="box gold">
+      <h3>Why no session</h3>
+      <p>Only helps a minority watching while admin posts — often &lt; half of league. Second mental model not worth it. Mosaic invented; Kylie cut.</p>
+    </div>
+    <div class="box wont">
+      <h3 class="plain">Won’t ship</h3>
+      <ul>
+        <li>Watching-live session</li>
+        <li>Show live scores sheet</li>
+        <li>Live scores strip</li>
+        <li>LIVE chips on leagues</li>
+        <li>Follow live · mark each dance</li>
+        <li>Any third path</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="foot">Human-facing OOO · companion <em>01-plain-flow</em> · Dense eng maps = Boards A–C</div>
+</div>
+</body>
+</html>

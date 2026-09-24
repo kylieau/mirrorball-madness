@@ -4,7 +4,7 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Up next, in order
 
-1. **Live score reveal during the West feed** — see its section below. Next thing to tackle.
+1. **Live score reveal during the West / Pacific feed** — design locked in `docs/design/west-pacific-live-reveal/` (mocks only; implement only after Kylie says). The earlier “Follow live + Realtime on Home” live strip is superseded / won’t-add; see the section below.
 2. **Dance Card League at a Glance: show the viewer's own points.** Every other manager's row shows the points gained that week, but the viewer is excluded (their picks are the card above), so their own week total isn't in the list. Add the viewer's own row/total so the list reads complete.
 3. **Split Scores and Enter Results into genuinely separate pages.** Both still live on one page, `/admin/results`, switched by `?tab=`. They are separate things (Scores is the read/view side; Enter Results is entry/propose/publish), and sharing one page risks state or behavior leaking between them. Give each its own route and keep the three access tiers (View / Propose / Publish) enforced per action as today.
 
@@ -159,7 +159,7 @@ Shipped: new state machine, West overlays, relative "Airs", `episodes.duration_m
 
 ## Live score reveal during the West feed
 
-Wanted (not designed): draft all scores after the East airing, then reveal couple scores one by one during the West feed, publishing final status (safe/eliminated) separately. Super admin only; viewers opt in via a per-viewer "Follow live" toggle on Home (off by default, Realtime push, Spoiler-Free viewers hidden until they opt in). Points update per reveal, so it needs a partial recompute (Dance Card judges' points per couple; survival, podium, Curtain Call and Grand Finale only at final-status publish), a split of `results_published_at` into scores-revealed vs results-published, and a per-dance reveal flag/RPC. Home's activity lines currently read only published `dance_scores`.
+**“Follow live + Realtime on Home” — superseded / won’t-add (2026-09-24).** A per-viewer Follow live toggle on Home, a West-feed Live strip, a watching-live session, a watching sheet, and LIVE chips on league rows will not ship. Locked lean (design mocks only; plan or implement app code only after Kylie says): super-admin reveals one couple at a time on Enter Results (confirm + ~30s undo), then a separate Publish results for safe/eliminated. Dance Card / judges points update per reveal; elimination points only on final publish. Spoiler-Free off sees scores and Recent Activity as revealed; Spoiler-Free on stays hidden until Mark week watched. Theatrical hero is “West Coast is watching”; hard facts are Pacific feed / 8pm PT. Pack: `docs/design/west-pacific-live-reveal/`. Eng gaps: `docs/design/west-pacific-live-reveal/ia/ENG-GAPS.md`.
 
 ## Parked nits
 

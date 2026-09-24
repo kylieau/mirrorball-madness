@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>00c · Eng gaps matrix — West live reveal · Push Pilot</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #120C14;
+    --gold: #D4AF37;
+    --gold-b: #E8C547;
+    --gold-dim: #C5A04E;
+    --text: #F3EAF2;
+    --muted: #9A8798;
+    --muted-dim: #6E5A6C;
+    --line: rgba(243,234,242,0.10);
+    --coral: #E07A5F;
+    --coral-b: #F0A08A;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1400px;
+    height: 900px;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 60% 50% at 80% 0%, #2A1520 0%, transparent 50%),
+      var(--bg);
+    color: var(--text);
+    font-family: Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #shot {
+    width: 1400px;
+    height: 900px;
+    padding: 18px 26px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .hdr {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+  .hdr h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .hdr .sub {
+    margin-top: 3px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .hdr .sub strong { color: var(--coral-b); }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--coral-b);
+    background: rgba(224,122,95,0.12);
+    border: 1px solid rgba(224,122,95,0.4);
+    padding: 5px 10px;
+    border-radius: 999px;
+  }
+
+  .matrix {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .col {
+    background: rgba(26,18,30,0.88);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .col.exists { border-color: rgba(154,135,152,0.28); }
+  .col.nw {
+    border-color: rgba(212,175,55,0.4);
+    background: rgba(212,175,55,0.04);
+  }
+  .col h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .col.exists h2 { color: var(--muted); }
+  .col.nw h2 { color: var(--gold); }
+  .pill {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 999px;
+  }
+  .pill.ex {
+    color: var(--muted);
+    background: rgba(154,135,152,0.12);
+    border: 1px solid rgba(154,135,152,0.3);
+  }
+  .pill.nw {
+    color: #1A121E;
+    background: var(--gold);
+  }
+  ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  li {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.35;
+    padding-left: 12px;
+    position: relative;
+  }
+  li::before {
+    content: '·';
+    position: absolute;
+    left: 2px;
+    color: var(--gold-dim);
+    font-weight: 700;
+  }
+  .col.exists li::before { color: var(--muted-dim); }
+  li b { color: var(--text); font-weight: 600; }
+  li code {
+    font-family: Inter, sans-serif;
+    font-size: 10.5px;
+    color: var(--gold-dim);
+    background: rgba(0,0,0,0.28);
+    padding: 0 4px;
+    border-radius: 3px;
+  }
+
+  .gaps {
+    flex: 1;
+    background: rgba(26,18,30,0.9);
+    border: 1px solid rgba(224,122,95,0.35);
+    border-radius: 12px;
+    padding: 12px 14px 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .gaps-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .gaps h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--coral-b);
+  }
+  .gaps .hint {
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .gap-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 7px;
+    flex: 1;
+  }
+  .gap {
+    background: rgba(224,122,95,0.08);
+    border: 1px solid rgba(224,122,95,0.28);
+    border-radius: 8px;
+    padding: 8px 9px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .gap.span2 { grid-column: span 1; }
+  .gap.wont {
+    background: rgba(20,14,22,0.5);
+    border-style: dashed;
+    border-color: rgba(154,135,152,0.3);
+    opacity: 0.85;
+  }
+  .gap .num {
+    flex-shrink: 0;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: rgba(224,122,95,0.3);
+    color: #FFD0C4;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .gap.wont .num {
+    background: rgba(154,135,152,0.2);
+    color: var(--muted);
+  }
+  .gap .body {
+    font-size: 11.5px;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .gap .body .t {
+    font-weight: 650;
+    color: #FFD0C4;
+    display: block;
+    margin-bottom: 1px;
+  }
+  .gap.wont .body .t { color: var(--muted); text-decoration: line-through; }
+  .gap .body .d { color: var(--muted); font-size: 10.5px; }
+
+  .paths {
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.28);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 10px;
+    color: var(--muted-dim);
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+  }
+  .paths strong {
+    color: var(--gold-dim);
+    font-weight: 600;
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-right: 6px;
+  }
+  .paths code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 9.5px;
+    color: var(--muted);
+  }
+
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: var(--muted-dim);
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div id="shot">
+  <div class="hdr">
+    <div>
+      <h1>Eng gaps · Push Pilot codebase audit</h1>
+      <div class="sub">
+        Exists match design surfaces · <strong>New / CODE</strong> = missing in main ·
+        Hardest gaps must ship for progressive reveal
+      </div>
+    </div>
+    <span class="badge">Board C · Exists | New · CODE</span>
+  </div>
+
+  <div class="matrix">
+    <div class="col exists">
+      <h2>Exists <span class="pill ex">Match design</span></h2>
+      <ul>
+        <li><b>Enter Results</b> · <code>/admin/results?tab=enter</code> · ResultsScreen · ResultsForm</li>
+        <li><b>Draft sandbox</b> episode-wide · status <code>not_started|draft|draft_correcting|published</code></li>
+        <li><b>Autosave</b> writes ALL couples at once · <code>saveEpisodeDraft</code></li>
+        <li><b>Publish</b> · <code>publishEpisodeResults</code> (super-admin) → <code>applyEpisodeResults</code> → <code>recomputeWeekScores</code> (Dance Card + survival + CC + GF)</li>
+        <li>Outcomes + dance/judge scores in one publish</li>
+        <li><b>Spoiler-Free</b> · <code>profiles.spoiler_free_mode</code> + mark watched week high-water · <b>UX gate only</b></li>
+        <li><b>Realtime</b> · Draft Room only · Home/Results = SSR + <code>revalidatePath</code></li>
+        <li>Roles · publish = SA · draft/propose = SA ∪ commissioner</li>
+      </ul>
+    </div>
+    <div class="col nw">
+      <h2>New <span class="pill nw">Does not exist</span></h2>
+      <ul>
+        <li><b>Per-couple reveal / undo</b></li>
+        <li>Split <b>scores revealed</b> vs <b>outcomes final</b> (today single <code>results_published_at</code>)</li>
+        <li><b>Partial recompute</b> (judges-only vs elim deferred) / provisional pts</li>
+        <li><b>Results Realtime</b> or Home polling for progressive Activity / Home</li>
+        <li><b>Super-admin Home chip</b> → Enter Results</li>
+        <li>Per-couple Revealed DB state · 30s undo window</li>
+        <li>Data-layer SF / API gate (tables world-readable once rows land)</li>
+        <li style="opacity:0.65;text-decoration:line-through"><b>Watching-live session</b> · cut · won’t ship</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="gaps">
+    <div class="gaps-head">
+      <h2>Hardest gaps · must appear on annotated boards</h2>
+      <div class="hint">Coral = eng work · distinct from design NEW gold</div>
+    </div>
+    <div class="gap-grid">
+      <div class="gap">
+        <div class="num">1</div>
+        <div class="body">
+          <span class="t">Atomic full-episode publish vs per-couple promote</span>
+          <span class="d">Today one publish dumps all · need couple-scoped promote</span>
+        </div>
+      </div>
+      <div class="gap">
+        <div class="num">2</div>
+        <div class="body">
+          <span class="t">Scoring trigger split / provisional week totals</span>
+          <span class="d">Judges-only recompute vs elim deferred · NEW engine</span>
+        </div>
+      </div>
+      <div class="gap">
+        <div class="num">3</div>
+        <div class="body">
+          <span class="t">Single results_published_at</span>
+          <span class="d">Need reveal vs final flags (scores_revealed · outcomes_final)</span>
+        </div>
+      </div>
+      <div class="gap">
+        <div class="num">4</div>
+        <div class="body">
+          <span class="t">~30s undo</span>
+          <span class="d">No publish undo today · need Revealed→Draft + pts rollback</span>
+        </div>
+      </div>
+      <div class="gap">
+        <div class="num">5</div>
+        <div class="body">
+          <span class="t">World-readable live tables</span>
+          <span class="d">SF won’t hide API once rows land · data-layer SF required</span>
+        </div>
+      </div>
+      <div class="gap">
+        <div class="num">6</div>
+        <div class="body">
+          <span class="t">No Results Realtime for Home / Activity</span>
+          <span class="d">Draft Room only · Home needs poll / Realtime for progressive posts</span>
+        </div>
+      </div>
+      <div class="gap">
+        <div class="num">7</div>
+        <div class="body">
+          <span class="t">Multi-night weeks + week-scoped recompute</span>
+          <span class="d">Partial nights must not clobber full-week scores</span>
+        </div>
+      </div>
+      <div class="gap">
+        <div class="num">8</div>
+        <div class="body">
+          <span class="t">Correction path vs progressive</span>
+          <span class="d">startCorrection must not fight reveal / undo</span>
+        </div>
+      </div>
+      <div class="gap wont">
+        <div class="num">9</div>
+        <div class="body">
+          <span class="t">BACKLOG “Follow live on Home”</span>
+          <span class="d">≠ locked lean · won’t add / superseded by SF gate</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="paths">
+    <strong>Key paths</strong>
+    <code>src/app/admin/results/{page,actions}.ts</code>
+    · <code>results-draft.ts</code>
+    · <code>results.ts</code>
+    · <code>scoring.ts</code>
+    · <code>results-form.tsx</code>
+    · <code>spoiler-{mode,cutoff}.ts</code>
+    · <code>today/page.tsx</code>
+    · <code>home-activity.ts</code>
+    · schema
+    · BACKLOG West-feed
+  </div>
+
+  <div class="footer">
+    <div>Mirrorball Madness · Board C · Eng gaps (Push Pilot read-only main)</div>
+    <div>Annotates Board A + B · see ENG-GAPS.md</div>
+  </div>
+</div>
+</body>
+</html>

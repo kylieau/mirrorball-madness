@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>00 · System map — West live reveal · Mirrorball Madness</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #120C14;
+    --bg2: #1A121E;
+    --card: #221A26;
+    --gold: #D4AF37;
+    --gold-b: #E8C547;
+    --gold-dim: #C5A04E;
+    --text: #F3EAF2;
+    --muted: #9A8798;
+    --muted-dim: #6E5A6C;
+    --line: rgba(243,234,242,0.10);
+    --maroon: #6B2434;
+    --coral: #E07A5F;
+    --coral-b: #F0A08A;
+    --amber: #E8A838;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1400px;
+    height: 900px;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, #2A1520 0%, transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #shot {
+    width: 1400px;
+    height: 900px;
+    padding: 18px 26px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+  }
+
+  .hdr {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  .hdr-left h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+  }
+  .hdr-left .sub {
+    margin-top: 3px;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-weight: 450;
+  }
+  .hdr-left .sub strong { color: var(--gold-b); font-weight: 600; }
+  .legend {
+    display: flex;
+    gap: 11px;
+    align-items: center;
+    flex-shrink: 0;
+    padding-top: 2px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 540px;
+  }
+  .leg {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .leg .sw {
+    width: 18px; height: 12px;
+    border-radius: 3px;
+  }
+  .leg.ex .sw {
+    border: 1.5px dashed rgba(154,135,152,0.55);
+    background: rgba(34,26,38,0.5);
+  }
+  .leg.ex { color: var(--muted); }
+  .leg.nw .sw {
+    border: 1.5px solid var(--gold);
+    background: rgba(212,175,55,0.12);
+  }
+  .leg.nw { color: var(--gold-b); }
+  .leg.chg .sw {
+    border: 1.5px solid rgba(212,175,55,0.55);
+    background: repeating-linear-gradient(
+      -45deg,
+      rgba(212,175,55,0.08),
+      rgba(212,175,55,0.08) 3px,
+      transparent 3px,
+      transparent 6px
+    );
+  }
+  .leg.chg { color: var(--gold-dim); }
+  .leg.code .sw {
+    border: 1.5px solid var(--coral);
+    background: rgba(224,122,95,0.18);
+  }
+  .leg.code { color: var(--coral-b); }
+  .lock-pill {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--gold-b);
+    background: rgba(212,175,55,0.10);
+    border: 1px solid rgba(212,175,55,0.32);
+    padding: 4px 9px;
+    border-radius: 999px;
+    letter-spacing: 0.03em;
+  }
+
+  .cols {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    min-height: 0;
+    position: relative;
+  }
+  .col {
+    background: rgba(26,18,30,0.72);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 11px 12px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    position: relative;
+  }
+  .col-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 1px;
+  }
+  .col-head h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 16.5px;
+    font-weight: 600;
+    color: var(--gold);
+  }
+  .col-head .page-tag {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .box {
+    border-radius: 9px;
+    padding: 8px 10px;
+    position: relative;
+  }
+  .box.ex {
+    background: rgba(20,14,22,0.55);
+    border: 1.5px dashed rgba(154,135,152,0.42);
+  }
+  .box.nw {
+    background: rgba(212,175,55,0.07);
+    border: 1.5px solid rgba(212,175,55,0.55);
+    box-shadow: 0 0 0 1px rgba(212,175,55,0.08);
+  }
+  .box.chg {
+    background: repeating-linear-gradient(
+      -45deg,
+      rgba(212,175,55,0.06),
+      rgba(212,175,55,0.06) 4px,
+      rgba(20,14,22,0.45) 4px,
+      rgba(20,14,22,0.45) 8px
+    );
+    border: 1.5px solid rgba(212,175,55,0.42);
+  }
+  .box.wont {
+    background: rgba(20,14,22,0.4);
+    border: 1.5px dashed rgba(154,135,152,0.28);
+    opacity: 0.72;
+  }
+  .box-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 3px;
+  }
+  .box-title {
+    font-size: 12.5px;
+    font-weight: 650;
+    color: #fff;
+    line-height: 1.25;
+  }
+  .box.wont .box-title {
+    text-decoration: line-through;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .tag {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .tag.ex {
+    color: var(--muted);
+    background: rgba(154,135,152,0.12);
+    border: 1px solid rgba(154,135,152,0.28);
+  }
+  .tag.nw {
+    color: #1A121E;
+    background: var(--gold);
+    border: 1px solid var(--gold-b);
+  }
+  .tag.chg {
+    color: var(--gold-b);
+    background: rgba(212,175,55,0.14);
+    border: 1px solid rgba(212,175,55,0.4);
+  }
+  .tag.no {
+    color: var(--muted-dim);
+    background: transparent;
+    border: 1px solid rgba(154,135,152,0.25);
+  }
+  .tag.code {
+    color: #1A0E0C;
+    background: var(--coral);
+    border: 1px solid var(--coral-b);
+  }
+  .tags {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    align-items: center;
+  }
+  .box-body {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+  .box-body em {
+    font-style: normal;
+    color: var(--gold-dim);
+    font-weight: 500;
+  }
+  .box-body code {
+    font-family: Inter, sans-serif;
+    font-size: 11px;
+    color: var(--text);
+    background: rgba(0,0,0,0.25);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 500;
+  }
+
+  .code-rail {
+    margin-top: 2px;
+    background: rgba(224,122,95,0.10);
+    border: 1px solid rgba(224,122,95,0.42);
+    border-left: 3px solid var(--coral);
+    border-radius: 7px;
+    padding: 6px 9px;
+    font-size: 10.5px;
+    color: var(--coral-b);
+    line-height: 1.35;
+  }
+  .code-rail strong {
+    color: #FFD0C4;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 9.5px;
+  }
+  .code-rail .gap-num {
+    display: inline-block;
+    background: rgba(224,122,95,0.25);
+    color: #FFD0C4;
+    font-weight: 700;
+    font-size: 9px;
+    padding: 0 4px;
+    border-radius: 3px;
+    margin-right: 2px;
+  }
+
+  .stack-note {
+    font-size: 10.5px;
+    color: var(--muted-dim);
+    padding: 1px 2px 0;
+    line-height: 1.3;
+  }
+
+  .flows {
+    flex-shrink: 0;
+    background: rgba(26,18,30,0.85);
+    border: 1px solid rgba(212,175,55,0.22);
+    border-radius: 10px;
+    padding: 9px 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+  .flow { display: flex; flex-direction: column; gap: 2px; }
+  .flow-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .flow-path {
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .flow-path .arr { color: var(--gold-b); font-weight: 700; margin: 0 2px; }
+  .flow-path .verb { color: var(--gold-b); font-weight: 700; }
+  .flow-meta { font-size: 10.5px; color: var(--muted); line-height: 1.25; }
+
+  .footer {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-size: 10.5px;
+    color: var(--muted-dim);
+    padding-top: 1px;
+  }
+  .one-glance {
+    font-size: 11.5px;
+    color: var(--text);
+    background: rgba(107,36,52,0.35);
+    border: 1px solid rgba(212,175,55,0.25);
+    padding: 5px 11px;
+    border-radius: 7px;
+    max-width: 860px;
+    line-height: 1.3;
+  }
+  .one-glance b { color: var(--gold-b); }
+  .ia-cap {
+    font-size: 10.5px;
+    color: var(--muted);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .ia-cap em { font-style: normal; color: var(--gold-dim); }
+</style>
+</head>
+<body>
+<div id="shot">
+  <div class="hdr">
+    <div class="hdr-left">
+      <h1>West live reveal · System / IA map</h1>
+      <div class="sub">
+        Progressive scores during Pacific feed · <strong>no new player page</strong> ·
+        reveal lives on existing <strong>Enter Results</strong> · gate = Spoiler-Free only
+        · <strong style="color:var(--coral-b)">CODE</strong> = Push Pilot eng gaps
+        · <strong>no watching-live session</strong>
+      </div>
+    </div>
+    <div class="legend">
+      <span class="leg ex"><span class="sw"></span> EXISTING</span>
+      <span class="leg nw"><span class="sw"></span> NEW</span>
+      <span class="leg chg"><span class="sw"></span> BEHAVIOR</span>
+      <span class="leg code"><span class="sw"></span> CODE GAP</span>
+      <span class="lock-pill">Locked · Sep 24 2026</span>
+    </div>
+  </div>
+
+  <div class="cols">
+    <!-- PLAYER HOME -->
+    <div class="col">
+      <div class="col-head">
+        <h2>Player Home</h2>
+        <span class="page-tag">Existing page</span>
+      </div>
+
+      <div class="box ex">
+        <div class="box-top">
+          <div class="box-title">Curtain (etiquette)</div>
+          <span class="tag ex">Existing · tweak</span>
+        </div>
+        <div class="box-body">
+          Pre: <code>Pacific feed at 8pm</code> · On: <em>West Coast is watching</em>
+        </div>
+      </div>
+
+      <div class="box chg">
+        <div class="box-top">
+          <div class="box-title">Recent Activity · score posts</div>
+          <div class="tags">
+            <span class="tag chg">Behavior</span>
+            <span class="tag code">CODE</span>
+          </div>
+        </div>
+        <div class="box-body">
+          <em>SF off</em> → score posts as revealed · <em>SF on</em> → quiet / spoiler-safe
+        </div>
+        <div class="code-rail">
+          <strong>CODE</strong>
+          <span class="gap-num">6</span> Home = SSR + revalidatePath today · need Realtime / poll for progressive Activity
+        </div>
+      </div>
+
+      <div class="box ex">
+        <div class="box-top">
+          <div class="box-title">Leagues · provisional pts</div>
+          <span class="tag ex">Existing · tweak</span>
+        </div>
+        <div class="box-body">
+          SF-off pts tick per reveal · elim pending · <em>no LIVE noise chips</em>
+        </div>
+      </div>
+
+      <div class="box wont">
+        <div class="box-top">
+          <div class="box-title">Live scores strip · watching session</div>
+          <span class="tag no">Won’t ship</span>
+        </div>
+        <div class="box-body">
+          Mosaic cut · second mental model not worth it
+        </div>
+      </div>
+
+      <div class="box nw">
+        <div class="box-top">
+          <div class="box-title">Admin Home chip</div>
+          <div class="tags">
+            <span class="tag nw">New · SA</span>
+            <span class="tag code">CODE</span>
+          </div>
+        </div>
+        <div class="box-body">
+          <code>3 of 8 posted · Reveal ›</code> · deep-link Enter Results
+        </div>
+        <div class="code-rail">
+          <strong>CODE</strong> Super-admin Home chip → Enter Results · does not exist
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN ENTER RESULTS -->
+    <div class="col">
+      <div class="col-head">
+        <h2>Admin · Enter Results</h2>
+        <span class="page-tag">Existing · gains reveal</span>
+      </div>
+
+      <div class="box ex">
+        <div class="box-top">
+          <div class="box-title">Draft all · Save · Episode picker</div>
+          <span class="tag ex">Existing</span>
+        </div>
+        <div class="box-body">
+          <code>/admin/results?tab=enter</code> · autosave ALL couples · status not_started|draft|draft_correcting|published · SA publish / SA∪comm draft
+        </div>
+      </div>
+
+      <div class="box nw">
+        <div class="box-top">
+          <div class="box-title">Live reveal mode</div>
+          <div class="tags">
+            <span class="tag nw">New</span>
+            <span class="tag code">CODE</span>
+          </div>
+        </div>
+        <div class="box-body">
+          Up next + <em>Reveal</em> per couple · lag Pacific, never lead
+        </div>
+        <div class="code-rail">
+          <strong>CODE</strong>
+          <span class="gap-num">1</span> Atomic full-episode publish today · per-couple promote = NEW
+        </div>
+      </div>
+
+      <div class="box nw">
+        <div class="box-top">
+          <div class="box-title">Confirm + Undo 30s</div>
+          <div class="tags">
+            <span class="tag nw">New</span>
+            <span class="tag code">CODE</span>
+          </div>
+        </div>
+        <div class="box-body">
+          Confirm couple + score → SF-off · Undo: re-hide + pts rollback
+        </div>
+        <div class="code-rail">
+          <strong>CODE</strong>
+          <span class="gap-num">4</span> No publish undo today ·
+          <span class="gap-num">8</span> startCorrection must not fight progressive/undo
+        </div>
+      </div>
+
+      <div class="box chg">
+        <div class="box-top">
+          <div class="box-title">Publish → final safe / elim</div>
+          <div class="tags">
+            <span class="tag chg">Behavior</span>
+            <span class="tag code">CODE</span>
+          </div>
+        </div>
+        <div class="box-body">
+          Final only · safe/elim + elim pts · ends progressive · not all-at-once scores
+        </div>
+        <div class="code-rail">
+          <strong>CODE</strong>
+          <span class="gap-num">2</span><span class="gap-num">3</span> Single <code style="color:#FFD0C4">results_published_at</code> · need reveal vs final flags · partial recompute
+        </div>
+      </div>
+
+      <div class="stack-note">
+        ✕ No Reveal console page · lives here · Realtime today = Draft Room only
+      </div>
+    </div>
+
+    <!-- SETTINGS / GATES -->
+    <div class="col">
+      <div class="col-head">
+        <h2>Settings / gates</h2>
+        <span class="page-tag">Existing controls</span>
+      </div>
+
+      <div class="box ex">
+        <div class="box-top">
+          <div class="box-title">Spoiler-Free</div>
+          <div class="tags">
+            <span class="tag ex">Sole gate</span>
+            <span class="tag code">CODE</span>
+          </div>
+        </div>
+        <div class="box-body">
+          <em>SF off</em> → see posts · <em>SF on</em> → hidden until Mark watched · no auto-watched
+        </div>
+        <div class="code-rail">
+          <strong>CODE</strong>
+          <span class="gap-num">5</span> UX gate only today · live tables world-readable to auth · <em style="color:#FFD0C4">need data-layer SF / API gate</em>
+        </div>
+      </div>
+
+      <div class="box ex">
+        <div class="box-top">
+          <div class="box-title">Mark week watched</div>
+          <span class="tag ex">Existing</span>
+        </div>
+        <div class="box-body">
+          High-water on profiles · unlock for SF-on (catch-up) · still required after final
+        </div>
+      </div>
+
+      <div class="box wont">
+        <div class="box-top">
+          <div class="box-title">Follow live · watching session</div>
+          <span class="tag no">Won’t ship</span>
+        </div>
+        <div class="box-body">
+          BACKLOG + Mosaic session · <strong style="color:var(--muted)">superseded</strong> · SF only
+        </div>
+      </div>
+
+      <div class="box nw" style="margin-top:2px">
+        <div class="box-top">
+          <div class="box-title">Backend verbs</div>
+          <div class="tags">
+            <span class="tag nw">New</span>
+            <span class="tag code">CODE</span>
+          </div>
+        </div>
+        <div class="box-body">
+          <code>reveal</code> · <code>undo</code> (30s) · existing <code>final publish</code> → applyEpisodeResults → recomputeWeekScores
+        </div>
+        <div class="code-rail">
+          <strong>CODE</strong>
+          <span class="gap-num">7</span> Multi-night weeks + week-scoped recompute · provisional pts NEW
+        </div>
+      </div>
+
+      <div class="box ex">
+        <div class="box-top">
+          <div class="box-title">Copy split (locked)</div>
+          <span class="tag ex">Content</span>
+        </div>
+        <div class="box-body">
+          Theatrical: <em>West Coast is watching</em> · Facts: <em>Pacific feed</em> / <em>8pm PT</em>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="flows">
+    <div class="flow">
+      <div class="flow-label">Flow 1 · Reveal</div>
+      <div class="flow-path">
+        <span class="verb">Reveal</span> (Enter Results)
+        <span class="arr">→</span> Activity + league pts
+        <span class="arr">→</span> SF-off only
+      </div>
+      <div class="flow-meta">CODE: per-couple promote + partial recompute + Home Realtime</div>
+    </div>
+    <div class="flow">
+      <div class="flow-label">Flow 2 · Gate</div>
+      <div class="flow-path">
+        SF <span class="verb">on</span>
+        <span class="arr">→</span> hidden
+        <span class="arr">→</span> <span class="verb">Mark week watched</span>
+      </div>
+      <div class="flow-meta">CODE: SF UX-only today → need API / data-layer gate</div>
+    </div>
+    <div class="flow">
+      <div class="flow-label">Flow 3 · Final</div>
+      <div class="flow-path">
+        <span class="verb">Final publish</span>
+        <span class="arr">→</span> Results in / elim pts
+        <span class="arr">→</span> end progressive
+      </div>
+      <div class="flow-meta">CODE: split scores_revealed vs outcomes_final flags</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="one-glance">
+      <b>One glance:</b> no new player page · Enter Results gains reveal · SF sole gate ·
+      reveal/undo NEW · final publish splits · <b>no session</b> ·
+      <b style="color:var(--coral-b)">9 CODE gaps → Board C</b>
+    </div>
+    <div class="ia-cap">IA = information architecture · pages, flows, gates · <em>not pixel UI</em> · Board A</div>
+  </div>
+</div>
+</body>
+</html>
