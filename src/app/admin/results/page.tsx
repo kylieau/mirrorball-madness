@@ -65,6 +65,7 @@ export default async function AdminResultsPage() {
       judgeScores={data.judgeScores}
       episodeResults={data.episodeResults}
       draftsByEpisode={data.draftsByEpisode}
+      revealedByEpisode={data.revealedByEpisode}
       publishedByNames={data.publishedByNames}
       season={data.season}
       participantsByEpisode={data.participantsByEpisode}

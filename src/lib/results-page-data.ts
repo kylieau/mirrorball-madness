@@ -21,6 +21,7 @@ export type ResultsPageData = {
     airs_at: string;
     theme: string | null;
     expected_dance_count: number;
+    judges_save_available: boolean;
     duration_minutes: number;
     status: string;
     results_published_at: string | null;
@@ -34,7 +35,14 @@ export type ResultsPageData = {
     is_finale: boolean;
     is_double_elimination_week: boolean;
   }[];
-  danceScores: { id: string; episode_id: string; couple_id: string; dance_style_id: string; total_score: number }[];
+  danceScores: {
+    id: string;
+    episode_id: string;
+    couple_id: string;
+    dance_style_id: string;
+    total_score: number;
+    created_at: string;
+  }[];
   judgeScores: { dance_score_id: string; judge_id: string; score: number }[];
   episodeResults: {
     episode_id: string;
@@ -46,6 +54,9 @@ export type ResultsPageData = {
     bonus_note: string | null;
   }[];
   draftsByEpisode: Record<string, DraftState>;
+  // Couples whose scores are live while the episode is still unpublished, with
+  // their latest post time (drives Posted rows and the undo window).
+  revealedByEpisode: Record<string, Record<string, string>>;
   publishedByNames: Record<string, string>;
   season: {
     id: string;
@@ -105,7 +116,7 @@ export async function loadResultsPageData(
     supabase
       .from("episodes")
       .select(
-        "id, episode_number, week_id, airs_at, theme, expected_dance_count, duration_minutes, status, results_published_at, results_published_by"
+        "id, episode_number, week_id, airs_at, theme, expected_dance_count, judges_save_available, duration_minutes, status, results_published_at, results_published_by"
       )
       .eq("season_id", activeSeasonId ?? "")
       .order("episode_number"),
@@ -116,7 +127,7 @@ export async function loadResultsPageData(
       .order("week_number"),
     supabase
       .from("dance_scores")
-      .select("id, episode_id, couple_id, dance_style_id, total_score"),
+      .select("id, episode_id, couple_id, dance_style_id, total_score, created_at"),
     supabase.from("judge_scores").select("dance_score_id, judge_id, score"),
     supabase
       .from("episode_results")
@@ -157,6 +168,16 @@ export async function loadResultsPageData(
     (episodes ?? []).map(async (e) => [e.id, await loadDraftForEpisode(admin, e.id)] as const)
   );
   const draftsByEpisode: Record<string, DraftState> = Object.fromEntries(draftEntries);
+
+  const unpublishedEpisodeIds = new Set(
+    (episodes ?? []).filter((e) => !e.results_published_at).map((e) => e.id)
+  );
+  const revealedByEpisode: Record<string, Record<string, string>> = {};
+  for (const row of danceScores ?? []) {
+    if (!unpublishedEpisodeIds.has(row.episode_id)) continue;
+    const byCouple = (revealedByEpisode[row.episode_id] ??= {});
+    if (!byCouple[row.couple_id] || row.created_at > byCouple[row.couple_id]) byCouple[row.couple_id] = row.created_at;
+  }
 
   const publisherIds = [
     ...new Set((episodes ?? []).map((e) => e.results_published_by).filter((id): id is string => !!id)),
@@ -201,6 +222,7 @@ export async function loadResultsPageData(
     judgeScores: judgeScores ?? [],
     episodeResults: episodeResults ?? [],
     draftsByEpisode,
+    revealedByEpisode,
     publishedByNames,
     season,
     participantsByEpisode,

@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { inJeopardyIdsToPersist, type Outcome } from "@/lib/scoring";
 import { applyEpisodeResults, replaceInJeopardyCouples, type EntrySubmission } from "@/lib/results";
+import { loadRevealedCouples, loadRevealedDances } from "@/lib/results-reveal";
+import { unpostedCoupleIds } from "@/lib/reveal-state";
 
 export type DraftJudgeScoreInput = { judgeId: string; score: number };
 
@@ -91,6 +93,13 @@ export async function saveDraftResults(
   );
   if (overrideErr) return { error: overrideErr.message };
 
+  // Couples already revealed keep the scores viewers can see; the draft only
+  // mirrors them until the episode is published.
+  const revealedDances = await loadRevealedDances(admin, input.episodeId);
+  const entries = input.entries.map((entry) =>
+    revealedDances.has(entry.coupleId) ? { ...entry, dances: revealedDances.get(entry.coupleId)! } : entry
+  );
+
   // draft_judge_scores cascades from draft_dance_scores, so clearing
   // draft_dance_scores is enough — same as the live tables.
   await admin.from("draft_dance_scores").delete().eq("episode_id", input.episodeId);
@@ -99,7 +108,7 @@ export async function saveDraftResults(
   // Inserted one dance at a time (not a bulk insert) so each row's real id
   // is known before inserting its judge_scores — same reasoning as
   // applyEpisodeResults.
-  for (const entry of input.entries) {
+  for (const entry of entries) {
     for (const dance of entry.dances) {
       const totalScore = dance.judgeScores.reduce((sum, js) => sum + js.score, 0);
       const { data: danceRow, error: danceErr } = await admin
@@ -128,7 +137,7 @@ export async function saveDraftResults(
     }
   }
 
-  const resultRows = input.entries.map((e) => ({
+  const resultRows = entries.map((e) => ({
     episode_id: input.episodeId,
     couple_id: e.coupleId,
     outcome: e.outcome,
@@ -146,7 +155,7 @@ export async function saveDraftResults(
     admin,
     "draft_episode_in_jeopardy_couples",
     input.episodeId,
-    inJeopardyIdsToPersist(input.inJeopardyCoupleIds, input.entries)
+    inJeopardyIdsToPersist(input.inJeopardyCoupleIds, entries)
   );
   if (jeopardyErr) return { error: jeopardyErr };
 
@@ -298,11 +307,17 @@ export async function publishEpisodeDraft(
     bonusNote: e.bonusNote,
   }));
 
-  const result = await applyEpisodeResults(admin, {
-    episodeId,
-    entries,
-    inJeopardyCoupleIds: draft.inJeopardyCoupleIds,
-  });
+  const revealedCoupleIds = new Set((await loadRevealedCouples(admin, episodeId)).keys());
+  const unposted = unpostedCoupleIds(draft.dances, revealedCoupleIds);
+  if (unposted.length > 0) {
+    return { error: `Post every couple's scores before publishing results (${unposted.length} still to post).` };
+  }
+
+  const result = await applyEpisodeResults(
+    admin,
+    { episodeId, entries, inJeopardyCoupleIds: draft.inJeopardyCoupleIds },
+    revealedCoupleIds
+  );
   if (result.error) return result;
 
   const { error: publishErr } = await admin

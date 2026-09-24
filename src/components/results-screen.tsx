@@ -43,6 +43,7 @@ type Episode = {
   airs_at: string;
   theme: string | null;
   expected_dance_count: number;
+  judges_save_available: boolean;
   duration_minutes: number;
   status: string;
   results_published_at: string | null;
@@ -93,6 +94,7 @@ export function ResultsScreen({
   judgeScores,
   episodeResults,
   draftsByEpisode,
+  revealedByEpisode,
   publishedByNames,
   season,
   participantsByEpisode,
@@ -118,6 +120,7 @@ export function ResultsScreen({
   judgeScores: JudgeScore[];
   episodeResults: EpisodeResult[];
   draftsByEpisode: Record<string, DraftState>;
+  revealedByEpisode: Record<string, Record<string, string>>;
   publishedByNames: Record<string, string>;
   season: Season;
   participantsByEpisode: Record<string, string[]>;
@@ -185,6 +188,7 @@ export function ResultsScreen({
           episodes={episodes}
           weeks={weeks}
           draftsByEpisode={draftsByEpisode}
+          revealedByEpisode={revealedByEpisode}
           forceSelectEpisodeId={forceSelectEpisodeId}
           participantsByEpisode={participantsByEpisode}
         />

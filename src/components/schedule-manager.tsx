@@ -29,6 +29,7 @@ import {
 } from "@/lib/episode-cast";
 import { exhibitionEpisodes, groupEpisodesByWeek } from "@/lib/competition-week";
 import { ChevronRightIcon, PlusIcon } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { DEFAULT_EPISODE_DURATION_MINUTES } from "@/lib/episode-banner";
 
 type Episode = {
@@ -38,6 +39,7 @@ type Episode = {
   airs_at: string;
   theme: string | null;
   expected_dance_count: number;
+  judges_save_available: boolean;
   duration_minutes: number;
   results_published_at: string | null;
   status: string;
@@ -204,6 +206,7 @@ export function ScheduleManager({
   const [isDoubleEliminationWeek, setIsDoubleEliminationWeek] = useState(false);
   const [participantCoupleIds, setParticipantCoupleIds] = useState<Set<string>>(new Set());
   const [expectedDanceCount, setExpectedDanceCount] = useState(1);
+  const [judgesSaveAvailable, setJudgesSaveAvailable] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(DEFAULT_EPISODE_DURATION_MINUTES);
   const [roundTypeIds, setRoundTypeIds] = useState<Set<string>>(new Set());
 
@@ -276,6 +279,7 @@ export function ScheduleManager({
     }).map((c) => c.id);
     setParticipantCoupleIds(new Set(defaultCheckedParticipantIds(participantsByEpisode[e.id], selectable)));
     setExpectedDanceCount(e.expected_dance_count);
+    setJudgesSaveAvailable(e.judges_save_available);
     setDurationMinutes(e.duration_minutes);
     const assignedNames = new Set(roundTypesByEpisode[e.id] ?? []);
     setRoundTypeIds(new Set(roundTypes.filter((rt) => assignedNames.has(rt.name)).map((rt) => rt.id)));
@@ -297,6 +301,7 @@ export function ScheduleManager({
       new Set(selectableCast(seasonCouples, nextWeekNumber, { published: false }).map((c) => c.id))
     );
     setExpectedDanceCount(1);
+    setJudgesSaveAvailable(false);
     setDurationMinutes(DEFAULT_EPISODE_DURATION_MINUTES);
     setRoundTypeIds(new Set());
   }
@@ -364,6 +369,7 @@ export function ScheduleManager({
       participantCoupleIds: participantIdsToPersist(participantCoupleIds, selectableIds),
       roundTypeIds: [...roundTypeIds],
       expectedDanceCount,
+      judgesSaveAvailable,
       durationMinutes,
     });
     if (result.error) {
@@ -549,6 +555,15 @@ export function ScheduleManager({
                 value={expectedDanceCount}
                 onChange={(e) => setExpectedDanceCount(Number(e.target.value))}
               />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label htmlFor="judgesSaveAvailable">Judges&apos; Save Active</Label>
+                <p className="text-xs text-muted-foreground">
+                  Turns on the per-couple &quot;Judges&apos; Save used&quot; option on Enter Results.
+                </p>
+              </div>
+              <Switch id="judgesSaveAvailable" checked={judgesSaveAvailable} onCheckedChange={setJudgesSaveAvailable} />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="durationMinutes">Duration (Minutes)</Label>

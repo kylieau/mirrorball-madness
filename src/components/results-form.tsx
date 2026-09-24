@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   saveEpisodeDraft,
+  revealCoupleScores,
+  undoCoupleReveal,
   addEpisodeCustomMoment,
   removeEpisodeCustomMoment,
   publishEpisodeResults,
@@ -13,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -23,14 +24,15 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { BOTTOM_NAV_STACK_ABOVE } from "@/components/bottom-nav";
+import { couplesRevealState, undoSecondsLeft } from "@/lib/reveal-state";
 import { buildPeopleDisplayNames, type CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName, coupleNameNode } from "@/components/couple-name";
 import {
@@ -58,6 +60,7 @@ type ScheduledEpisode = {
   airs_at: string;
   theme: string | null;
   expected_dance_count: number;
+  judges_save_available: boolean;
   results_published_at: string | null;
 };
 type CompetitionWeek = {
@@ -177,6 +180,7 @@ export function ResultsForm({
   episodes,
   weeks,
   draftsByEpisode,
+  revealedByEpisode,
   forceSelectEpisodeId,
   participantsByEpisode,
 }: {
@@ -193,6 +197,7 @@ export function ResultsForm({
   episodes: ScheduledEpisode[];
   weeks: CompetitionWeek[];
   draftsByEpisode: Record<string, DraftState>;
+  revealedByEpisode: Record<string, Record<string, string>>;
   // Set by AllResultsView's "Correct Results" button (lifted up into
   // ResultsScreen) to jump here already pointed at that episode, once
   // startEpisodeCorrection has seeded a fresh draft for it.
@@ -227,6 +232,7 @@ export function ResultsForm({
 
   const selectedEpisode = sortedEpisodes.find((e) => e.id === selectedEpisodeId) ?? null;
   const expectedDanceCount = selectedEpisode?.expected_dance_count ?? 1;
+  const judgesSaveAvailable = selectedEpisode?.judges_save_available ?? false;
   const selectedWeek = selectedEpisode?.week_id ? (weekById.get(selectedEpisode.week_id) ?? null) : null;
   const isFinale = selectedWeek?.is_finale ?? false;
   const nightsCount = selectedEpisode?.week_id ? (nightsCountByWeek.get(selectedEpisode.week_id) ?? 1) : 1;
@@ -236,6 +242,8 @@ export function ResultsForm({
   // as of that week (and anyone already on the correction draft) so history
   // stays editable.
   const published = selectedEpisode?.results_published_at != null;
+  const revealedAtByCouple = revealedByEpisode[selectedEpisode?.id ?? ""] ?? {};
+  const revealedCoupleIds = new Set(published ? [] : Object.keys(revealedAtByCouple));
   const selectable = selectedEpisode
     ? selectableCast(allCouplesWithStatus, selectedWeek?.week_number ?? selectedEpisode.episode_number, {
         published,
@@ -254,7 +262,6 @@ export function ResultsForm({
     .map((id) => couplesById.get(id) ?? activeCouples.find((c) => c.id === id))
     .filter((c): c is Couple => !!c);
 
-  const [judgesSaveAvailable, setJudgesSaveAvailable] = useState(false);
   const [rows, setRows] = useState<Record<string, CoupleRow>>({});
   const [customMoments, setCustomMoments] = useState<DraftState["customMoments"]>([]);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
@@ -265,10 +272,15 @@ export function ResultsForm({
   const [error, setError] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState(false);
   const [seedingCorrection, setSeedingCorrection] = useState(false);
-  const [coupleViewMode, setCoupleViewMode] = useState<"all" | "byCouple" | "leaderboard">("all");
+  const [coupleViewMode, setCoupleViewMode] = useState<"unpublished" | "published" | "leaderboard">("unpublished");
   const [byCoupleSelectedId, setByCoupleSelectedId] = useState("");
+  const [publishedSelectedId, setPublishedSelectedId] = useState("");
 
-  const [teamSheetOpen, setTeamSheetOpen] = useState(false);
+  const [revealBusy, setRevealBusy] = useState(false);
+  // Null until mounted so the undo countdown never renders a server clock.
+  const [nowMs, setNowMs] = useState<number | null>(null);
+
+  const [confirmNoElimination, setConfirmNoElimination] = useState(false);
   const [customMomentLabel, setCustomMomentLabel] = useState("");
   const [customMomentCoupleId, setCustomMomentCoupleId] = useState("");
   const [addingCustomMoment, setAddingCustomMoment] = useState(false);
@@ -351,7 +363,6 @@ export function ResultsForm({
     }
     seedingEpisodeId.current = null;
     setSeedingCorrection(false);
-    setJudgesSaveAvailable(draft?.judgesSaveAvailable ?? false);
     setRows(buildRowsFromDraft(draft, episodeCouples));
     setCustomMoments(draft?.customMoments ?? []);
     setDraftSavedAt(draft?.updatedAt ?? null);
@@ -363,8 +374,35 @@ export function ResultsForm({
   }, [selectedEpisode?.id, selectedEpisode?.results_published_at, draftsByEpisode[selectedEpisode?.id ?? ""]?.updatedAt, draftsByEpisode[selectedEpisode?.id ?? ""]?.hasDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const status: EpisodeResultsStatus | null = selectedEpisode
-    ? deriveResultsStatus({ results_published_at: selectedEpisode.results_published_at }, hasDraft)
+    ? deriveResultsStatus({ results_published_at: selectedEpisode.results_published_at }, hasDraft, revealedCoupleIds.size > 0)
     : null;
+
+  // Super admins publish a couple at a time; everyone else only saves drafts.
+  const publishPerCouple = canPublish && !!selectedEpisode && !published;
+  const revealStates = couplesRevealState(
+    episodeCouples.flatMap((c) =>
+      (rows[c.id] ?? emptyRow()).dances
+        .filter((d) => d.danceStyleId)
+        .map((d) => ({ coupleId: c.id, judgeScores: Object.values(d.scores).filter((v) => v !== "").map((v) => ({ score: Number(v) })) }))
+    ),
+    revealedCoupleIds
+  );
+  const unpostedCount = revealStates.size - episodeCouples.filter((c) => revealStates.get(c.id) === "posted").length;
+
+  const scoredCouples = episodeCouples.filter((c) =>
+    (rows[c.id] ?? emptyRow()).dances.some((d) => Object.values(d.scores).some((v) => v !== ""))
+  );
+  const publishedCouples = episodeCouples.filter((c) => revealedCoupleIds.has(c.id));
+  const unpublishedCouples = episodeCouples.filter((c) => !revealedCoupleIds.has(c.id));
+  const eliminatedCount = episodeCouples.filter((c) => (rows[c.id] ?? emptyRow()).outcome === "eliminated").length;
+  const requiredEliminations = selectedWeek?.is_double_elimination_week ? 2 : 1;
+
+  useEffect(() => {
+    if (revealedCoupleIds.size === 0) return;
+    setNowMs(Date.now());
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [revealedCoupleIds.size]);
 
   function buildDraftInput() {
     return {
@@ -416,6 +454,46 @@ export function ResultsForm({
     }
     setSavingDraft(false);
     return result;
+  }
+
+  async function handlePublishCouple(coupleId: string) {
+    if (!selectedEpisode) return;
+    setError(null);
+    setRevealBusy(true);
+    // Flush first so the server reads exactly what's on screen.
+    const saveResult = await flushDraft();
+    if (saveResult.error) {
+      setRevealBusy(false);
+      return;
+    }
+    const result = await revealCoupleScores({ episodeId: selectedEpisode.id, coupleId });
+    if (result.error) {
+      setError(result.error);
+    } else {
+      router.refresh();
+    }
+    setRevealBusy(false);
+  }
+
+  async function handleUndoReveal(coupleId: string) {
+    if (!selectedEpisode) return;
+    setError(null);
+    setRevealBusy(true);
+    const result = await undoCoupleReveal({ episodeId: selectedEpisode.id, coupleId });
+    if (result.error) {
+      setError(result.error);
+    } else {
+      router.refresh();
+    }
+    setRevealBusy(false);
+  }
+
+  function handleFinishWeek() {
+    if (selectedWeek?.is_elimination_week && eliminatedCount < requiredEliminations) {
+      setConfirmNoElimination(true);
+      return;
+    }
+    void handlePublish();
   }
 
   async function handlePublish() {
@@ -474,10 +552,6 @@ export function ResultsForm({
     });
   }
 
-  function danceCountFor(coupleId: string): number {
-    return (rows[coupleId]?.dances ?? []).length;
-  }
-
   function addDance(coupleId: string) {
     const row = rows[coupleId] ?? emptyRow();
     updateRow(coupleId, {
@@ -495,24 +569,6 @@ export function ResultsForm({
   function removeDance(coupleId: string, danceKey: string) {
     const row = rows[coupleId] ?? emptyRow();
     updateRow(coupleId, { dances: row.dances.filter((d) => d.key !== danceKey) });
-  }
-
-  function addTeamDance(coupleIds: string[], danceStyleId: string, songTitle: string, scores: Record<string, string>) {
-    setRows((prev) => {
-      const next = { ...prev };
-      for (const coupleId of coupleIds) {
-        const row = next[coupleId] ?? emptyRow();
-        next[coupleId] = {
-          ...row,
-          dances: [
-            ...row.dances,
-            { key: `team-${Date.now()}-${Math.random()}-${coupleId}`, danceStyleId, songTitle, scores: { ...scores } },
-          ],
-        };
-      }
-      return next;
-    });
-    scheduleAutosave();
   }
 
   async function handleAddCustomMoment() {
@@ -583,25 +639,166 @@ export function ResultsForm({
     .filter((c) => c.elimination_week !== null || c.status === "winner" || c.status === "runner_up" || c.status === "third_place")
     .sort((a, b) => (a.elimination_week ?? 999) - (b.elimination_week ?? 999));
 
-  // One couple's editable row — shared by the "All Couples" list and the
-  // "By Couple" stepper so the two views can never drift apart.
-  function CoupleEntryCard({ c, rank }: { c: Couple; rank?: number }) {
+  // Called as a plain function, not rendered as <Component/>: a component
+  // declared inside this one gets a new identity every render, which would
+  // remount its inputs on every keystroke and drop focus.
+  function renderCouplePicker(list: Couple[], selectedId: string, onSelect: (id: string) => void) {
+    const current = list.find((c) => c.id === selectedId) ?? list[0];
+    return (
+      <>
+        <Select
+          items={Object.fromEntries(list.map((c) => [c.id, coupleNameNode(coupleParts(c))]))}
+          value={current.id}
+          onValueChange={(v) => onSelect(v ?? "")}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {list.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {coupleNameNode(coupleParts(c))}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {renderDanceEntry(current)}
+      </>
+    );
+  }
+
+  function renderDanceEntry(c: Couple, rank?: number) {
     const row = rows[c.id] ?? emptyRow();
     const canAddDance = row.dances.length < expectedDanceCount;
+    const revealState = publishPerCouple ? revealStates.get(c.id) : undefined;
+    const locked = revealState === "posted";
+    const postedAtIso = revealedAtByCouple[c.id];
+    const undoLeft = nowMs !== null && postedAtIso ? undoSecondsLeft(postedAtIso, nowMs) : 0;
+    const publishBlocker = row.dances.filter((d) => d.danceStyleId).length === 0
+      ? "Pick a dance style to publish."
+      : revealState === "waiting"
+        ? "Enter every dance's judge scores to publish."
+        : null;
     return (
-      <div className="rounded-xl border border-border p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold">
-            {rank != null && <span className="text-muted-foreground">#{rank}</span>}{" "}
-            <CoupleName {...coupleParts(c)} />
-            {rank != null && <span className="ml-1.5 text-muted-foreground">· {coupleTotal(row)} pts</span>}
-          </p>
+      <div key={c.id} className="rounded-xl border border-border p-2.5">
+        <p className="text-sm font-semibold">
+          {rank != null && <span className="text-muted-foreground">#{rank}</span>} <CoupleName {...coupleParts(c)} />
+          {rank != null && <span className="ml-1.5 text-muted-foreground">· {coupleTotal(row)} pts</span>}
+        </p>
+
+        <fieldset disabled={locked} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
+          {row.dances.map((d) => (
+            <div key={d.key} className="flex flex-wrap items-end gap-1.5 rounded-lg bg-muted/50 p-1.5">
+              <Select
+                items={danceStyleItems}
+                value={d.danceStyleId}
+                onValueChange={(v) => updateDance(c.id, d.key, { danceStyleId: v ?? "" })}
+              >
+                <SelectTrigger className="h-8 w-36 text-xs">
+                  <SelectValue placeholder="Dance style" />
+                </SelectTrigger>
+                <SelectContent>
+                  {danceStyles.map((ds) => (
+                    <SelectItem key={ds.id} value={ds.id}>
+                      {ds.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                className="h-8 min-w-32 flex-1 text-xs"
+                placeholder="Song title"
+                value={d.songTitle}
+                onChange={(e) => updateDance(c.id, d.key, { songTitle: e.target.value })}
+              />
+              {judgesForDance(d).map((j) => (
+                <div key={j.id} className="flex flex-col gap-0.5">
+                  <Label className="text-[10px] text-muted-foreground">{judgeDisplayNames.get(j.id) ?? j.name}</Label>
+                  <Input
+                    className="h-8 w-12 px-1.5 text-center text-xs"
+                    placeholder="—"
+                    value={d.scores[j.id] ?? ""}
+                    onChange={(e) => updateDance(c.id, d.key, { scores: { ...d.scores, [j.id]: e.target.value } })}
+                  />
+                </div>
+              ))}
+              <div className="flex flex-col gap-0.5">
+                <Label className="text-[10px] text-muted-foreground">Total</Label>
+                <p className="flex h-8 items-center px-1 text-sm font-medium">{danceTotal(d)}</p>
+              </div>
+              <Button
+                size="xs"
+                variant="ghost"
+                className="text-destructive"
+                onClick={() => removeDance(c.id, d.key)}
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
+          {canAddDance && (
+            <Button
+              size="xs"
+              variant="outline"
+              className="self-start"
+              disabled={row.outcome === "bye"}
+              onClick={() => addDance(c.id)}
+            >
+              + Dance
+            </Button>
+          )}
+        </fieldset>
+
+        {publishPerCouple && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+            {locked ? (
+              <>
+                <Badge>Posted</Badge>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  className="text-destructive"
+                  disabled={revealBusy}
+                  onClick={() => void handleUndoReveal(c.id)}
+                >
+                  {undoLeft > 0 ? `Undo · ${undoLeft}s` : "Un-Post"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button size="sm" variant="outline" disabled={savingDraft || revealBusy} onClick={() => void flushDraft()}>
+                  {savingDraft ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!!publishBlocker || savingDraft || revealBusy}
+                  onClick={() => void handlePublishCouple(c.id)}
+                >
+                  {revealBusy ? "Publishing..." : "Publish"}
+                </Button>
+                {publishBlocker && <p className="text-xs text-muted-foreground">{publishBlocker}</p>}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderOutcomeRow(c: Couple) {
+    const row = rows[c.id] ?? emptyRow();
+    return (
+      <tr key={c.id} className="border-t border-border">
+        <td className="sticky left-0 z-10 bg-card py-1 pr-2 font-medium">
+          <CoupleName {...coupleParts(c)} />
+        </td>
+        <td className="px-1 py-1">
           <Select
             items={STATUS_LABELS}
             value={row.outcome}
             onValueChange={(v) => setStatus(c.id, (v as StatusValue) ?? "safe")}
           >
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="h-7 w-28 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -612,116 +809,38 @@ export function ResultsForm({
               ))}
             </SelectContent>
           </Select>
-        </div>
-        {row.outcome === "bye" && (
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            For a couple still in the cast tonight who didn&apos;t perform (an
-            odd-couple bye, a mid-competition injury) — stays active, earns no survival
-            bonus this week. For a couple not appearing this broadcast at all, use
-            &quot;Who&apos;s Performing?&quot; under Edit Scheduled Episode instead.
-          </p>
-        )}
-
-        <div className="mt-3 flex flex-col gap-2">
-          {row.dances.map((d) => (
-            <div key={d.key} className="flex flex-col gap-2 rounded-lg bg-muted/50 p-2">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Select
-                  items={danceStyleItems}
-                  value={d.danceStyleId}
-                  onValueChange={(v) => updateDance(c.id, d.key, { danceStyleId: v ?? "" })}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Dance style" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {danceStyles.map((ds) => (
-                      <SelectItem key={ds.id} value={ds.id}>
-                        {ds.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder="Song title"
-                  value={d.songTitle}
-                  onChange={(e) => updateDance(c.id, d.key, { songTitle: e.target.value })}
-                />
-              </div>
-              <div className="flex flex-wrap items-end gap-2">
-                {judgesForDance(d).map((j) => (
-                  <div key={j.id} className="flex flex-col gap-1">
-                    <Label className="text-xs text-muted-foreground">
-                      {judgeDisplayNames.get(j.id) ?? j.name}
-                    </Label>
-                    <Input
-                      className="w-16"
-                      placeholder="—"
-                      value={d.scores[j.id] ?? ""}
-                      onChange={(e) =>
-                        updateDance(c.id, d.key, { scores: { ...d.scores, [j.id]: e.target.value } })
-                      }
-                    />
-                  </div>
-                ))}
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">Total</Label>
-                  <p className="flex h-8 items-center text-sm font-medium">{danceTotal(d)}</p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-destructive"
-                  onClick={() => removeDance(c.id, d.key)}
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-          ))}
-          {canAddDance && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="self-start"
-              disabled={row.outcome === "bye"}
-              onClick={() => addDance(c.id)}
-            >
-              + Dance
-            </Button>
-          )}
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-          <label className="flex items-center gap-1.5">
+        </td>
+        <td className="px-2 text-center">
+          <input
+            type="checkbox"
+            aria-label="In Jeopardy"
+            checked={row.inJeopardy}
+            disabled={row.outcome === "eliminated"}
+            onChange={(e) => updateRow(c.id, { inJeopardy: e.target.checked })}
+          />
+        </td>
+        {judgesSaveAvailable && (
+          <td className="px-2 text-center">
             <input
               type="checkbox"
-              checked={row.inJeopardy}
-              disabled={row.outcome === "eliminated"}
-              onChange={(e) => updateRow(c.id, { inJeopardy: e.target.checked })}
-            />
-            In Jeopardy
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
+              aria-label="Judges' Save used"
               checked={row.savedByJudges}
-              disabled={!judgesSaveAvailable}
               onChange={(e) => updateRow(c.id, { savedByJudges: e.target.checked })}
             />
-            Judges&apos; Save used
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={row.hadImmunity}
-              onChange={(e) => updateRow(c.id, { hadImmunity: e.target.checked })}
-            />
-            Immunity
-          </label>
+          </td>
+        )}
+        <td className="px-2 text-center">
+          <input
+            type="checkbox"
+            aria-label="Immunity"
+            checked={row.hadImmunity}
+            onChange={(e) => updateRow(c.id, { hadImmunity: e.target.checked })}
+          />
+        </td>
+        <td className="px-1">
           <BonusDisclosure row={row} onChange={(patch) => updateRow(c.id, patch)} />
-        </div>
-      </div>
+        </td>
+      </tr>
     );
   }
 
@@ -829,22 +948,6 @@ export function ResultsForm({
                 <Label className="text-xs text-muted-foreground">Theme</Label>
                 <p className="text-sm">{selectedEpisode.theme ?? "—"}</p>
               </div>
-              <div className="flex items-center justify-between gap-3 sm:col-span-2">
-                <div>
-                  <Label htmlFor="judgesSave">Judges&apos; Save active this episode</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Enables the per-couple &quot;Judges&apos; Save used&quot; option below.
-                  </p>
-                </div>
-                <Switch
-                  id="judgesSave"
-                  checked={judgesSaveAvailable}
-                  onCheckedChange={(checked) => {
-                    setJudgesSaveAvailable(checked);
-                    scheduleAutosave();
-                  }}
-                />
-              </div>
               <p className="text-xs text-muted-foreground sm:col-span-2">
                 Enter raw judges&apos; scores — each league&apos;s Judges&apos; Score Multiplier
                 applies automatically once results are published. To add a score box
@@ -857,45 +960,21 @@ export function ResultsForm({
 
           <Card>
             <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <CardTitle>Couples &amp; Scores</CardTitle>
-                  <CardDescription>
-                    Tick In Jeopardy for couples the show called down who stayed. That list is what
-                    Curtain Call uses — it is not taken from the scores.
-                  </CardDescription>
-                </div>
-                <Sheet open={teamSheetOpen} onOpenChange={setTeamSheetOpen}>
-                  <SheetTrigger render={<Button variant="outline" size="sm" />}>Score a Team Dance</SheetTrigger>
-                  <TeamDanceSheetContent
-                    couples={episodeCouples}
-                    coupleParts={coupleParts}
-                    danceStyles={danceStyles}
-                    judges={judgesForScoreInputs(judges)}
-                    judgeDisplayNames={judgeDisplayNames}
-                    danceCountFor={danceCountFor}
-                    expectedDanceCount={expectedDanceCount}
-                    onSubmit={(coupleIds, danceStyleId, songTitle, scores) => {
-                      addTeamDance(coupleIds, danceStyleId, songTitle, scores);
-                      setTeamSheetOpen(false);
-                    }}
-                  />
-                </Sheet>
-              </div>
+              <CardTitle>Couples &amp; Scores</CardTitle>
               <div className="flex gap-2 pt-1">
                 <Button
                   size="sm"
-                  variant={coupleViewMode === "all" ? "default" : "outline"}
-                  onClick={() => setCoupleViewMode("all")}
+                  variant={coupleViewMode === "unpublished" ? "default" : "outline"}
+                  onClick={() => setCoupleViewMode("unpublished")}
                 >
-                  All Couples
+                  Unpublished
                 </Button>
                 <Button
                   size="sm"
-                  variant={coupleViewMode === "byCouple" ? "default" : "outline"}
-                  onClick={() => setCoupleViewMode("byCouple")}
+                  variant={coupleViewMode === "published" ? "default" : "outline"}
+                  onClick={() => setCoupleViewMode("published")}
                 >
-                  By Couple
+                  Published
                 </Button>
                 <Button
                   size="sm"
@@ -907,47 +986,106 @@ export function ResultsForm({
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              {coupleViewMode === "all" ? (
-                episodeCouples.map((c) => <CoupleEntryCard key={c.id} c={c} />)
-              ) : coupleViewMode === "leaderboard" ? (
-                episodeCouples.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No couples to check for this episode.</p>
+              {coupleViewMode === "leaderboard" ? (
+                scoredCouples.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No scores entered yet.</p>
                 ) : (
-                  [...episodeCouples]
+                  [...scoredCouples]
                     .sort((a, b) => coupleTotal(rows[b.id] ?? emptyRow()) - coupleTotal(rows[a.id] ?? emptyRow()))
-                    .map((c, i) => <CoupleEntryCard key={c.id} c={c} rank={i + 1} />)
+                    .map((c, i) => renderDanceEntry(c, i + 1))
                 )
-              ) : episodeCouples.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No couples to check for this episode.</p>
+              ) : coupleViewMode === "published" ? (
+                publishedCouples.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No couples published yet.</p>
+                ) : (
+                  renderCouplePicker(publishedCouples, publishedSelectedId, setPublishedSelectedId)
+                )
+              ) : unpublishedCouples.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {episodeCouples.length === 0
+                    ? "No couples to check for this episode."
+                    : "Every couple's scores are published."}
+                </p>
               ) : (
-                (() => {
-                  const current =
-                    episodeCouples.find((c) => c.id === byCoupleSelectedId) ?? episodeCouples[0];
-                  return (
-                    <>
-                      <Select
-                        items={Object.fromEntries(episodeCouples.map((c) => [c.id, coupleNameNode(coupleParts(c))]))}
-                        value={current.id}
-                        onValueChange={(v) => setByCoupleSelectedId(v ?? "")}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {episodeCouples.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {coupleNameNode(coupleParts(c))}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <CoupleEntryCard key={current.id} c={current} />
-                    </>
-                  );
-                })()
+                renderCouplePicker(unpublishedCouples, byCoupleSelectedId, setByCoupleSelectedId)
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{published ? "Outcomes" : "Finish Week"}</CardTitle>
+              <CardDescription className="text-xs">
+                Mark eliminations and anything else that happened, then{" "}
+                {published ? "publish the correction" : "finish the week"}. Tick In Jeopardy for couples the show
+                called down who stayed. That list is what Curtain Call uses — it is not taken from the scores.
+                {publishPerCouple && revealedCoupleIds.size > 0 && unpostedCount > 0
+                  ? ` ${unpostedCount} ${unpostedCount === 1 ? "couple is" : "couples are"} still to publish.`
+                  : ""}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="sticky left-0 z-10 bg-card py-1 pr-2 font-medium">Couple</th>
+                      <th className="px-1 font-medium">Status</th>
+                      <th className="px-2 text-center font-medium">In Jeopardy</th>
+                      {judgesSaveAvailable && <th className="px-2 text-center font-medium">Judges&apos; Save</th>}
+                      <th className="px-2 text-center font-medium">Immunity</th>
+                      <th className="px-1 font-medium">Bonus</th>
+                    </tr>
+                  </thead>
+                  <tbody>{episodeCouples.map((c) => renderOutcomeRow(c))}</tbody>
+                </table>
+              </div>
+              {episodeCouples.some((c) => (rows[c.id] ?? emptyRow()).outcome === "bye") && (
+                <p className="text-xs text-muted-foreground">
+                  Did Not Dance is for a couple still in the cast tonight who didn&apos;t perform (an odd-couple bye, a
+                  mid-competition injury): they stay active and earn no survival bonus this week. For a couple not
+                  appearing this broadcast at all, use &quot;Who&apos;s Performing?&quot; under Edit Scheduled Episode.
+                </p>
+              )}
+              {publishPerCouple && (
+                <Button
+                  className="self-start"
+                  onClick={handleFinishWeek}
+                  disabled={savingDraft || publishing || unpostedCount > 0}
+                >
+                  {publishing ? "Finishing..." : "Finish Week"}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          <Dialog open={confirmNoElimination} onOpenChange={setConfirmNoElimination}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirm the Eliminations</DialogTitle>
+                <DialogDescription>
+                  {eliminatedCount === 0
+                    ? "No elimination is marked for this week."
+                    : `Only ${eliminatedCount} of ${requiredEliminations} eliminations are marked for this week.`}{" "}
+                  Confirm that&apos;s right, or go back and mark them first. Finishing posts survival, Curtain Call
+                  and Grand Finale points to every league.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirmNoElimination(false)}>
+                  Go Back
+                </Button>
+                <Button
+                  onClick={() => {
+                    setConfirmNoElimination(false);
+                    void handlePublish();
+                  }}
+                >
+                  Finish Week Anyway
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Card>
             <CardHeader>
@@ -1066,7 +1204,9 @@ export function ResultsForm({
             <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="hidden text-xs text-muted-foreground sm:block">
                 {canPublish
-                  ? "Publishing updates Results & Standings across every league immediately."
+                  ? published
+                    ? "Publishing updates Results & Standings across every league immediately."
+                    : "Publish each couple as their scores are in. Finish Week posts safe and eliminated."
                   : "Your draft is saved for a site admin to review and publish."}
               </p>
               <div className="flex gap-2 sm:w-auto">
@@ -1078,7 +1218,7 @@ export function ResultsForm({
                 >
                   {savingDraft ? "Saving..." : "Save Draft"}
                 </Button>
-                {canPublish && (
+                {canPublish && published && (
                   <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing}>
                     {publishing ? "Publishing..." : "Publish Results"}
                   </Button>
@@ -1103,134 +1243,26 @@ function BonusDisclosure({
 
   if (!open) {
     return (
-      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        + Bonus Points
+      <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
+        + Bonus
       </Button>
     );
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <Input
         type="number"
-        className="w-16"
+        className="h-7 w-14 text-xs"
         value={row.bonusPoints}
         onChange={(e) => onChange({ bonusPoints: Number(e.target.value) })}
       />
       <Input
-        className="w-40"
+        className="h-7 w-32 text-xs"
         placeholder="e.g. Dance-off win"
         value={row.bonusNote}
         onChange={(e) => onChange({ bonusNote: e.target.value })}
       />
     </div>
-  );
-}
-
-function TeamDanceSheetContent({
-  couples,
-  coupleParts,
-  danceStyles,
-  judges,
-  judgeDisplayNames,
-  danceCountFor,
-  expectedDanceCount,
-  onSubmit,
-}: {
-  couples: Couple[];
-  coupleParts: (c: Couple) => CoupleNameParts;
-  danceStyles: Named[];
-  judges: Named[];
-  judgeDisplayNames: Map<string, string>;
-  danceCountFor: (coupleId: string) => number;
-  expectedDanceCount: number;
-  onSubmit: (coupleIds: string[], danceStyleId: string, songTitle: string, scores: Record<string, string>) => void;
-}) {
-  const [selectedCoupleIds, setSelectedCoupleIds] = useState<Set<string>>(new Set());
-  const [danceStyleId, setDanceStyleId] = useState("");
-  const [songTitle, setSongTitle] = useState("");
-  const [scores, setScores] = useState<Record<string, string>>({});
-
-  const availableCouples = couples.filter((c) => danceCountFor(c.id) < expectedDanceCount);
-  const total = Object.values(scores).reduce((sum, v) => {
-    const n = Number(v);
-    return sum + (Number.isNaN(n) ? 0 : n);
-  }, 0);
-
-  function toggle(coupleId: string) {
-    setSelectedCoupleIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(coupleId)) next.delete(coupleId);
-      else next.add(coupleId);
-      return next;
-    });
-  }
-
-  function reset() {
-    setSelectedCoupleIds(new Set());
-    setDanceStyleId("");
-    setSongTitle("");
-    setScores({});
-  }
-
-  return (
-    <SheetContent className="overflow-y-auto">
-      <SheetHeader>
-        <SheetTitle>Score a Team Dance</SheetTitle>
-        <SheetDescription>One shared score applied to every couple selected below.</SheetDescription>
-      </SheetHeader>
-      <div className="flex flex-col gap-4 px-4 pb-4">
-        <div className="flex flex-col gap-2">
-          <Label className="text-xs text-muted-foreground">Couples on This Team</Label>
-          <div className="flex flex-wrap gap-3">
-            {availableCouples.map((c) => (
-              <label key={c.id} className="flex items-center gap-1.5 text-sm">
-                <input type="checkbox" checked={selectedCoupleIds.has(c.id)} onChange={() => toggle(c.id)} />
-                <CoupleName {...coupleParts(c)} />
-              </label>
-            ))}
-          </div>
-        </div>
-        <Select items={Object.fromEntries(danceStyles.map((d) => [d.id, d.name]))} value={danceStyleId} onValueChange={(v) => setDanceStyleId(v ?? "")}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Dance style" />
-          </SelectTrigger>
-          <SelectContent>
-            {danceStyles.map((d) => (
-              <SelectItem key={d.id} value={d.id}>
-                {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input placeholder="Song title" value={songTitle} onChange={(e) => setSongTitle(e.target.value)} />
-        <div className="flex flex-wrap items-end gap-2">
-          {judges.map((j) => (
-            <div key={j.id} className="flex flex-col gap-1">
-              <Label className="text-xs text-muted-foreground">{judgeDisplayNames.get(j.id) ?? j.name}</Label>
-              <Input
-                className="w-16"
-                placeholder="—"
-                value={scores[j.id] ?? ""}
-                onChange={(e) => setScores((prev) => ({ ...prev, [j.id]: e.target.value }))}
-              />
-            </div>
-          ))}
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">Total</Label>
-            <p className="flex h-8 items-center text-sm font-medium">{total}</p>
-          </div>
-        </div>
-        <Button
-          disabled={selectedCoupleIds.size === 0 || !danceStyleId}
-          onClick={() => {
-            onSubmit([...selectedCoupleIds], danceStyleId, songTitle, scores);
-            reset();
-          }}
-        >
-          Add Team Dance
-        </Button>
-      </div>
-    </SheetContent>
   );
 }

@@ -14,6 +14,10 @@ describe("deriveResultsStatus", () => {
     expect(deriveResultsStatus({ results_published_at: "2026-01-01T00:00:00Z" }, false)).toBe("published");
   });
 
+  it("is revealing when an unpublished draft has couples already posted", () => {
+    expect(deriveResultsStatus({ results_published_at: null }, true, true)).toBe("revealing");
+  });
+
   it("is draft_correcting when a draft exists for an already-published episode", () => {
     expect(deriveResultsStatus({ results_published_at: "2026-01-01T00:00:00Z" }, true)).toBe(
       "draft_correcting"

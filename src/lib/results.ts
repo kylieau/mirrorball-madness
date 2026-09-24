@@ -168,6 +168,7 @@ export type ScheduleEpisodeInput = {
   participantCoupleIds: string[];
   roundTypeIds: string[];
   expectedDanceCount: number;
+  judgesSaveAvailable: boolean;
   durationMinutes: number;
 };
 
@@ -246,6 +247,7 @@ export async function applyEpisodeSchedule(
     airs_at: input.airsAt,
     theme: input.theme,
     expected_dance_count: input.expectedDanceCount,
+    judges_save_available: input.judgesSaveAvailable,
     duration_minutes: input.durationMinutes,
   };
 
@@ -291,6 +293,43 @@ export async function applyEpisodeSchedule(
   return { error: null };
 }
 
+export async function recomputeWeekForReveal(
+  admin: SupabaseClient<Database>,
+  episodeId: string
+): Promise<string | null> {
+  const { seasonId, error: seasonErr } = await getActiveSeasonId(admin);
+  if (seasonErr || !seasonId) return seasonErr;
+
+  const { data: episode, error: episodeErr } = await admin
+    .from("episodes")
+    .select("id, week_id")
+    .eq("id", episodeId)
+    .single();
+  if (episodeErr) return episodeErr.message;
+  if (!episode.week_id) return null;
+
+  const [{ data: week, error: weekErr }, { data: weekEpisodes, error: weekEpisodesErr }] = await Promise.all([
+    admin
+      .from("competition_weeks")
+      .select("id, week_number, is_double_elimination_week")
+      .eq("id", episode.week_id)
+      .single(),
+    admin.from("episodes").select("id").eq("week_id", episode.week_id),
+  ]);
+  if (weekErr) return weekErr.message;
+  if (weekEpisodesErr) return weekEpisodesErr.message;
+
+  return recomputeWeekScores(
+    admin,
+    seasonId,
+    week,
+    (weekEpisodes ?? []).map((row) => row.id),
+    [],
+    episode.id,
+    { reveal: true }
+  );
+}
+
 export type EpisodeResultsInput = {
   episodeId: string;
   entries: EntrySubmission[];
@@ -322,7 +361,11 @@ async function recomputeWeekScores(
   },
   episodeIds: string[],
   thisEpisodeOutcomeRows: { couple_id: string; outcome: string; bonus_points: number }[],
-  thisEpisodeId: string
+  thisEpisodeId: string,
+  // Reveal mode: this episode's dance scores are posted but its outcomes are
+  // not, so only judges points move. Curtain Call and Grand Finale wait for
+  // the final publish.
+  { reveal = false }: { reveal?: boolean } = {}
 ): Promise<string | null> {
   const [{ data: allDances, error: dancesErr }, { data: allOutcomes, error: outcomesErr }] = await Promise.all([
     admin.from("dance_scores").select("couple_id, total_score").in("episode_id", episodeIds),
@@ -399,7 +442,7 @@ async function recomputeWeekScores(
   }));
 
   let inJeopardyCoupleIds: string[] = [];
-  if (episodeIds.length > 0) {
+  if (episodeIds.length > 0 && !reveal) {
     const { data: jeopardyRows, error: jeopardyErr } = await admin
       .from("episode_in_jeopardy_couples")
       .select("couple_id")
@@ -481,7 +524,7 @@ async function recomputeWeekScores(
         : [],
       danceScores: danceScoreInputs,
       episodeOutcomes: episodeOutcomeInputs,
-      predictions: scoringStarted
+      predictions: scoringStarted && !reveal
         ? (predictions ?? []).map((p) => ({
             managerId: p.manager_id,
             predictedEliminatedCoupleId: p.predicted_eliminated_couple_id,
@@ -529,7 +572,10 @@ async function recomputeWeekScores(
 // in tests without a Next.js request context.
 export async function applyEpisodeResults(
   admin: SupabaseClient<Database>,
-  input: EpisodeResultsInput
+  input: EpisodeResultsInput,
+  // Couples whose dances were already revealed keep their live rows as-is, so
+  // a final publish never blanks or re-ids a score viewers can already see.
+  preserveDanceCoupleIds: ReadonlySet<string> = new Set()
 ): Promise<{ error: string | null }> {
   const { seasonId, error: seasonErr } = await getActiveSeasonId(admin);
   if (seasonErr || !seasonId) return { error: seasonErr };
@@ -597,10 +643,14 @@ export async function applyEpisodeResults(
     }
   }
 
-  await admin.from("dance_scores").delete().eq("episode_id", episode.id);
+  const staleDances = admin.from("dance_scores").delete().eq("episode_id", episode.id);
+  await (preserveDanceCoupleIds.size > 0
+    ? staleDances.not("couple_id", "in", `(${[...preserveDanceCoupleIds].join(",")})`)
+    : staleDances);
   await admin.from("episode_results").delete().eq("episode_id", episode.id);
 
   for (const e of input.entries) {
+    if (preserveDanceCoupleIds.has(e.coupleId)) continue;
     for (const dance of e.dances) {
       const totalScore = dance.judgeScores.reduce((sum, js) => sum + js.score, 0);
       const { data: danceScoreRow, error: danceErr } = await admin

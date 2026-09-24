@@ -18,6 +18,7 @@ import {
   type SaveDraftResultsInput,
   type SeasonSettingsInput,
 } from "@/lib/results-draft";
+import { revealCouple, undoReveal } from "@/lib/results-reveal";
 import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
 
 // Both checks return userId alongside error so callers that need to stamp
@@ -115,6 +116,30 @@ export async function publishEpisodeResults(episodeId: string): Promise<{ error:
     revalidatePath("/admin/results");
     revalidatePath("/admin/schedule");
   }
+  return result;
+}
+
+export async function revealCoupleScores(input: {
+  episodeId: string;
+  coupleId: string;
+}): Promise<{ error: string | null }> {
+  const access = await requireAdminAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await revealCouple(createAdminClient(), input);
+  if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function undoCoupleReveal(input: {
+  episodeId: string;
+  coupleId: string;
+}): Promise<{ error: string | null }> {
+  const access = await requireAdminAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await undoReveal(createAdminClient(), input);
+  if (!result.error) revalidatePath("/admin/results");
   return result;
 }
 
