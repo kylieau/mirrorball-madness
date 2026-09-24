@@ -29,6 +29,9 @@ export type ScoreHistoryLine = {
   weekNumber: number;
   module: HistoryModule;
   label: string;
+  // The verdict shown after the label ("✓", "Exact", "Off 2"); HIT_MARK gets
+  // the app's green check styling.
+  result?: string;
   points: number;
 };
 
@@ -95,8 +98,10 @@ function weightSuffix(weight: number): string {
   return weight === 1 ? "" : ` × ${trimNumber(weight)} Wt`;
 }
 
+export const HIT_MARK = "✓";
+
 function verdictLabel(verdict: CurtainCallVerdict): string {
-  return verdict === "exact" ? "✓" : "🤏🏼";
+  return verdict === "exact" ? HIT_MARK : "🤏";
 }
 
 // Reconstructs one manager's nonzero point-contribution lines from the same
@@ -127,7 +132,8 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
     key: string,
     label: string,
     rawPoints: number,
-    weight: number
+    weight: number,
+    result?: string
   ) => {
     const points = roundPoints(rawPoints * weight);
     if (points === 0) return;
@@ -136,6 +142,7 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       weekNumber,
       module,
       label: `${label}${weightSuffix(weight)}`,
+      result,
       points,
     });
   };
@@ -164,7 +171,7 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       const picks: { key: string; tag: string; coupleId: string | null; verdict: CurtainCallVerdict; exact: number }[] = [
         {
           key: "elim1",
-          tag: "Elim",
+          tag: "Home",
           coupleId: prediction.eliminatedCoupleId,
           verdict: classifyEliminationGuess(prediction.eliminatedCoupleId, eliminatedIds, inJeopardyIds),
           exact: eliminationExact,
@@ -173,7 +180,7 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       if (week.isDoubleElimination) {
         picks.push({
           key: "elim2",
-          tag: "Elim",
+          tag: "Home",
           coupleId: prediction.eliminatedCoupleId2,
           verdict: classifyEliminationGuess(prediction.eliminatedCoupleId2, eliminatedIds, inJeopardyIds),
           exact: eliminationExact,
@@ -181,7 +188,7 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       }
       picks.push({
         key: "top",
-        tag: "Top",
+        tag: "High",
         coupleId: prediction.topScorerCoupleId,
         verdict: classifyTopScorerGuess(prediction.topScorerCoupleId, totals),
         exact: topScorerExact,
@@ -193,9 +200,10 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
           w,
           "curtainCall",
           pick.key,
-          `${pick.tag} · ${nameOf(pick.coupleId)}: ${verdictLabel(resolved.verdict)}`,
+          `${pick.tag}: ${nameOf(pick.coupleId)}`,
           resolved.points,
-          weight
+          weight,
+          verdictLabel(resolved.verdict)
         );
       }
     }
@@ -255,9 +263,10 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
         w,
         "grandFinale",
         `gf:${resolved.coupleId}`,
-        `${plannedWeek === null ? "Finale" : `Elim W${plannedWeek}`} · ${nameOf(resolved.coupleId)}: ${spotsOff === 0 ? "Exact" : `Off ${spotsOff}`}`,
+        `${nameOf(resolved.coupleId)}: ${plannedWeek === null ? "Finale" : `Elim W${plannedWeek}`}`,
         raw,
-        categoryWeights.bonus
+        categoryWeights.bonus,
+        spotsOff === 0 ? "Exact" : `Off ${spotsOff}`
       );
     }
   }

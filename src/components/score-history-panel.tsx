@@ -6,7 +6,7 @@ import { cn } from "cn";
 import type { getScoreHistory } from "@/app/leagues/[id]/score-history/actions";
 import { formatEpisodeCasualShort } from "@/lib/format-week";
 import { formatPoints, formatSignedPoints, roundPoints } from "@/lib/format-points";
-import { groupHistory, type HistoryModule } from "@/lib/score-history";
+import { groupHistory, HIT_MARK, type HistoryModule } from "@/lib/score-history";
 import { SCORING_MODULES, scoringModule, type ScoringModuleKey } from "@/lib/scoring-modules";
 
 export type ModuleTotals = { season: number } & Record<ScoringModuleKey, number | null>;
@@ -122,7 +122,15 @@ export function ScoreHistoryPanel({ target, result }: { target: HistoryTarget; r
                 >
                   {scoringModule(row.module).icon}
                 </span>
-                <span className="min-w-0 flex-1 text-[11px] font-medium leading-snug">{row.label}</span>
+                <span className="min-w-0 flex-1 text-[11px] font-medium leading-snug">
+                  {row.label}
+                  {row.result && (
+                    <>
+                      {" · "}
+                      {row.result === HIT_MARK ? <span className="text-emerald-text">{HIT_MARK}</span> : row.result}
+                    </>
+                  )}
+                </span>
                 <span className="w-12 text-right font-heading text-xs font-semibold tabular-nums text-accent">
                   {formatSignedPoints(row.points)}
                 </span>

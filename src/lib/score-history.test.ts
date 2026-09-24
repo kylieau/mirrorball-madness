@@ -193,6 +193,8 @@ function engineWeek(input: ManagerHistoryInput, week: HistoryWeekData) {
   }).find((s) => s.managerId === "m");
 }
 
+const text = (l: ScoreHistoryLine) => (l.result ? `${l.label} · ${l.result}` : l.label);
+
 function sumLines(lines: ScoreHistoryLine[], weekNumber: number, module: HistoryModule): number {
   return lines
     .filter((l) => l.weekNumber === weekNumber && l.module === module)
@@ -259,23 +261,23 @@ describe("buildScoreHistory lines", () => {
   });
 
   it("scores both Curtain Call elimination picks on a double-elimination week and skips a miss", () => {
-    const week2 = lines.filter((l) => l.weekNumber === 2 && l.module === "curtainCall").map((l) => l.label);
-    expect(week2).toEqual(["Elim · Danny: ✓"]);
+    const week2 = lines.filter((l) => l.weekNumber === 2 && l.module === "curtainCall").map(text);
+    expect(week2).toEqual(["Home: Danny · ✓"]);
   });
 
   it("marks In Jeopardy and within-one top-scorer picks as near misses", () => {
-    const week3 = lines.filter((l) => l.weekNumber === 3 && l.module === "curtainCall").map((l) => l.label);
-    expect(week3).toEqual(["Elim · Ilona: 🤏🏼", "Top · Ilona: 🤏🏼"]);
+    const week3 = lines.filter((l) => l.weekNumber === 3 && l.module === "curtainCall").map(text);
+    expect(week3).toEqual(["Home: Ilona · 🤏", "High: Ilona · 🤏"]);
   });
 
   it("credits Grand Finale picks when the couple's position resolves, tagged Exact or by how many spots off", () => {
     const gf = lines.filter((l) => l.module === "grandFinale");
     expect(gf.find((l) => l.label.includes("Ezra"))).toMatchObject({ weekNumber: 1 });
-    expect(gf.find((l) => l.label.includes("Ezra"))?.label).toBe("Elim W2 · Ezra: Off 1");
-    expect(gf.find((l) => l.label.includes("Danny"))?.label).toBe("Elim W2 · Danny: Exact");
-    expect(gf.find((l) => l.label.includes("Robert"))?.label).toBe("Elim W2 · Robert: Exact");
+    expect(text(gf.find((l) => l.label.includes("Ezra"))!)).toBe("Ezra: Elim W2 · Off 1");
+    expect(text(gf.find((l) => l.label.includes("Danny"))!)).toBe("Danny: Elim W2 · Exact");
+    expect(text(gf.find((l) => l.label.includes("Robert"))!)).toBe("Robert: Elim W2 · Exact");
     expect(gf.find((l) => l.label.includes("Ilona"))).toMatchObject({ weekNumber: 3 });
-    expect(gf.find((l) => l.label.includes("Ilona"))?.label).toBe("Finale · Ilona: Exact");
+    expect(text(gf.find((l) => l.label.includes("Ilona"))!)).toBe("Ilona: Finale · Exact");
   });
 
   it("scales lines by the category weight and says so only when the weight isn't 1", () => {
@@ -321,7 +323,7 @@ describe("plannedEliminationWeek", () => {
 describe("buildScoreHistory Grand Finale week labels", () => {
   it("uses the real elimination count for weeks that aired, not the planned shape", () => {
     const gf = buildScoreHistory(base).filter((l) => l.module === "grandFinale");
-    expect(gf.find((l) => l.label.includes("Robert"))?.label).toBe("Elim W2 · Robert: Exact");
+    expect(text(gf.find((l) => l.label.includes("Robert"))!)).toBe("Robert: Elim W2 · Exact");
   });
 
   it("falls back to the planned shape for weeks the viewer can't see yet", () => {
