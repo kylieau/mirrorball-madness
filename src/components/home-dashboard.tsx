@@ -32,7 +32,7 @@ export function HomeDashboard({
   leagues: HomeLeague[];
   deadlines: { leagueId: string; leagueName: string; iso: string }[];
   recentActivity: ActivityLine[];
-  pendingReveal: { weekNumber: number } | null;
+  pendingReveal: { weekNumber: number; inProgress?: boolean } | null;
   episodeBanner: { input: EpisodeBannerInput; initialState: EpisodeBannerState | null };
 }) {
   // Picks-due leagues lead so the cap never hides the one that needs attention.
@@ -49,7 +49,7 @@ export function HomeDashboard({
         {needingPicks > 0 ? ` · ${needingPicks} need${needingPicks === 1 ? "s" : ""} picks` : " · all caught up"}
       </p>
 
-      {pendingReveal && <SpoilerRevealCallout weekNumber={pendingReveal.weekNumber} />}
+      {pendingReveal && <SpoilerRevealCallout weekNumber={pendingReveal.weekNumber} inProgress={pendingReveal.inProgress} />}
 
       {deadlines.length > 0 && (
         <div className="mb-4">

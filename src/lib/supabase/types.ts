@@ -2060,6 +2060,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      unmark_episodes_watched_from: {
+        Args: { p_week_number: number }
+        Returns: undefined
+      }
       update_scoring_categories: {
         Args: {
           p_bonus_picks_category_enabled: boolean

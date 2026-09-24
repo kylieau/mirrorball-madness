@@ -11,15 +11,15 @@ const week = (weekNumber: number, over: Partial<ActivityWeek> = {}): ActivityWee
 });
 
 describe("buildRecentActivity", () => {
-  it("lists newest week first, eliminations before scores, scores high to low", () => {
+  it("lists newest week first, eliminations before scores, scores newest first", () => {
     const lines = buildRecentActivity({
       weeks: [
-        week(1, { scores: [{ celebrity: "Sam", danceStyle: "Foxtrot", total: 20 }] }),
+        week(1, { scores: [{ celebrity: "Sam", danceStyle: "Foxtrot", total: 20, at: "2026-09-16T00:09:00Z" }] }),
         week(2, {
           eliminated: ["Giada & Alan"],
           scores: [
-            { celebrity: "Ava", danceStyle: "Waltz", total: 24 },
-            { celebrity: "Ben", danceStyle: "Jive", total: 27 },
+            { celebrity: "Ava", danceStyle: "Waltz", total: 24, at: "2026-09-23T00:30:00Z" },
+            { celebrity: "Ben", danceStyle: "Jive", total: 27, at: "2026-09-23T00:05:00Z" },
           ],
         }),
       ],
@@ -28,8 +28,8 @@ describe("buildRecentActivity", () => {
     });
     expect(lines.map(plain)).toEqual([
       "Giada & Alan eliminated",
-      "Ben scored 27 on their Jive",
       "Ava scored 24 on their Waltz",
+      "Ben scored 27 on their Jive",
       "Sam scored 20 on their Foxtrot",
     ]);
     expect(lines.map((l) => l.weekLabel)).toEqual(["Week 2", "Week 2", "Week 2", "Week 1"]);
@@ -45,15 +45,15 @@ describe("buildRecentActivity", () => {
     expect(lines[0].weekLabel).toBeNull();
   });
 
-  it("collapses the West-airing week to one results-are-in line", () => {
+  it("collapses the West-airing week's eliminations to one line and keeps its score posts", () => {
     const lines = buildRecentActivity({
       weeks: [
-        week(2, { eliminated: ["A & B"], scores: [{ celebrity: "Ava", danceStyle: "Waltz", total: 24 }] }),
+        week(2, { eliminated: ["A & B"], scores: [{ celebrity: "Ava", danceStyle: "Waltz", total: 24, at: "2026-09-23T00:05:00Z" }] }),
         week(1, { eliminated: ["C & D"] }),
       ],
       westWeek: 2,
       extraLines: [],
     });
-    expect(lines.map(plain)).toEqual(["Week 2 results are in", "C & D eliminated"]);
+    expect(lines.map(plain)).toEqual(["Week 2 results are in", "Ava scored 24 on their Waltz", "C & D eliminated"]);
   });
 });

@@ -12,6 +12,8 @@ import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week
 import { computeEpisodeBannerState, DEFAULT_EPISODE_DURATION_MINUTES, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
+import { findRevealingWeek, scoredWeekIds } from "@/lib/revealing-week";
+import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 
 export default async function TodayPage() {
   const supabase = await createClient();
@@ -77,6 +79,18 @@ export default async function TodayPage() {
     completedWeeks
   );
 
+  const unpublishedEpisodeIds = groupedWeeks
+    .flatMap((week) => week.episodes)
+    .filter((episode) => episode.status !== "completed" && !episode.results_published_at)
+    .map((episode) => episode.id);
+  const { data: postedRows } =
+    unpublishedEpisodeIds.length > 0
+      ? await supabase.from("dance_scores").select("episode_id").in("episode_id", unpublishedEpisodeIds)
+      : { data: [] as { episode_id: string }[] };
+  const revealing = findRevealingWeek(groupedWeeks, new Set((postedRows ?? []).map((row) => row.episode_id)));
+  const scoredIds = scoredWeekIds(cutoff, revealing ? { id: revealing.week.id, week_number: revealing.week.week_number } : null);
+  const revealingVisible = !!revealing && scoredIds.has(revealing.week.id);
+
   const trueLatestCompletedWeek = completedWeeks[0] ?? null;
   const latestCompletedWeekId = cutoff.effectiveLatestEpisode?.id ?? null;
   const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
@@ -98,13 +112,19 @@ export default async function TodayPage() {
         latestCompletedWeekId,
         latestCompletedResultsPublishedAt,
         joinCutoffMs,
-        cutoff.allowedEpisodeIds
+        scoredIds,
+        revealingVisible ? revealing.week.id : null
       )
     )
   );
 
   // Results are season-global, so they're fetched once and shared by every league.
-  const visibleWeeks = cutoff.visibleEpisodes;
+  const visibleWeeks = [
+    ...cutoff.visibleEpisodes,
+    ...(revealingVisible
+      ? [{ id: revealing.week.id, week_number: revealing.week.week_number, episodeIds: revealing.episodeIds }]
+      : []),
+  ];
   const visibleEpisodeIds = visibleWeeks.flatMap((week) => week.episodeIds);
   const weekNumberByEpisodeId = new Map(
     visibleWeeks.flatMap((week) => week.episodeIds.map((id) => [id, week.week_number] as const))
@@ -117,7 +137,7 @@ export default async function TodayPage() {
       supabase.from("episode_results").select("episode_id, couple_id, outcome").in("episode_id", visibleEpisodeIds),
       supabase
         .from("dance_scores")
-        .select("episode_id, couple_id, total_score, dance_styles(name)")
+        .select("episode_id, couple_id, total_score, created_at, dance_styles(name)")
         .in("episode_id", visibleEpisodeIds),
       supabase
         .from("couples")
@@ -139,14 +159,17 @@ export default async function TodayPage() {
       const parts = displayNames.get(d.couple_id);
       const week = activityWeeks.get(weekNumberByEpisodeId.get(d.episode_id) ?? -1);
       if (parts && week && d.dance_styles) {
-        week.scores.push({ celebrity: parts.celebrity, danceStyle: d.dance_styles.name, total: d.total_score });
+        week.scores.push({ celebrity: parts.celebrity, danceStyle: d.dance_styles.name, total: d.total_score, at: d.created_at });
       }
     }
   }
 
-  const pendingReveal = cutoff.pendingRevealEpisode
-    ? { weekNumber: cutoff.pendingRevealEpisode.week_number }
-    : null;
+  const pendingReveal =
+    accountSettingsData.spoilerFreeMode && revealing && (cutoff.lastWatchedWeek ?? 0) < revealing.week.week_number
+      ? { weekNumber: revealing.week.week_number, inProgress: true }
+      : cutoff.pendingRevealEpisode
+        ? { weekNumber: cutoff.pendingRevealEpisode.week_number }
+        : null;
 
   const leagues = summaries.map((s) => ({
     id: s.id,
@@ -183,11 +206,12 @@ export default async function TodayPage() {
     .map((s) => ({ leagueId: s.id, leagueName: s.name, iso: s.nextDeadline!.iso }))
     .sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime());
 
+  const westWindow = episodeBannerState?.kind === "west_soon" || episodeBannerState?.kind === "west_watching";
+  const autoRefresh = accountSettingsData.spoilerFreeMode ? revealingVisible : !!revealing || westWindow;
+
   const recentActivity = buildRecentActivity({
     weeks: [...activityWeeks.values()],
-    westWeek: episodeBannerState?.kind === "west_soon" || episodeBannerState?.kind === "west_watching"
-      ? episodeBannerState.weekNumber
-      : null,
+    westWeek: westWindow ? episodeBannerState!.weekNumber : null,
     extraLines: [
       ...summaries.filter((s) => s.tookLead).map((s) => [
         { text: s.name, kind: "league" as const },
@@ -231,6 +255,7 @@ export default async function TodayPage() {
         />
       </div>
 
+      <RevealAutoRefresh active={autoRefresh} />
       <FanBottomNav active="home" leagueId={firstLeagueId} />
     </div>
   );

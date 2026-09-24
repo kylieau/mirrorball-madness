@@ -23,9 +23,11 @@ import {
 } from "@/components/ui/dialog";
 import { formatEpisodeCasual } from "@/lib/format-week";
 
-export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
+// inProgress: the week's scores are still being posted, so there is no
+// auto-opening dialog, and copy warns that later results unlock too.
+export function SpoilerRevealCallout({ weekNumber, inProgress = false }: { weekNumber: number; inProgress?: boolean }) {
   const router = useRouter();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(!inProgress);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const episodeLabel = formatEpisodeCasual(weekNumber);
@@ -40,6 +42,10 @@ export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
       return;
     }
     setOpen(false);
+    if (inProgress) {
+      router.refresh();
+      return;
+    }
     router.push("/this-week");
     router.refresh();
   }
@@ -60,10 +66,12 @@ export function SpoilerRevealCallout({ weekNumber }: { weekNumber: number }) {
             Spoiler-Free Mode
           </span>
           <span className="mt-0.5 block font-heading text-sm font-semibold">
-            {episodeLabel} results are in
+            {inProgress ? `${episodeLabel} scores are being posted` : `${episodeLabel} results are in`}
           </span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
-            Mark as watched once you&apos;ve caught up
+            {inProgress
+              ? "Marking it watched shows everything posted so far, and results posted later tonight, like who went home"
+              : "Mark as watched once you've caught up"}
           </span>
         </span>
         <span className="mt-1 shrink-0 rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-primary-foreground">

@@ -44,9 +44,9 @@ function statusCopy(state: EpisodeBannerState, airsAtLabel: string, upNextWeek: 
         sticky: "Results in",
       };
     case "west_soon":
-      return { title: "West feed at 8pm", sub: "Spoilers can wait", sticky: "West feed 8pm" };
+      return { title: "Pacific feed at 8pm", sub: "Spoilers can wait", sticky: "Pacific feed 8pm" };
     case "west_watching":
-      return { title: "West Coast is watching", sub: "Spoilers can wait", sticky: "West feed on" };
+      return { title: "West Coast is watching", sub: "Spoilers can wait", sticky: "Pacific feed on" };
   }
 }
 

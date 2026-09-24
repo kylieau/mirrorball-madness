@@ -3,15 +3,15 @@ import { formatEpisodeCasual } from "./format-week";
 export type ActivityWeek = {
   weekNumber: number;
   eliminated: string[];
-  scores: { celebrity: string; danceStyle: string; total: number }[];
+  scores: { celebrity: string; danceStyle: string; total: number; at: string }[];
 };
 
 export type ActivitySegment = { text: string; kind?: "couple" | "manager" | "league" | "score" };
 export type ActivityLine = { key: string; segments: ActivitySegment[]; weekLabel: string | null };
 
 // Weeks arrive already limited to what the viewer may see. `westWeek` is the
-// week whose West feed is still airing: its details stay hidden behind a
-// single "results are in" line until that window ends.
+// week whose West feed is still airing: who went home stays behind a single
+// "results are in" line until that window ends, while posted scores still show.
 export function buildRecentActivity({
   weeks,
   westWeek,
@@ -25,15 +25,15 @@ export function buildRecentActivity({
 
   for (const week of [...weeks].sort((a, b) => b.weekNumber - a.weekNumber)) {
     const weekLabel = formatEpisodeCasual(week.weekNumber);
-    if (week.weekNumber === westWeek) {
+    if (week.weekNumber === westWeek && week.eliminated.length > 0) {
       lines.push({ key: `w${week.weekNumber}-hidden`, segments: [{ text: `${weekLabel} results are in` }], weekLabel: null });
-      continue;
+    } else {
+      week.eliminated.forEach((name, i) =>
+        lines.push({ key: `w${week.weekNumber}-elim-${i}`, segments: [{ text: name, kind: "couple" }, { text: " eliminated" }], weekLabel })
+      );
     }
-    week.eliminated.forEach((name, i) =>
-      lines.push({ key: `w${week.weekNumber}-elim-${i}`, segments: [{ text: name, kind: "couple" }, { text: " eliminated" }], weekLabel })
-    );
     [...week.scores]
-      .sort((a, b) => b.total - a.total || a.celebrity.localeCompare(b.celebrity))
+      .sort((a, b) => b.at.localeCompare(a.at) || b.total - a.total || a.celebrity.localeCompare(b.celebrity))
       .forEach((s, i) =>
         lines.push({
           key: `w${week.weekNumber}-score-${i}`,

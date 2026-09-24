@@ -34,7 +34,10 @@ export async function computeLeagueHomeSummary(
   // null = unrestricted (current behavior). Callers pass the viewer's
   // spoiler cutoff so rank/points here never account for a week the
   // viewer hasn't marked as watched yet.
-  allowedWeekIds: Set<string> | null = null
+  allowedWeekIds: Set<string> | null = null,
+  // The week being revealed is not yet a completed week, so a "previous rank"
+  // must leave it out the same way it leaves out the latest completed one.
+  revealingWeekId: string | null = null
 ): Promise<LeagueHomeSummary> {
   const [{ data: scoringSettings }, { data: members }, { data: scores }] = await Promise.all([
     supabase
@@ -59,7 +62,7 @@ export async function computeLeagueHomeSummary(
   for (const row of scores ?? []) {
     if (allowedWeekIds && !allowedWeekIds.has(row.week_id)) continue;
     pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
-    if (row.week_id !== latestCompletedWeekId) {
+    if (row.week_id !== latestCompletedWeekId && row.week_id !== revealingWeekId) {
       previousPointsByManager.set(row.manager_id, (previousPointsByManager.get(row.manager_id) ?? 0) + row.total_points);
     }
   }
