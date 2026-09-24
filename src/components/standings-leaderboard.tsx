@@ -60,8 +60,8 @@ export function StandingsLeaderboard({
               className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left"
             >
               <span aria-hidden className="w-3 text-[10px]">
-                {row.change === "up" && <span className="text-emerald-text">▲</span>}
-                {row.change === "down" && <span className="text-danger-text">▼</span>}
+                {row.change === "up" && <span className="text-rank-up">▲</span>}
+                {row.change === "down" && <span className="text-rank-down">▼</span>}
               </span>
               <span
                 className={cn(

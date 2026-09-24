@@ -45,6 +45,8 @@
   --color-emerald: var(--emerald);
   --color-emerald-text: var(--emerald-text);
   --color-danger-text: var(--danger-text);
+  --color-rank-up: var(--rank-up);
+  --color-rank-down: var(--rank-down);
   --font-heading: var(--font-heading);
   --font-rank: var(--font-rank);
   --radius-sm: calc(var(--radius) - 4px);
@@ -99,6 +101,8 @@
     --emerald: #4c7a5a;
     --emerald-text: #9fcbac;
     --danger-text: #e7aba8;
+    --rank-up: #5fd58a;
+    --rank-down: #f26b66;
   }
   * {
     @apply border-border outline-ring/50;
