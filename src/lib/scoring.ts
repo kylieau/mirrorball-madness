@@ -68,7 +68,7 @@ export type CategoryWeights = {
 // rather than by Outcome — a couple's 4th/5th place finish isn't a distinct
 // couples.status value, it's derived from the same elimination-order
 // ranking Grand Finale's full-order prediction already resolves against.
-const DANCE_CARD_PLACEMENT_KEY: Record<
+export const DANCE_CARD_PLACEMENT_KEY: Record<
   number,
   | "firstPlacePoints"
   | "secondPlacePoints"
@@ -90,7 +90,11 @@ const DANCE_CARD_PLACEMENT_KEY: Record<
 // also no bonus for a week they didn't dance, but see NO_SURVIVAL_OUTCOMES
 // vs. the couples.status sync in applyEpisodeResults, where bye is different
 // again (doesn't open the roster slot, unlike eliminated/withdrawn).
-const NO_SURVIVAL_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn", "bye"]);
+export const NO_SURVIVAL_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn", "bye"]);
+
+// Outcomes that fix a couple's final position, which is when its Grand Finale
+// picks pay out.
+export const RESOLVING_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn", "winner", "runner_up", "third_place"]);
 
 export function sumDanceScoresByCouple(danceScores: DanceScore[]): Map<string, number> {
   const totals = new Map<string, number>();

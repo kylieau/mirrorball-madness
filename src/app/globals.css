@@ -46,6 +46,7 @@
   --color-emerald-text: var(--emerald-text);
   --color-danger-text: var(--danger-text);
   --font-heading: var(--font-heading);
+  --font-rank: var(--font-rank);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

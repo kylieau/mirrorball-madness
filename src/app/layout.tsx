@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter } from "next/font/google";
+import { Fraunces, Inter, Libre_Caslon_Text } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { SiteHeader } from "@/components/site-header";
 import { NativeAuthListener } from "@/components/native-auth-listener";
@@ -11,6 +11,7 @@ const fraunces = Fraunces({
   variable: "--font-heading",
 });
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const caslon = Libre_Caslon_Text({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-rank" });
 
 export const metadata: Metadata = {
   title: "Mirrorball Madness",
@@ -41,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn(fraunces.variable, inter.variable)}>
+    <html lang="en" className={cn(fraunces.variable, inter.variable, caslon.variable)}>
       <body className="font-sans antialiased">
         <NativeAuthListener />
         <SiteHeader />

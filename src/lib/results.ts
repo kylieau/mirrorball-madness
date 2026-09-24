@@ -6,6 +6,7 @@ import {
   computeWeeklyScores,
   couplesRemainingAtWeek,
   inJeopardyIdsToPersist,
+  RESOLVING_OUTCOMES,
   type GrandFinaleMethod,
   type Outcome,
   type TierPayStyle,
@@ -13,8 +14,6 @@ import {
 import { participantIdsToPersist, selectableCast } from "@/lib/episode-cast";
 import { sortJudgesForDisplay } from "@/lib/couple-display";
 import type { ScoringJudge } from "@/lib/scoring-judges";
-
-const RESOLVING_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn", "winner", "runner_up", "third_place"]);
 
 export type JudgeScoreSubmission = { judgeId: string; score: number };
 
@@ -386,9 +385,12 @@ async function recomputeWeekScores(
     week.week_number
   );
 
+  // Only the row that settles a couple's fate carries its placement. Every
+  // other row of the same couple (a "safe" week) would otherwise re-award the
+  // podium bonus when an earlier week is recomputed after the finale.
   const episodeOutcomeInputs = rawOutcomeRows.map((row) => ({
     ...row,
-    finalPlacement: finalPlacementByCouple.get(row.coupleId) ?? null,
+    finalPlacement: RESOLVING_OUTCOMES.has(row.outcome) ? (finalPlacementByCouple.get(row.coupleId) ?? null) : null,
   }));
 
   let inJeopardyCoupleIds: string[] = [];
@@ -419,8 +421,12 @@ async function recomputeWeekScores(
 
     if (!scoringSettings || !rosterSlots) continue;
 
+    // The league's Anchor Week is when scoring begins for every module: a
+    // week that aired before it pays nothing, even where picks exist for it.
+    const scoringStarted = week.week_number >= scoringSettings.judges_score_starts_week;
+
     let grandFinalePointsByManager: Record<string, number> = {};
-    if (newlyResolvedCoupleIds.length > 0) {
+    if (scoringStarted && newlyResolvedCoupleIds.length > 0) {
       const { data: grandFinalePredictions, error: gfpErr } = await admin
         .from("grand_finale_predictions")
         .select("manager_id, couple_id, predicted_position")
@@ -450,8 +456,6 @@ async function recomputeWeekScores(
       });
     }
 
-    const judgesScoreStarted = week.week_number >= scoringSettings.judges_score_starts_week;
-
     const scores = computeWeeklyScores({
       scoringSettings: {
         judgesScoreMultiplier: scoringSettings.judges_score_multiplier,
@@ -465,19 +469,21 @@ async function recomputeWeekScores(
         fifthPlacePoints: scoringSettings.fifth_place_points,
         curtainCallNearMissEnabled: scoringSettings.curtain_call_near_miss_enabled !== false,
       },
-      rosterSlots: judgesScoreStarted
+      rosterSlots: scoringStarted
         ? rosterSlots
             .filter((r): r is { manager_id: string; couple_id: string } => r.couple_id !== null)
             .map((r) => ({ managerId: r.manager_id, coupleId: r.couple_id }))
         : [],
       danceScores: danceScoreInputs,
       episodeOutcomes: episodeOutcomeInputs,
-      predictions: (predictions ?? []).map((p) => ({
-        managerId: p.manager_id,
-        predictedEliminatedCoupleId: p.predicted_eliminated_couple_id,
-        predictedEliminatedCoupleId2: p.predicted_eliminated_couple_id_2,
-        predictedTopScorerCoupleId: p.predicted_top_scorer_couple_id,
-      })),
+      predictions: scoringStarted
+        ? (predictions ?? []).map((p) => ({
+            managerId: p.manager_id,
+            predictedEliminatedCoupleId: p.predicted_eliminated_couple_id,
+            predictedEliminatedCoupleId2: p.predicted_eliminated_couple_id_2,
+            predictedTopScorerCoupleId: p.predicted_top_scorer_couple_id,
+          }))
+        : [],
       isDoubleElimination: week.is_double_elimination_week,
       couplesRemaining,
       totalCouples,

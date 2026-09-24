@@ -1,17 +1,11 @@
 import { formatPoints } from "@/lib/format-points";
-import { cn } from "cn";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RankBadge } from "@/components/rank-badge";
+import { StandingsLeaderboard, type LeaderboardRow } from "@/components/standings-leaderboard";
+import type { ModuleTotals } from "@/components/score-history-panel";
 import { formatEpisodeCasualShort } from "@/lib/format-week";
 
-type StandingsRow = {
-  managerId: string;
-  displayName: string;
-  totalPoints: number;
-  change: "up" | "down" | null;
-};
-
 export function StandingsTable({
+  leagueId,
   standings,
   currentUserId,
   latestCompletedWeek,
@@ -19,14 +13,17 @@ export function StandingsTable({
   viewerTotalPoints,
   categoryBreakdown,
   standingMessage,
+  moduleTotals,
 }: {
-  standings: StandingsRow[];
+  leagueId: string;
+  standings: LeaderboardRow[];
   currentUserId: string;
   latestCompletedWeek: number | null;
   viewerRank: number;
   viewerTotalPoints: number;
-  categoryBreakdown: { label: string; points: number }[];
+  categoryBreakdown: { label: string; icon: string; points: number }[];
   standingMessage: { placement: string; comment: string };
+  moduleTotals: Record<string, Omit<ModuleTotals, "season">>;
 }) {
   const sorted = [...standings].sort((a, b) => b.totalPoints - a.totalPoints);
 
@@ -38,6 +35,11 @@ export function StandingsTable({
           <p className="font-heading text-base font-semibold">{formatPoints(viewerTotalPoints)} pts</p>
           <p className="text-sm text-muted-foreground">of {standings.length} players</p>
         </div>
+        {standingMessage.comment && (
+          <p className="min-w-0 flex-1 pl-3 text-center text-[11px] italic leading-snug text-accent">
+            {standingMessage.comment}
+          </p>
+        )}
       </div>
 
       {categoryBreakdown.length > 0 && (
@@ -45,67 +47,29 @@ export function StandingsTable({
           {categoryBreakdown.map((c) => (
             <div key={c.label} className="flex-1 rounded-xl border border-border bg-card px-2 py-2.5 text-center">
               <p className="font-heading text-base font-semibold">{formatPoints(c.points)}</p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">{c.label}</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                <span aria-hidden>{c.icon}</span> {c.label}
+              </p>
             </div>
           ))}
         </div>
       )}
 
-      {standingMessage.comment && (
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle>{standingMessage.placement}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">{standingMessage.comment}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="mb-2 mt-6 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
-        <span>Leaderboard</span>
-        <span className="font-normal text-muted-foreground">
+      <div className="mb-2.5 mt-6 flex items-baseline justify-between gap-3">
+        <h2 className="font-heading text-lg font-semibold text-accent">Leaderboard</h2>
+        <span className="text-xs text-muted-foreground">
           {latestCompletedWeek !== null
             ? `through ${formatEpisodeCasualShort(latestCompletedWeek)}`
             : "Results appear once you mark a week as watched"}
         </span>
       </div>
 
-      <div className="flex flex-col">
-        {sorted.map((row, i) => {
-          const isYou = row.managerId === currentUserId;
-          return (
-            <div
-              key={row.managerId}
-              className={cn(
-                "flex items-center gap-3 border-t border-border py-2.5 first:border-t-0",
-                isYou && "-mx-2 rounded-lg border-t-0 border-l-2 border-l-primary bg-primary/8 px-2"
-              )}
-            >
-              <span
-                className={cn(
-                  "w-5 font-heading text-sm font-semibold",
-                  isYou ? "text-accent" : "text-muted-foreground"
-                )}
-              >
-                {i + 1}
-              </span>
-              <span className="flex-1 text-sm font-medium">
-                {row.displayName}
-                {isYou && " (you)"}
-                <span className="block text-xs font-normal text-muted-foreground">
-                  {formatPoints(row.totalPoints)} pts
-                </span>
-              </span>
-              <span className="flex items-center gap-1 text-sm font-semibold">
-                {formatPoints(row.totalPoints)}
-                {row.change === "up" && <span className="text-emerald-text">▲</span>}
-                {row.change === "down" && <span className="text-danger-text">▼</span>}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      <StandingsLeaderboard
+        leagueId={leagueId}
+        rows={sorted}
+        currentUserId={currentUserId}
+        moduleTotals={moduleTotals}
+      />
     </div>
   );
 }

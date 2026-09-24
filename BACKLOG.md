@@ -124,6 +124,7 @@ Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Hom
 
 ## Scoring calibration follow-ups
 
+- **Lock `judges_score_multiplier` with the other scoring settings** (wanted, not built). It's excluded from the Grand Finale-deadline lock in `update_scoring_categories` on purpose: `start_draft` calibrates it by roster size, and drafts often run after that deadline, so a plain lock would stop a commissioner adjusting it before a late draft. Needs a rule first, e.g. "locked once the draft is complete and the deadline has passed."
 - **Dance Card ~25% calibration overshoot** — known; needs a product conversation before any fix, not a quiet patch.
 - **Full Monte Carlo recalibration against real Season 35 data** — blocked on live SQL / `SUPABASE_ACCESS_TOKEN`, and the season isn't over. Re-running `scripts/monte-carlo-calibration/` already bakes in `POINT_SCALE`.
 - **Equal-EV / neutral fair scoring defaults** — parked behind Enter Results UX polish.
@@ -132,9 +133,12 @@ Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Hom
 
 `draft_type` lives in League Settings' Dance Card card, but the actual order (reorder list + `CustomDraftOrderCard`'s per-round grid) only lives in the draft lobby (`draft-room.tsx`) — two hops for a one-time setup decision. Designed, not built; not urgent since all drafts have run. Design: move order editing (commissioner-only) into `league-modules-form.tsx` next to `draft_type`, keep a **read-only** mirror in the lobby so managers can still build their auto-draft queue, leave queue/autopilot in the lobby. The wrinkle: the lobby effects that guarantee an order exists before `start_draft` can't move wholesale, or nothing forces a commissioner to open Settings first — resolve by moving the membership-reconcile effects into the new Settings component plus a defensive reconcile inside `handleStartDraft`. No SQL needed; `set_draft_order`/`set_custom_draft_order` are already commissioner + `not_started`-gated server-side.
 
-## Standings points breakdown (design in progress)
+## Standings Score History
 
-Players can't tell how anyone's points are tallied on Standings. Being designed in a separate session with third-party mockups; concepts on the table: explainer tiles with a tap-for-rules sheet, expandable leaderboard rows with a per-module split, a weekly ledger. Current pieces: `StandingsTable`, `StandingsModuleBreakdown` (Points by Module), `categoryBreakdown` / `moduleBreakdownMembers` in `src/app/leagues/[id]/page.tsx`. Open question: quote this league's live point values in the copy, or keep it generic. Note the Curtain Call payout-scaling wording now lives in League Settings, not on the Picks lines.
+Shipped: per-manager Score History, an inline hop under the leaderboard that a leaderboard row also opens, plus condensed Dance Cards on Standings (see CLAUDE.md). Design pack: `docs/design/standings-score-history/`. Earlier "points breakdown" concepts (rules sheets, expandable rows, weekly ledger) were rejected.
+
+- **Container:** each leaderboard row expands in place into a compact fixed-height (`h-72`) scrolling panel; several can be open at once. Kylie is also sending mockups for a clearer tap affordance on leaderboard rows.
+- Live check still owed on real published data (after republishing Week 1 so its Grand Finale credits refresh): own + peer panels, filters, sticky totals vs Standings, Spoiler-Free clamping, a weight ≠ 1 league.
 
 ## Scoring display follow-ups
 

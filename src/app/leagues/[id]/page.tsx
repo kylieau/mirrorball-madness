@@ -7,7 +7,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StandingsTable } from "@/components/standings-table";
-import { StandingsModuleBreakdown } from "@/components/standings-module-breakdown";
 import { RosterCard } from "@/components/roster-card";
 import { DanceCardLeagueList, type DanceCardLeagueEntry } from "@/components/dance-card-league-list";
 import { CurtainCallCard } from "@/components/curtain-call-card";
@@ -30,7 +29,7 @@ import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { partitionRecastSlots } from "@/lib/recast-framing";
-import { LeagueRostersCard } from "@/components/league-rosters-card";
+import { DanceCardRosters } from "@/components/dance-card-rosters";
 import { scoringModule, type ScoringModuleKey } from "@/lib/scoring-modules";
 import { EpisodeCarousel } from "@/components/episode-carousel";
 import { adjacentThisWeekWeeks, rosterWeekHref } from "@/lib/this-week-carousel";
@@ -263,35 +262,44 @@ export default async function LeaguePage({
   const currentRanks = ranksFromPoints(pointsByManager);
   const previousRanks = latestCompletedWeekId ? ranksFromPoints(previousPointsByManager) : null;
 
+  const latestWeekPointsByManager = new Map<string, number>();
+  for (const row of allScores ?? []) {
+    if (row.week_id === latestCompletedWeekId && cutoff.allowedEpisodeIds.has(row.week_id)) {
+      latestWeekPointsByManager.set(row.manager_id, row.total_points);
+    }
+  }
+
   const standingsWithChange = standings.map((s) => {
-    if (!previousRanks) return { ...s, change: null as "up" | "down" | null };
+    const weekPoints = latestCompletedWeekId ? (latestWeekPointsByManager.get(s.managerId) ?? 0) : null;
+    if (!previousRanks) return { ...s, weekPoints, change: null as "up" | "down" | null };
     const curr = currentRanks.get(s.managerId)!;
     const prev = previousRanks.get(s.managerId)!;
     const change: "up" | "down" | null = curr < prev ? "up" : curr > prev ? "down" : null;
-    return { ...s, change };
+    return { ...s, weekPoints, change };
   });
 
-  const moduleBreakdownMembers = [...standingsWithChange]
-    .sort((a, b) => b.totalPoints - a.totalPoints)
-    .map((s) => ({
-      managerId: s.managerId,
-      displayName: s.displayName,
-      danceCard: danceCardOn
-        ? roundPoints(
-            (rosterPointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
-          )
-        : null,
-      curtainCall: curtainCallOn
-        ? roundPoints(
-            (predictionPointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.eliminations_category_weight ?? 1)
-          )
-        : null,
-      grandFinale: grandFinaleOn
-        ? roundPoints(
-            (grandFinalePointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.bonus_picks_category_weight ?? 1)
-          )
-        : null,
-    }));
+  const moduleTotalsByManager = Object.fromEntries(
+    standings.map((s) => [
+      s.managerId,
+      {
+        curtainCall: curtainCallOn
+          ? roundPoints(
+              (predictionPointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.eliminations_category_weight ?? 1)
+            )
+          : null,
+        danceCard: danceCardOn
+          ? roundPoints(
+              (rosterPointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
+            )
+          : null,
+        grandFinale: grandFinaleOn
+          ? roundPoints(
+              (grandFinalePointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.bonus_picks_category_weight ?? 1)
+            )
+          : null,
+      },
+    ])
+  );
 
   const nameByManager = Object.fromEntries(
     (members ?? []).map((m) => [
@@ -447,18 +455,21 @@ export default async function LeaguePage({
     [
       curtainCallOn && {
         label: scoringModule("curtainCall").name,
+        icon: scoringModule("curtainCall").icon,
         points: roundPoints(
           (predictionPointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.eliminations_category_weight ?? 1)
         ),
       },
       danceCardOn && {
         label: scoringModule("danceCard").name,
+        icon: scoringModule("danceCard").icon,
         points: roundPoints(
           (rosterPointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
         ),
       },
       grandFinaleOn && {
         label: scoringModule("grandFinale").name,
+        icon: scoringModule("grandFinale").icon,
         points: roundPoints(
           (grandFinalePointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.bonus_picks_category_weight ?? 1)
         ),
@@ -1070,6 +1081,7 @@ export default async function LeaguePage({
         standings={
           <div>
             <StandingsTable
+              leagueId={id}
               standings={standingsWithChange}
               currentUserId={myTeamId}
               latestCompletedWeek={latestCompletedWeek}
@@ -1077,21 +1089,9 @@ export default async function LeaguePage({
               viewerTotalPoints={userPoints}
               categoryBreakdown={categoryBreakdown}
               standingMessage={standingMessage}
+              moduleTotals={moduleTotalsByManager}
             />
-            <StandingsModuleBreakdown
-              members={moduleBreakdownMembers}
-              danceCardOn={danceCardOn}
-              curtainCallOn={curtainCallOn}
-              grandFinaleOn={grandFinaleOn}
-            />
-            {leagueRosters && (
-              <div id="rosters" className="mt-6 scroll-mt-4">
-                <LeagueRostersCard
-                  description="Every roster, couple by couple."
-                  groups={leagueRosters.groups}
-                />
-              </div>
-            )}
+            {leagueRosters && <DanceCardRosters groups={leagueRosters.groups} />}
           </div>
         }
       />
