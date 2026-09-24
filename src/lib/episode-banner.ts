@@ -28,6 +28,7 @@ export type EpisodeBannerInput = {
 
 const HOUR_MS = 60 * 60 * 1000;
 const RESULTS_IN_LEAD_MS = 48 * HOUR_MS;
+const RESULTS_IN_HOLD_MS = 48 * HOUR_MS;
 const FINAL_RESULTS_HOLD_MS = 7 * 24 * HOUR_MS;
 const WEST_FEED_START_HOUR = 20;
 const WEST_FEED_END_HOUR = 22;
@@ -127,9 +128,11 @@ export function computeEpisodeBannerState(
   const liveIndex = weeks.findIndex((week) => !isComplete(week));
   const lastCompleted = weeks.slice(0, liveIndex === -1 ? weeks.length : liveIndex).filter(isComplete).at(-1);
 
+  const publishedAt = lastCompleted ? latestPublishedAt(lastCompleted) : null;
+  const heldFor = (holdMs: number) => !!publishedAt && now.getTime() < publishedAt.getTime() + holdMs;
+
   if (liveIndex === -1) {
-    const publishedAt = lastCompleted ? latestPublishedAt(lastCompleted) : null;
-    return lastCompleted && publishedAt && now.getTime() < publishedAt.getTime() + FINAL_RESULTS_HOLD_MS
+    return lastCompleted && heldFor(FINAL_RESULTS_HOLD_MS)
       ? { kind: "results_in", weekNumber: lastCompleted.weekNumber }
       : null;
   }
@@ -143,7 +146,7 @@ export function computeEpisodeBannerState(
 
   const airs = new Date(driver.airsAt);
   const untouched = remaining.length === live.episodes.length;
-  if (lastCompleted && untouched && now.getTime() < airs.getTime() - RESULTS_IN_LEAD_MS) {
+  if (lastCompleted && untouched && heldFor(RESULTS_IN_HOLD_MS) && now.getTime() < airs.getTime() - RESULTS_IN_LEAD_MS) {
     return { kind: "results_in", weekNumber: lastCompleted.weekNumber };
   }
 
@@ -166,10 +169,18 @@ export function computeEpisodeBannerState(
 // Minute-by-minute around an episode's air time (when the state actually moves
 // fast), otherwise wake daily or when the next window opens, whichever is first.
 export function nextBannerRefreshMs(weeks: BannerWeek[], now: Date = new Date()): number {
-  const airTimes = weeks.flatMap((week) => week.episodes.map((episode) => new Date(episode.airsAt).getTime()));
-  if (airTimes.some((t) => Math.abs(now.getTime() - t) <= LIVE_WINDOW_MS)) return 60 * 1000;
-  const untilNextWindow = Math.min(
-    ...airTimes.filter((t) => t - LIVE_WINDOW_MS > now.getTime()).map((t) => t - LIVE_WINDOW_MS - now.getTime())
+  const nowMs = now.getTime();
+  const episodes = weeks.flatMap((week) => week.episodes);
+  const airTimes = episodes.map((episode) => new Date(episode.airsAt).getTime());
+  if (airTimes.some((t) => Math.abs(nowMs - t) <= LIVE_WINDOW_MS)) return 60 * 1000;
+  const resultsInExpiries = episodes.flatMap((episode) =>
+    episode.publishedAt
+      ? [RESULTS_IN_HOLD_MS, FINAL_RESULTS_HOLD_MS].map((holdMs) => new Date(episode.publishedAt!).getTime() + holdMs)
+      : []
   );
-  return Math.min(24 * HOUR_MS, untilNextWindow);
+  const untilNextChange = Math.min(
+    ...airTimes.filter((t) => t - LIVE_WINDOW_MS > nowMs).map((t) => t - LIVE_WINDOW_MS - nowMs),
+    ...resultsInExpiries.filter((t) => t > nowMs).map((t) => t - nowMs)
+  );
+  return Math.min(24 * HOUR_MS, untilNextChange);
 }

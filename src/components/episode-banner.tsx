@@ -22,7 +22,7 @@ const CURTAIN_FOLDS =
 
 type BannerCopy = { title: string | null; sub: string | null; sticky: string | null };
 
-function statusCopy(state: EpisodeBannerState, airsAtLabel: string): BannerCopy {
+function statusCopy(state: EpisodeBannerState, airsAtLabel: string, upNextWeek: number | null): BannerCopy {
   const airs = (prefix: string) => (airsAtLabel ? `${prefix}Airs ${airsAtLabel}` : null);
   switch (state.kind) {
     case "picks_open":
@@ -38,7 +38,11 @@ function statusCopy(state: EpisodeBannerState, airsAtLabel: string): BannerCopy 
     case "results_soon":
       return { title: "Results soon", sub: "Scores post after the show", sticky: "Results soon" };
     case "results_in":
-      return { title: "Results in", sub: "Standings are updated", sticky: "Results in" };
+      return {
+        title: "Results in",
+        sub: upNextWeek === null ? "Standings are updated" : `Standings are updated · ${formatEpisodeCasual(upNextWeek)} up next`,
+        sticky: "Results in",
+      };
     case "west_soon":
       return { title: "West feed at 8pm", sub: "Spoilers can wait", sticky: "West feed 8pm" };
     case "west_watching":
@@ -134,7 +138,8 @@ export function EpisodeBanner({
 
   if (!state) return null;
 
-  const { title, sub, sticky } = statusCopy(state, airsAtLabel);
+  const track = seasonTrack(input.weeks, state);
+  const { title, sub, sticky } = statusCopy(state, airsAtLabel, track.upNext ? track.currentWeek : null);
   const weekLabel = formatEpisodeCasual(state.weekNumber);
   const onAir = state.kind === "on_air";
 
@@ -179,7 +184,7 @@ export function EpisodeBanner({
               {sub && <p className="mt-px text-[11px] text-accent">{sub}</p>}
             </div>
           </div>
-          <SeasonTrack {...seasonTrack(input.weeks, state)} />
+          <SeasonTrack {...track} />
         </div>
       </div>
 

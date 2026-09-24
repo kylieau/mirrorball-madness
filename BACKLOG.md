@@ -161,6 +161,10 @@ Shipped: new state machine, West overlays, relative "Airs", `episodes.duration_m
 - **Locked-state gap**: the lock transition happens outside the per-minute window when the lock is more than 6 hours before air, so it updates on the daily tick or next page load.
 - Couples Leaderboard is a fixed `h-96` scroller; revisit if the cast is small enough that it looks empty.
 
+## Live score reveal during the West feed
+
+Wanted (not designed): draft all scores after the East airing, then reveal couple scores one by one during the West feed, publishing final status (safe/eliminated) separately. Super admin only; viewers opt in via a per-viewer "Follow live" toggle on Home (off by default, Realtime push, Spoiler-Free viewers hidden until they opt in). Points update per reveal, so it needs a partial recompute (Dance Card judges' points per couple; survival, podium, Curtain Call and Grand Finale only at final-status publish), a split of `results_published_at` into scores-revealed vs results-published, and a per-dance reveal flag/RPC. Home's activity lines currently read only published `dance_scores`.
+
 ## Housekeeping
 
 - Decide whether to delete `claude/grand-finale-picks-feedback-brief.md` (stale brief for a dropped design) and `scratch/recovered-docs/` (recovered pre-cut CLAUDE.md/handoff copies).

@@ -52,6 +52,7 @@ import {
   defaultPointsPerCorrect,
 } from "@/lib/grand-finale-explainer";
 import { buildLeagueGrandFinalePredictions } from "@/lib/grand-finale-predictions";
+import { hasCurtainCallPicks } from "@/lib/curtain-call-picks";
 
 export default async function LeaguePage({
   params,
@@ -450,7 +451,7 @@ export default async function LeaguePage({
   });
 
   const picksNeeded =
-    (curtainCallOn && !!upcomingEpisode && !isLocked && !ownPrediction) ||
+    (curtainCallOn && !!upcomingEpisode && !isLocked && !hasCurtainCallPicks(ownPrediction)) ||
     (grandFinaleOn && !grandFinaleLocked && !grandFinaleOrder);
 
   const categoryBreakdown = (

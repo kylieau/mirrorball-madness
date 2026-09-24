@@ -72,17 +72,17 @@ describe("computeEpisodeBannerState", () => {
     expect(state).toEqual({ kind: "results_soon", weekNumber: 2 });
   });
 
-  it("holds results_in after a week completes, then advances 48h before the next air", () => {
+  it("holds results_in for 48h after the publish, then advances to the next week", () => {
     const done: BannerWeek = {
       weekNumber: 1,
       episodes: [episode({ airsAt: "2026-09-16T00:00:00Z", completed: true, publishedAt: "2026-09-16T02:00:00Z" })],
     };
     const next = live([episode({ airsAt: "2026-09-23T00:00:00Z" })]);
-    expect(computeEpisodeBannerState(input([done, next]), at("2026-09-19T12:00:00Z"))).toEqual({
+    expect(computeEpisodeBannerState(input([done, next]), at("2026-09-17T12:00:00Z"))).toEqual({
       kind: "results_in",
       weekNumber: 1,
     });
-    expect(computeEpisodeBannerState(input([done, next]), at("2026-09-21T01:00:00Z"))).toMatchObject({
+    expect(computeEpisodeBannerState(input([done, next]), at("2026-09-19T12:00:00Z"))).toMatchObject({
       kind: "picks_open",
       weekNumber: 2,
     });

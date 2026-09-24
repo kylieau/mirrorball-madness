@@ -1,12 +1,16 @@
 import { formatPoints } from "@/lib/format-points";
 import Link from "next/link";
+import { cn } from "cn";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { DeadlineStub } from "@/components/deadline-stub";
 import { EpisodeBanner } from "@/components/episode-banner";
 import { SpoilerRevealCallout } from "@/components/spoiler-reveal-callout";
 import type { EpisodeBannerInput, EpisodeBannerState } from "@/lib/episode-banner";
+import type { ActivityLine } from "@/lib/home-activity";
 import { formatCountdown } from "@/lib/format-countdown";
+
+const MAX_LEAGUES_SHOWN = 4;
 
 type HomeLeague = {
   id: string;
@@ -15,9 +19,6 @@ type HomeLeague = {
   totalMembers: number;
   totalPoints: number;
   picksDue: boolean;
-  danceCardOn: boolean;
-  curtainCallOn: boolean;
-  grandFinaleOn: boolean;
   weeksBehind: number;
 };
 
@@ -30,11 +31,14 @@ export function HomeDashboard({
 }: {
   leagues: HomeLeague[];
   deadlines: { leagueId: string; leagueName: string; iso: string }[];
-  recentActivity: string[];
+  recentActivity: ActivityLine[];
   pendingReveal: { weekNumber: number } | null;
   episodeBanner: { input: EpisodeBannerInput; initialState: EpisodeBannerState | null };
 }) {
+  // Picks-due leagues lead so the cap never hides the one that needs attention.
+  const shownLeagues = [...leagues].sort((a, b) => Number(b.picksDue) - Number(a.picksDue)).slice(0, MAX_LEAGUES_SHOWN);
   const needingPicks = leagues.filter((l) => l.picksDue).length;
+  const sharedCountdown = deadlines[0] ? formatCountdown(deadlines[0].iso) : "";
 
   return (
     <div>
@@ -48,60 +52,64 @@ export function HomeDashboard({
       {pendingReveal && <SpoilerRevealCallout weekNumber={pendingReveal.weekNumber} />}
 
       {deadlines.length > 0 && (
-        <div className="flex flex-col gap-2.5">
-          {deadlines.map((d) => (
-            <DeadlineStub
-              key={d.leagueId}
-              label={d.leagueName}
-              headline={`Closes in ${formatCountdown(d.iso)}`}
-              ctaLabel="Make picks"
-              href={`/leagues/${d.leagueId}?tab=yourpicks`}
-            />
-          ))}
+        <div className="mb-4">
+          <p className="mb-2 font-heading text-base font-semibold">Picks close in {sharedCountdown}</p>
+          <div className="grid grid-cols-2 gap-2.5">
+            {deadlines.map((d) => {
+              const countdown = formatCountdown(d.iso);
+              return (
+                <DeadlineStub
+                  key={d.leagueId}
+                  label={d.leagueName}
+                  note={countdown === sharedCountdown ? undefined : countdown}
+                  ctaLabel="Make picks"
+                  href={`/leagues/${d.leagueId}?tab=yourpicks`}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
 
       <div className="mb-2 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
-        <span>Your Leagues</span>
-        <span className="font-normal text-muted-foreground">{leagues.length}</span>
+        <span>
+          Your Leagues <span className="font-normal text-muted-foreground">({leagues.length})</span>
+        </span>
+        <Link href="/leagues" className="font-normal text-muted-foreground">
+          See All ›
+        </Link>
       </div>
-      <div className="flex flex-col gap-2.5">
-        {leagues.map((l) => (
-          <Card key={l.id}>
-            <CardContent className="flex items-start justify-between gap-3 py-4">
-              <Link href={`/leagues/${l.id}?tab=standings`} className="flex-1">
-                <p className="font-heading text-sm font-semibold">{l.name}</p>
+      <Card>
+        <CardContent className="flex flex-col py-0">
+          {shownLeagues.map((l) => (
+            <Link
+              key={l.id}
+              href={`/leagues/${l.id}?tab=standings`}
+              className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-heading text-sm font-semibold">{l.name}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Rank {l.rank} of {l.totalMembers} · <span className="font-heading font-semibold">{formatPoints(l.totalPoints)}</span> pts
+                  Rank {l.rank} of {l.totalMembers} ·{" "}
+                  <span className="font-heading font-semibold">{formatPoints(l.totalPoints)}</span> pts
                 </p>
-                <div className="mt-2 flex gap-1.5 text-sm">
-                  <span className={l.danceCardOn ? "opacity-100" : "opacity-30"}>🪩</span>
-                  <span className={l.curtainCallOn ? "opacity-100" : "opacity-30"}>🔮</span>
-                  <span className={l.grandFinaleOn ? "opacity-100" : "opacity-30"}>🏆</span>
-                </div>
-              </Link>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
-                {l.picksDue ? (
-                  <span className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
-                    Picks Due
-                  </span>
-                ) : l.weeksBehind > 0 ? (
-                  <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
-                    {l.weeksBehind} wk behind
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
-                    All caught up
-                  </span>
-                )}
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              {l.picksDue ? (
+                <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
+                  Picks Due
+                </span>
+              ) : (
+                <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                  {l.weeksBehind > 0 ? `${l.weeksBehind} wk behind` : "All caught up"}
+                </span>
+              )}
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
 
       <div className="mt-3">
-        <CreateJoinLeagueDialogs />
+        <CreateJoinLeagueDialogs quiet />
       </div>
 
       {recentActivity.length > 0 && (
@@ -110,26 +118,34 @@ export function HomeDashboard({
             Recent Activity
           </div>
           <Card>
-            <CardContent className="flex flex-col py-2">
-              {recentActivity.map((line, i) => (
+            <CardContent className="flex h-72 flex-col overflow-y-auto py-2">
+              {recentActivity.map((line) => (
                 <p
-                  key={i}
-                  className="border-t border-border py-2.5 text-sm text-muted-foreground first:border-t-0"
+                  key={line.key}
+                  className="flex items-baseline justify-between gap-3 border-t border-border py-2.5 text-sm text-muted-foreground first:border-t-0"
                 >
-                  {line}
+                  <span>
+                    {line.segments.map((seg, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          seg.kind === "couple" && "font-semibold text-accent/92",
+                          seg.kind === "manager" && "font-medium text-foreground",
+                          seg.kind === "league" && "italic text-foreground/70",
+                          seg.kind === "score" && "font-heading font-semibold text-foreground"
+                        )}
+                      >
+                        {seg.text}
+                      </span>
+                    ))}
+                  </span>
+                  {line.weekLabel && <span className="shrink-0 text-xs">{line.weekLabel}</span>}
                 </p>
               ))}
             </CardContent>
           </Card>
         </>
       )}
-
-      <Link
-        href="/leagues"
-        className="mt-3 block rounded-xl border border-border py-3 text-center text-sm font-semibold text-accent"
-      >
-        See All Leagues
-      </Link>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { formatCountdown } from "@/lib/format-countdown";
+import { hasCurtainCallPicks } from "@/lib/curtain-call-picks";
 
 export type LeagueSummary = {
   id: string;
@@ -54,12 +55,12 @@ export async function computeLeagueSummary(
     if (!isLocked) {
       const { data: ownPrediction } = await supabase
         .from("predictions")
-        .select("manager_id")
+        .select("predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
         .eq("league_id", league.id)
         .eq("week_id", upcomingEpisode.id)
         .eq("manager_id", myTeamId)
         .maybeSingle();
-      curtainCallPending = !ownPrediction;
+      curtainCallPending = !hasCurtainCallPicks(ownPrediction);
     }
   }
 

@@ -11,6 +11,7 @@ import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { computeEpisodeBannerState, DEFAULT_EPISODE_DURATION_MINUTES, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
+import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
 
 export default async function TodayPage() {
   const supabase = await createClient();
@@ -102,15 +103,22 @@ export default async function TodayPage() {
     )
   );
 
-  // Eliminations are season-global, so this only needs fetching once and
-  // applies the same to every Dance-Card league the couple's manager is in.
-  let latestEliminatedNames: string[] = [];
-  if ((cutoff.effectiveLatestEpisode?.episodeIds.length ?? 0) > 0) {
-    const [{ data: episodeResults }, { data: couples }] = await Promise.all([
+  // Results are season-global, so they're fetched once and shared by every league.
+  const visibleWeeks = cutoff.visibleEpisodes;
+  const visibleEpisodeIds = visibleWeeks.flatMap((week) => week.episodeIds);
+  const weekNumberByEpisodeId = new Map(
+    visibleWeeks.flatMap((week) => week.episodeIds.map((id) => [id, week.week_number] as const))
+  );
+  const activityWeeks = new Map<number, ActivityWeek>(
+    visibleWeeks.map((week) => [week.week_number, { weekNumber: week.week_number, eliminated: [], scores: [] }])
+  );
+  if (visibleEpisodeIds.length > 0) {
+    const [{ data: episodeResults }, { data: danceScores }, { data: couples }] = await Promise.all([
+      supabase.from("episode_results").select("episode_id, couple_id, outcome").in("episode_id", visibleEpisodeIds),
       supabase
-        .from("episode_results")
-        .select("couple_id, outcome")
-        .in("episode_id", cutoff.effectiveLatestEpisode!.episodeIds),
+        .from("dance_scores")
+        .select("episode_id, couple_id, total_score, dance_styles(name)")
+        .in("episode_id", visibleEpisodeIds),
       supabase
         .from("couples")
         .select("id, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"),
@@ -122,11 +130,18 @@ export default async function TodayPage() {
         pro_name: c.pro?.name ?? "Unknown",
       }))
     );
-    latestEliminatedNames = (episodeResults ?? [])
-      .filter((r) => r.outcome === "eliminated")
-      .map((r) => displayNames.get(r.couple_id))
-      .filter((parts): parts is NonNullable<typeof parts> => !!parts)
-      .map((parts) => formatCoupleName(parts));
+    for (const r of episodeResults ?? []) {
+      const parts = displayNames.get(r.couple_id);
+      const week = activityWeeks.get(weekNumberByEpisodeId.get(r.episode_id) ?? -1);
+      if (r.outcome === "eliminated" && parts && week) week.eliminated.push(formatCoupleName(parts));
+    }
+    for (const d of danceScores ?? []) {
+      const parts = displayNames.get(d.couple_id);
+      const week = activityWeeks.get(weekNumberByEpisodeId.get(d.episode_id) ?? -1);
+      if (parts && week && d.dance_styles) {
+        week.scores.push({ celebrity: parts.celebrity, danceStyle: d.dance_styles.name, total: d.total_score });
+      }
+    }
   }
 
   const pendingReveal = cutoff.pendingRevealEpisode
@@ -140,9 +155,7 @@ export default async function TodayPage() {
     totalMembers: s.totalMembers,
     totalPoints: s.totalPoints,
     picksDue: s.picksDue,
-    danceCardOn: s.danceCardOn,
     curtainCallOn: s.curtainCallOn,
-    grandFinaleOn: s.grandFinaleOn,
     weeksBehind,
   }));
 
@@ -170,16 +183,26 @@ export default async function TodayPage() {
     .map((s) => ({ leagueId: s.id, leagueName: s.name, iso: s.nextDeadline!.iso }))
     .sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime());
 
-  const recentActivity = [
-    ...summaries.flatMap((s) =>
-      s.danceCardOn ? latestEliminatedNames.map((name) => `${name} eliminated — ${s.name}`) : []
-    ),
-    ...summaries.filter((s) => s.tookLead).map((s) => `${s.name}: you took the points lead`),
-    ...summaries
-      .flatMap((s) => s.recentJoins.map((j) => ({ ...j, leagueName: s.name })))
-      .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
-      .map((j) => `${j.name} joined ${j.leagueName}`),
-  ].slice(0, 3);
+  const recentActivity = buildRecentActivity({
+    weeks: [...activityWeeks.values()],
+    westWeek: episodeBannerState?.kind === "west_soon" || episodeBannerState?.kind === "west_watching"
+      ? episodeBannerState.weekNumber
+      : null,
+    extraLines: [
+      ...summaries.filter((s) => s.tookLead).map((s) => [
+        { text: s.name, kind: "league" as const },
+        { text: ": you took the points lead" },
+      ]),
+      ...summaries
+        .flatMap((s) => s.recentJoins.map((j) => ({ ...j, leagueName: s.name })))
+        .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
+        .map((j) => [
+          { text: j.name, kind: "manager" as const },
+          { text: " joined " },
+          { text: j.leagueName, kind: "league" as const },
+        ]),
+    ],
+  });
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">

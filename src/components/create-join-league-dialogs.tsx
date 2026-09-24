@@ -25,11 +25,13 @@ function SubmitButton({ idleLabel, pendingLabel }: { idleLabel: string; pendingL
   );
 }
 
-export function CreateJoinLeagueDialogs() {
+export function CreateJoinLeagueDialogs({ quiet = false }: { quiet?: boolean }) {
   return (
     <div className="flex gap-2">
       <Dialog>
-        <DialogTrigger render={<Button />}>+ Create a League</DialogTrigger>
+        <DialogTrigger render={<Button variant={quiet ? "ghost" : "default"} size={quiet ? "sm" : "default"} />}>
+          + Create a League
+        </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create a League</DialogTitle>
@@ -70,7 +72,9 @@ export function CreateJoinLeagueDialogs() {
       </Dialog>
 
       <Dialog>
-        <DialogTrigger render={<Button variant="outline" />}>Join with Code</DialogTrigger>
+        <DialogTrigger render={<Button variant={quiet ? "ghost" : "outline"} size={quiet ? "sm" : "default"} />}>
+          Join with Code
+        </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Join a League</DialogTitle>
