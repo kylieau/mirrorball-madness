@@ -1,7 +1,7 @@
 # Session Handoff
 
 ## 1. Current State
-**All of this session's work is committed and pushed** (`cd2ff92` on `origin/main`, on top of the handoff commit `50efbaf`, which briefly left `main` without `dance-card-rosters.tsx` before the code commit landed). Checked: `tsc --noEmit`, `eslint src` and all 400 tests passed at the last run; the user looked at Standings, Picks and the Home banner in their own dev preview and signed off on each tweak. **Not run:** `npm run build` (the user's `next dev` holds port 3000). **Verified live (read-only, service role):** no stored `weekly_manager_scores` rows exist before any league's Anchor Week, and `episodes.duration_minutes` exists (all 120) — the user already applied `supabase/apply-episode-duration.sql`.
+**All of this session's work is committed and pushed** (`cd2ff92` on `origin/main`, on top of the handoff commit `50efbaf`, which briefly left `main` without `dance-card-rosters.tsx` before the code commit landed). Checked: `tsc --noEmit`, `eslint src` and all 400 tests passed at the last run; the user looked at Standings, Picks and the Home banner in their own dev preview and signed off on each tweak. `npm run build` also passed (dev server stopped first; it is **not running now** — restart with `npm run dev`). **Verified live (read-only, service role):** no stored `weekly_manager_scores` rows exist before any league's Anchor Week, and `episodes.duration_minutes` exists (all 120) — the user already applied `supabase/apply-episode-duration.sql`.
 
 Built this session:
 - **Grand Finale (Picks):** a couple eliminated before the league's Anchor Week (`judges_score_starts_week`) shows "—" instead of points (`PointsTag`, `GrandFinaleScoring.scoringStartsWeek`). "Your Season Bracket" always reopens collapsed once locked (plain `useState(true)`, no persistence); expanded it is the capped, scrolling window around the next predicted elimination (`windowed`), with a chevron-only "View picks" on the next-elimination row and a right-aligned "Collapse Surrounding Picks" under the list.
@@ -24,6 +24,6 @@ Ours (all committed): `CLAUDE.md`, `BACKLOG.md`, `supabase/{schema.sql,apply-epi
 ## 4. Backlog & Next Steps
 Deferred work is in [BACKLOG.md](BACKLOG.md) (Home banner follow-ups, full build owed, Score History live check, older items).
 
-Next: stop the dev server on port 3000, then run `npm run build`.
+Next: restart the dev server (`npm run dev`) and do a live check of the Home banner on a real episode night; see BACKLOG.md.
 
-`git fetch && git status -sb`
+`npm run dev`

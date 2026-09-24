@@ -163,7 +163,6 @@ Shipped: new state machine, West overlays, relative "Airs", `episodes.duration_m
 
 ## Housekeeping
 
-- Full `npm run build` is still owed (last one predates League at a Glance, Score History and the Couples Leaderboard / Home banner work); needs the dev server on port 3000 stopped first.
 - Decide whether to delete `claude/grand-finale-picks-feedback-brief.md` (stale brief for a dropped design) and `scratch/recovered-docs/` (recovered pre-cut CLAUDE.md/handoff copies).
 - The user said "these are separate pages now" about Scores / Enter Results, but the repo still uses one page (`/admin/results`) with `?tab=`.
 
