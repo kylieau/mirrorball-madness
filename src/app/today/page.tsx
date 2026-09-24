@@ -9,7 +9,7 @@ import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
-import { computeEpisodeBannerState } from "@/lib/episode-banner";
+import { computeEpisodeBannerState, DEFAULT_EPISODE_DURATION_MINUTES, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 
 export default async function TodayPage() {
@@ -47,7 +47,7 @@ export default async function TodayPage() {
       .eq("season_id", activeSeasonId ?? ""),
     supabase
       .from("episodes")
-      .select("id, episode_number, week_id, airs_at, theme, status, results_published_at")
+      .select("id, episode_number, week_id, airs_at, duration_minutes, theme, status, results_published_at")
       .eq("season_id", activeSeasonId ?? ""),
   ]);
   const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
@@ -146,10 +146,24 @@ export default async function TodayPage() {
     weeksBehind,
   }));
 
-  const episodeBannerState = computeEpisodeBannerState({
-    liveWeek,
+  const episodeBannerInput: EpisodeBannerInput = {
+    weeks: groupedWeeks.map((week) => ({
+      weekNumber: week.week_number,
+      episodes: week.episodes.map((episode) => ({
+        airsAt: episode.airs_at,
+        durationMinutes: episode.duration_minutes ?? DEFAULT_EPISODE_DURATION_MINUTES,
+        completed: episode.status === "completed",
+        publishedAt: episode.results_published_at ?? null,
+      })),
+    })),
     picksModuleOn: leagues.some((l) => l.curtainCallOn),
-  });
+    curtainCallLockAtIso:
+      summaries
+        .flatMap((s) => (s.curtainCallLockAt ? [s.curtainCallLockAt] : []))
+        .sort()
+        .at(0) ?? null,
+  };
+  const episodeBannerState = computeEpisodeBannerState(episodeBannerInput);
 
   const deadlines = summaries
     .filter((s) => s.picksDue && s.nextDeadline)
@@ -190,7 +204,7 @@ export default async function TodayPage() {
           deadlines={deadlines}
           recentActivity={recentActivity}
           pendingReveal={pendingReveal}
-          episodeBanner={episodeBannerState ? { state: episodeBannerState, weeksDone: completedWeeks.length } : null}
+          episodeBanner={{ input: episodeBannerInput, initialState: episodeBannerState }}
         />
       </div>
 

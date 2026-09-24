@@ -453,6 +453,9 @@ create table episodes (
   -- couple (the finale is not uniform), not a hard limit. Publish does not
   -- overwrite it.
   expected_dance_count int not null default 1,
+  -- Broadcast length; set on Schedule. Drives when the Home banner leaves
+  -- "On Air Now".
+  duration_minutes int not null default 120 check (duration_minutes > 0),
   status text not null default 'upcoming' check (status in ('upcoming', 'locked', 'completed')),
   -- guest_judge_name is a leftover caption, not a people(role='judge') row.
   -- It is not shown anywhere and is no longer editable in Enter Results —

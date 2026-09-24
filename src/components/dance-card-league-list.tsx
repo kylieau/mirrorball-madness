@@ -45,7 +45,7 @@ export function DanceCardLeagueList({
                 </span>
                 <span>{e.displayName}</span>
                 <span className="ml-auto pr-2 text-xs font-normal text-muted-foreground">
-                  {formatSignedPoints(e.weekPoints)} pts
+                  <span className="font-heading font-semibold">{formatSignedPoints(e.weekPoints)}</span> pts
                 </span>
               </span>
             </AccordionTrigger>

@@ -29,11 +29,12 @@ import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { partitionRecastSlots } from "@/lib/recast-framing";
-import { DanceCardRosters } from "@/components/dance-card-rosters";
+import { CouplesLeaderboard } from "@/components/couples-leaderboard";
 import { scoringModule, type ScoringModuleKey } from "@/lib/scoring-modules";
 import { EpisodeCarousel } from "@/components/episode-carousel";
 import { adjacentThisWeekWeeks, rosterWeekHref } from "@/lib/this-week-carousel";
-import { buildLeagueRosters, orderManagersForRosters } from "@/lib/league-rosters";
+import { buildCouplesLeaderboard } from "@/lib/couples-leaderboard";
+import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
 import { judgePointsThroughWeek, slotActiveInWeek } from "@/lib/roster-couple-points";
 import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
 import { roundPoints } from "@/lib/format-points";
@@ -101,6 +102,7 @@ export default async function LeaguePage({
     tierSize: scoringSettings?.bonus_picks_tier_size ?? null,
     tierPayStyle:
       (scoringSettings?.bonus_picks_tier_pay_style as TierPayStyle | null) ?? GRAND_FINALE_DEFAULT_TIER_PAY_STYLE,
+    scoringStartsWeek: scoringSettings?.judges_score_starts_week ?? 1,
   };
   // Section labels (🔮 Curtain Call / 🪩 Dance Card / 🏆 Grand Finale) only
   // earn their keep once there's more than one module on the page to tell
@@ -271,10 +273,10 @@ export default async function LeaguePage({
 
   const standingsWithChange = standings.map((s) => {
     const weekPoints = latestCompletedWeekId ? (latestWeekPointsByManager.get(s.managerId) ?? 0) : null;
-    if (!previousRanks) return { ...s, weekPoints, change: null as "up" | "down" | null };
+    if (!previousRanks) return { ...s, weekPoints, change: null as "up" | "down" | "same" | null };
     const curr = currentRanks.get(s.managerId)!;
     const prev = previousRanks.get(s.managerId)!;
-    const change: "up" | "down" | null = curr < prev ? "up" : curr > prev ? "down" : null;
+    const change: "up" | "down" | "same" = curr < prev ? "up" : curr > prev ? "down" : "same";
     return { ...s, weekPoints, change };
   });
 
@@ -651,34 +653,43 @@ export default async function LeaguePage({
     );
   }
 
-  // Standings → Dance Cards: everyone's current roster with season totals.
-  const currentSlotPeriods = leagueSlotPeriods.filter((slot) => slot.endWeek === null);
-  const seasonPointsByCouple = latestVisibleDanceWeek
-    ? judgePointsThroughWeek({
-        ...judgePointsInputs,
-        slots: currentSlotPeriods,
-        week: latestVisibleDanceWeek.week_number,
-      })
-    : undefined;
-  const leagueRosters = showLeagueRosters
-    ? buildLeagueRosters({
-        managers: orderManagersForRosters(standings, myTeamId),
-        slots: currentSlotPeriods,
-        couples: flatCouples
-          .filter((c) => c.season_id === activeSeasonId)
-          .map((c) => ({
-            id: c.id,
-            status: c.status,
-            eliminationWeek: c.elimination_week,
-            names: allDisplayNames.get(c.id) ?? { celebrity: c.celebrity_name, pro: c.pro_name },
-          })),
-        viewerId: myTeamId,
-        asOfWeek: latestVisibleDanceWeek?.week_number,
-        pointsByCoupleId: seasonPointsByCouple
-          ? new Map([...seasonPointsByCouple].map(([coupleId, p]) => [coupleId, { total: p.total }]))
-          : undefined,
-      })
-    : null;
+  // Standings → Couples Leaderboard: every cast couple ranked by what it has
+  // earned for its manager, undrafted ones as a what-if.
+  const managerNameById = new Map(standings.map((s) => [s.managerId, s.displayName]));
+  const couplesLeaderboard =
+    showLeagueRosters && scoringSettings
+      ? buildCouplesLeaderboard({
+          scoring: {
+            judgesScoreMultiplier: scoringSettings.judges_score_multiplier,
+            survivalPoints: scoringSettings.survival_points,
+            eliminationPredictionPoints: scoringSettings.elimination_prediction_points,
+            topScorerPredictionPoints: scoringSettings.top_scorer_prediction_points,
+            firstPlacePoints: scoringSettings.first_place_points,
+            secondPlacePoints: scoringSettings.second_place_points,
+            thirdPlacePoints: scoringSettings.third_place_points,
+            fourthPlacePoints: scoringSettings.fourth_place_points,
+            fifthPlacePoints: scoringSettings.fifth_place_points,
+            curtainCallNearMissEnabled: scoringSettings.curtain_call_near_miss_enabled !== false,
+          },
+          anchorWeek: scoringSettings.judges_score_starts_week,
+          categoryWeight: scoringSettings.judges_score_category_weight,
+          weeks: await loadCoupleWeekResults(supabase, visibleDanceWeeks),
+          couples: seasonCouplesSpoilerSafe,
+          slots: leagueSlotPeriods,
+        }).map((standing) => {
+          const couple = seasonCouplesSpoilerSafe.find((c) => c.id === standing.coupleId)!;
+          const names = allDisplayNames.get(couple.id) ?? { celebrity: couple.celebrity_name, pro: couple.pro_name };
+          return {
+            ...standing,
+            celebrity: names.celebrity,
+            pro: names.pro,
+            ownerName: standing.ownerId ? (managerNameById.get(standing.ownerId) ?? "Unknown") : null,
+            isViewer: standing.ownerId === myTeamId,
+            eliminated: couple.status === "eliminated" || couple.status === "withdrawn",
+          };
+        })
+        .sort((a, b) => b.totalPoints - a.totalPoints || a.celebrity.localeCompare(b.celebrity))
+      : null;
 
   const recastSlotSource = (rosterSlots ?? [])
     .filter((s) => s.couples)
@@ -1091,7 +1102,7 @@ export default async function LeaguePage({
               standingMessage={standingMessage}
               moduleTotals={moduleTotalsByManager}
             />
-            {leagueRosters && <DanceCardRosters groups={leagueRosters.groups} />}
+            {couplesLeaderboard && <CouplesLeaderboard rows={couplesLeaderboard} />}
           </div>
         }
       />

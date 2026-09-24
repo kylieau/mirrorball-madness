@@ -21,6 +21,7 @@ export type ResultsPageData = {
     airs_at: string;
     theme: string | null;
     expected_dance_count: number;
+    duration_minutes: number;
     status: string;
     results_published_at: string | null;
     results_published_by: string | null;
@@ -104,7 +105,7 @@ export async function loadResultsPageData(
     supabase
       .from("episodes")
       .select(
-        "id, episode_number, week_id, airs_at, theme, expected_dance_count, status, results_published_at, results_published_by"
+        "id, episode_number, week_id, airs_at, theme, expected_dance_count, duration_minutes, status, results_published_at, results_published_by"
       )
       .eq("season_id", activeSeasonId ?? "")
       .order("episode_number"),

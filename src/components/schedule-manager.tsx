@@ -29,6 +29,7 @@ import {
 } from "@/lib/episode-cast";
 import { exhibitionEpisodes, groupEpisodesByWeek } from "@/lib/competition-week";
 import { ChevronRightIcon, PlusIcon } from "lucide-react";
+import { DEFAULT_EPISODE_DURATION_MINUTES } from "@/lib/episode-banner";
 
 type Episode = {
   id: string;
@@ -37,6 +38,7 @@ type Episode = {
   airs_at: string;
   theme: string | null;
   expected_dance_count: number;
+  duration_minutes: number;
   results_published_at: string | null;
   status: string;
 };
@@ -202,6 +204,7 @@ export function ScheduleManager({
   const [isDoubleEliminationWeek, setIsDoubleEliminationWeek] = useState(false);
   const [participantCoupleIds, setParticipantCoupleIds] = useState<Set<string>>(new Set());
   const [expectedDanceCount, setExpectedDanceCount] = useState(1);
+  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_EPISODE_DURATION_MINUTES);
   const [roundTypeIds, setRoundTypeIds] = useState<Set<string>>(new Set());
 
   const parsedWeekNumber = competitionWeek.trim() === "" ? null : Number(competitionWeek);
@@ -273,6 +276,7 @@ export function ScheduleManager({
     }).map((c) => c.id);
     setParticipantCoupleIds(new Set(defaultCheckedParticipantIds(participantsByEpisode[e.id], selectable)));
     setExpectedDanceCount(e.expected_dance_count);
+    setDurationMinutes(e.duration_minutes);
     const assignedNames = new Set(roundTypesByEpisode[e.id] ?? []);
     setRoundTypeIds(new Set(roundTypes.filter((rt) => assignedNames.has(rt.name)).map((rt) => rt.id)));
     setSheetOpen(true);
@@ -293,6 +297,7 @@ export function ScheduleManager({
       new Set(selectableCast(seasonCouples, nextWeekNumber, { published: false }).map((c) => c.id))
     );
     setExpectedDanceCount(1);
+    setDurationMinutes(DEFAULT_EPISODE_DURATION_MINUTES);
     setRoundTypeIds(new Set());
   }
 
@@ -336,6 +341,10 @@ export function ScheduleManager({
       setError("Dances per couple must be a positive integer.");
       return;
     }
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 1) {
+      setError("Duration must be a positive number of minutes.");
+      return;
+    }
 
     setSubmitting(true);
     // Sending every selectable couple back as "participants" is
@@ -355,6 +364,7 @@ export function ScheduleManager({
       participantCoupleIds: participantIdsToPersist(participantCoupleIds, selectableIds),
       roundTypeIds: [...roundTypeIds],
       expectedDanceCount,
+      durationMinutes,
     });
     if (result.error) {
       setError(result.error);
@@ -538,6 +548,16 @@ export function ScheduleManager({
                 min={1}
                 value={expectedDanceCount}
                 onChange={(e) => setExpectedDanceCount(Number(e.target.value))}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="durationMinutes">Duration (Minutes)</Label>
+              <Input
+                id="durationMinutes"
+                type="number"
+                min={1}
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(Number(e.target.value))}
               />
             </div>
             <div className="flex flex-col gap-2">

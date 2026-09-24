@@ -847,6 +847,7 @@ export type Database = {
       episodes: {
         Row: {
           airs_at: string
+          duration_minutes: number
           episode_number: number
           expected_dance_count: number
           guest_judge_name: string | null
@@ -861,6 +862,7 @@ export type Database = {
         }
         Insert: {
           airs_at: string
+          duration_minutes?: number
           episode_number: number
           expected_dance_count?: number
           guest_judge_name?: string | null
@@ -875,6 +877,7 @@ export type Database = {
         }
         Update: {
           airs_at?: string
+          duration_minutes?: number
           episode_number?: number
           expected_dance_count?: number
           guest_judge_name?: string | null

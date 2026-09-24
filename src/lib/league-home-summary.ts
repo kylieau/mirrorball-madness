@@ -10,6 +10,7 @@ export type LeagueHomeSummary = {
   totalPoints: number;
   picksDue: boolean;
   nextDeadline: { label: string; iso: string } | null;
+  curtainCallLockAt: string | null;
   danceCardOn: boolean;
   curtainCallOn: boolean;
   grandFinaleOn: boolean;
@@ -139,6 +140,7 @@ export async function computeLeagueHomeSummary(
     totalPoints: pointsByManager.get(myTeamId) ?? 0,
     picksDue: curtainCallPicksDue || grandFinalePicksDue,
     nextDeadline: deadlineCandidates[0] ?? null,
+    curtainCallLockAt: lockAt,
     danceCardOn,
     curtainCallOn,
     grandFinaleOn,

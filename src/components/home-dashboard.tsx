@@ -5,7 +5,7 @@ import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs
 import { DeadlineStub } from "@/components/deadline-stub";
 import { EpisodeBanner } from "@/components/episode-banner";
 import { SpoilerRevealCallout } from "@/components/spoiler-reveal-callout";
-import type { EpisodeBannerState } from "@/lib/episode-banner";
+import type { EpisodeBannerInput, EpisodeBannerState } from "@/lib/episode-banner";
 import { formatCountdown } from "@/lib/format-countdown";
 
 type HomeLeague = {
@@ -32,13 +32,13 @@ export function HomeDashboard({
   deadlines: { leagueId: string; leagueName: string; iso: string }[];
   recentActivity: string[];
   pendingReveal: { weekNumber: number } | null;
-  episodeBanner: { state: EpisodeBannerState; weeksDone: number } | null;
+  episodeBanner: { input: EpisodeBannerInput; initialState: EpisodeBannerState | null };
 }) {
   const needingPicks = leagues.filter((l) => l.picksDue).length;
 
   return (
     <div>
-      {episodeBanner && <EpisodeBanner state={episodeBanner.state} weeksDone={episodeBanner.weeksDone} />}
+      <EpisodeBanner {...episodeBanner} />
 
       <p className="mb-4 text-sm text-muted-foreground">
         {leagues.length} league{leagues.length === 1 ? "" : "s"}
@@ -72,7 +72,7 @@ export function HomeDashboard({
               <Link href={`/leagues/${l.id}?tab=standings`} className="flex-1">
                 <p className="font-heading text-sm font-semibold">{l.name}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Rank {l.rank} of {l.totalMembers} · {formatPoints(l.totalPoints)} pts
+                  Rank {l.rank} of {l.totalMembers} · <span className="font-heading font-semibold">{formatPoints(l.totalPoints)}</span> pts
                 </p>
                 <div className="mt-2 flex gap-1.5 text-sm">
                   <span className={l.danceCardOn ? "opacity-100" : "opacity-30"}>🪩</span>

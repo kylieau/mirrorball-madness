@@ -38,8 +38,8 @@ describe("formatEpisodeCasualShort", () => {
 });
 
 describe("formatEpisodeCasualAbbreviated", () => {
-  it("uses Wk N for tight inline spots, no em dash", () => {
-    expect(formatEpisodeCasualAbbreviated(2)).toBe("Wk 2");
+  it("uses WN for tight inline spots, no em dash", () => {
+    expect(formatEpisodeCasualAbbreviated(2)).toBe("W2");
   });
 });
 

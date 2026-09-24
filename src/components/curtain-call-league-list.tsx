@@ -76,9 +76,13 @@ export function CurtainCallLeagueList({
                 </span>
                 <span>{e.displayName}</span>
                 <span className="ml-auto pr-2 text-xs font-normal text-muted-foreground">
-                  {e.comparison
-                    ? `${formatSignedPoints(e.comparison.predictionPoints)} pts`
-                    : "Awaiting results"}
+                  {e.comparison ? (
+                    <>
+                      <span className="font-heading font-semibold">{formatSignedPoints(e.comparison.predictionPoints)}</span> pts
+                    </>
+                  ) : (
+                    "Awaiting results"
+                  )}
                 </span>
               </span>
             </AccordionTrigger>

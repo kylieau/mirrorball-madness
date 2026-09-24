@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { YouPill } from "@/components/you-pill";
 import { cn } from "cn";
 import { getScoreHistory } from "@/app/leagues/[id]/score-history/actions";
 import { ScoreHistoryPanel, type HistoryResult, type ModuleTotals } from "@/components/score-history-panel";
@@ -12,7 +13,7 @@ export type LeaderboardRow = {
   displayName: string;
   totalPoints: number;
   weekPoints: number | null;
-  change: "up" | "down" | null;
+  change: "up" | "down" | "same" | null;
 };
 
 export function StandingsLeaderboard({
@@ -62,6 +63,7 @@ export function StandingsLeaderboard({
               <span aria-hidden className="w-3 text-[10px]">
                 {row.change === "up" && <span className="text-rank-up">▲</span>}
                 {row.change === "down" && <span className="text-rank-down">▼</span>}
+                {row.change === "same" && <span className="text-muted-foreground">–</span>}
               </span>
               <span
                 className={cn(
@@ -72,9 +74,9 @@ export function StandingsLeaderboard({
                 {i + 1}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold">
+                <span className="flex items-center gap-2 text-sm font-semibold">
                   {row.displayName}
-                  {isYou && " (you)"}
+                  {isYou && <YouPill />}
                 </span>
                 {row.weekPoints !== null && (
                   <span className={cn("block font-heading text-xs", isYou ? "text-accent" : "text-muted-foreground")}>

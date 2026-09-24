@@ -18,7 +18,7 @@ export function formatEpisodeCasualShort(weekNumber: number): string {
 // The only genuinely-abbreviated variant — for tight inline spots (e.g. a
 // couple's status tag) where "Week N" doesn't fit.
 export function formatEpisodeCasualAbbreviated(weekNumber: number): string {
-  return `Wk ${weekNumber}`;
+  return `W${weekNumber}`;
 }
 
 export function formatEpisodeCasualWithTheme(weekNumber: number, theme?: string | null): string {

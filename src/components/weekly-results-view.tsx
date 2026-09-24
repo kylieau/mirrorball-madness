@@ -235,7 +235,7 @@ export function WeeklyResultsView({
                     {nameByManager[s.managerId] ?? "Unknown"}
                     {isYou && " (you)"}
                   </span>
-                  <span>{formatSignedPoints(s.totalPoints)}</span>
+                  <span className="font-heading font-semibold tabular-nums">{formatSignedPoints(s.totalPoints)}</span>
                 </div>
               );
             })}

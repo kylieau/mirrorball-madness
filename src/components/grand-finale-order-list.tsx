@@ -25,6 +25,7 @@ export type GrandFinaleScoring = {
   distancePenalty: number | null;
   tierSize: number | null;
   tierPayStyle: TierPayStyle;
+  scoringStartsWeek: number;
 };
 
 export function statusLabel(couple: GrandFinaleCouple): string {
@@ -46,13 +47,27 @@ export function statusLabel(couple: GrandFinaleCouple): string {
 
 // Gold "Next Predicted Elimination" bubble sitting on the top edge of the
 // framed row; the row's own text keeps its normal color.
-export function NextEliminationFrame({ children }: { children: ReactNode }) {
+export function NextEliminationFrame({ children, onExpand }: { children: ReactNode; onExpand?: () => void }) {
   return (
-    <div data-next-elim className="relative mt-3 rounded-lg border border-primary/40 bg-primary/10 px-2 py-1.5">
+    <div
+      data-next-elim
+      className="relative mt-3 flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-2 py-1.5"
+    >
       <span className="absolute -top-2.5 left-2 rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary-foreground">
         Next Predicted Elimination
       </span>
-      {children}
+      <div className="min-w-0 flex-1">{children}</div>
+      {onExpand && (
+        <button
+          type="button"
+          aria-expanded={false}
+          aria-label="View picks"
+          onClick={onExpand}
+          className="shrink-0 text-accent"
+        >
+          <ChevronDownIcon className="size-4" />
+        </button>
+      )}
     </div>
   );
 }
@@ -85,6 +100,11 @@ export function PointsTag({
   if (!couple) return null;
   const range = context.positionRanges.get(couple.id);
   if (range) {
+    if (couple.elimination_week !== null && couple.elimination_week < scoring.scoringStartsWeek) {
+      return (
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">—</span>
+      );
+    }
     const points = roundPoints(
       grandFinalePredictionPoints({
         ...scoring,
@@ -97,7 +117,7 @@ export function PointsTag({
     return (
       <span
         className={cn(
-          "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+          "rounded-full px-2 py-0.5 font-heading text-[10px] font-semibold",
           points > 0 ? "bg-emerald/20 text-emerald-text" : "bg-destructive/15 text-destructive"
         )}
       >

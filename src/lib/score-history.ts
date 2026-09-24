@@ -45,6 +45,32 @@ export type HistoryWeekData = {
   inJeopardyCoupleIds: string[];
 };
 
+type EpisodeRows<T> = ({ episode_id: string } & T)[];
+
+// One competition week's dance scores and result rows, in episode order (the
+// last result row per couple decides survival and bonus, as in the engine).
+export function weekResults(
+  episodeIds: string[],
+  danceRows: EpisodeRows<{ couple_id: string; total_score: number }>,
+  outcomeRows: EpisodeRows<{ couple_id: string; outcome: string; bonus_points: number }>
+): Pick<HistoryWeekData, "danceScores" | "outcomes"> {
+  const inWeek = new Set(episodeIds);
+  const episodeOrder = new Map(episodeIds.map((id, index) => [id, index]));
+  return {
+    danceScores: danceRows
+      .filter((row) => inWeek.has(row.episode_id))
+      .map((row) => ({ coupleId: row.couple_id, totalScore: Number(row.total_score) })),
+    outcomes: outcomeRows
+      .filter((row) => inWeek.has(row.episode_id))
+      .sort((a, b) => episodeOrder.get(a.episode_id)! - episodeOrder.get(b.episode_id)!)
+      .map((row) => ({
+        coupleId: row.couple_id,
+        outcome: row.outcome as Outcome,
+        bonusPoints: Number(row.bonus_points),
+      })),
+  };
+}
+
 export type ManagerHistoryInput = {
   scoring: ScoringSettings;
   anchorWeek: number;

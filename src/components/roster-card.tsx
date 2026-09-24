@@ -40,7 +40,9 @@ export function RosterCard({
     <Card>
       <CardHeader>
         <CardTitle>Your Fantasy Roster</CardTitle>
-        <CardDescription>{formatPoints(totalPoints)} pts this season</CardDescription>
+        <CardDescription>
+          <span className="font-heading font-semibold">{formatPoints(totalPoints)}</span> pts this season
+        </CardDescription>
         {carousel}
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5">
@@ -76,7 +78,13 @@ export function RosterCard({
                 <span className="block font-heading text-base font-semibold text-foreground">
                   {formatSignedPoints(c.weeklyPoints)}
                 </span>
-                {c.totalPoints !== undefined ? `${formatPoints(c.totalPoints)} total` : "this wk"}
+                {c.totalPoints !== undefined ? (
+                  <>
+                    <span className="font-heading font-semibold">{formatPoints(c.totalPoints)}</span> total
+                  </>
+                ) : (
+                  "this wk"
+                )}
               </div>
             </div>
           );

@@ -56,7 +56,7 @@ export function StandingsTable({
       )}
 
       <div className="mb-2.5 mt-6 flex items-baseline justify-between gap-3">
-        <h2 className="font-heading text-lg font-semibold text-accent">Leaderboard</h2>
+        <h2 className="font-heading text-lg font-semibold text-accent">Managers Leaderboard</h2>
         <span className="text-xs text-muted-foreground">
           {latestCompletedWeek !== null
             ? `through ${formatEpisodeCasualShort(latestCompletedWeek)}`

@@ -14,6 +14,7 @@ export type WeekEpisode = {
   episode_number: number;
   week_id: string | null;
   airs_at: string;
+  duration_minutes?: number;
   theme: string | null;
   status: string;
   results_published_at?: string | null;

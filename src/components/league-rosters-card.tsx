@@ -28,7 +28,9 @@ function CoupleLine({ couple }: { couple: RosterCouple }) {
                 <span className="font-heading font-semibold">
                   {couple.points.week > 0 ? formatSignedPoints(couple.points.week) : "—"}
                 </span>
-                <span className="block text-[10px] text-muted-foreground">{formatPoints(couple.points.total)} total</span>
+                <span className="block text-[10px] text-muted-foreground">
+                  <span className="font-heading font-semibold">{formatPoints(couple.points.total)}</span> total
+                </span>
               </>
             ) : (
               <span className="font-heading font-semibold">{formatPoints(couple.points.total)} pts</span>

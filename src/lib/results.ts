@@ -168,6 +168,7 @@ export type ScheduleEpisodeInput = {
   participantCoupleIds: string[];
   roundTypeIds: string[];
   expectedDanceCount: number;
+  durationMinutes: number;
 };
 
 async function deleteWeekIfEmpty(
@@ -200,6 +201,9 @@ export async function applyEpisodeSchedule(
   }
   if (!Number.isInteger(input.expectedDanceCount) || input.expectedDanceCount < 1) {
     return { error: "Dances per couple must be a positive integer." };
+  }
+  if (!Number.isInteger(input.durationMinutes) || input.durationMinutes < 1) {
+    return { error: "Duration must be a positive number of minutes." };
   }
 
   let weekId: string | null = null;
@@ -242,6 +246,7 @@ export async function applyEpisodeSchedule(
     airs_at: input.airsAt,
     theme: input.theme,
     expected_dance_count: input.expectedDanceCount,
+    duration_minutes: input.durationMinutes,
   };
 
   const { data: episode, error } = input.episodeId

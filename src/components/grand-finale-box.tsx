@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import {
   submitGrandFinalePredictionToLeagues,
   type LeagueSaveResult,
@@ -17,7 +18,6 @@ import {
 import { coupleNameNode } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
-import { usePersistedState } from "@/lib/use-persisted-state";
 import {
   nextPredictedElimination,
   pinEliminatedFirst,
@@ -80,7 +80,7 @@ export function GrandFinaleBox({
   // Only meaningful once locked — collapses the full bracket down to just the
   // next-predicted-elimination row so the card doesn't dominate the page once
   // there's a permanent League at a Glance list underneath it.
-  const [collapsed, setCollapsed] = usePersistedState<boolean>(`gf-own-collapsed:${leagueId}`, false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const coupleById = new Map(couples.map((c) => [c.id, c]));
   const rowContext = grandFinaleRowContext(couples);
@@ -173,13 +173,23 @@ export function GrandFinaleBox({
           {isCollapsed ? (
             <div className="flex flex-col gap-2">
               {highlightId ? (
-                <NextEliminationFrame>{nameFor(highlightId)}</NextEliminationFrame>
+                <NextEliminationFrame onExpand={() => setCollapsed(false)}>
+                  {nameFor(highlightId)}
+                </NextEliminationFrame>
               ) : (
-                <p className="text-muted-foreground">Nothing left to predict — your bracket&apos;s fully resolved.</p>
+                <>
+                  <p className="text-muted-foreground">Nothing left to predict — your bracket&apos;s fully resolved.</p>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="self-end"
+                    aria-label="View picks"
+                    onClick={() => setCollapsed(false)}
+                  >
+                    <ChevronDownIcon className="size-4" />
+                  </Button>
+                </>
               )}
-              <Button variant="ghost" size="sm" className="self-start" onClick={() => setCollapsed(false)}>
-                Tap to view full bracket
-              </Button>
             </div>
           ) : (
             <>
@@ -191,10 +201,12 @@ export function GrandFinaleBox({
                 totalCouples={totalCouples}
                 showStatus
                 showNextEliminationHighlight
+                windowed={locked}
               />
               {locked && (
-                <Button variant="ghost" size="sm" className="mt-1 self-start" onClick={() => setCollapsed(true)}>
-                  Collapse bracket
+                <Button variant="ghost" size="sm" className="mt-1 self-end" onClick={() => setCollapsed(true)}>
+                  Collapse Surrounding Picks
+                  <ChevronUpIcon className="size-3.5" />
                 </Button>
               )}
             </>

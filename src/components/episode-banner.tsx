@@ -2,9 +2,16 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { cn } from "cn";
-import type { EpisodeBannerState } from "@/lib/episode-banner";
+import {
+  computeEpisodeBannerState,
+  nextBannerRefreshMs,
+  seasonTrack,
+  type EpisodeBannerInput,
+  type EpisodeBannerState,
+  type SeasonTrackModel,
+} from "@/lib/episode-banner";
+import { formatAirsAt } from "@/lib/format-airs";
 import { formatEpisodeCasual } from "@/lib/format-week";
-import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 
 // Total season length isn't known, so the track shows what's done, the
 // current week, and a few hollow dots that fade out instead of a real "N of M".
@@ -13,37 +20,66 @@ const FUTURE_DOTS = 3;
 const CURTAIN_FOLDS =
   "bg-[repeating-linear-gradient(90deg,#5c1022_0_9px,#7d1a33_9px_18px,#5c1022_18px_27px)]";
 
-function statusCopy(state: EpisodeBannerState, formattedAirsAt: string) {
-  if (state.kind === "on_air") {
-    return { title: "On Air Now", sub: state.picksModuleOn ? "Picks are locked" : null };
+type BannerCopy = { title: string | null; sub: string | null; sticky: string | null };
+
+function statusCopy(state: EpisodeBannerState, airsAtLabel: string): BannerCopy {
+  const airs = (prefix: string) => (airsAtLabel ? `${prefix}Airs ${airsAtLabel}` : null);
+  switch (state.kind) {
+    case "picks_open":
+      return {
+        title: state.picksModuleOn ? "Picks open" : null,
+        sub: airs(""),
+        sticky: state.picksModuleOn ? "Picks open" : null,
+      };
+    case "picks_locked":
+      return { title: "Picks open", sub: airs("Picks locked · "), sticky: "Picks locked" };
+    case "on_air":
+      return { title: "On Air Now", sub: state.picksModuleOn ? "Picks are locked" : null, sticky: "On Air Now" };
+    case "results_soon":
+      return { title: "Results soon", sub: "Scores post after the show", sticky: "Results soon" };
+    case "results_in":
+      return { title: "Results in", sub: "Standings are updated", sticky: "Results in" };
+    case "west_soon":
+      return { title: "West feed at 8pm", sub: "Spoilers can wait", sticky: "West feed 8pm" };
+    case "west_watching":
+      return { title: "West Coast is watching", sub: "Spoilers can wait", sticky: "West feed on" };
   }
-  return {
-    title: state.picksModuleOn ? "Picks open" : null,
-    sub: formattedAirsAt ? `Airs ${formattedAirsAt}` : null,
-  };
 }
 
-function SeasonTrack({ weeksDone, weekNumber }: { weeksDone: number; weekNumber: number }) {
+function SeasonTrack({ weeksDone, currentWeek, upNext }: SeasonTrackModel) {
   const dots = [
     ...Array.from({ length: weeksDone }, () => ({ kind: "done" as const, label: "✓" })),
-    { kind: "current" as const, label: String(weekNumber) },
+    ...(currentWeek === null ? [] : [{ kind: "current" as const, label: String(currentWeek) }]),
     ...Array.from({ length: FUTURE_DOTS }, () => ({ kind: "future" as const, label: "" })),
   ];
 
   return (
-    <div className="flex w-full items-center overflow-hidden px-1.5" aria-hidden>
+    <div
+      className={cn(
+        "flex w-full items-center px-1.5",
+        upNext ? "relative -top-2.5 overflow-x-clip overflow-y-visible pb-3" : "overflow-hidden"
+      )}
+      aria-hidden
+    >
       {dots.map((dot, i) => (
         <Fragment key={i}>
-          <span
-            className={cn(
-              "grid size-4 flex-none place-items-center rounded-full border-[1.5px] text-[8.5px] font-semibold",
-              dot.kind === "done" && "border-primary bg-primary text-primary-foreground",
-              dot.kind === "current" &&
-                "size-[22px] border-[#fff3c8] bg-primary text-[11px] text-primary-foreground shadow-[0_0_0_3px_rgba(230,197,111,0.22),0_0_14px_rgba(255,220,130,0.6)]",
-              dot.kind === "future" && "border-primary/40 bg-black/30"
+          <span className="relative flex-none">
+            <span
+              className={cn(
+                "grid size-4 flex-none place-items-center rounded-full border-[1.5px] text-[8.5px] font-semibold",
+                dot.kind === "done" && "border-primary bg-primary text-primary-foreground",
+                dot.kind === "current" &&
+                  "size-[22px] border-[#fff3c8] bg-primary text-[11px] text-primary-foreground shadow-[0_0_0_3px_rgba(230,197,111,0.22),0_0_14px_rgba(255,220,130,0.6)]",
+                dot.kind === "future" && "border-primary/40 bg-black/30"
+              )}
+            >
+              {dot.label}
+            </span>
+            {dot.kind === "current" && upNext && (
+              <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap text-[8px] font-medium text-accent">
+                Up next
+              </span>
             )}
-          >
-            {dot.label}
           </span>
           <span
             className={cn(
@@ -58,12 +94,34 @@ function SeasonTrack({ weeksDone, weekNumber }: { weeksDone: number; weekNumber:
   );
 }
 
-export function EpisodeBanner({ state, weeksDone }: { state: EpisodeBannerState; weeksDone: number }) {
-  const formattedAirsAt = useFormattedDeadline(state.kind === "picks_open" ? state.airsAtIso : null);
-  const { title, sub } = statusCopy(state, formattedAirsAt);
-  const weekLabel = formatEpisodeCasual(state.weekNumber);
-  const onAir = state.kind === "on_air";
+export function EpisodeBanner({
+  input,
+  initialState,
+}: {
+  input: EpisodeBannerInput;
+  initialState: EpisodeBannerState | null;
+}) {
+  // The state moves with the clock, so it is re-derived here rather than only
+  // at render time on the server. The first paint uses the server's state to
+  // stay hydration-safe.
+  const [state, setState] = useState(initialState);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      setState(computeEpisodeBannerState(input));
+      timer = setTimeout(tick, nextBannerRefreshMs(input.weeks));
+    };
+    tick();
+    return () => clearTimeout(timer);
+  }, [input]);
 
+  const airsIso = state?.kind === "picks_open" || state?.kind === "picks_locked" ? state.airsAtIso : null;
+  const [airsAtLabel, setAirsAtLabel] = useState("");
+  useEffect(() => {
+    setAirsAtLabel(airsIso ? formatAirsAt(airsIso) : "");
+  }, [airsIso, state]);
+
+  const visible = state !== null;
   const bannerRef = useRef<HTMLDivElement>(null);
   const [scrolledPast, setScrolledPast] = useState(false);
   useEffect(() => {
@@ -72,7 +130,13 @@ export function EpisodeBanner({ state, weeksDone }: { state: EpisodeBannerState;
     const observer = new IntersectionObserver(([entry]) => setScrolledPast(!entry.isIntersecting));
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [visible]);
+
+  if (!state) return null;
+
+  const { title, sub, sticky } = statusCopy(state, airsAtLabel);
+  const weekLabel = formatEpisodeCasual(state.weekNumber);
+  const onAir = state.kind === "on_air";
 
   return (
     <>
@@ -115,7 +179,7 @@ export function EpisodeBanner({ state, weeksDone }: { state: EpisodeBannerState;
               {sub && <p className="mt-px text-[11px] text-accent">{sub}</p>}
             </div>
           </div>
-          <SeasonTrack weeksDone={weeksDone} weekNumber={state.weekNumber} />
+          <SeasonTrack {...seasonTrack(input.weeks, state)} />
         </div>
       </div>
 
@@ -133,10 +197,10 @@ export function EpisodeBanner({ state, weeksDone }: { state: EpisodeBannerState;
               <span className="inline-block size-[7px] rounded-full bg-[#ff4d5e]" />
             )}
             <span className="font-heading text-[15px] font-black text-primary">{weekLabel}</span>
-            {title && (
+            {sticky && (
               <>
                 <span className="opacity-40">·</span>
-                <span>{title}</span>
+                <span>{sticky}</span>
               </>
             )}
           </p>

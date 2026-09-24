@@ -43,6 +43,7 @@ type Episode = {
   airs_at: string;
   theme: string | null;
   expected_dance_count: number;
+  duration_minutes: number;
   status: string;
   results_published_at: string | null;
   results_published_by: string | null;

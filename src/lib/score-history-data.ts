@@ -2,8 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
-import { buildScoreHistory, type HistoryWeekData, type ScoreHistoryLine } from "@/lib/score-history";
-import type { GrandFinaleMethod, Outcome, TierPayStyle } from "@/lib/scoring";
+import { buildScoreHistory, weekResults, type HistoryWeekData, type ScoreHistoryLine } from "@/lib/score-history";
+import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { isOwnMembership } from "@/lib/acting-manager";
 
@@ -99,21 +99,10 @@ export async function loadScoreHistory(
 
   const weeks: HistoryWeekData[] = allowedWeeks.map((week) => {
     const inWeek = new Set(week.episodes.map((episode) => episode.id));
-    const episodeOrder = new Map(week.episodes.map((episode, index) => [episode.id, index]));
     return {
       weekNumber: week.week_number,
       isDoubleElimination: week.is_double_elimination_week,
-      danceScores: (danceRows ?? [])
-        .filter((row) => inWeek.has(row.episode_id))
-        .map((row) => ({ coupleId: row.couple_id, totalScore: Number(row.total_score) })),
-      outcomes: (outcomeRows ?? [])
-        .filter((row) => inWeek.has(row.episode_id))
-        .sort((a, b) => episodeOrder.get(a.episode_id)! - episodeOrder.get(b.episode_id)!)
-        .map((row) => ({
-          coupleId: row.couple_id,
-          outcome: row.outcome as Outcome,
-          bonusPoints: Number(row.bonus_points),
-        })),
+      ...weekResults(week.episodes.map((episode) => episode.id), danceRows ?? [], outcomeRows ?? []),
       inJeopardyCoupleIds: [
         ...new Set((jeopardyRows ?? []).filter((row) => inWeek.has(row.episode_id)).map((row) => row.couple_id)),
       ],
