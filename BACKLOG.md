@@ -135,7 +135,7 @@ Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Hom
 
 ## Standings Score History
 
-Shipped: per-manager Score History, an inline hop under the leaderboard that a leaderboard row also opens, plus condensed Dance Cards on Standings (see CLAUDE.md). Design pack: `docs/design/standings-score-history/`. Earlier "points breakdown" concepts (rules sheets, expandable rows, weekly ledger) were rejected.
+Shipped: per-manager Score History that expands in place under each leaderboard row, plus a redesigned Standings tab with a Dance Card Rosters section (see CLAUDE.md). Design pack: `docs/design/standings-score-history/`. Earlier "points breakdown" concepts (rules sheets, expandable rows, weekly ledger) were rejected.
 
 - **Container:** each leaderboard row expands in place into a compact fixed-height (`h-72`) scrolling panel; several can be open at once. Kylie is also sending mockups for a clearer tap affordance on leaderboard rows.
 - Live check still owed on real published data (after republishing Week 1 so its Grand Finale credits refresh): own + peer panels, filters, sticky totals vs Standings, Spoiler-Free clamping, a weight ≠ 1 league.
