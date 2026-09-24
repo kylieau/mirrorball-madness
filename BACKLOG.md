@@ -122,7 +122,7 @@ The Add to Home Screen / enable-notifications *how-to* is a top-level Settings r
 
 ## Account-nav follow-up edits
 
-Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Home Screen, Appearance (coming soon), Account & data. Site Admin and Sign out stay below. No further account-nav edits currently queued.
+Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Home Screen, Account & data. Site Admin and Sign out stay below. No further account-nav edits currently queued.
 
 ## Scoring calibration follow-ups
 
