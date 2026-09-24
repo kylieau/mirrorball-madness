@@ -154,7 +154,7 @@ Shipped: per-manager Score History that expands in place under each leaderboard 
 
 ## Home curtain banner follow-ups
 
-Shipped (uncommitted as of the last handoff): new state machine, West overlays, relative "Airs", `episodes.duration_minutes`. See CLAUDE.md. Still worth deciding or checking:
+Shipped: new state machine, West overlays, relative "Airs", `episodes.duration_minutes`. See CLAUDE.md. Still worth deciding or checking:
 
 - **Multi-night lock wording**: Curtain Call locks per week (first night minus lock hours), so Night 2 reads "Picks open · Picks locked · Airs Night 2" rather than plain "Picks open". Flip it if that reads wrong.
 - **Live check** on a real episode night: the lock, on-air, West-feed and 10pm PT transitions, and the Results in hold, have only unit tests behind them.
