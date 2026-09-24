@@ -1,3 +1,4 @@
+import { roundPoints } from "./format-points";
 import { wasInCastForWeek } from "./episode-cast";
 import { isOpenRosterStatus } from "./recast-framing";
 import { spoilerSafeCoupleStatus } from "./spoiler-safe-couple-status";
@@ -16,7 +17,20 @@ export function computeCoupleWeeklyPoints(
   judgesScoreMultiplier: number,
   categoryWeight: number
 ): number {
-  return Math.round(totalScore * judgesScoreMultiplier * categoryWeight);
+  return roundPoints(totalScore * judgesScoreMultiplier * categoryWeight);
+}
+
+// Survival, finale placement and per-couple bonus points aren't part of any
+// couple's judges' line, so they're what's left of the week's weighted roster
+// total after the couples' judges' points are taken out. Reading it as a
+// remainder keeps the card's lines summing to the week's total exactly.
+export function weeklyBonusPoints(
+  weekRosterPoints: number,
+  categoryWeight: number,
+  coupleWeeklyPoints: number[]
+): number {
+  const judgesPoints = coupleWeeklyPoints.reduce((sum, p) => sum + p, 0);
+  return Math.max(0, roundPoints(weekRosterPoints * categoryWeight - judgesPoints));
 }
 
 // Deliberately excludes survival/podium bonuses, which are manager-level

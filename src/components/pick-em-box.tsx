@@ -89,9 +89,9 @@ export function PickEmBox({
   episode: { id: string; week_number: number; theme: string | null };
   lockAt: string | null;
   activeCouples: Couple[];
-  // Season-wide cast size — for the "N pts · M couples left" preview, not
-  // itself spoiler-sensitive (cast size is public). couplesRemaining for
-  // that preview reuses activeCouples.length below: the same spoiler-safe
+  // Season-wide cast size — for scaling the payout preview, not itself
+  // spoiler-sensitive (cast size is public). couplesRemaining for that
+  // preview reuses activeCouples.length below: the same spoiler-safe
   // count already driving which couples this picker offers.
   totalCouples: number;
   eliminationPredictionPoints: number;
@@ -199,17 +199,15 @@ export function PickEmBox({
   const topScorerExact = curtainCallPayout(topScorerPredictionPoints, couplesRemaining, totalCouples);
   const eliminationPreview = curtainCallPreviewCopy({
     kind: "elimination",
-    exactDisplayPoints: Math.round(eliminationExact),
+    exactDisplayPoints: eliminationExact,
     nearMissPoints: curtainCallNearMissPoints(eliminationExact),
     nearMissEnabled,
-    couplesRemaining,
   });
   const topScorerPreview = curtainCallPreviewCopy({
     kind: "top_scorer",
-    exactDisplayPoints: Math.round(topScorerExact),
+    exactDisplayPoints: topScorerExact,
     nearMissPoints: curtainCallNearMissPoints(topScorerExact),
     nearMissEnabled,
-    couplesRemaining,
   });
   const pickSources = otherLeagues.filter((l) => l.pick);
 

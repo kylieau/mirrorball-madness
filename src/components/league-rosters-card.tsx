@@ -1,3 +1,4 @@
+import { formatPoints, formatSignedPoints } from "@/lib/format-points";
 import { cn } from "cn";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CoupleName } from "@/components/couple-name";
@@ -25,12 +26,12 @@ function CoupleLine({ couple }: { couple: RosterCouple }) {
             {couple.points.week !== undefined ? (
               <>
                 <span className="font-heading font-semibold">
-                  {couple.points.week > 0 ? `+${couple.points.week}` : "—"}
+                  {couple.points.week > 0 ? formatSignedPoints(couple.points.week) : "—"}
                 </span>
-                <span className="block text-[10px] text-muted-foreground">{couple.points.total} total</span>
+                <span className="block text-[10px] text-muted-foreground">{formatPoints(couple.points.total)} total</span>
               </>
             ) : (
-              <span className="font-heading font-semibold">{couple.points.total} pts</span>
+              <span className="font-heading font-semibold">{formatPoints(couple.points.total)} pts</span>
             )}
           </span>
         )}
@@ -43,16 +44,14 @@ export function LeagueRostersCard({
   title = "Dance Cards",
   description,
   groups,
-  unrostered,
+  unrostered = [],
   unrosteredLabel,
-  note,
 }: {
   title?: string;
   description: string;
   groups: RosterGroup[];
-  unrostered: RosterCouple[];
-  unrosteredLabel: string;
-  note?: string;
+  unrostered?: RosterCouple[];
+  unrosteredLabel?: string;
 }) {
   return (
     <Card>
@@ -72,7 +71,7 @@ export function LeagueRostersCard({
             ))}
           </div>
         ))}
-        {unrostered.length > 0 && (
+        {unrosteredLabel && unrostered.length > 0 && (
           <div className="flex flex-col gap-1.5 rounded-2xl border border-dashed border-border px-3.5 py-3">
             <p className="text-sm font-semibold text-muted-foreground">{unrosteredLabel}</p>
             {unrostered.map((c) => (
@@ -80,7 +79,6 @@ export function LeagueRostersCard({
             ))}
           </div>
         )}
-        {note && <p className="text-xs text-muted-foreground">{note}</p>}
       </CardContent>
     </Card>
   );

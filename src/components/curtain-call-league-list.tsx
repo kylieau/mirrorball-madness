@@ -1,5 +1,7 @@
 "use client";
 
+import { LeagueGlanceHop } from "@/components/league-glance-hop";
+import { formatPoints, formatSignedPoints } from "@/lib/format-points";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CoupleName } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
@@ -18,12 +20,12 @@ export type CurtainCallLeagueEntry = {
 
 function PickPoints({ pick }: { pick: PickMatch }) {
   if (pick.verdict === "exact") {
-    return <span className="font-heading font-semibold text-emerald-text">✓ +{pick.points}</span>;
+    return <span className="font-heading font-semibold text-emerald-text">✓ +{formatPoints(pick.points)}</span>;
   }
   if (pick.verdict === "near_miss") {
     return (
       <span className="font-heading font-semibold text-amber-800 dark:text-amber-300">
-        In Jeopardy +{pick.points}
+        In Jeopardy +{formatPoints(pick.points)}
       </span>
     );
   }
@@ -63,8 +65,7 @@ export function CurtainCallLeagueList({
   }
 
   return (
-    <div className="mt-2 flex flex-col gap-1 border-t border-border pt-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">League at a Glance</p>
+    <LeagueGlanceHop>
       <Accordion multiple value={expanded} onValueChange={setExpanded}>
         {entries.map((e) => (
           <AccordionItem key={e.managerId} value={e.managerId}>
@@ -76,7 +77,7 @@ export function CurtainCallLeagueList({
                 <span>{e.displayName}</span>
                 <span className="ml-auto pr-2 text-xs font-normal text-muted-foreground">
                   {e.comparison
-                    ? `${e.comparison.predictionPoints >= 0 ? "+" : ""}${e.comparison.predictionPoints} pts`
+                    ? `${formatSignedPoints(e.comparison.predictionPoints)} pts`
                     : "Awaiting results"}
                 </span>
               </span>
@@ -104,6 +105,6 @@ export function CurtainCallLeagueList({
           </AccordionItem>
         ))}
       </Accordion>
-    </div>
+    </LeagueGlanceHop>
   );
 }

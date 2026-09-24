@@ -3,14 +3,16 @@ import {
   clampRosterCoupleForWeek,
   computeCoupleWeeklyPoints,
   deriveCoupleWeeklyTag,
+  weeklyBonusPoints,
 } from "./roster-weekly-points";
 
 describe("computeCoupleWeeklyPoints", () => {
-  it("applies the judges' score multiplier and the category weight, rounded", () => {
+  it("applies the judges' score multiplier and the category weight, to two decimals", () => {
     expect(computeCoupleWeeklyPoints(24, 1, 1)).toBe(24);
     expect(computeCoupleWeeklyPoints(24, 1.5, 1)).toBe(36);
     expect(computeCoupleWeeklyPoints(24, 1, 1.5)).toBe(36);
-    expect(computeCoupleWeeklyPoints(23, 1.1, 1)).toBe(25); // 25.3 rounds to 25
+    expect(computeCoupleWeeklyPoints(23, 1.1, 1)).toBe(25.3);
+    expect(computeCoupleWeeklyPoints(23, 1.111, 1)).toBe(25.55); // 25.553 rounds to 25.55
   });
 
   it("handles a zero score", () => {
@@ -77,5 +79,17 @@ describe("clampRosterCoupleForWeek", () => {
         }
       )
     ).toEqual({ tag: "safe", weeklyPoints: 22 });
+  });
+});
+
+describe("weeklyBonusPoints", () => {
+  it("is the weighted week total minus the couples' judges' points", () => {
+    // 9.31 raw roster points x2 weight = 18.62; couples' judges' points 6.80 + 5.82
+    expect(weeklyBonusPoints(9.31, 2, [6.8, 5.82])).toBe(6);
+  });
+
+  it("is zero when nothing beyond judges' points was earned, and never negative", () => {
+    expect(weeklyBonusPoints(0, 2, [])).toBe(0);
+    expect(weeklyBonusPoints(1, 1, [3])).toBe(0);
   });
 });

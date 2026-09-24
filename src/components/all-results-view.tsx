@@ -15,6 +15,8 @@ import {
   type EpisodeResultsStatus,
 } from "@/lib/results-status";
 import type { DraftState } from "@/lib/results-draft";
+import { formatPoints } from "@/lib/format-points";
+import { isUnscheduledPlaceholderRow } from "@/lib/episode-participants";
 import { formatEpisodeCasual, formatEpisodeCasualWithTheme, formatEpisodeLabel } from "@/lib/format-week";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -75,6 +77,7 @@ export function AllResultsView({
   roundTypes,
   roundTypesByEpisode,
   inJeopardyByEpisode,
+  participantsByEpisode,
   spoilerFreeMode,
   allowedWeekIds,
 }: {
@@ -100,6 +103,7 @@ export function AllResultsView({
   roundTypes: Named[];
   roundTypesByEpisode: Record<string, string[]>;
   inJeopardyByEpisode: Record<string, string[]>;
+  participantsByEpisode: Record<string, string[]>;
   // Your own spoiler_free_mode + last_watched_week, applied here the same
   // way as This Week — Scores' View tier being open to any signed-in user
   // is about access, not about defeating your own spoiler preference.
@@ -155,10 +159,23 @@ export function AllResultsView({
     if (r.saved_by_judges) notes.push("judges' save");
     if (r.had_immunity) notes.push("immunity");
     if (r.bonus_points) {
-      notes.push(`+${r.bonus_points} bonus${r.bonus_note ? ` (${r.bonus_note})` : ""}`);
+      notes.push(`+${formatPoints(r.bonus_points)} bonus${r.bonus_note ? ` (${r.bonus_note})` : ""}`);
     }
     return notes.join(", ");
   }
+
+  // Nights the schedule didn't put a couple on (a split-broadcast premiere)
+  // never appear for that couple; withdrawals and other real events still do.
+  const visibleEpisodeResults = episodeResults.filter(
+    (r) =>
+      !isUnscheduledPlaceholderRow({
+        participantCoupleIds: participantsByEpisode[r.episode_id],
+        coupleId: r.couple_id,
+        outcome: r.outcome,
+        hasDances: (danceScoresByEpisodeCouple.get(`${r.episode_id}:${r.couple_id}`) ?? []).length > 0,
+        hasNotes: noteLabel(r) !== "",
+      })
+  );
 
   function DanceBreakdownRow({
     dance,
@@ -216,7 +233,7 @@ export function AllResultsView({
     .sort((a, b) => b.episode_number - a.episode_number);
 
   function episodeResultsRows(ep: EpisodeWithStatus) {
-    return episodeResults
+    return visibleEpisodeResults
       .filter((r) => r.episode_id === ep.id)
       .map((r) => ({
         ...r,
@@ -336,7 +353,7 @@ export function AllResultsView({
     return groupEpisodes[0]?.resultsStatus ?? "draft";
   }
 
-  const coupleIdsWithResults = new Set(episodeResults.map((r) => r.couple_id));
+  const coupleIdsWithResults = new Set(visibleEpisodeResults.map((r) => r.couple_id));
   const couplesWithHistory = couples
     .filter((c) => coupleIdsWithResults.has(c.id))
     .sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
@@ -352,7 +369,7 @@ export function AllResultsView({
               const status = groupStatus(weekEpisodes);
               const locked = spoilerFreeMode && status === "published" && !allowedWeekIds.has(week.id);
               const coupleCount = weekEpisodes.reduce((sum, ep) => {
-                const published = episodeResults.filter((r) => r.episode_id === ep.id).length;
+                const published = visibleEpisodeResults.filter((r) => r.episode_id === ep.id).length;
                 return sum + (published > 0 ? published : (draftsByEpisode[ep.id]?.entries.length ?? 0));
               }, 0);
               return (
@@ -431,7 +448,7 @@ export function AllResultsView({
         <p className="text-sm text-muted-foreground">No results entered yet.</p>
       ) : (
         couplesWithHistory.map((c) => {
-          const history = episodeResults
+          const history = visibleEpisodeResults
             .filter((r) => r.couple_id === c.id)
             .map((r) => {
               const dances = danceScoresByEpisodeCouple.get(`${r.episode_id}:${c.id}`) ?? [];

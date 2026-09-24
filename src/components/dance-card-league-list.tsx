@@ -1,5 +1,7 @@
 "use client";
 
+import { LeagueGlanceHop } from "@/components/league-glance-hop";
+import { formatSignedPoints } from "@/lib/format-points";
 import { cn } from "cn";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CoupleName } from "@/components/couple-name";
@@ -10,6 +12,7 @@ export type DanceCardLeagueEntry = {
   managerId: string;
   displayName: string;
   weekPoints: number;
+  bonusPoints: number;
   couples: (CoupleNameParts & { coupleId: string; weeklyPoints: number; tag: "safe" | "eliminated" })[];
 };
 
@@ -31,8 +34,7 @@ export function DanceCardLeagueList({
   if (entries.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1 border-t border-border pt-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">League at a Glance</p>
+    <LeagueGlanceHop>
       <Accordion multiple value={expanded} onValueChange={setExpanded}>
         {entries.map((e) => (
           <AccordionItem key={e.managerId} value={e.managerId}>
@@ -43,8 +45,7 @@ export function DanceCardLeagueList({
                 </span>
                 <span>{e.displayName}</span>
                 <span className="ml-auto pr-2 text-xs font-normal text-muted-foreground">
-                  {e.weekPoints >= 0 ? "+" : ""}
-                  {e.weekPoints} pts
+                  {formatSignedPoints(e.weekPoints)} pts
                 </span>
               </span>
             </AccordionTrigger>
@@ -59,16 +60,21 @@ export function DanceCardLeagueList({
                       <CoupleName celebrity={c.celebrity} pro={c.pro} />
                     </span>
                     <span className="font-heading font-semibold">
-                      {c.weeklyPoints >= 0 ? "+" : ""}
-                      {c.weeklyPoints}
+                      {formatSignedPoints(c.weeklyPoints)}
                     </span>
                   </div>
                 ))}
+                {e.bonusPoints > 0 && (
+                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <span>Survival &amp; Bonuses</span>
+                    <span className="font-heading font-semibold">{formatSignedPoints(e.bonusPoints)}</span>
+                  </div>
+                )}
               </div>
             </AccordionContent>
           </AccordionItem>
         ))}
       </Accordion>
-    </div>
+    </LeagueGlanceHop>
   );
 }

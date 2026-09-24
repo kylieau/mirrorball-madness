@@ -17,6 +17,10 @@ describe("distanceCreditTable", () => {
     ]);
   });
 
+  it("rounds each row to two decimals", () => {
+    expect(distanceCreditTable(20.7, 5.2).map((r) => r.points)).toEqual([20.7, 15.5, 10.3, 5.1, 0]);
+  });
+
   it("floors at 0 when the penalty overshoots", () => {
     expect(distanceCreditTable(100, 70).map((r) => r.points)).toEqual([100, 30, 0]);
   });
@@ -49,8 +53,20 @@ describe("explainGrandFinaleMethod", () => {
 
   it("explains distance-based with worked examples and the zero point", () => {
     const text = explainGrandFinaleMethod({ ...base, method: "distance_based" });
-    expect(text).toContain("1 off → 150");
-    expect(text).toContain("0 at 4 off");
+    expect(text).toContain("1 off → 150.00");
+    expect(text).toContain("down to 0.00 at 4 off");
+  });
+
+  it("shows every point value to two decimals without float noise", () => {
+    const text = explainGrandFinaleMethod({
+      ...base,
+      method: "distance_based",
+      pointsPerCorrect: 20.7,
+      distancePenalty: 5.2,
+    });
+    expect(text).toBe(
+      "Earn 20.70 pts for an exact spot, minus 5.20 for each spot you're off (exact → 20.70, 1 off → 15.50, 2 off → 10.30, 3 off → 5.10), down to 0.00 at 4 off."
+    );
   });
 
   it("explains bands with places, not positions", () => {

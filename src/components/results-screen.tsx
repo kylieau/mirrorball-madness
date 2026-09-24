@@ -209,6 +209,7 @@ export function ResultsScreen({
           roundTypes={roundTypes}
           roundTypesByEpisode={roundTypesByEpisode}
           inJeopardyByEpisode={inJeopardyByEpisode}
+          participantsByEpisode={participantsByEpisode}
           spoilerFreeMode={spoilerFreeMode}
           allowedWeekIds={new Set(allowedWeekIds)}
         />

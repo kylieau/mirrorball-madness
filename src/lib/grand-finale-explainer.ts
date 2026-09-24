@@ -1,3 +1,4 @@
+import { formatPoints, roundPoints } from "./format-points";
 import { bandPayoutFraction, type GrandFinaleMethod, type TierPayStyle } from "./scoring";
 
 export type { GrandFinaleMethod, TierPayStyle };
@@ -29,7 +30,7 @@ export type DistanceCreditRow = { off: number; points: number };
 export function distanceCreditTable(pointsPerCorrect: number, penalty: number): DistanceCreditRow[] {
   const rows: DistanceCreditRow[] = [];
   for (let off = 0; off <= 12; off++) {
-    const points = Math.max(0, pointsPerCorrect - off * penalty);
+    const points = roundPoints(Math.max(0, pointsPerCorrect - off * penalty));
     rows.push({ off, points });
     if (points === 0 || penalty <= 0) break;
   }
@@ -74,18 +75,18 @@ export function explainGrandFinaleMethod({
 }): string {
   switch (method) {
     case "exact_position":
-      return `Earn ${pointsPerCorrect} pts for each couple you place in exactly the right spot. Nothing for near misses.`;
+      return `Earn ${formatPoints(pointsPerCorrect)} pts for each couple you place in exactly the right spot. Nothing for near misses.`;
     case "distance_based": {
       const penalty = distancePenalty ?? 0;
       if (penalty <= 0) {
-        return `Earn ${pointsPerCorrect} pts for every couple, however far off you are.`;
+        return `Earn ${formatPoints(pointsPerCorrect)} pts for every couple, however far off you are.`;
       }
       const examples = distanceCreditTable(pointsPerCorrect, penalty)
         .slice(0, 4)
-        .map((r) => `${r.off === 0 ? "exact" : `${r.off} off`} → ${r.points}`)
+        .map((r) => `${r.off === 0 ? "exact" : `${r.off} off`} → ${formatPoints(r.points)}`)
         .join(", ");
       const zeroAt = Math.ceil(pointsPerCorrect / penalty);
-      return `Earn ${pointsPerCorrect} pts for an exact spot, minus ${penalty} for each spot you're off (${examples}), down to 0 at ${zeroAt} off.`;
+      return `Earn ${formatPoints(pointsPerCorrect)} pts for an exact spot, minus ${formatPoints(penalty)} for each spot you're off (${examples}), down to ${formatPoints(0)} at ${zeroAt} off.`;
     }
     case "band_tier": {
       const width = Math.max(1, tierSize ?? 1);
@@ -93,9 +94,9 @@ export function explainGrandFinaleMethod({
       const preview = bands.map((b) => `${placeRange(b)}${tierPayStyle === "graded" ? ` (${b.fraction * 100}%)` : ""}`).join(", ");
       const pay =
         tierPayStyle === "graded"
-          ? `Lower bands pay less: 75%, 50%, then 25% of ${pointsPerCorrect} pts.`
+          ? `Lower bands pay less: 75%, 50%, then 25% of ${formatPoints(pointsPerCorrect)} pts.`
           : `Every band pays the same.`;
-      return `The cast is split into bands of ${width} by finishing place: ${preview}. Earn ${pointsPerCorrect} pts for each couple you place in its correct band — order within a band doesn't matter. ${pay}`;
+      return `The cast is split into bands of ${width} by finishing place: ${preview}. Earn ${formatPoints(pointsPerCorrect)} pts for each couple you place in its correct band — order within a band doesn't matter. ${pay}`;
     }
   }
 }

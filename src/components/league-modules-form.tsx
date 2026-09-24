@@ -1,5 +1,6 @@
 "use client";
 
+import { formatPoints } from "@/lib/format-points";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -91,6 +92,9 @@ type League = {
 };
 
 type SeasonEpisode = { week_number: number; theme: string | null; airs_at: string };
+
+const CURTAIN_CALL_PAYOUT_NOTE =
+  "Each week's payout scales with how many couples are still in the running: full value at the start of the season, shrinking as couples are eliminated.";
 
 const METHOD_ITEMS: Record<ScoringMethod, string> = {
   exact_position: "Exact Position",
@@ -460,10 +464,11 @@ export function LeagueModulesForm({
               <CardDescription>Weekly elimination and top-scorer picks.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col">
-              <SettingRow label="Elimination Prediction Points" value={eliminationPredictionPoints} />
-              <SettingRow label="Top Scorer Prediction Points" value={topScorerPredictionPoints} />
+              <SettingRow label="Elimination Prediction Points" value={formatPoints(eliminationPredictionPoints)} />
+              <SettingRow label="Top Scorer Prediction Points" value={formatPoints(topScorerPredictionPoints)} />
               <SettingRow label="In Jeopardy" value={nearMissEnabled ? "On" : "Off"} />
               <SettingRow label="Pick 'Em Lock" value={`${predictionLockHoursBeforeAir}h before air`} />
+              <p className="pt-2 text-sm text-muted-foreground">{CURTAIN_CALL_PAYOUT_NOTE}</p>
             </CardContent>
           </Card>
         )}
@@ -476,12 +481,12 @@ export function LeagueModulesForm({
             </CardHeader>
             <CardContent className="flex flex-col">
               <SettingRow label="Judges' Score Multiplier" value={judgesScoreMultiplier.toFixed(2)} />
-              <SettingRow label="Survival Points" value={survivalPoints} />
-              <SettingRow label="1st Place Bonus" value={firstPlacePoints} />
-              <SettingRow label="2nd Place Bonus" value={secondPlacePoints} />
-              <SettingRow label="3rd Place Bonus" value={thirdPlacePoints} />
-              <SettingRow label="4th Place Bonus" value={fourthPlacePoints} />
-              <SettingRow label="5th Place Bonus" value={fifthPlacePoints} />
+              <SettingRow label="Survival Points" value={formatPoints(survivalPoints)} />
+              <SettingRow label="1st Place Bonus" value={formatPoints(firstPlacePoints)} />
+              <SettingRow label="2nd Place Bonus" value={formatPoints(secondPlacePoints)} />
+              <SettingRow label="3rd Place Bonus" value={formatPoints(thirdPlacePoints)} />
+              <SettingRow label="4th Place Bonus" value={formatPoints(fourthPlacePoints)} />
+              <SettingRow label="5th Place Bonus" value={formatPoints(fifthPlacePoints)} />
               <SettingRow label="Recast Mode" value={WAIVER_MODE_ITEMS[waiverMode]} />
               {waiverMode === "waivers" && (
                 <SettingRow label="Recast Method" value={WAIVER_CLAIM_METHOD_ITEMS[waiverClaimMethod]} />
@@ -506,10 +511,10 @@ export function LeagueModulesForm({
                 label="Deadline"
                 value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}
               />
-              <SettingRow label="Points per Correctly-Placed Couple" value={bonusPicksPointsPerCorrect} />
+              <SettingRow label="Points per Correctly-Placed Couple" value={formatPoints(bonusPicksPointsPerCorrect)} />
               <SettingRow label="Scoring Method" value={METHOD_ITEMS[bonusMethod]} />
               {bonusMethod === "distance_based" && (
-                <SettingRow label="Points Lost per Spot Off" value={bonusDistancePenalty} />
+                <SettingRow label="Points Lost per Spot Off" value={formatPoints(bonusDistancePenalty)} />
               )}
               {bonusMethod === "band_tier" && (
                 <>
@@ -727,6 +732,7 @@ export function LeagueModulesForm({
                 />
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">{CURTAIN_CALL_PAYOUT_NOTE}</p>
           </CardContent>
         </Card>
       )}

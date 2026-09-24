@@ -1,3 +1,4 @@
+import { formatPoints } from "@/lib/format-points";
 import { SCORING_MODULES } from "@/lib/scoring-modules";
 
 type MemberBreakdown = {
@@ -40,14 +41,17 @@ export function StandingsModuleBreakdown({
         {members.map((m) => (
           <div key={m.managerId} className="contents">
             <span className="border-t border-border py-2 font-medium">{m.displayName}</span>
-            {columns.map((c) => (
-              <span
-                key={c.key}
-                className="border-t border-border py-2 text-right font-semibold text-foreground"
-              >
-                {m[c.key] ?? "—"}
-              </span>
-            ))}
+            {columns.map((c) => {
+              const points = m[c.key];
+              return (
+                <span
+                  key={c.key}
+                  className="border-t border-border py-2 text-right font-semibold text-foreground"
+                >
+                  {points === null ? "—" : formatPoints(points)}
+                </span>
+              );
+            })}
           </div>
         ))}
       </div>

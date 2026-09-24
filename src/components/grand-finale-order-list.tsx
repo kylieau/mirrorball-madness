@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { formatPoints, roundPoints } from "@/lib/format-points";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronDownIcon } from "lucide-react";
 import { cn } from "cn";
 import { coupleNameNode } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
@@ -83,7 +85,7 @@ export function PointsTag({
   if (!couple) return null;
   const range = context.positionRanges.get(couple.id);
   if (range) {
-    const points = Math.round(
+    const points = roundPoints(
       grandFinalePredictionPoints({
         ...scoring,
         totalCouples,
@@ -99,12 +101,12 @@ export function PointsTag({
           points > 0 ? "bg-emerald/20 text-emerald-text" : "bg-destructive/15 text-destructive"
         )}
       >
-        +{points} pts
+        +{formatPoints(points)} pts
       </span>
     );
   }
   if (couple.status === "eliminated" || couple.status === "withdrawn") return null;
-  const bestCase = Math.round(
+  const bestCase = roundPoints(
     grandFinaleBestCasePoints({
       ...scoring,
       totalCouples,
@@ -114,7 +116,7 @@ export function PointsTag({
   );
   return (
     <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-      up to {bestCase} pts
+      up to {formatPoints(bestCase)} pts
     </span>
   );
 }
@@ -130,8 +132,21 @@ export function GrandFinaleScoringExplainer({
   scoring: GrandFinaleScoring;
   totalCouples: number;
 }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <p className="text-xs text-muted-foreground">{explainGrandFinaleMethod({ ...scoring, totalCouples })}</p>
+    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 self-start font-medium"
+      >
+        How Points Work
+        <ChevronDownIcon className={cn("size-3.5 shrink-0", open && "rotate-180")} />
+      </button>
+      {open && <p>{explainGrandFinaleMethod({ ...scoring, totalCouples })}</p>}
+    </div>
   );
 }
 

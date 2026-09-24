@@ -1,3 +1,5 @@
+import { roundPoints } from "./format-points";
+
 export type RosterSlotPeriod = {
   managerId: string;
   coupleId: string;
@@ -44,7 +46,7 @@ export function judgePointsThroughWeek({
       totalRaw += row.totalScore;
       if (row.weekNumber === week) weekRaw += row.totalScore;
     }
-    points.set(slot.coupleId, { week: Math.round(weekRaw * scale), total: Math.round(totalRaw * scale) });
+    points.set(slot.coupleId, { week: roundPoints(weekRaw * scale), total: roundPoints(totalRaw * scale) });
   }
 
   return points;

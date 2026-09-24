@@ -1,3 +1,5 @@
+import { roundPoints, formatPoints } from "./format-points";
+
 export type ScoringSettings = {
   judgesScoreMultiplier: number;
   survivalPoints: number;
@@ -137,10 +139,10 @@ export const CURTAIN_CALL_NEAR_MISS_FRACTION = 0.25;
 
 export type CurtainCallVerdict = "exact" | "near_miss" | "miss";
 
-// Whole points. Floors the unrounded exact payout (curtainCallPayout), not a
-// rounded display value — 15.5 × 0.25 is 3, not 4.
+// Two-decimal points, taken from the unrounded exact payout (curtainCallPayout)
+// so the near-miss figure never compounds a rounding step.
 export function curtainCallNearMissPoints(exactPayout: number): number {
-  return Math.floor(exactPayout * CURTAIN_CALL_NEAR_MISS_FRACTION);
+  return roundPoints(exactPayout * CURTAIN_CALL_NEAR_MISS_FRACTION);
 }
 
 export function couplesRemainingAtWeek(
@@ -195,7 +197,7 @@ export function resolveCurtainCallGuess(
   exactPayout: number,
   nearMissEnabled: boolean
 ): { verdict: CurtainCallVerdict; points: number } {
-  if (verdict === "exact") return { verdict: "exact", points: Math.round(exactPayout) };
+  if (verdict === "exact") return { verdict: "exact", points: roundPoints(exactPayout) };
   if (verdict === "near_miss" && nearMissEnabled) {
     return { verdict: "near_miss", points: curtainCallNearMissPoints(exactPayout) };
   }
@@ -207,19 +209,16 @@ export function curtainCallPreviewCopy({
   exactDisplayPoints,
   nearMissPoints,
   nearMissEnabled,
-  couplesRemaining,
 }: {
   kind: "elimination" | "top_scorer";
   exactDisplayPoints: number;
   nearMissPoints: number;
   nearMissEnabled: boolean;
-  couplesRemaining: number;
 }): string {
   const exactLabel = kind === "elimination" ? "Correct elimination" : "Correct top scorer";
   const nearClause = kind === "elimination" ? "if In Jeopardy" : "if within 1 of the high";
-  const couplesLeft = `${couplesRemaining} couple${couplesRemaining === 1 ? "" : "s"} left`;
-  const near = nearMissEnabled ? ` · ${nearMissPoints} pts ${nearClause}` : "";
-  return `${exactLabel}: ${exactDisplayPoints} pts${near} · ${couplesLeft}`;
+  const near = nearMissEnabled ? ` · ${formatPoints(nearMissPoints)} pts ${nearClause}` : "";
+  return `${exactLabel}: ${formatPoints(exactDisplayPoints)} pts${near}`;
 }
 
 // Pure and DB-free by design: the caller is responsible for fetching
@@ -323,15 +322,15 @@ export function computeWeeklyScores({
   ]);
 
   return [...managerIds].map((managerId) => {
-    const rosterPoints = Math.round(rosterPointsByManager.get(managerId) ?? 0);
-    const predictionPoints = Math.round(predictionPointsByManager.get(managerId) ?? 0);
-    const grandFinalePoints = Math.round(grandFinalePointsByManager[managerId] ?? 0);
+    const rosterPoints = roundPoints(rosterPointsByManager.get(managerId) ?? 0);
+    const predictionPoints = roundPoints(predictionPointsByManager.get(managerId) ?? 0);
+    const grandFinalePoints = roundPoints(grandFinalePointsByManager[managerId] ?? 0);
     return {
       managerId,
       rosterPoints,
       predictionPoints,
       grandFinalePoints,
-      totalPoints: Math.round(
+      totalPoints: roundPoints(
         rosterPoints * categoryWeights.judges +
           predictionPoints * categoryWeights.eliminations +
           grandFinalePoints * categoryWeights.bonus
@@ -512,7 +511,7 @@ export function computeGrandFinalePoints({
   }
 
   for (const managerId in pointsByManager) {
-    pointsByManager[managerId] = Math.round(pointsByManager[managerId]);
+    pointsByManager[managerId] = roundPoints(pointsByManager[managerId]);
   }
 
   return pointsByManager;

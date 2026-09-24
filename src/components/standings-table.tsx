@@ -1,3 +1,4 @@
+import { formatPoints } from "@/lib/format-points";
 import { cn } from "cn";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RankBadge } from "@/components/rank-badge";
@@ -34,7 +35,7 @@ export function StandingsTable({
       <div className="flex items-center gap-3.5">
         <RankBadge rank={viewerRank} />
         <div>
-          <p className="font-heading text-base font-semibold">{viewerTotalPoints} pts</p>
+          <p className="font-heading text-base font-semibold">{formatPoints(viewerTotalPoints)} pts</p>
           <p className="text-sm text-muted-foreground">of {standings.length} players</p>
         </div>
       </div>
@@ -43,7 +44,7 @@ export function StandingsTable({
         <div className="mt-4 flex gap-2">
           {categoryBreakdown.map((c) => (
             <div key={c.label} className="flex-1 rounded-xl border border-border bg-card px-2 py-2.5 text-center">
-              <p className="font-heading text-base font-semibold">{c.points}</p>
+              <p className="font-heading text-base font-semibold">{formatPoints(c.points)}</p>
               <p className="mt-0.5 text-[10px] text-muted-foreground">{c.label}</p>
             </div>
           ))}
@@ -93,11 +94,11 @@ export function StandingsTable({
                 {row.displayName}
                 {isYou && " (you)"}
                 <span className="block text-xs font-normal text-muted-foreground">
-                  {row.totalPoints} pts
+                  {formatPoints(row.totalPoints)} pts
                 </span>
               </span>
               <span className="flex items-center gap-1 text-sm font-semibold">
-                {row.totalPoints}
+                {formatPoints(row.totalPoints)}
                 {row.change === "up" && <span className="text-emerald-text">▲</span>}
                 {row.change === "down" && <span className="text-danger-text">▼</span>}
               </span>

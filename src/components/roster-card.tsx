@@ -1,3 +1,4 @@
+import { formatPoints, formatSignedPoints } from "@/lib/format-points";
 import type { ReactNode } from "react";
 import { cn } from "cn";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,11 +26,13 @@ const TAG_INFO: Record<RosterWeeklyTag, { label: string; className: string }> = 
 export function RosterCard({
   couples,
   totalPoints,
+  weekBonusPoints = 0,
   carousel,
   leagueSection,
 }: {
   couples: RosterCouple[];
   totalPoints: number;
+  weekBonusPoints?: number;
   carousel?: ReactNode;
   leagueSection?: ReactNode;
 }) {
@@ -37,7 +40,7 @@ export function RosterCard({
     <Card>
       <CardHeader>
         <CardTitle>Your Fantasy Roster</CardTitle>
-        <CardDescription>{totalPoints} points this season</CardDescription>
+        <CardDescription>{formatPoints(totalPoints)} pts this season</CardDescription>
         {carousel}
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5">
@@ -71,14 +74,19 @@ export function RosterCard({
               </div>
               <div className="shrink-0 text-right text-xs text-muted-foreground">
                 <span className="block font-heading text-base font-semibold text-foreground">
-                  {c.weeklyPoints >= 0 ? "+" : ""}
-                  {c.weeklyPoints}
+                  {formatSignedPoints(c.weeklyPoints)}
                 </span>
-                {c.totalPoints !== undefined ? `${c.totalPoints} total` : "this wk"}
+                {c.totalPoints !== undefined ? `${formatPoints(c.totalPoints)} total` : "this wk"}
               </div>
             </div>
           );
         })}
+        {weekBonusPoints > 0 && (
+          <div className="flex items-center justify-between gap-3 px-3.5 text-xs text-muted-foreground">
+            <span>Survival &amp; Bonuses</span>
+            <span className="font-heading font-semibold">{formatSignedPoints(weekBonusPoints)}</span>
+          </div>
+        )}
         {leagueSection}
       </CardContent>
     </Card>

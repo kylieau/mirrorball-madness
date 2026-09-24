@@ -24,7 +24,7 @@ import { LeagueTabs } from "@/components/league-tabs";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { getStandingMessage } from "@/lib/standings-message";
 import { managerIdForPick, type DraftType } from "@/lib/draft";
-import { clampRosterCoupleForWeek } from "@/lib/roster-weekly-points";
+import { clampRosterCoupleForWeek, weeklyBonusPoints } from "@/lib/roster-weekly-points";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
@@ -37,6 +37,7 @@ import { adjacentThisWeekWeeks, rosterWeekHref } from "@/lib/this-week-carousel"
 import { buildLeagueRosters, orderManagersForRosters } from "@/lib/league-rosters";
 import { judgePointsThroughWeek, slotActiveInWeek } from "@/lib/roster-couple-points";
 import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
+import { roundPoints } from "@/lib/format-points";
 import { formatManagerName } from "@/lib/manager-display";
 import {
   buildCurtainCallWeeks,
@@ -276,17 +277,17 @@ export default async function LeaguePage({
       managerId: s.managerId,
       displayName: s.displayName,
       danceCard: danceCardOn
-        ? Math.round(
+        ? roundPoints(
             (rosterPointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
           )
         : null,
       curtainCall: curtainCallOn
-        ? Math.round(
+        ? roundPoints(
             (predictionPointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.eliminations_category_weight ?? 1)
           )
         : null,
       grandFinale: grandFinaleOn
-        ? Math.round(
+        ? roundPoints(
             (grandFinalePointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.bonus_picks_category_weight ?? 1)
           )
         : null,
@@ -446,19 +447,19 @@ export default async function LeaguePage({
     [
       curtainCallOn && {
         label: scoringModule("curtainCall").name,
-        points: Math.round(
+        points: roundPoints(
           (predictionPointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.eliminations_category_weight ?? 1)
         ),
       },
       danceCardOn && {
         label: scoringModule("danceCard").name,
-        points: Math.round(
+        points: roundPoints(
           (rosterPointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
         ),
       },
       grandFinaleOn && {
         label: scoringModule("grandFinale").name,
-        points: Math.round(
+        points: roundPoints(
           (grandFinalePointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.bonus_picks_category_weight ?? 1)
         ),
       },
@@ -525,6 +526,31 @@ export default async function LeaguePage({
   const yourRosterPoints = yourRosterWeek
     ? judgePointsThroughWeek({ ...judgePointsInputs, slots: yourSlotsForWeek, week: yourRosterWeek.week_number })
     : undefined;
+  const yourRosterWeekBonusPoints = yourRosterWeek
+    ? weeklyBonusPoints(
+        (allScores ?? [])
+          .filter(
+            (row) =>
+              row.manager_id === myTeamId &&
+              groupedWeeks.find((w) => w.id === row.week_id)?.week_number === yourRosterWeek.week_number
+          )
+          .reduce((sum, row) => sum + row.roster_points, 0),
+        judgePointsInputs.categoryWeight,
+        yourSlotsForWeek.map((slot) => {
+          const couple = flatCouplesById.get(slot.coupleId);
+          if (!couple) return 0;
+          return clampRosterCoupleForWeek(
+            { status: couple.status, eliminationWeek: couple.elimination_week },
+            {
+              cutoffWeek: yourRosterWeek.week_number,
+              finaleWeekNumber,
+              weekNumber: yourRosterWeek.week_number,
+              rawWeeklyPoints: yourRosterPoints?.get(slot.coupleId)?.week ?? 0,
+            }
+          ).weeklyPoints;
+        })
+      )
+    : 0;
   const yourRosterWeekEpisodeIds =
     groupedWeeks.find((w) => w.id === yourRosterWeek?.id)?.episodes.map((e) => e.id) ?? [];
   const { data: yourRosterWeekJeopardy } =
@@ -596,10 +622,16 @@ export default async function LeaguePage({
         );
         return [{ ...names, coupleId: slot.coupleId, ...clamped }];
       });
+      const weekRosterPoints = weekPointsByManager.get(m.managerId) ?? 0;
       return {
         managerId: m.managerId,
         displayName: m.displayName,
-        weekPoints: Math.round((weekPointsByManager.get(m.managerId) ?? 0) * categoryWeight),
+        weekPoints: roundPoints(weekRosterPoints * categoryWeight),
+        bonusPoints: weeklyBonusPoints(
+          weekRosterPoints,
+          categoryWeight,
+          couples.map((c) => c.weeklyPoints)
+        ),
         couples,
       };
     });
@@ -955,7 +987,10 @@ export default async function LeaguePage({
                 {rosterCouples.length > 0 && (
                   <RosterCard
                     couples={rosterCouples}
-                    totalPoints={pointsByManager.get(myTeamId) ?? 0}
+                    totalPoints={roundPoints(
+                      (rosterPointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
+                    )}
+                    weekBonusPoints={yourRosterWeekBonusPoints}
                     carousel={
                       yourRosterWeek ? (
                         <EpisodeCarousel
@@ -1052,10 +1087,8 @@ export default async function LeaguePage({
             {leagueRosters && (
               <div id="rosters" className="mt-6 scroll-mt-4">
                 <LeagueRostersCard
-                  description="Where every couple ended up."
-                  unrosteredLabel="Not on a roster"
-                  note="Points are judges' scores only. Survival and placement bonuses count toward manager totals, not couples."
-                  {...leagueRosters}
+                  description="Every roster, couple by couple."
+                  groups={leagueRosters.groups}
                 />
               </div>
             )}

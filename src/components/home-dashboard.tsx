@@ -1,3 +1,4 @@
+import { formatPoints } from "@/lib/format-points";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
@@ -71,7 +72,7 @@ export function HomeDashboard({
               <Link href={`/leagues/${l.id}?tab=standings`} className="flex-1">
                 <p className="font-heading text-sm font-semibold">{l.name}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Rank {l.rank} of {l.totalMembers} · {l.totalPoints} pts
+                  Rank {l.rank} of {l.totalMembers} · {formatPoints(l.totalPoints)} pts
                 </p>
                 <div className="mt-2 flex gap-1.5 text-sm">
                   <span className={l.danceCardOn ? "opacity-100" : "opacity-30"}>🪩</span>

@@ -1,3 +1,4 @@
+import { formatSignedPoints } from "@/lib/format-points";
 import { CoupleName } from "@/components/couple-name";
 import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
 import type { CoupleNameParts } from "@/lib/couple-display";
@@ -168,8 +169,7 @@ export function PastPicksRecap({
       <div className="flex items-baseline justify-between border-t border-border pt-1">
         <span className="text-muted-foreground">Curtain Call</span>
         <span className="font-heading text-base font-semibold">
-          {comparison.predictionPoints >= 0 ? "+" : ""}
-          {comparison.predictionPoints}
+          {formatSignedPoints(comparison.predictionPoints)}
           <span className="ml-1 text-xs font-normal text-muted-foreground">this wk</span>
         </span>
       </div>

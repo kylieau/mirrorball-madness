@@ -170,8 +170,6 @@ export function GrandFinaleBox({
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
           <OtherLeagueSaveSummary results={otherResults} destinations={otherLeagues} />
-          <GrandFinaleScoringExplainer scoring={scoring} totalCouples={totalCouples} />
-
           {isCollapsed ? (
             <div className="flex flex-col gap-2">
               {highlightId ? (

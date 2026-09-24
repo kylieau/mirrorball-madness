@@ -289,7 +289,7 @@ describe("computeWeeklyScores", () => {
     expect(alice.rosterPoints).toBe(30); // 20 dance + 10 survival, unweighted
     expect(alice.predictionPoints).toBe(15); // unweighted
     expect(alice.grandFinalePoints).toBe(10); // unweighted
-    expect(alice.totalPoints).toBe(Math.round(30 * 2 + 15 * 0.5 + 10 * 1)); // 77.5 rounds to 78
+    expect(alice.totalPoints).toBe(77.5); // 30*2 + 15*0.5 + 10*1, kept to two decimals
   });
 
   it("defaults totalPoints to a flat sum when no weights/grand-finale points are passed", () => {
@@ -350,9 +350,9 @@ describe("computeWeeklyScores — couples-remaining scaling", () => {
     });
 
     const alice = result.find((r) => r.managerId === "alice")!;
-    // eliminationPredictionPoints=20 at ratio 0.5 rounds to 10; topScorerPredictionPoints=15
-    // at ratio 0.5 rounds to 8 (7.5 → 8); summed and rounded again is a no-op at 18.
-    expect(alice.predictionPoints).toBe(18);
+    // eliminationPredictionPoints=20 at ratio 0.5 is 10; topScorerPredictionPoints=15
+    // at ratio 0.5 is 7.5; the two-decimal sum is 17.5.
+    expect(alice.predictionPoints).toBe(17.5);
   });
 
   it("scales both double-elimination guesses by the same ratio", () => {
@@ -512,16 +512,16 @@ describe("Curtain Call In Jeopardy", () => {
     finalPlacement: null,
   });
 
-  it("floors 25% of the unrounded exact payout to a whole point", () => {
+  it("takes 25% of the unrounded exact payout, to two decimals", () => {
     expect(curtainCallNearMissPoints(20)).toBe(5);
-    expect(curtainCallNearMissPoints(15)).toBe(3);
-    expect(curtainCallNearMissPoints(10)).toBe(2);
-    // 31 * 5/10 = 15.5; 15.5 * 0.25 = 3.875 → 3, not round-to-4.
-    expect(curtainCallNearMissPoints(curtainCallPayout(31, 5, 10))).toBe(3);
-    expect(curtainCallNearMissPoints(1)).toBe(0);
+    expect(curtainCallNearMissPoints(15)).toBe(3.75);
+    expect(curtainCallNearMissPoints(10)).toBe(2.5);
+    // 31 * 5/10 = 15.5; 15.5 * 0.25 = 3.875 → 3.88.
+    expect(curtainCallNearMissPoints(curtainCallPayout(31, 5, 10))).toBe(3.88);
+    expect(curtainCallNearMissPoints(1)).toBe(0.25);
   });
 
-  it("pays a floored quarter when the elim guess was marked In Jeopardy", () => {
+  it("pays a quarter when the elim guess was marked In Jeopardy", () => {
     const result = computeWeeklyScores({
       scoringSettings: settings,
       rosterSlots: [],
@@ -633,7 +633,7 @@ describe("Curtain Call In Jeopardy", () => {
       ...noScaling,
     });
 
-    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(3);
+    expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(3.75);
     expect(result.find((r) => r.managerId === "bob")!.predictionPoints).toBe(0);
     expect(result.find((r) => r.managerId === "carol")!.predictionPoints).toBe(15);
   });
@@ -680,34 +680,31 @@ describe("Curtain Call In Jeopardy", () => {
     expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(0);
   });
 
-  it("previews the floored points, with a qualitative elim caveat", () => {
+  it("previews two-decimal points, with the near-miss clause only when enabled", () => {
     expect(
       curtainCallPreviewCopy({
         kind: "elimination",
         exactDisplayPoints: 30,
-        nearMissPoints: 7,
+        nearMissPoints: 7.5,
         nearMissEnabled: true,
-        couplesRemaining: 12,
       })
-    ).toBe("Correct elimination: 30 pts · 7 pts if In Jeopardy · 12 couples left");
+    ).toBe("Correct elimination: 30.00 pts · 7.50 pts if In Jeopardy");
     expect(
       curtainCallPreviewCopy({
         kind: "top_scorer",
         exactDisplayPoints: 20,
         nearMissPoints: 5,
         nearMissEnabled: true,
-        couplesRemaining: 4,
       })
-    ).toBe("Correct top scorer: 20 pts · 5 pts if within 1 of the high · 4 couples left");
+    ).toBe("Correct top scorer: 20.00 pts · 5.00 pts if within 1 of the high");
     expect(
       curtainCallPreviewCopy({
         kind: "elimination",
         exactDisplayPoints: 30,
-        nearMissPoints: 7,
+        nearMissPoints: 7.5,
         nearMissEnabled: false,
-        couplesRemaining: 1,
       })
-    ).toBe("Correct elimination: 30 pts · 1 couple left");
+    ).toBe("Correct elimination: 30.00 pts");
   });
 });
 

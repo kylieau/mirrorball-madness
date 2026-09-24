@@ -1,3 +1,4 @@
+import { formatSignedPoints } from "@/lib/format-points";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { CoupleName } from "@/components/couple-name";
 import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
@@ -234,7 +235,7 @@ export function WeeklyResultsView({
                     {nameByManager[s.managerId] ?? "Unknown"}
                     {isYou && " (you)"}
                   </span>
-                  <span>{s.totalPoints >= 0 ? "+" : ""}{s.totalPoints}</span>
+                  <span>{formatSignedPoints(s.totalPoints)}</span>
                 </div>
               );
             })}

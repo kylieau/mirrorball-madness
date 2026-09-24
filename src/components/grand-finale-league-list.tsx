@@ -1,5 +1,6 @@
 "use client";
 
+import { LeagueGlanceHop } from "@/components/league-glance-hop";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { GrandFinaleOrderList, type GrandFinaleCouple, type GrandFinaleScoring } from "@/components/grand-finale-order-list";
 import { coupleNameNode } from "@/components/couple-name";
@@ -42,8 +43,7 @@ export function GrandFinaleLeagueList({
   if (managers.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1 border-t border-border pt-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">League at a Glance</p>
+    <LeagueGlanceHop>
       <Accordion multiple value={expanded} onValueChange={setExpanded}>
         {managers.map((m) => (
           <AccordionItem key={m.managerId} value={m.managerId}>
@@ -75,6 +75,6 @@ export function GrandFinaleLeagueList({
           </AccordionItem>
         ))}
       </Accordion>
-    </div>
+    </LeagueGlanceHop>
   );
 }
