@@ -135,7 +135,7 @@ Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Hom
 
 ## Standings Score History
 
-Shipped: per-manager Score History that expands in place under each leaderboard row, plus a redesigned Standings tab with a Dance Card Rosters section (see CLAUDE.md). Design pack: `docs/design/standings-score-history/`. Earlier "points breakdown" concepts (rules sheets, expandable rows, weekly ledger) were rejected.
+Shipped: per-manager Score History that expands in place under each leaderboard row, plus a redesigned Standings tab with a Couples Leaderboard section (see CLAUDE.md). Design pack: `docs/design/standings-score-history/`. Earlier "points breakdown" concepts (rules sheets, expandable rows, weekly ledger) were rejected.
 
 - **Container:** each leaderboard row expands in place into a compact fixed-height (`h-72`) scrolling panel; several can be open at once. Kylie is also sending mockups for a clearer tap affordance on leaderboard rows.
 - Live check still owed on real published data (after republishing Week 1 so its Grand Finale credits refresh): own + peer panels, filters, sticky totals vs Standings, Spoiler-Free clamping, a weight ≠ 1 league.
@@ -152,9 +152,18 @@ Shipped: per-manager Score History that expands in place under each leaderboard 
 - Weeks published before the Grand Finale scoring change need a republish to correct their points (unverified: all leagues' `weekly_manager_scores` were recomputed 2026-09-23 ~22:26, likely after `03523ee`, but that was not confirmed).
 - Double elimination in the top five gives both couples the lower placement's 4th/5th bonus; review before the finale.
 
+## Home curtain banner follow-ups
+
+Shipped (uncommitted as of the last handoff): new state machine, West overlays, relative "Airs", `episodes.duration_minutes`. See CLAUDE.md. Still worth deciding or checking:
+
+- **Multi-night lock wording**: Curtain Call locks per week (first night minus lock hours), so Night 2 reads "Picks open · Picks locked · Airs Night 2" rather than plain "Picks open". Flip it if that reads wrong.
+- **Live check** on a real episode night: the lock, on-air, West-feed and 10pm PT transitions, and the Results in hold, have only unit tests behind them.
+- **Locked-state gap**: the lock transition happens outside the per-minute window when the lock is more than 6 hours before air, so it updates on the daily tick or next page load.
+- Couples Leaderboard is a fixed `h-96` scroller; revisit if the cast is small enough that it looks empty.
+
 ## Housekeeping
 
-- Full `npm run build` is still owed (last one predates League at a Glance and this session's changes); needs the dev server on port 3000 stopped first.
+- Full `npm run build` is still owed (last one predates League at a Glance, Score History and the Couples Leaderboard / Home banner work); needs the dev server on port 3000 stopped first.
 - Decide whether to delete `claude/grand-finale-picks-feedback-brief.md` (stale brief for a dropped design) and `scratch/recovered-docs/` (recovered pre-cut CLAUDE.md/handoff copies).
 - The user said "these are separate pages now" about Scores / Enter Results, but the repo still uses one page (`/admin/results`) with `?tab=`.
 
