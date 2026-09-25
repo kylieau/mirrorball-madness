@@ -8,72 +8,52 @@ import { formatEpisodeCasual } from "@/lib/format-week";
 
 export function WatchedThroughSetting() {
   const router = useRouter();
-  const [watchedThrough, setWatchedThrough] = useState<number | null>(null);
+  const [lastWatched, setLastWatched] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    void getWatchedThroughWeek().then(setWatchedThrough);
+    void getWatchedThroughWeek().then(setLastWatched);
   }, []);
 
-  if (watchedThrough === null) return null;
+  if (lastWatched === null) return null;
 
-  const weekItems = Object.fromEntries(
-    Array.from({ length: watchedThrough }, (_, i) => [String(i + 1), formatEpisodeCasual(i + 1)])
-  );
+  // Only weeks up to the current mark: this control can hide weeks again, never reveal more.
+  const items: Record<string, string> = { "0": "None" };
+  for (let week = 1; week <= lastWatched; week++) items[String(week)] = formatEpisodeCasual(week);
 
-  async function handleUnmark(value: string | null) {
-    if (!value) return;
+  async function handleChange(value: string | null) {
+    if (value === null || Number(value) === lastWatched) return;
     setError(null);
-    setNotice(null);
     setPending(true);
-    const result = await unmarkEpisodesWatchedFrom(Number(value));
+    // The server function takes the first unwatched week, so "I last watched N" is N + 1.
+    const result = await unmarkEpisodesWatchedFrom(Number(value) + 1);
     if (result.error) {
       setError(result.error);
     } else {
-      const now = await getWatchedThroughWeek();
-      setWatchedThrough(now);
-      setNotice(
-        now === 0
-          ? "Nothing is marked as watched now. Every week is hidden until you mark it."
-          : `Now caught up through ${formatEpisodeCasual(now)}. Later weeks are hidden until you mark them.`
-      );
+      setLastWatched(await getWatchedThroughWeek());
       router.refresh();
     }
     setPending(false);
   }
 
   return (
-    <div className="flex items-start justify-between gap-3 px-4 pb-3 text-sm">
-      <div className="flex flex-col gap-1">
-        {notice ? (
-          <p className="text-xs text-foreground">{notice}</p>
-        ) : (
-          <>
-            <p className="text-xs text-foreground">
-              {watchedThrough > 0 ? `Caught up through ${formatEpisodeCasual(watchedThrough)}.` : "Nothing marked as watched yet."}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Fell behind? Pick the first week you haven&apos;t watched, and that week and everything after it is hidden
-              again.
-            </p>
-          </>
-        )}
-        {error && <p className="text-xs text-destructive">{error}</p>}
-      </div>
-      <Select items={weekItems} value="" onValueChange={handleUnmark} disabled={pending || watchedThrough === 0}>
-        <SelectTrigger className="h-8 w-36 shrink-0 text-xs">
-          <SelectValue placeholder="First Unwatched…" />
+    <div className="flex flex-col gap-2 px-4 pb-3 text-sm">
+      <p className="text-xs text-foreground">Fell behind? Hide unwatched episode results.</p>
+      <Select items={items} value={String(lastWatched)} onValueChange={handleChange} disabled={pending}>
+        <SelectTrigger className="h-9 w-full text-sm">
+          <span className="text-muted-foreground">I last watched</span>
+          <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {Object.entries(weekItems).map(([value, label]) => (
+          {Object.entries(items).map(([value, label]) => (
             <SelectItem key={value} value={value}>
               {label}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
