@@ -4,7 +4,7 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Up next, in order
 
-1. **Live score reveal during the West feed** — see its section below. Next thing to tackle.
+1. **Live score reveal: check it on a real episode night** — see its section below. The feature is built.
 2. **Dance Card League at a Glance: show the viewer's own points.** Every other manager's row shows the points gained that week, but the viewer is excluded (their picks are the card above), so their own week total isn't in the list. Add the viewer's own row/total so the list reads complete.
 3. **Split Scores and Enter Results into genuinely separate pages.** Both still live on one page, `/admin/results`, switched by `?tab=`. They are separate things (Scores is the read/view side; Enter Results is entry/propose/publish), and sharing one page risks state or behavior leaking between them. Give each its own route and keep the three access tiers (View / Propose / Publish) enforced per action as today.
 
@@ -168,7 +168,12 @@ Shipped: new state machine, West overlays, relative "Airs", `episodes.duration_m
 
 ## Live score reveal during the West feed
 
-**P0 (admin per-couple publish/undo, Finish Week) and P1a (Home activity + league points for a revealing week, Spoiler-Free mid-reveal Mark watched with un-mark, Pacific copy) are built; P1a's un-mark needs `supabase/apply-unmark-watched.sql` run in the Dashboard. P1b (Standings, Score History, Couples Leaderboard, roster cards, Results read a revealing week) is built too. Still to do: P2 polish and a live end-to-end check on a real episode night. Key decisions are in CLAUDE.md.** Original notes:  draft all scores after the East airing, then reveal couple scores one by one during the West feed, publishing final status (safe/eliminated) separately. Super admin only; viewers opt in via a per-viewer "Follow live" toggle on Home (off by default, Realtime push, Spoiler-Free viewers hidden until they opt in). Points update per reveal, so it needs a partial recompute (Dance Card judges' points per couple; survival, podium, Curtain Call and Grand Finale only at final-status publish), a split of `results_published_at` into scores-revealed vs results-published, and a per-dance reveal flag/RPC. Home's activity lines currently read only published `dance_scores`.
+Built (per-couple publish and undo, Finish Week, Home and every page reading a revealing week, Spoiler-Free mid-reveal watch and un-mark). How it works is in CLAUDE.md. Still to do:
+
+- **Check it on a real episode night**, ideally a low-stakes one: publish couples as they dance on the Pacific feed, watch Home/Standings/Results as a Spoiler-Free-off and a Spoiler-Free-on viewer, undo one, then Finish Week. Nothing has run through a real final publish with couples already posted; the only live checks so far were reveal, undo and the row-preserving filter on an empty future week.
+- **Multi-night weeks:** while Night 2 is being revealed, the week's Curtain Call points that Night 1's publish had already computed drop to 0 until Night 2's Finish Week recomputes the week.
+- **Standings' pre-season message** still keys off whether any score rows exist for the league, so it can flip once a week has revealed rows even for a viewer who can't see them.
+- **Pushes and lock-screen alerts** don't exist yet; if they're ever added they must never fire on a reveal and must respect Spoiler-Free.
 
 ## Parked nits
 
