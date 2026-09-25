@@ -128,3 +128,19 @@ describe("Your Picks carousel hrefs keep each other's position", () => {
     expect(rosterWeekHref("l", "w-3", "ep-2")).toBe("/leagues/l?tab=yourpicks&rosterWeek=w-3&week=ep-2");
   });
 });
+
+describe("selectThisWeekEpisode with a revealing week", () => {
+  const weeks = [
+    { id: "w1", week_number: 1, theme: null, status: "completed" },
+    { id: "w2", week_number: 2, theme: null, status: "upcoming" },
+  ];
+
+  it("lands on the revealing week in scores mode when the viewer may see it", () => {
+    expect(selectThisWeekEpisode(weeks, null, "w2")).toMatchObject({ episode: { id: "w2" }, mode: "scores" });
+  });
+
+  it("keeps a plain peek and the latest completed default when it is hidden", () => {
+    expect(selectThisWeekEpisode(weeks, null, null)).toMatchObject({ episode: { id: "w1" }, mode: "results" });
+    expect(selectThisWeekEpisode(weeks, "w2", null)).toMatchObject({ episode: { id: "w2" }, mode: "peek" });
+  });
+});

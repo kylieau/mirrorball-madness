@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
+import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { buildScoreHistory, weekResults, type HistoryWeekData, type ScoreHistoryLine } from "@/lib/score-history";
 import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
@@ -42,7 +43,8 @@ export async function loadScoreHistory(
   ]);
   if (!settings) return { lines: null, error: "Scoring settings not found" };
 
-  const completedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? [])
+  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const completedWeeks = groupedWeeks
     .filter((week) => week.status === "completed")
     .sort((a, b) => b.week_number - a.week_number);
   const cutoff = await resolveSpoilerCutoff(
@@ -52,11 +54,20 @@ export async function loadScoreHistory(
     profile?.spoiler_free_mode ?? false,
     completedWeeks
   );
-  const allowedWeeks = completedWeeks.filter((week) => cutoff.allowedEpisodeIds.has(week.id));
+  const completedAllowedWeeks = completedWeeks.filter((week) => cutoff.allowedEpisodeIds.has(week.id));
+  // A week being revealed has judges points but no outcomes yet: it is listed
+  // (posted episodes only), and Curtain Call / Grand Finale lines stay out
+  // until the final publish.
+  const { revealing, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
+  const revealingWeek =
+    revealing && revealingVisible
+      ? { ...revealing.week, episodes: revealing.week.episodes.filter((e) => revealing.episodeIds.includes(e.id)) }
+      : null;
+  const allowedWeeks = revealingWeek ? [...completedAllowedWeeks, revealingWeek] : completedAllowedWeeks;
   if (allowedWeeks.length === 0) return { lines: [], error: null };
 
   const episodeIds = allowedWeeks.flatMap((week) => week.episodes.map((episode) => episode.id));
-  const weekIds = allowedWeeks.map((week) => week.id);
+  const weekIds = completedAllowedWeeks.map((week) => week.id);
 
   const [
     { data: couples },
@@ -109,7 +120,7 @@ export async function loadScoreHistory(
     };
   });
 
-  const weekNumberById = new Map(allowedWeeks.map((week) => [week.id, week.week_number]));
+  const weekNumberById = new Map(completedAllowedWeeks.map((week) => [week.id, week.week_number]));
 
   const lines = buildScoreHistory({
     scoring: {

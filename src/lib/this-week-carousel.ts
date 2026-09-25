@@ -6,7 +6,8 @@ export type ThisWeekCarouselEpisode = {
   nightsLabel?: string | null;
 };
 
-export type ThisWeekSelectionMode = "results" | "peek";
+// "scores": a week still being revealed, so dances and judge scores but no outcomes.
+export type ThisWeekSelectionMode = "results" | "scores" | "peek";
 
 export type ThisWeekSelection<E extends ThisWeekCarouselEpisode> = {
   episode: E | null;
@@ -27,19 +28,22 @@ export function buildThisWeekCarouselWeeks<E extends ThisWeekCarouselEpisode>(
 
 export function selectThisWeekEpisode<E extends ThisWeekCarouselEpisode>(
   carouselWeeks: E[],
-  weekParam?: string | null
+  weekParam?: string | null,
+  // The week being revealed, only when this viewer may see its scores.
+  revealingWeekId?: string | null
 ): ThisWeekSelection<E> {
   if (carouselWeeks.length === 0) return { episode: null, mode: null };
 
   const requested = weekParam ? carouselWeeks.find((e) => e.id === weekParam) : undefined;
   const selected =
     requested ??
+    (revealingWeekId ? carouselWeeks.find((e) => e.id === revealingWeekId) : undefined) ??
     [...carouselWeeks].reverse().find((e) => e.status === "completed") ??
     carouselWeeks[0];
 
   return {
     episode: selected,
-    mode: selected.status === "completed" ? "results" : "peek",
+    mode: selected.status === "completed" ? "results" : selected.id === revealingWeekId ? "scores" : "peek",
   };
 }
 

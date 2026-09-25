@@ -26,6 +26,8 @@ import { managerIdForPick, type DraftType } from "@/lib/draft";
 import { clampRosterCoupleForWeek, weeklyBonusPoints } from "@/lib/roster-weekly-points";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
+import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { partitionRecastSlots } from "@/lib/recast-framing";
@@ -197,6 +199,8 @@ export default async function LeaguePage({
     completedEpisodes ?? []
   );
 
+  const { revealing, scoredIds, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
+
   const pointsByManager = new Map<string, number>();
   const rosterPointsByManager = new Map<string, number>();
   const predictionPointsByManager = new Map<string, number>();
@@ -206,7 +210,7 @@ export default async function LeaguePage({
     { managerId: string; rosterPoints: number; predictionPoints: number; grandFinalePoints: number; totalPoints: number }[]
   > = {};
   for (const row of allScores ?? []) {
-    if (!cutoff.allowedEpisodeIds.has(row.week_id)) continue;
+    if (!scoredIds.has(row.week_id)) continue;
     pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
     rosterPointsByManager.set(row.manager_id, (rosterPointsByManager.get(row.manager_id) ?? 0) + row.roster_points);
     predictionPointsByManager.set(
@@ -243,11 +247,15 @@ export default async function LeaguePage({
   const latestCompletedWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;
   const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
 
+  // Rank arrows and the week column compare against the week being revealed
+  // while there is one, else the latest completed week.
+  const changeFocusWeekId = revealing && revealingVisible ? revealing.week.id : latestCompletedWeekId;
+
   const previousPointsByManager = new Map<string, number>();
-  if (latestCompletedWeekId) {
+  if (changeFocusWeekId) {
     for (const row of allScores ?? []) {
-      if (!cutoff.allowedEpisodeIds.has(row.week_id)) continue;
-      if (row.week_id === latestCompletedWeekId) continue;
+      if (!scoredIds.has(row.week_id)) continue;
+      if (row.week_id === changeFocusWeekId) continue;
       previousPointsByManager.set(
         row.manager_id,
         (previousPointsByManager.get(row.manager_id) ?? 0) + row.total_points
@@ -263,17 +271,17 @@ export default async function LeaguePage({
   }
 
   const currentRanks = ranksFromPoints(pointsByManager);
-  const previousRanks = latestCompletedWeekId ? ranksFromPoints(previousPointsByManager) : null;
+  const previousRanks = changeFocusWeekId ? ranksFromPoints(previousPointsByManager) : null;
 
   const latestWeekPointsByManager = new Map<string, number>();
   for (const row of allScores ?? []) {
-    if (row.week_id === latestCompletedWeekId && cutoff.allowedEpisodeIds.has(row.week_id)) {
+    if (row.week_id === changeFocusWeekId && scoredIds.has(row.week_id)) {
       latestWeekPointsByManager.set(row.manager_id, row.total_points);
     }
   }
 
   const standingsWithChange = standings.map((s) => {
-    const weekPoints = latestCompletedWeekId ? (latestWeekPointsByManager.get(s.managerId) ?? 0) : null;
+    const weekPoints = changeFocusWeekId ? (latestWeekPointsByManager.get(s.managerId) ?? 0) : null;
     if (!previousRanks) return { ...s, weekPoints, change: null as "up" | "down" | "same" | null };
     const curr = currentRanks.get(s.managerId)!;
     const prev = previousRanks.get(s.managerId)!;
@@ -497,8 +505,21 @@ export default async function LeaguePage({
   // Flipping model shared with Curtain Call: visible completed weeks only,
   // latest by default. With none yet, roster views show who holds what now,
   // with no points.
-  const visibleDanceWeeks = [...completedEpisodes]
-    .filter((w) => cutoff.allowedEpisodeIds.has(w.id))
+  const revealingDanceWeek =
+    revealing && revealingVisible
+      ? [
+          {
+            id: revealing.week.id,
+            week_number: revealing.week.week_number,
+            theme: revealing.week.theme,
+            is_double_elimination_week: revealing.week.is_double_elimination_week,
+            nightsLabel: revealing.week.nightsLabel,
+            results_published_at: null,
+            episodeIds: revealing.episodeIds,
+          },
+        ]
+      : [];
+  const visibleDanceWeeks = [...completedEpisodes.filter((w) => cutoff.allowedEpisodeIds.has(w.id)), ...revealingDanceWeek]
     .sort((a, b) => a.week_number - b.week_number);
   const latestVisibleDanceWeek = visibleDanceWeeks[visibleDanceWeeks.length - 1] ?? null;
   const yourRosterWeek =
@@ -506,7 +527,7 @@ export default async function LeaguePage({
 
   const episodeWeekNumber = new Map<string, number>();
   for (const week of groupedWeeks) {
-    if (!cutoff.allowedEpisodeIds.has(week.id)) continue;
+    if (!scoredIds.has(week.id)) continue;
     for (const episode of week.episodes) episodeWeekNumber.set(episode.id, week.week_number);
   }
   const { data: leagueDanceScores } =
@@ -916,6 +937,7 @@ export default async function LeaguePage({
       {error && <p className="text-sm text-destructive">{error}</p>}
       {message && <p className="text-sm text-muted-foreground">{message}</p>}
 
+      <RevealAutoRefresh active={revealingVisible} />
       <LeagueTabs
         leagueId={id}
         activeTab={activeTab}

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
+import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
+import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
 import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
 import { PageHeader } from "@/components/page-header";
@@ -94,10 +96,15 @@ export default async function ThisWeekPage({
   // theme peek. ?week= honors that list; an unrecognized or unwatched
   // completed id falls back instead of leaking results.
   const carouselWeeks = buildThisWeekCarouselWeeks(seasonWeeks, cutoff.allowedEpisodeIds);
-  const { episode: selectedWeek, mode: selectedMode } = selectThisWeekEpisode(carouselWeeks, weekParam);
+  const { revealing, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
+  const { episode: selectedWeek, mode: selectedMode } = selectThisWeekEpisode(
+    carouselWeeks,
+    weekParam,
+    revealing && revealingVisible ? revealing.week.id : null
+  );
   const selectedWeekId = selectedWeek?.id ?? null;
   const neighbors = selectedWeekId ? adjacentThisWeekWeeks(carouselWeeks, selectedWeekId) : { prev: null, next: null };
-  const showResults = selectedMode === "results";
+  const showResults = selectedMode === "results" || selectedMode === "scores";
   const selectedEpisodeIds = selectedWeek?.episodes.map((episode) => episode.id) ?? [];
 
   const pendingReveal = cutoff.pendingRevealEpisode
@@ -151,7 +158,7 @@ export default async function ThisWeekPage({
       .in("manager_id", myTeamIds)
       .in("league_id", leagueIds)
       .is("end_week", null),
-    showResults && selectedWeekId
+    selectedMode === "results" && selectedWeekId
       ? supabase
           .from("predictions")
           .select("league_id, predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
@@ -273,10 +280,12 @@ export default async function ThisWeekPage({
             coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
             leaguesByCouple={leaguesByCouple}
             pendingReveal={pendingReveal}
+            scoresOnly={selectedMode === "scores"}
           />
         )}
       </div>
 
+      <RevealAutoRefresh active={revealingVisible} />
       <FanBottomNav active="results" leagueId={firstLeagueId} />
     </div>
   );

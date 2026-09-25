@@ -12,7 +12,7 @@ import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week
 import { computeEpisodeBannerState, DEFAULT_EPISODE_DURATION_MINUTES, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
-import { findRevealingWeek, scoredWeekIds } from "@/lib/revealing-week";
+import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 
 export default async function TodayPage() {
@@ -79,17 +79,7 @@ export default async function TodayPage() {
     completedWeeks
   );
 
-  const unpublishedEpisodeIds = groupedWeeks
-    .flatMap((week) => week.episodes)
-    .filter((episode) => episode.status !== "completed" && !episode.results_published_at)
-    .map((episode) => episode.id);
-  const { data: postedRows } =
-    unpublishedEpisodeIds.length > 0
-      ? await supabase.from("dance_scores").select("episode_id").in("episode_id", unpublishedEpisodeIds)
-      : { data: [] as { episode_id: string }[] };
-  const revealing = findRevealingWeek(groupedWeeks, new Set((postedRows ?? []).map((row) => row.episode_id)));
-  const scoredIds = scoredWeekIds(cutoff, revealing ? { id: revealing.week.id, week_number: revealing.week.week_number } : null);
-  const revealingVisible = !!revealing && scoredIds.has(revealing.week.id);
+  const { revealing, scoredIds, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
 
   const trueLatestCompletedWeek = completedWeeks[0] ?? null;
   const latestCompletedWeekId = cutoff.effectiveLatestEpisode?.id ?? null;
@@ -113,7 +103,7 @@ export default async function TodayPage() {
         latestCompletedResultsPublishedAt,
         joinCutoffMs,
         scoredIds,
-        revealingVisible ? revealing.week.id : null
+        revealing && revealingVisible ? revealing.week.id : null
       )
     )
   );
@@ -121,7 +111,7 @@ export default async function TodayPage() {
   // Results are season-global, so they're fetched once and shared by every league.
   const visibleWeeks = [
     ...cutoff.visibleEpisodes,
-    ...(revealingVisible
+    ...(revealing && revealingVisible
       ? [{ id: revealing.week.id, week_number: revealing.week.week_number, episodeIds: revealing.episodeIds }]
       : []),
   ];

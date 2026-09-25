@@ -370,3 +370,30 @@ describe("groupHistory", () => {
     expect(gfOnly.map((g) => g.weekNumber)).toEqual([3, 1]);
   });
 });
+
+describe("a week being revealed", () => {
+  const revealingWeek: HistoryWeekData = {
+    weekNumber: 3,
+    isDoubleElimination: false,
+    danceScores: [
+      { coupleId: "A", totalScore: 30 },
+      { coupleId: "B", totalScore: 29 },
+    ],
+    outcomes: [],
+    inJeopardyCoupleIds: [],
+  };
+  const revealing: ManagerHistoryInput = {
+    ...base,
+    weeks: [weeks[0], weeks[1], revealingWeek],
+    predictions: base.predictions.filter((p) => p.weekNumber !== 3),
+  };
+
+  it("lists only judges lines for it and matches the reveal-mode engine total", () => {
+    const lines = buildScoreHistory(revealing);
+    const week3 = lines.filter((l) => l.weekNumber === 3);
+    expect(week3.length).toBeGreaterThan(0);
+    expect(week3.every((l) => l.module === "danceCard" && l.label.includes("Jdg"))).toBe(true);
+    const engine = engineWeek({ ...revealing, predictions: [], grandFinalePredictions: [] }, revealingWeek);
+    expect(sumLines(lines, 3, "danceCard")).toBeCloseTo(engine!.rosterPoints, 2);
+  });
+});

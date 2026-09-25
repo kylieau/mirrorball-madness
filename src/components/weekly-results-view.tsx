@@ -46,6 +46,7 @@ export function WeeklyResultsView({
   leaguesByCouple,
   pendingReveal,
   inJeopardyCoupleIds,
+  scoresOnly = false,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
@@ -68,6 +69,9 @@ export function WeeklyResultsView({
   pendingReveal?: { weekNumber: number; theme: string | null } | null;
   // Union of commissioner In Jeopardy ticks for the episodes on screen.
   inJeopardyCoupleIds?: string[];
+  // A week still being revealed: list each posted couple by its judges' score,
+  // with no outcome badges or eliminations.
+  scoresOnly?: boolean;
 }) {
   const inJeopardy = new Set(inJeopardyCoupleIds ?? []);
   const episode = episodes[0];
@@ -130,7 +134,10 @@ export function WeeklyResultsView({
     danceScoresByCouple.set(ds.couple_id, list);
   }
 
-  const outcomes = mergeCoupleOutcomes(episodeResults.filter((r) => episodeIds.has(r.episode_id)))
+  const outcomeRows = scoresOnly
+    ? [...danceScoresByCouple.keys()].map((couple_id) => ({ episode_id: episodes[0].id, couple_id, outcome: "safe" }))
+    : episodeResults.filter((r) => episodeIds.has(r.episode_id));
+  const outcomes = mergeCoupleOutcomes(outcomeRows)
     .map((r) => {
       const dances = danceScoresByCouple.get(r.couple_id) ?? [];
       return {
@@ -194,10 +201,12 @@ export function WeeklyResultsView({
                 ))}
               </div>
               <div className="shrink-0 text-right text-xs text-muted-foreground">
-                <span className={cn("mb-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold", tag.className)}>
-                  {tag.label}
-                </span>
-                {inJeopardyBadge && (
+                {!scoresOnly && (
+                  <span className={cn("mb-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold", tag.className)}>
+                    {tag.label}
+                  </span>
+                )}
+                {!scoresOnly && inJeopardyBadge && (
                   <span
                     className={cn(
                       "mb-1 ml-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold",

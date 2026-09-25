@@ -57,12 +57,15 @@ export async function computeLeagueHomeSummary(
   // below resolves through myTeamId instead of the raw viewer id.
   const myTeamId = findOwnMembership(members ?? [], userId)?.user_id ?? userId;
 
+  // The week the "change" compares against: the one being revealed, else the latest completed.
+  const focusWeekId = revealingWeekId ?? latestCompletedWeekId;
+
   const pointsByManager = new Map<string, number>();
   const previousPointsByManager = new Map<string, number>();
   for (const row of scores ?? []) {
     if (allowedWeekIds && !allowedWeekIds.has(row.week_id)) continue;
     pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
-    if (row.week_id !== latestCompletedWeekId && row.week_id !== revealingWeekId) {
+    if (row.week_id !== focusWeekId) {
       previousPointsByManager.set(row.manager_id, (previousPointsByManager.get(row.manager_id) ?? 0) + row.total_points);
     }
   }
@@ -75,7 +78,7 @@ export async function computeLeagueHomeSummary(
     1,
     [...standings].sort((a, b) => b.points - a.points).findIndex((s) => s.managerId === myTeamId) + 1
   );
-  const previousRank = latestCompletedWeekId
+  const previousRank = focusWeekId
     ? Math.max(
         1,
         [...standings].sort((a, b) => b.previousPoints - a.previousPoints).findIndex((s) => s.managerId === myTeamId) + 1
