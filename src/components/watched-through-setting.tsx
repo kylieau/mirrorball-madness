@@ -17,10 +17,10 @@ export function WatchedThroughSetting() {
     void getWatchedThroughWeek().then(setWatchedThrough);
   }, []);
 
-  if (!watchedThrough && !notice) return null;
+  if (watchedThrough === null) return null;
 
   const weekItems = Object.fromEntries(
-    Array.from({ length: watchedThrough ?? 0 }, (_, i) => [String(i + 1), formatEpisodeCasual(i + 1)])
+    Array.from({ length: watchedThrough }, (_, i) => [String(i + 1), formatEpisodeCasual(i + 1)])
   );
 
   async function handleUnmark(value: string | null) {
@@ -51,7 +51,9 @@ export function WatchedThroughSetting() {
           <p className="text-xs text-foreground">{notice}</p>
         ) : (
           <>
-            <p className="text-xs text-foreground">Caught up through {formatEpisodeCasual(watchedThrough ?? 0)}.</p>
+            <p className="text-xs text-foreground">
+              {watchedThrough > 0 ? `Caught up through ${formatEpisodeCasual(watchedThrough)}.` : "Nothing marked as watched yet."}
+            </p>
             <p className="text-xs text-muted-foreground">
               Fell behind? Pick the first week you haven&apos;t watched, and that week and everything after it is hidden
               again.
@@ -60,20 +62,18 @@ export function WatchedThroughSetting() {
         )}
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
-      {!!watchedThrough && (
-        <Select items={weekItems} value="" onValueChange={handleUnmark} disabled={pending}>
-          <SelectTrigger className="h-8 w-36 shrink-0 text-xs">
-            <SelectValue placeholder="First Unwatched…" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(weekItems).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+      <Select items={weekItems} value="" onValueChange={handleUnmark} disabled={pending || watchedThrough === 0}>
+        <SelectTrigger className="h-8 w-36 shrink-0 text-xs">
+          <SelectValue placeholder="First Unwatched…" />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(weekItems).map(([value, label]) => (
+            <SelectItem key={value} value={value}>
+              {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
