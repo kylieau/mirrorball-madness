@@ -39,7 +39,7 @@ export function WatchedThroughSetting() {
 
   return (
     <div className="flex flex-col gap-2 px-4 pb-3 text-sm">
-      <p className="text-xs text-foreground">Fell behind? Hide unwatched episode results.</p>
+      <p className="text-xs text-foreground">Fell behind? Hide unwatched results.</p>
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground">I last watched</span>
         <Select items={items} value={String(lastWatched)} onValueChange={handleChange} disabled={pending}>
