@@ -40,19 +40,21 @@ export function WatchedThroughSetting() {
   return (
     <div className="flex flex-col gap-2 px-4 pb-3 text-sm">
       <p className="text-xs text-foreground">Fell behind? Hide unwatched episode results.</p>
-      <Select items={items} value={String(lastWatched)} onValueChange={handleChange} disabled={pending}>
-        <SelectTrigger className="h-9 w-full text-sm">
-          <span className="text-muted-foreground">I last watched</span>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {Object.entries(items).map(([value, label]) => (
-            <SelectItem key={value} value={value}>
-              {label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground">I last watched</span>
+        <Select items={items} value={String(lastWatched)} onValueChange={handleChange} disabled={pending}>
+          <SelectTrigger className="h-8 w-28 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent alignItemWithTrigger={false} align="start" className="min-w-0">
+            {Object.entries(items).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
