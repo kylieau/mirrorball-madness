@@ -13,6 +13,10 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 - **Judges' Save Active** now lives on the Schedule episode form (`episodes.judges_save_available`, no SQL needed) and Enter Results reads it; the switch is gone from Enter Results. Check it saves and that the Judges' Save column appears in Finish Week for that episode.
 - **Team Dance:** the Score a Team Dance sheet is removed. A team-dance night is now marked by its Round Type on the Schedule form, and each couple's dance is entered on its own. Check this covers how team dances are actually entered.
 
+## Spoiler-Free persistent banner (needs a mock first)
+
+In Spoiler-Free mode, replace the per-page catch-up card (and its auto-opening dialog) with one persistent slim bar pinned under the top bar on every fan page: "Spoiler-Free · Caught up through Week 2 · Mark Week 3 Watched". Mock it first; it touches every page's chrome (`TopBar`/`SlimTopBar`) and the `SpoilerRevealCallout` flow, and would also be where the in-progress week's mark lives during a reveal.
+
 ## Results / Picks week carousel
 
 Shared slim ← `Week N — {theme}` → control (`EpisodeCarousel` / `formatEpisodeCasualWithTheme`). Not on Home. `?week=` is `competition_weeks.id`. Multi-episode weeks may show a subtle `Night One + Night Two` under the label.
