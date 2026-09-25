@@ -13,8 +13,7 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 Shipped in `b4254a8`; the user checked it on their phone. Still open:
 
 - **Home curtain banner restructure is on hold** (status-first stack, dimmed week rail, `h-28` to ~`h-36`). It waits for the mock that also covers the persistent Spoiler-Free banner below. The rest of the Home/Your Leagues triage plan (tap routing, cards, per-module status) shipped; the expand-on-due-card idea was replaced by the two-button row.
-- **Recent Activity card** on Home still has the doubled card + row padding that the Leagues card had (only Leagues This Week was fixed).
-- **Double-elimination weeks:** the Curtain Call stack only tracks Home and High; the second Home slot (`predicted_eliminated_couple_id_2`) is ignored on purpose.
+- **Double-elimination weeks:** the Curtain Call stack only tracks Home and High; the second Home slot (`predicted_eliminated_couple_id_2`) is ignored on purpose, since a double is only known once the episode airs.
 - **Module status wording** is the user's spec (`buildModuleStack`, `src/lib/league-triage.ts`); change it there, tests are in `league-triage.test.ts`.
 
 ## To check: Schedule settings that used to live on Enter Results

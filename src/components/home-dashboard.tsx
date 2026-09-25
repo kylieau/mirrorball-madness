@@ -110,8 +110,8 @@ export function HomeDashboard({
           <div className="mb-2 mt-6 border-t border-border pt-4 text-sm font-semibold text-accent">
             Recent Activity
           </div>
-          <Card>
-            <CardContent className="flex h-72 flex-col overflow-y-auto py-2">
+          <Card className="py-0">
+            <CardContent className="flex h-72 flex-col overflow-y-auto">
               {recentActivity.map((line) => (
                 <p
                   key={line.key}

@@ -23,6 +23,6 @@ Ours (all committed and pushed in `b4254a8`): `CLAUDE.md`, `src/app/leagues/page
 - Never `npm run build` / `rm -rf .next` while a dev server holds port 3000. Shared working dir: `git fetch` + `git status -sb` first; stage by name, never `git add -A`.
 
 ## 4. Backlog & Next Steps
-Deferred work is in [BACKLOG.md](BACKLOG.md), top of file in priority order: (1) check the live reveal on a real episode night and run `npm run build` once no dev server is running, (2) show the viewer's own points in Dance Card League at a Glance (verified still open), (3) split Scores and Enter Results into separate pages (verified still open). New "Manage Leagues follow-ups" section covers the held Home banner restructure and Recent Activity padding.
+Deferred work is in [BACKLOG.md](BACKLOG.md), top of file in priority order: (1) check the live reveal on a real episode night and run `npm run build` once no dev server is running, (2) show the viewer's own points in Dance Card League at a Glance (verified still open), (3) split Scores and Enter Results into separate pages (verified still open). New "Manage Leagues follow-ups" section covers the held Home banner restructure and the deliberate double-elim omission.
 
 `git fetch && git status -sb`
