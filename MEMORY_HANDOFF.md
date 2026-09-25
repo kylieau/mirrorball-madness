@@ -1,16 +1,17 @@
 # Session Handoff
 
 ## 1. Current State
-**The Manage Leagues (`/leagues`) triage rebuild is committed and pushed** (`b4254a8` on `origin/main`); the user checked it on their phone and signed off (Home spacing, cards, buttons, Spoiler-Free "Week N" hiding). `tsc --noEmit`, `eslint src` and 439 tests pass. **`npm run build` has not been run** (a dev server holds port 3000). The user also confirmed Grand Finale "Next elim" behaves under a Spoiler-Free viewer who is behind. The live score reveal from the previous session is also still unchecked on a real episode night (see BACKLOG.md).
+**Everything is committed and pushed** (`e5aabcb` on `origin/main`). The Manage Leagues (`/leagues`) triage rebuild (`b4254a8`), the Recent Activity padding fix (`d0ea015`) and the inner-scroller bottom fades (`e5aabcb`) were all checked by the user on their phone except the fades, which are unchecked on a device. **In focus next: the persistent Spoiler-Free banner** (mock first, together with the held Home curtain banner restructure). `tsc --noEmit`, `eslint src` and 439 tests pass. **`npm run build` has not been run** (a dev server holds port 3000). The user also confirmed Grand Finale "Next elim" behaves under a Spoiler-Free viewer who is behind. The live score reveal from the previous session is also still unchecked on a real episode night (see BACKLOG.md).
 
 What shipped:
 - **Manage Leagues:** titled "Manage Leagues" with the live "Week N" once under it (hidden but space-reserved for a Spoiler-Free viewer who is behind), stacked small Create / Join. One `LeagueTriageCard` per league: name + status pill, rank · pts, a Curtain Call / Dance Card / Grand Finale stack (emoji labels, right-aligned italic "Locked" / "Locks in …", gold "Need …"), then Make/Edit/Locked Picks, Open Standings, and an icon-only gear to League Settings. Due leagues get a slim gold left edge. Picks-due leagues sort first.
 - **Home:** section is "Leagues This Week • N of M need picks / all caught up", link is "Manage ›" (inset to line up with the pills), rows tap to Picks when due else Standings (`leagueTapHref`), card end padding fixed.
 - **League Settings:** Leave League now lives in League Info for everyone (commissioners see "Commissioners can't leave").
+- **Scroll fades:** `ScrollFade` (`src/components/scroll-fade.tsx`) fades the bottom of Recent Activity, Score History and the Couples Leaderboard while more remains; it hides when content fits or at the end. Pass the border/rounding via `outerClassName` so the fade stays inside the outline.
 - **Refactors:** Home and Manage Leagues share `loadHomeLeagueData`; `LeagueStatusPill` is one component used on Home, the switcher and the cards.
 
 ## 2. Changes Made
-Ours (all committed and pushed in `b4254a8`): `CLAUDE.md`, `src/app/leagues/page.tsx`, `src/app/leagues/[id]/settings/page.tsx`, `src/app/today/page.tsx`, `src/components/{home-dashboard,create-join-league-dialogs,league-info-section,league-switcher,league-status-pill,league-triage-card}.tsx`, `src/lib/{league-home-summary,home-league-data,league-module-stack-data,league-triage}.ts`, `src/lib/league-triage.test.ts`.
+Ours (all committed and pushed in `b4254a8`, `d0ea015`, `e5aabcb`): `CLAUDE.md`, `src/app/leagues/page.tsx`, `src/app/leagues/[id]/settings/page.tsx`, `src/app/today/page.tsx`, `src/components/{home-dashboard,create-join-league-dialogs,league-info-section,league-switcher,league-status-pill,league-triage-card,scroll-fade,couples-leaderboard,score-history-panel}.tsx`, `src/lib/{league-home-summary,home-league-data,league-module-stack-data,league-triage}.ts`, `src/lib/league-triage.test.ts`.
 **Not ours, leave unstaged:** `ios/App/App.xcodeproj/project.pbxproj` (modified); untracked `scratch/` (`prefill-week3-draft.mts`, `league-settings-relocation-plan.md`, `draft-recast-handoff.html` are kept on purpose).
 
 ## 3. Key Decisions
@@ -23,6 +24,6 @@ Ours (all committed and pushed in `b4254a8`): `CLAUDE.md`, `src/app/leagues/page
 - Never `npm run build` / `rm -rf .next` while a dev server holds port 3000. Shared working dir: `git fetch` + `git status -sb` first; stage by name, never `git add -A`.
 
 ## 4. Backlog & Next Steps
-Deferred work is in [BACKLOG.md](BACKLOG.md), top of file in priority order: (1) check the live reveal on a real episode night and run `npm run build` once no dev server is running, (2) show the viewer's own points in Dance Card League at a Glance (verified still open), (3) split Scores and Enter Results into separate pages (verified still open). New "Manage Leagues follow-ups" section covers the held Home banner restructure and the deliberate double-elim omission.
+Deferred work is in [BACKLOG.md](BACKLOG.md), top of file in priority order: (1) check the live reveal on a real episode night and run `npm run build` once no dev server is running, (2) show the viewer's own points in Dance Card League at a Glance (verified still open), (3) split Scores and Enter Results into separate pages (verified still open). New "Manage Leagues follow-ups" section covers the held Home banner restructure and the deliberate double-elim omission. Up next is the "Spoiler-Free persistent banner" section (needs a mock first; touches `TopBar`/`SlimTopBar` and `SpoilerRevealCallout`).
 
 `git fetch && git status -sb`
