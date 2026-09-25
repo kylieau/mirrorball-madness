@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LeagueMembersSection } from "@/components/league-members-section";
 import { LeagueInfoSection } from "@/components/league-info-section";
 import { LeagueModulesForm } from "@/components/league-modules-form";
+import { LeaveLeagueButton } from "@/components/leave-league-button";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { findOwnMembership } from "@/lib/acting-manager";
@@ -144,7 +145,16 @@ export default async function LeagueSettingsPage({
           canResetDraft={
             (scoringSettings?.judges_score_category_enabled ?? true) && league.draft_status !== "not_started"
           }
-        />
+        >
+          <LeaveLeagueButton
+            leagueId={id}
+            leagueName={league.name}
+            isCommissioner={isCommissioner}
+            isCoManager={viewerMembership.user_id !== user.id}
+            hasCoManager={viewerMembership.user_id === user.id && viewerMembership.co_manager_id !== null}
+            teamUserId={viewerMembership.user_id}
+          />
+        </LeagueInfoSection>
         <LeagueModulesForm
           leagueId={id}
           league={league}

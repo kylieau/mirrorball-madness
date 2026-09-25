@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronDownIcon, CheckIcon } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
+import { LeagueStatusPill } from "@/components/league-status-pill";
 import { cn } from "cn";
 
 export type SwitcherLeague = {
@@ -59,14 +60,8 @@ export function LeagueSwitcher({
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   {isCurrent ? (
                     <CheckIcon className="size-4 text-accent" aria-hidden />
-                  ) : l.picksDue ? (
-                    <span className="rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
-                      Picks Due
-                    </span>
                   ) : (
-                    <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
-                      All caught up
-                    </span>
+                    <LeagueStatusPill picksDue={l.picksDue} />
                   )}
                 </div>
               </div>

@@ -5,14 +5,11 @@ import { HomeDashboard } from "@/components/home-dashboard";
 import { PageHeader } from "@/components/page-header";
 import { ScrollRevealBar } from "@/components/scroll-reveal-bar";
 import { SlimTopBar, TopBar } from "@/components/top-bar";
-import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
+import { loadHomeLeagueData } from "@/lib/home-league-data";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
-import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
-import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { computeEpisodeBannerState, DEFAULT_EPISODE_DURATION_MINUTES, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
-import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 
 export default async function TodayPage() {
@@ -42,70 +39,11 @@ export default async function TodayPage() {
 
   const firstLeagueId = leagueRefs[0].id;
 
-  const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
-    supabase
-      .from("competition_weeks")
-      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
-      .eq("season_id", activeSeasonId ?? ""),
-    supabase
-      .from("episodes")
-      .select("id, episode_number, week_id, airs_at, duration_minutes, theme, status, results_published_at")
-      .eq("season_id", activeSeasonId ?? ""),
-  ]);
-  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
-  const liveWeek = liveCompetitionWeek(groupedWeeks);
-  const upcomingEpisode = liveWeek ? { id: liveWeek.id, week_number: liveWeek.week_number } : null;
-  const completedWeeks = groupedWeeks
-    .filter((week) => week.status === "completed")
-    .sort((a, b) => b.week_number - a.week_number)
-    .map((week) => ({
-      id: week.id,
-      week_number: week.week_number,
-      results_published_at:
-        week.episodes
-          .map((episode) => episode.results_published_at)
-          .filter((value): value is string => !!value)
-          .sort()
-          .at(-1) ?? null,
-      episodeIds: week.episodes.map((episode) => episode.id),
-    }));
-
-  const cutoff = await resolveSpoilerCutoff(
+  const { groupedWeeks, cutoff, revealing, revealingVisible, weeksBehind, summaries } = await loadHomeLeagueData(
     supabase,
     user.id,
-    activeSeasonId ?? null,
     accountSettingsData.spoilerFreeMode,
-    completedWeeks
-  );
-
-  const { revealing, scoredIds, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
-
-  const trueLatestCompletedWeek = completedWeeks[0] ?? null;
-  const latestCompletedWeekId = cutoff.effectiveLatestEpisode?.id ?? null;
-  const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
-  const weeksBehind =
-    trueLatestCompletedWeek && trueLatestCompletedWeek.id !== latestCompletedWeekId
-      ? trueLatestCompletedWeek.week_number - (cutoff.effectiveLatestEpisode?.week_number ?? 0)
-      : 0;
-
-  const RECENT_JOIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-  const joinCutoffMs = Date.now() - RECENT_JOIN_WINDOW_MS;
-
-  const summaries = await Promise.all(
-    leagueRefs.map((league) =>
-      computeLeagueHomeSummary(
-        supabase,
-        user.id,
-        league,
-        upcomingEpisode ?? null,
-        latestCompletedWeekId,
-        latestCompletedResultsPublishedAt,
-        joinCutoffMs,
-        scoredIds,
-        revealing && revealingVisible ? revealing.week.id : null
-      )
-    )
+    leagueRefs
   );
 
   // Results are season-global, so they're fetched once and shared by every league.

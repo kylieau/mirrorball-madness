@@ -27,6 +27,7 @@ export function LeagueInfoSection({
   inviteCode,
   canEdit,
   canResetDraft,
+  children,
 }: {
   leagueId: string;
   leagueName: string;
@@ -35,6 +36,7 @@ export function LeagueInfoSection({
   // Dance Card on and a draft under way or finished — the only time there's
   // anything to reset.
   canResetDraft: boolean;
+  children?: React.ReactNode;
 }) {
   const [draftWasReset, setDraftWasReset] = useState(false);
   const [name, setName] = useState(leagueName);
@@ -83,6 +85,7 @@ export function LeagueInfoSection({
             <SettingRow label="Invite code" value={<span className="font-mono">{inviteCode}</span>} />
           </div>
           <CopyInviteLinkButton inviteCode={inviteCode} />
+          {children}
         </CardContent>
       </Card>
     );
@@ -166,6 +169,7 @@ export function LeagueInfoSection({
               </DialogContent>
             </Dialog>
           </div>
+          {children}
         </div>
       </CardContent>
     </Card>

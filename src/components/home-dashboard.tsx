@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { DeadlineStub } from "@/components/deadline-stub";
 import { EpisodeBanner } from "@/components/episode-banner";
+import { LeagueStatusPill } from "@/components/league-status-pill";
+import { leagueTapHref } from "@/lib/league-triage";
 import { SpoilerRevealCallout } from "@/components/spoiler-reveal-callout";
 import type { EpisodeBannerInput, EpisodeBannerState } from "@/lib/episode-banner";
 import type { ActivityLine } from "@/lib/home-activity";
@@ -38,16 +40,15 @@ export function HomeDashboard({
   // Picks-due leagues lead so the cap never hides the one that needs attention.
   const shownLeagues = [...leagues].sort((a, b) => Number(b.picksDue) - Number(a.picksDue)).slice(0, MAX_LEAGUES_SHOWN);
   const needingPicks = leagues.filter((l) => l.picksDue).length;
+  const leagueSummary =
+    needingPicks > 0
+      ? `${needingPicks} of ${leagues.length} need${needingPicks === 1 ? "s" : ""} picks`
+      : "all caught up";
   const sharedCountdown = deadlines[0] ? formatCountdown(deadlines[0].iso) : "";
 
   return (
     <div>
       <EpisodeBanner {...episodeBanner} />
-
-      <p className="mb-4 text-sm text-muted-foreground">
-        {leagues.length} league{leagues.length === 1 ? "" : "s"}
-        {needingPicks > 0 ? ` · ${needingPicks} need${needingPicks === 1 ? "s" : ""} picks` : " · all caught up"}
-      </p>
 
       {pendingReveal && <SpoilerRevealCallout weekNumber={pendingReveal.weekNumber} inProgress={pendingReveal.inProgress} />}
 
@@ -71,20 +72,20 @@ export function HomeDashboard({
         </div>
       )}
 
-      <div className="mb-2 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
-        <span>
-          Your Leagues <span className="font-normal text-muted-foreground">({leagues.length})</span>
+      <div className="mb-2 flex items-center justify-between border-t border-border pr-4 pt-4 text-sm font-semibold text-accent">
+        <span className="min-w-0 truncate">
+          Leagues This Week <span className="font-normal text-muted-foreground">• {leagueSummary}</span>
         </span>
-        <Link href="/leagues" className="font-normal text-muted-foreground">
-          See All ›
+        <Link href="/leagues" className="shrink-0 pl-3 font-normal text-muted-foreground">
+          Manage ›
         </Link>
       </div>
-      <Card>
-        <CardContent className="flex flex-col py-0">
+      <Card className="py-0">
+        <CardContent className="flex flex-col px-4">
           {shownLeagues.map((l) => (
             <Link
               key={l.id}
-              href={`/leagues/${l.id}?tab=standings`}
+              href={leagueTapHref(l.id, l.picksDue)}
               className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
             >
               <div className="min-w-0">
@@ -94,15 +95,7 @@ export function HomeDashboard({
                   <span className="font-heading font-semibold">{formatPoints(l.totalPoints)}</span> pts
                 </p>
               </div>
-              {l.picksDue ? (
-                <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
-                  Picks Due
-                </span>
-              ) : (
-                <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
-                  {l.weeksBehind > 0 ? `${l.weeksBehind} wk behind` : "All caught up"}
-                </span>
-              )}
+              <LeagueStatusPill picksDue={l.picksDue} weeksBehind={l.weeksBehind} />
             </Link>
           ))}
         </CardContent>

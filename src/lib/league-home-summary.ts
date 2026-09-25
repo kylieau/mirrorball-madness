@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
 import { hasCurtainCallPicks } from "@/lib/curtain-call-picks";
+import type { CurtainCallState } from "@/lib/league-triage";
 
 export type LeagueHomeSummary = {
   id: string;
@@ -15,6 +16,13 @@ export type LeagueHomeSummary = {
   danceCardOn: boolean;
   curtainCallOn: boolean;
   grandFinaleOn: boolean;
+  myTeamId: string;
+  curtainCall: {
+    state: CurtainCallState;
+    eliminatedCoupleId: string | null;
+    topScorerCoupleId: string | null;
+  };
+  grandFinale: { open: boolean; locked: boolean; deadlineAt: string | null; hasPrediction: boolean };
   recentJoins: { name: string; joinedAt: string }[];
   tookLead: boolean;
 };
@@ -49,7 +57,7 @@ export async function computeLeagueHomeSummary(
       .from("league_members")
       .select("user_id, co_manager_id, joined_at, profiles!league_members_user_id_fkey(display_name)")
       .eq("league_id", league.id),
-    supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points").eq("league_id", league.id),
+supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points").eq("league_id", league.id),
   ]);
 
   // A co-manager's auth uid never matches a manager_id/user_id column
@@ -95,31 +103,33 @@ export async function computeLeagueHomeSummary(
 
   let lockAt: string | null = null;
   let curtainCallPicksDue = false;
+  let curtainCallState: CurtainCallState = "no_week";
+  let ownPrediction: { predicted_eliminated_couple_id: string | null; predicted_top_scorer_couple_id: string | null } | null =
+    null;
   if (curtainCallOn && upcomingEpisode) {
-    const { data } = await supabase.rpc("prediction_lock_at", {
-      p_league_id: league.id,
-      p_week_id: upcomingEpisode.id,
-    });
-    lockAt = data;
-    const isLocked = !!lockAt && new Date() >= new Date(lockAt);
-    // Don't nag about the next week's pick until the previous week's
-    // results are actually published — a league on its first week (no
-    // previous week at all) is unaffected.
-    const previousResultsPublished = !latestCompletedWeekId || !!latestCompletedResultsPublishedAt;
-    if (!isLocked && previousResultsPublished) {
-      const { data: ownPrediction } = await supabase
+    const [{ data: lockData }, { data: prediction }] = await Promise.all([
+      supabase.rpc("prediction_lock_at", { p_league_id: league.id, p_week_id: upcomingEpisode.id }),
+      supabase
         .from("predictions")
         .select("predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
         .eq("league_id", league.id)
         .eq("week_id", upcomingEpisode.id)
         .eq("manager_id", myTeamId)
-        .maybeSingle();
-      curtainCallPicksDue = !hasCurtainCallPicks(ownPrediction);
-    }
+        .maybeSingle(),
+    ]);
+    lockAt = lockData;
+    ownPrediction = prediction;
+    const locked = !!lockAt && new Date() >= new Date(lockAt);
+    // Don't nag about the next week's pick until the previous week's
+    // results are actually published — a league on its first week (no
+    // previous week at all) is unaffected.
+    const previousResultsPublished = !latestCompletedWeekId || !!latestCompletedResultsPublishedAt;
+    curtainCallState = locked ? "locked" : previousResultsPublished ? "open" : "awaiting_results";
+    curtainCallPicksDue = curtainCallState === "open" && !hasCurtainCallPicks(ownPrediction);
   }
 
-  let grandFinalePicksDue = false;
-  if (grandFinaleOn && !grandFinaleLocked) {
+  let hasGrandFinalePrediction = false;
+  if (grandFinaleOn) {
     const { data: ownGrandFinalePick } = await supabase
       .from("grand_finale_predictions")
       .select("manager_id")
@@ -127,8 +137,9 @@ export async function computeLeagueHomeSummary(
       .eq("manager_id", myTeamId)
       .limit(1)
       .maybeSingle();
-    grandFinalePicksDue = !ownGrandFinalePick;
+    hasGrandFinalePrediction = !!ownGrandFinalePick;
   }
+  const grandFinalePicksDue = grandFinaleOn && !grandFinaleLocked && !hasGrandFinalePrediction;
 
   const deadlineCandidates: { label: string; iso: string }[] = [];
   if (curtainCallPicksDue && lockAt && new Date(lockAt) > new Date()) {
@@ -151,6 +162,18 @@ export async function computeLeagueHomeSummary(
     danceCardOn,
     curtainCallOn,
     grandFinaleOn,
+    myTeamId,
+    curtainCall: {
+      state: curtainCallState,
+      eliminatedCoupleId: ownPrediction?.predicted_eliminated_couple_id ?? null,
+      topScorerCoupleId: ownPrediction?.predicted_top_scorer_couple_id ?? null,
+    },
+    grandFinale: {
+      open: grandFinaleOn && !grandFinaleLocked,
+      locked: grandFinaleLocked,
+      deadlineAt: grandFinaleDeadline,
+      hasPrediction: hasGrandFinalePrediction,
+    },
     recentJoins: (members ?? [])
       .filter((m) => !isOwnMembership(m, userId) && new Date(m.joined_at).getTime() >= joinCutoffMs)
       .map((m) => ({ name: m.profiles?.display_name ?? "Someone", joinedAt: m.joined_at })),
