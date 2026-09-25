@@ -12,7 +12,6 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 Shipped in `b4254a8`; the user checked it on their phone. Still open:
 
-- **Spoiler-Free check of Grand Finale "Next elim"** on a test account that is a week behind: the name must not advance past an elimination that account hasn't watched. It reuses `nextPredictedElimination` over `spoilerSafeCoupleStatus` couples (`loadModuleStackInputs`), but the clamp was never exercised against real Spoiler-Free data.
 - **Home curtain banner restructure is on hold** (status-first stack, dimmed week rail, `h-28` to ~`h-36`). It waits for the mock that also covers the persistent Spoiler-Free banner below. The rest of the Home/Your Leagues triage plan (tap routing, cards, per-module status) shipped; the expand-on-due-card idea was replaced by the two-button row.
 - **Recent Activity card** on Home still has the doubled card + row padding that the Leagues card had (only Leagues This Week was fixed).
 - **Double-elimination weeks:** the Curtain Call stack only tracks Home and High; the second Home slot (`predicted_eliminated_couple_id_2`) is ignored on purpose.

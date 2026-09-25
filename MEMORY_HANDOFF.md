@@ -1,7 +1,7 @@
 # Session Handoff
 
 ## 1. Current State
-**The Manage Leagues (`/leagues`) triage rebuild is committed and pushed** (`b4254a8` on `origin/main`); the user checked it on their phone and signed off (Home spacing, cards, buttons, Spoiler-Free "Week N" hiding). `tsc --noEmit`, `eslint src` and 439 tests pass. **`npm run build` has not been run** (a dev server holds port 3000). Grand Finale "Next elim" under a Spoiler-Free viewer who is behind was **not** verified against real data. The live score reveal from the previous session is also still unchecked on a real episode night (see BACKLOG.md).
+**The Manage Leagues (`/leagues`) triage rebuild is committed and pushed** (`b4254a8` on `origin/main`); the user checked it on their phone and signed off (Home spacing, cards, buttons, Spoiler-Free "Week N" hiding). `tsc --noEmit`, `eslint src` and 439 tests pass. **`npm run build` has not been run** (a dev server holds port 3000). The user also confirmed Grand Finale "Next elim" behaves under a Spoiler-Free viewer who is behind. The live score reveal from the previous session is also still unchecked on a real episode night (see BACKLOG.md).
 
 What shipped:
 - **Manage Leagues:** titled "Manage Leagues" with the live "Week N" once under it (hidden but space-reserved for a Spoiler-Free viewer who is behind), stacked small Create / Join. One `LeagueTriageCard` per league: name + status pill, rank · pts, a Curtain Call / Dance Card / Grand Finale stack (emoji labels, right-aligned italic "Locked" / "Locks in …", gold "Need …"), then Make/Edit/Locked Picks, Open Standings, and an icon-only gear to League Settings. Due leagues get a slim gold left edge. Picks-due leagues sort first.
@@ -23,6 +23,6 @@ Ours (all committed and pushed in `b4254a8`): `CLAUDE.md`, `src/app/leagues/page
 - Never `npm run build` / `rm -rf .next` while a dev server holds port 3000. Shared working dir: `git fetch` + `git status -sb` first; stage by name, never `git add -A`.
 
 ## 4. Backlog & Next Steps
-Deferred work is in [BACKLOG.md](BACKLOG.md), top of file in priority order: (1) check the live reveal on a real episode night and run `npm run build` once no dev server is running, (2) show the viewer's own points in Dance Card League at a Glance (verified still open), (3) split Scores and Enter Results into separate pages (verified still open). New "Manage Leagues follow-ups" section covers the Spoiler-Free "Next elim" check, the held Home banner restructure, and Recent Activity padding.
+Deferred work is in [BACKLOG.md](BACKLOG.md), top of file in priority order: (1) check the live reveal on a real episode night and run `npm run build` once no dev server is running, (2) show the viewer's own points in Dance Card League at a Glance (verified still open), (3) split Scores and Enter Results into separate pages (verified still open). New "Manage Leagues follow-ups" section covers the held Home banner restructure and Recent Activity padding.
 
 `git fetch && git status -sb`
