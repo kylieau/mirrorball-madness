@@ -1,3 +1,4 @@
+import { ScrollFade } from "@/components/scroll-fade";
 import { cn } from "cn";
 import { YouPill } from "@/components/you-pill";
 import { formatPoints } from "@/lib/format-points";
@@ -21,7 +22,10 @@ export function CouplesLeaderboard({ rows }: { rows: CoupleLeaderboardRow[] }) {
     <section id="couples" className="mt-6 scroll-mt-4">
       <h2 className="font-heading text-lg font-semibold text-accent">Couples Leaderboard</h2>
 
-      <div className="mt-3 h-96 overflow-y-auto overscroll-contain rounded-2xl border border-primary/45 bg-card">
+      <ScrollFade
+        outerClassName="mt-3 overflow-hidden rounded-2xl border border-primary/45 bg-card"
+        className="h-96 overscroll-contain"
+      >
         <div
           className={cn(
             COLUMNS,
@@ -83,7 +87,7 @@ export function CouplesLeaderboard({ rows }: { rows: CoupleLeaderboardRow[] }) {
             );
           })}
         </ol>
-      </div>
+      </ScrollFade>
     </section>
   );
 }

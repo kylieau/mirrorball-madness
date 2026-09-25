@@ -7,6 +7,7 @@ import { DeadlineStub } from "@/components/deadline-stub";
 import { EpisodeBanner } from "@/components/episode-banner";
 import { LeagueStatusPill } from "@/components/league-status-pill";
 import { leagueTapHref } from "@/lib/league-triage";
+import { ScrollFade } from "@/components/scroll-fade";
 import { SpoilerRevealCallout } from "@/components/spoiler-reveal-callout";
 import type { EpisodeBannerInput, EpisodeBannerState } from "@/lib/episode-banner";
 import type { ActivityLine } from "@/lib/home-activity";
@@ -111,7 +112,7 @@ export function HomeDashboard({
             Recent Activity
           </div>
           <Card className="py-0">
-            <CardContent className="flex h-72 flex-col overflow-y-auto">
+            <ScrollFade className="flex h-72 flex-col px-4">
               {recentActivity.map((line) => (
                 <p
                   key={line.key}
@@ -135,7 +136,7 @@ export function HomeDashboard({
                   {line.weekLabel && <span className="shrink-0 text-xs">{line.weekLabel}</span>}
                 </p>
               ))}
-            </CardContent>
+            </ScrollFade>
           </Card>
         </>
       )}

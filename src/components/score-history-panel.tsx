@@ -1,5 +1,6 @@
 "use client";
 
+import { ScrollFade } from "@/components/scroll-fade";
 import { useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { cn } from "cn";
@@ -51,7 +52,7 @@ export function ScoreHistoryPanel({ target, result }: { target: HistoryTarget; r
   const totalPoints = formatPoints(isAll ? target.totals.season : combinedTotal);
 
   return (
-    <div className="h-72 overflow-y-auto overscroll-contain bg-card px-3 pb-2">
+    <ScrollFade className="h-72 overscroll-contain bg-card px-3 pb-2">
       <div className="sticky top-0 z-10 -mx-3 flex h-10 items-center gap-1.5 overflow-x-auto bg-card px-3">
         <Chip active={isAll} onClick={() => setSelected([])}>
           All
@@ -142,6 +143,6 @@ export function ScoreHistoryPanel({ target, result }: { target: HistoryTarget; r
           </ul>
         </section>
       ))}
-    </div>
+    </ScrollFade>
   );
 }
