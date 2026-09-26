@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 
@@ -6,6 +7,15 @@ import { Button } from "@/components/ui/button";
 // routes each render their own header (in-league topbar, or a back-nav
 // elsewhere) — see design/mockups.html, which has no persistent global chrome.
 export async function SiteHeader() {
+  // Dev-only preview route. Skip the auth lookup so the harness can render
+  // without Supabase credentials; production never sets this header.
+  if (
+    process.env.NODE_ENV === "development" &&
+    (await headers()).get("x-preview-harness") === "1"
+  ) {
+    return null;
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
