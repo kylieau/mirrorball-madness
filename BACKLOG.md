@@ -4,15 +4,28 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Up next, in order
 
-1. **Live score reveal: check it on a real episode night** — see its section below. The feature is built.
+1. **Check everything in "Built but not checked" below**, starting with Tuesday's episode (live score reveal, curtain states, Spoiler-Free strip and prompt).
 2. **Dance Card League at a Glance: show the viewer's own points.** Every other manager's row shows the points gained that week, but the viewer is excluded (their picks are the card above), so their own week total isn't in the list. Add the viewer's own row/total so the list reads complete.
 3. **Split Scores and Enter Results into genuinely separate pages.** Both still live on one page, `/admin/results`, switched by `?tab=`. They are separate things (Scores is the read/view side; Enter Results is entry/propose/publish), and sharing one page risks state or behavior leaking between them. Give each its own route and keep the three access tiers (View / Propose / Publish) enforced per action as today.
+
+## Built but not checked in a browser or on a real episode (needs a phone, or Tuesday's episode)
+
+Everything below is committed and pushed (`49c0887`, `afe8716`, `72934f2`, `60435fa`), passes `tsc`, `eslint src`, 441 tests and `npm run build`, and was never seen running: the container has no browser, and the states depend on the episode clock or on scores posting. Next real episode: Tuesday 2026-09-29, 8pm ET / 5pm PT (West feed 11pm ET / 8pm PT).
+
+- **Home curtain** (`episode-banner.tsx`, copy in `statusCopy`). Only one chip state has been seen on a phone. Check each of the seven states (Picks Open, Picks Locked, On Air Now, Hold the Curtain, West Coast "Let's Dance", Results Soon, Scores Are In): the `Week N · {chip}` fits on one line beside the live dot (C and G), the fixed `h-48` height holds a two-line title ("Hold the Curtain", 💃Let's Dance🕺), the sub's viewer-local time reads "Today 5 PM PT" style, and the seven-node rail's NOW/NEXT label sits correctly (A, B, F, E = NEXT; C, D, G = NOW; D stays on the current week). A time-mocked check of all states (feed `EpisodeBannerInput` fixtures at 390px) was never done. Picks Locked is only reachable when a league sets a lock lead above 0 hours, or on Night 2. Curtain Call off swaps in "Curtain Up Soon" / "Time to Vote" copy (unseen).
+- **Spoiler-Free strip on Home** (`spoiler-free-strip.tsx`): "Spoiler-Free · Week N scores posting now" must stay on one line at 390px (it truncates if not; shorten the copy or button to "Mark" if it clips). Ready and Watching-live states are unseen. The strip pins under the top bar via `--sticky-header-h`; the old curtain sticky bar was removed, so Spoiler-Free-off viewers now have nothing pinned on Home.
+- **Mark sheet**: single-week vs two-or-more-weeks-behind flows, "Choose an Earlier Week ›", the vertical "I've Watched Through" radio list, "Mark Through Week N", plain-text (no hover button) links, and the always-latest default. Live-posting week keeps its own description ("…plus anything else posted tonight, including who goes home"); every other case reads "Scores, dances, and eliminations will show through this week."
+- **`LiveScoresPrompt`** (`live-scores-prompt.tsx`): opens once per week per device when a Spoiler-Free viewer opens Home with an unmarked posting week; Dismiss persists via `usePersistedState`; both action buttons run the same mark. Also unverified: Home auto-refreshing every 20s while any week is revealing or the West window is open (so the prompt appears without a reload), and the strip flipping to "Watching live · Week N" after opting in and back to the Ready strip (or nothing) after the final publish.
+- **Settings "I last watched" picker** (`watched-through-setting.tsx`, `use-spoiler-progress.ts`, `spoiler-progress.ts`): lists fully published weeks newest first, moves the mark forward or back, prefetches after paint. Check there is no pop-in or lag when the sheet opens, that the disabled "…" placeholder is brief when toggling Spoiler-Free on, and that a live-marked week still shows as the current value.
+- **Create / Join buttons on Home** reverted to solid + outline at `xs` size (`afe8716`); the older larger size was not restored.
+- **Bottom fade on inner scrollers** (`ScrollFade`, `e5aabcb`) still unchecked on a device.
+- **Live score reveal** (per-couple publish/undo, Finish Week) still needs a real episode night, ideally a low-stakes one; see its section below.
 
 ## Manage Leagues (`/leagues`) follow-ups
 
 Shipped in `b4254a8`; the user checked it on their phone. Still open:
 
-- **Home curtain banner restructure is on hold** (status-first stack, dimmed week rail, `h-28` to ~`h-36`). It waits for the mock that also covers the persistent Spoiler-Free banner below. The rest of the Home/Your Leagues triage plan (tap routing, cards, per-module status) shipped; the expand-on-due-card idea was replaced by the two-button row.
+- **Home curtain banner restructure** shipped (status-first curtain, `49c0887`); it is in the unchecked list above.
 - **Double-elimination weeks:** the Curtain Call stack only tracks Home and High; the second Home slot (`predicted_eliminated_couple_id_2`) is ignored on purpose, since a double is only known once the episode airs.
 - **Module status wording** is the user's spec (`buildModuleStack`, `src/lib/league-triage.ts`); change it there, tests are in `league-triage.test.ts`.
 
@@ -24,11 +37,6 @@ Shipped in `b4254a8`; the user checked it on their phone. Still open:
 ## Spoiler-Free strip: extend past Home (built on Home only, awaiting review)
 
 `SpoilerFreeStrip` is live on Home and replaces the old callout and auto-opening dialog; the curtain's own sticky bar is gone (its `Week N · status` is now the curtain's top chip). Still open, pending the user's judgement of Home: the same strip on Results / Picks / Standings (under the league switcher there), and retiring the in-context mark buttons (`WeeklyResultsView`, `AllResultsView`, `PastPicksCard`, `RecastCatchUpCard`). Those mark a specific week, so decide which week a global strip marks when a viewer is 2+ weeks behind before removing them.
-
-## To check on the Tuesday episode (Spoiler-Free strip and curtain)
-
-- The "Spoiler-Free · Week N scores posting now" strip stays on one line at 390px, and its sheet works mid-reveal.
-- The curtain's two-line titles ("Hold the Curtain", 💃Let's Dance🕺) fit the fixed height, and each of the seven chip states fits on one line with its dot.
 
 ## Spoiler-Free "watching live" prompt (built, unchecked on a real episode night)
 
