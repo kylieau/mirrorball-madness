@@ -25,11 +25,11 @@ function SubmitButton({ idleLabel, pendingLabel }: { idleLabel: string; pendingL
   );
 }
 
-export function CreateJoinLeagueDialogs({ quiet = false, stacked = false }: { quiet?: boolean; stacked?: boolean }) {
+export function CreateJoinLeagueDialogs({ stacked = false }: { stacked?: boolean }) {
   return (
     <div className={stacked ? "flex flex-col items-stretch gap-1.5" : "flex gap-2"}>
       <Dialog>
-        <DialogTrigger render={<Button variant={quiet ? "ghost" : "default"} size="xs" />}>
+        <DialogTrigger render={<Button size="xs" />}>
           + Create a League
         </DialogTrigger>
         <DialogContent>
@@ -72,7 +72,7 @@ export function CreateJoinLeagueDialogs({ quiet = false, stacked = false }: { qu
       </Dialog>
 
       <Dialog>
-        <DialogTrigger render={<Button variant={quiet ? "ghost" : "outline"} size="xs" />}>
+        <DialogTrigger render={<Button variant="outline" size="xs" />}>
           Join with Code
         </DialogTrigger>
         <DialogContent>

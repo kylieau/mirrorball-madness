@@ -103,7 +103,7 @@ export function HomeDashboard({
       </Card>
 
       <div className="mt-3">
-        <CreateJoinLeagueDialogs quiet />
+        <CreateJoinLeagueDialogs />
       </div>
 
       {recentActivity.length > 0 && (
