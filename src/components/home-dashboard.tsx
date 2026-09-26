@@ -8,7 +8,7 @@ import { EpisodeBanner } from "@/components/episode-banner";
 import { LeagueStatusPill } from "@/components/league-status-pill";
 import { leagueTapHref } from "@/lib/league-triage";
 import { ScrollFade } from "@/components/scroll-fade";
-import { SpoilerRevealCallout } from "@/components/spoiler-reveal-callout";
+import { SpoilerFreeStrip, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
 import type { EpisodeBannerInput, EpisodeBannerState } from "@/lib/episode-banner";
 import type { ActivityLine } from "@/lib/home-activity";
 import { formatCountdown } from "@/lib/format-countdown";
@@ -29,13 +29,13 @@ export function HomeDashboard({
   leagues,
   deadlines,
   recentActivity,
-  pendingReveal,
+  spoilerFreeStrip,
   episodeBanner,
 }: {
   leagues: HomeLeague[];
   deadlines: { leagueId: string; leagueName: string; iso: string }[];
   recentActivity: ActivityLine[];
-  pendingReveal: { weekNumber: number; inProgress?: boolean } | null;
+  spoilerFreeStrip: SpoilerFreeStripState | null;
   episodeBanner: { input: EpisodeBannerInput; initialState: EpisodeBannerState | null };
 }) {
   // Picks-due leagues lead so the cap never hides the one that needs attention.
@@ -49,9 +49,12 @@ export function HomeDashboard({
 
   return (
     <div>
-      <EpisodeBanner {...episodeBanner} />
+      {spoilerFreeStrip && <SpoilerFreeStrip
+          key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${spoilerFreeStrip.earlierWeeks.join()}`}
+          state={spoilerFreeStrip}
+        />}
 
-      {pendingReveal && <SpoilerRevealCallout weekNumber={pendingReveal.weekNumber} inProgress={pendingReveal.inProgress} />}
+      <EpisodeBanner {...episodeBanner} />
 
       {deadlines.length > 0 && (
         <div className="mb-4">

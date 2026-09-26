@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { cn } from "cn";
 import {
   computeEpisodeBannerState,
@@ -14,55 +14,63 @@ import { formatAirsAt } from "@/lib/format-airs";
 import { formatEpisodeCasual } from "@/lib/format-week";
 
 // Total season length isn't known, so the track shows what's done, the
-// current week, and a few hollow dots that fade out instead of a real "N of M".
-const FUTURE_DOTS = 3;
+// current week, and hollow dots that fade out instead of a real "N of M". It
+// holds seven nodes early in the season, then grows with the checked weeks.
+const TRACK_NODES = 7;
+const MIN_FUTURE_DOTS = 3;
+
+// Titles longer than this drop a size step so the fixed-height curtain still fits.
+const SHORT_TITLE_MAX = 12;
 
 const CURTAIN_FOLDS =
   "bg-[repeating-linear-gradient(90deg,#5c1022_0_9px,#7d1a33_9px_18px,#5c1022_18px_27px)]";
 
-type BannerCopy = { title: string | null; sub: string | null; sticky: string | null };
+type BannerCopy = { chip: string; title: string | null; sub: string | null; live: boolean };
 
-function statusCopy(state: EpisodeBannerState, airsAtLabel: string, upNextWeek: number | null): BannerCopy {
-  const airs = (prefix: string) => (airsAtLabel ? `${prefix}Airs ${airsAtLabel}` : null);
+const LETS_DANCE = "💃Let's Dance🕺";
+
+// Chip = where the broadcast is, title = what the league can do, sub = what
+// changes next. Times are viewer-local, so the labels arrive after mount.
+function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
+  const at = (prefix: string) => (timeLabel ? `${prefix} · ${timeLabel}` : null);
   switch (state.kind) {
     case "picks_open":
       return {
-        title: state.picksModuleOn ? "Picks open" : null,
-        sub: airs(""),
-        sticky: state.picksModuleOn ? "Picks open" : null,
+        chip: "Curtain Up Soon",
+        title: state.picksModuleOn ? "Picks Open" : "Curtain Up Soon",
+        sub: at("Live On Air"),
+        live: false,
       };
     case "picks_locked":
-      return { title: "Picks open", sub: airs("Picks locked · "), sticky: "Picks locked" };
+      return { chip: "Curtain Up Soon", title: "Picks Locked", sub: at("Live On Air"), live: false };
     case "on_air":
-      return { title: "On Air Now", sub: state.picksModuleOn ? "Picks are locked" : null, sticky: "On Air Now" };
-    case "results_soon":
-      return { title: "Results soon", sub: "Scores post after the show", sticky: "Results soon" };
-    case "results_in":
       return {
-        title: "Results in",
-        sub: upNextWeek === null ? "Standings are updated" : `Standings are updated · ${formatEpisodeCasual(upNextWeek)} up next`,
-        sticky: "Results in",
+        chip: "On Air Live ET",
+        title: LETS_DANCE,
+        sub: state.picksModuleOn ? "Picks Locked · Time to Vote" : "Time to Vote",
+        live: true,
       };
     case "west_soon":
-      return { title: "Pacific feed at 8pm", sub: "Spoilers can wait", sticky: "Pacific feed 8pm" };
+      return { chip: "Spoiler Lockdown", title: "Hold the Curtain", sub: at("West Coast Showtime"), live: false };
     case "west_watching":
-      return { title: "West Coast is watching", sub: "Spoilers can wait", sticky: "Pacific feed on" };
+      return { chip: "On Air · Live PT", title: LETS_DANCE, sub: "No spoilers, darling", live: true };
+    case "results_soon":
+      return { chip: "Curtain Closed", title: "Results Soon", sub: "Tallying the scores", live: false };
+    case "results_in":
+      return { chip: "That's a Wrap", title: "Scores Are In", sub: "See where you landed", live: false };
   }
 }
 
-function SeasonTrack({ weeksDone, currentWeek, upNext }: SeasonTrackModel) {
+function SeasonTrack({ weeksDone, currentWeek, marker }: SeasonTrackModel) {
   const dots = [
     ...Array.from({ length: weeksDone }, () => ({ kind: "done" as const, label: "✓" })),
     ...(currentWeek === null ? [] : [{ kind: "current" as const, label: String(currentWeek) }]),
-    ...Array.from({ length: FUTURE_DOTS }, () => ({ kind: "future" as const, label: "" })),
+    ...Array.from({ length: Math.max(MIN_FUTURE_DOTS, TRACK_NODES - 1 - weeksDone) }, () => ({ kind: "future" as const, label: "" })),
   ];
 
   return (
     <div
-      className={cn(
-        "flex w-full items-center px-1.5",
-        upNext ? "relative -top-2.5 overflow-x-clip overflow-y-visible pb-3" : "overflow-hidden"
-      )}
+      className="flex w-full items-center overflow-hidden px-1.5 pb-4 opacity-60"
       aria-hidden
     >
       {dots.map((dot, i) => (
@@ -79,9 +87,9 @@ function SeasonTrack({ weeksDone, currentWeek, upNext }: SeasonTrackModel) {
             >
               {dot.label}
             </span>
-            {dot.kind === "current" && upNext && (
-              <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap text-[8px] font-medium text-accent">
-                Up next
+            {dot.kind === "current" && (
+              <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap text-[8px] font-medium uppercase tracking-wider text-accent">
+                {marker === "now" ? "Now" : "Next"}
               </span>
             )}
           </span>
@@ -119,98 +127,60 @@ export function EpisodeBanner({
     return () => clearTimeout(timer);
   }, [input]);
 
-  const airsIso = state?.kind === "picks_open" || state?.kind === "picks_locked" ? state.airsAtIso : null;
-  const [airsAtLabel, setAirsAtLabel] = useState("");
+  const timeIso =
+    state?.kind === "picks_open" || state?.kind === "picks_locked"
+      ? state.airsAtIso
+      : state?.kind === "west_soon"
+        ? state.westStartIso
+        : null;
+  const [timeLabel, setTimeLabel] = useState("");
   useEffect(() => {
-    setAirsAtLabel(airsIso ? formatAirsAt(airsIso) : "");
-  }, [airsIso, state]);
-
-  const visible = state !== null;
-  const bannerRef = useRef<HTMLDivElement>(null);
-  const [scrolledPast, setScrolledPast] = useState(false);
-  useEffect(() => {
-    const el = bannerRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(([entry]) => setScrolledPast(!entry.isIntersecting));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [visible]);
+    setTimeLabel(timeIso ? formatAirsAt(timeIso) : "");
+  }, [timeIso, state]);
 
   if (!state) return null;
 
   const track = seasonTrack(input.weeks, state);
-  const { title, sub, sticky } = statusCopy(state, airsAtLabel, track.upNext ? track.currentWeek : null);
+  const { chip, title, sub, live } = statusCopy(state, timeLabel);
   const weekLabel = formatEpisodeCasual(state.weekNumber);
-  const onAir = state.kind === "on_air";
 
   return (
-    <>
+    <div className="relative mb-4 h-48 overflow-hidden rounded-2xl bg-[radial-gradient(ellipse_at_50%_62%,rgba(255,232,170,0.4),rgba(255,232,170,0.07)_58%,#14060f_88%)] shadow-[0_6px_22px_rgba(0,0,0,0.45)]">
+      <div className="absolute inset-x-0 top-0 z-10 h-1.5 border-b-2 border-primary bg-linear-to-b from-[#3b0a17] to-[#5c1022]" />
       <div
-        ref={bannerRef}
-        className="relative mb-4 h-28 overflow-hidden rounded-2xl bg-[radial-gradient(ellipse_at_50%_62%,rgba(255,232,170,0.4),rgba(255,232,170,0.07)_58%,#14060f_88%)] shadow-[0_6px_22px_rgba(0,0,0,0.45)]"
-      >
-        <div className="absolute inset-x-0 top-0 z-10 h-1.5 border-b-2 border-primary bg-linear-to-b from-[#3b0a17] to-[#5c1022]" />
-        <div
-          className={cn(
-            "absolute inset-y-0 left-0 w-[13%] rounded-br-[50%_18%] border-r-2 border-primary/80 shadow-[inset_0_-20px_28px_rgba(0,0,0,0.35)]",
-            CURTAIN_FOLDS
-          )}
-        />
-        <div
-          className={cn(
-            "absolute inset-y-0 right-0 w-[13%] rounded-bl-[50%_18%] border-l-2 border-primary/80 shadow-[inset_0_-20px_28px_rgba(0,0,0,0.35)]",
-            CURTAIN_FOLDS
-          )}
-        />
-        <div className="absolute inset-y-0 top-2 right-[13%] left-[13%] flex flex-col items-center justify-center gap-2 pt-0.5">
-          <div className="flex items-center gap-3">
-            <div className="text-center leading-none">
-              <span className="block pl-[0.22em] text-[8.5px] font-semibold uppercase tracking-[0.22em] text-primary">
-                Week
-              </span>
-              <span className="mt-0.5 block font-heading text-4xl font-black text-foreground [text-shadow:0_0_22px_rgba(255,220,130,0.6)]">
-                {state.weekNumber}
-              </span>
-            </div>
-            <div>
-              {title && (
-                <p className="flex items-center text-[13px] font-semibold text-foreground">
-                  {onAir && (
-                    <span className="mr-1.5 inline-block size-[7px] rounded-full bg-[#ff4d5e]" />
-                  )}
-                  {title}
-                </p>
-              )}
-              {sub && <p className="mt-px text-[11px] text-accent">{sub}</p>}
-            </div>
-          </div>
+        className={cn(
+          "absolute inset-y-0 left-0 w-[13%] rounded-br-[50%_18%] border-r-2 border-primary/80 shadow-[inset_0_-20px_28px_rgba(0,0,0,0.35)]",
+          CURTAIN_FOLDS
+        )}
+      />
+      <div
+        className={cn(
+          "absolute inset-y-0 right-0 w-[13%] rounded-bl-[50%_18%] border-l-2 border-primary/80 shadow-[inset_0_-20px_28px_rgba(0,0,0,0.35)]",
+          CURTAIN_FOLDS
+        )}
+      />
+      <div className="relative mx-[13%] flex h-full flex-col items-center justify-center gap-2 px-3 pt-2 text-center">
+        <p className="flex items-center gap-1.5 rounded-full border border-primary/60 bg-black/30 px-3 py-1 text-xs font-semibold text-primary">
+          {live && <span className="inline-block size-[7px] rounded-full bg-[#ff4d5e]" />}
+          {weekLabel}
+          <span className="opacity-50">·</span>
+          {chip}
+        </p>
+        {title && (
+          <p
+            className={cn(
+              "text-balance font-heading font-black leading-tight text-foreground [text-shadow:0_0_22px_rgba(255,220,130,0.45)]",
+              title.length > SHORT_TITLE_MAX ? "text-2xl" : "text-3xl"
+            )}
+          >
+            {title}
+          </p>
+        )}
+        {sub && <p className="text-[13px] text-accent">{sub}</p>}
+        <div className="mt-1 w-full">
           <SeasonTrack {...track} />
         </div>
       </div>
-
-      <div className="sticky top-[var(--sticky-header-h,0px)] z-30 h-0" aria-hidden>
-        <div
-          className={cn(
-            "absolute inset-x-0 top-0 overflow-hidden rounded-b-xl border-b-2 border-primary shadow-[0_8px_18px_rgba(0,0,0,0.5)] transition duration-200 motion-reduce:transition-none",
-            CURTAIN_FOLDS,
-            scrolledPast ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0"
-          )}
-        >
-          <div className="absolute inset-0 bg-linear-to-r from-black/5 via-black/55 to-black/5" />
-          <p className="relative flex h-10 items-center gap-2 px-4 text-[13px] font-semibold text-foreground">
-            {onAir && (
-              <span className="inline-block size-[7px] rounded-full bg-[#ff4d5e]" />
-            )}
-            <span className="font-heading text-[15px] font-black text-primary">{weekLabel}</span>
-            {sticky && (
-              <>
-                <span className="opacity-40">·</span>
-                <span>{sticky}</span>
-              </>
-            )}
-          </p>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }

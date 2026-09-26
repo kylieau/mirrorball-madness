@@ -4,7 +4,7 @@ export type EpisodeBannerState =
   | { kind: "on_air"; weekNumber: number; picksModuleOn: boolean }
   | { kind: "results_soon"; weekNumber: number }
   | { kind: "results_in"; weekNumber: number }
-  | { kind: "west_soon"; weekNumber: number }
+  | { kind: "west_soon"; weekNumber: number; westStartIso: string }
   | { kind: "west_watching"; weekNumber: number };
 
 // Matches the episodes.duration_minutes column default.
@@ -73,7 +73,9 @@ function westFeedState(weeks: BannerWeek[], now: Date): EpisodeBannerState | nul
       const westStart = pacificClockOnSameDay(airs, WEST_FEED_START_HOUR);
       const westEnd = pacificClockOnSameDay(airs, WEST_FEED_END_HOUR);
       if (now >= westStart && now < westEnd) return { kind: "west_watching", weekNumber: week.weekNumber };
-      if (now >= eastEnd && now < westStart) return { kind: "west_soon", weekNumber: week.weekNumber };
+      if (now >= eastEnd && now < westStart) {
+        return { kind: "west_soon", weekNumber: week.weekNumber, westStartIso: westStart.toISOString() };
+      }
     }
   }
   return null;
@@ -83,22 +85,25 @@ function isComplete(week: BannerWeek): boolean {
   return week.episodes.length > 0 && week.episodes.every((episode) => episode.completed);
 }
 
+const LIVE_MARKER_KINDS = new Set<EpisodeBannerState["kind"]>(["on_air", "west_watching", "results_soon"]);
+
 export type SeasonTrackModel = {
   weeksDone: number;
   // The week on the glowing circle; null when a finished season has no next week.
   currentWeek: number | null;
-  upNext: boolean;
+  // "now" while that week is on air or awaiting results, "next" while it is still to come.
+  marker: "now" | "next";
 };
 
 // Normally the banner's own week is the glowing circle and earlier completed
 // weeks are checked. Once that week is fully published (Results in) it is
-// checked too, and the circle moves on to the next week, labelled "up next".
+// checked too, and the circle moves on to the next week.
 export function seasonTrack(weeks: BannerWeek[], state: EpisodeBannerState): SeasonTrackModel {
   if (state.kind !== "results_in") {
     return {
       weeksDone: weeks.filter((week) => week.weekNumber < state.weekNumber && isComplete(week)).length,
       currentWeek: state.weekNumber,
-      upNext: false,
+      marker: LIVE_MARKER_KINDS.has(state.kind) ? "now" : "next",
     };
   }
   const nextWeek = weeks
@@ -107,7 +112,7 @@ export function seasonTrack(weeks: BannerWeek[], state: EpisodeBannerState): Sea
   return {
     weeksDone: weeks.filter((week) => week.weekNumber <= state.weekNumber && isComplete(week)).length,
     currentWeek: nextWeek?.weekNumber ?? null,
-    upNext: true,
+    marker: "next",
   };
 }
 

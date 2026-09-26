@@ -4,8 +4,8 @@ function startOfLocalDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
-// "Today 5 PM PDT", "Tomorrow 5 PM PDT", "Tuesday 5 PM PDT" within the next
-// week, "Tue, Oct 6 5 PM PDT" beyond. Runs in the viewer's own time zone, so
+// "Today 5 PM PT", "Tomorrow 5 PM PT", "Tuesday 5 PM PT" within the next
+// week, "Tue, Oct 6 5 PM PT" beyond (US zones drop daylight/standard). Runs in the viewer's own time zone, so
 // call it client-side after mount (see useFormattedDeadline).
 export function formatAirsAt(iso: string, now: Date = new Date()): string {
   const airs = new Date(iso);
@@ -14,7 +14,9 @@ export function formatAirsAt(iso: string, now: Date = new Date()): string {
     hour: "numeric",
     ...(airs.getMinutes() !== 0 ? { minute: "2-digit" as const } : {}),
     timeZoneName: "short",
-  }).format(airs);
+  })
+    .format(airs)
+    .replace(/([A-Z])[DS]T$/, "$1T");
 
   let day: string;
   if (daysAway === 0) day = "Today";

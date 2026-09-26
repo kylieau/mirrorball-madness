@@ -127,6 +127,7 @@ describe("computeEpisodeBannerState", () => {
       expect(computeEpisodeBannerState(input(weeks), at("2026-09-23T02:30:00Z"))).toEqual({
         kind: "west_soon",
         weekNumber: 2,
+        westStartIso: "2026-09-23T03:00:00.000Z",
       });
       expect(computeEpisodeBannerState(input(weeks), at("2026-09-23T03:30:00Z"))).toEqual({
         kind: "west_watching",
@@ -209,8 +210,19 @@ describe("seasonTrack", () => {
     expect(seasonTrack(weeks, { kind: "on_air", weekNumber: 2, picksModuleOn: true })).toEqual({
       weeksDone: 1,
       currentWeek: 2,
-      upNext: false,
+      marker: "now",
     });
+  });
+
+  it("marks a week that has not aired yet as next, and the Pacific wait as next too", () => {
+    const weeks = [done(1), upcoming(2)];
+    const westSoon = { kind: "west_soon", weekNumber: 2, westStartIso: "2026-09-23T03:00:00.000Z" } as const;
+    expect(seasonTrack(weeks, { kind: "picks_open", weekNumber: 2, airsAtIso: AIRS, picksModuleOn: true }).marker).toBe("next");
+    expect(seasonTrack(weeks, westSoon).marker).toBe("next");
+  });
+
+  it("marks a week awaiting results as now", () => {
+    expect(seasonTrack([done(1), upcoming(2)], { kind: "results_soon", weekNumber: 2 }).marker).toBe("now");
   });
 
   it("checks a fully published week and moves the circle to the next week, up next", () => {
@@ -218,7 +230,7 @@ describe("seasonTrack", () => {
     expect(seasonTrack(weeks, { kind: "results_in", weekNumber: 2 })).toEqual({
       weeksDone: 2,
       currentWeek: 3,
-      upNext: true,
+      marker: "next",
     });
   });
 
@@ -226,7 +238,7 @@ describe("seasonTrack", () => {
     expect(seasonTrack([done(1), done(2)], { kind: "results_in", weekNumber: 2 })).toEqual({
       weeksDone: 2,
       currentWeek: null,
-      upNext: true,
+      marker: "next",
     });
   });
 });

@@ -10,6 +10,7 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { computeEpisodeBannerState, DEFAULT_EPISODE_DURATION_MINUTES, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
+import type { SpoilerFreeStripState } from "@/components/spoiler-free-strip";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 
 export default async function TodayPage() {
@@ -92,12 +93,20 @@ export default async function TodayPage() {
     }
   }
 
-  const pendingReveal =
-    accountSettingsData.spoilerFreeMode && revealing && (cutoff.lastWatchedWeek ?? 0) < revealing.week.week_number
-      ? { weekNumber: revealing.week.week_number, inProgress: true }
+  const unmarkedWeeks = groupedWeeks
+    .filter((week) => week.status === "completed" && week.week_number > (cutoff.lastWatchedWeek ?? 0))
+    .map((week) => week.week_number)
+    .sort((a, b) => a - b);
+  const stripWeek =
+    revealing && (cutoff.lastWatchedWeek ?? 0) < revealing.week.week_number
+      ? { kind: "posting" as const, weekNumber: revealing.week.week_number }
       : cutoff.pendingRevealEpisode
-        ? { weekNumber: cutoff.pendingRevealEpisode.week_number }
+        ? { kind: "ready" as const, weekNumber: cutoff.pendingRevealEpisode.week_number }
         : null;
+  const spoilerFreeStrip: SpoilerFreeStripState | null =
+    accountSettingsData.spoilerFreeMode && stripWeek
+      ? { ...stripWeek, earlierWeeks: unmarkedWeeks.filter((week) => week < stripWeek.weekNumber) }
+      : null;
 
   const leagues = summaries.map((s) => ({
     id: s.id,
@@ -178,7 +187,7 @@ export default async function TodayPage() {
           leagues={leagues}
           deadlines={deadlines}
           recentActivity={recentActivity}
-          pendingReveal={pendingReveal}
+          spoilerFreeStrip={spoilerFreeStrip}
           episodeBanner={{ input: episodeBannerInput, initialState: episodeBannerState }}
         />
       </div>
