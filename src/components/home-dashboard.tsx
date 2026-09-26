@@ -9,7 +9,7 @@ import { LiveScoresPrompt } from "@/components/live-scores-prompt";
 import { LeagueStatusPill } from "@/components/league-status-pill";
 import { leagueTapHref } from "@/lib/league-triage";
 import { ScrollFade } from "@/components/scroll-fade";
-import { SpoilerFreeStrip, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
+import type { SpoilerFreeStripState } from "@/components/spoiler-free-strip";
 import type { EpisodeBannerInput, EpisodeBannerState } from "@/lib/episode-banner";
 import type { ActivityLine } from "@/lib/home-activity";
 import { formatCountdown } from "@/lib/format-countdown";
@@ -50,16 +50,8 @@ export function HomeDashboard({
 
   return (
     <div>
-      {spoilerFreeStrip && (
-        <>
-          {spoilerFreeStrip.kind === "posting" && (
-            <LiveScoresPrompt weekNumber={spoilerFreeStrip.weekNumber} earlierWeeks={spoilerFreeStrip.earlierWeeks} />
-          )}
-          <SpoilerFreeStrip
-            key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
-            state={spoilerFreeStrip}
-          />
-        </>
+      {spoilerFreeStrip?.kind === "posting" && (
+        <LiveScoresPrompt weekNumber={spoilerFreeStrip.weekNumber} earlierWeeks={spoilerFreeStrip.earlierWeeks} />
       )}
 
       <EpisodeBanner {...episodeBanner} />

@@ -36,7 +36,7 @@ Shipped in `b4254a8`; the user checked it on their phone. Still open:
 
 ## Spoiler-Free strip: extend past Home (built on Home only, awaiting review)
 
-`SpoilerFreeStrip` is live on Home and replaces the old callout and auto-opening dialog; the curtain's own sticky bar is gone (its `Week N · status` is now the curtain's top chip). Still open, pending the user's judgement of Home: the same strip on Results / Picks / Standings (under the league switcher there), and retiring the in-context mark buttons (`WeeklyResultsView`, `AllResultsView`, `PastPicksCard`, `RecastCatchUpCard`). Those mark a specific week, so decide which week a global strip marks when a viewer is 2+ weeks behind before removing them.
+`SpoilerFreeStrip` is live on Home (Pattern B + Soft inset: sticky wordmark + avatar, mauve strip with one hairline directly under it; see `docs/design/spoiler-free-strip-placement/` and `docs/design/spoiler-free-strip-styles/`) and replaces the old callout and auto-opening dialog; the curtain's own sticky bar is gone (its `Week N · status` is now the curtain's top chip). Still open, pending the user's judgement of Home: the same strip on Results / Picks / Standings (under the league switcher there), and retiring the in-context mark buttons (`WeeklyResultsView`, `AllResultsView`, `PastPicksCard`, `RecastCatchUpCard`). Those mark a specific week, so decide which week a global strip marks when a viewer is 2+ weeks behind before removing them.
 
 ## Spoiler-Free "watching live" prompt (built, unchecked on a real episode night)
 

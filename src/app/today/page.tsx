@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cn } from "cn";
 import { createClient } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { HomeDashboard } from "@/components/home-dashboard";
@@ -10,7 +11,7 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { computeEpisodeBannerState, DEFAULT_EPISODE_DURATION_MINUTES, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
-import type { SpoilerFreeStripState } from "@/components/spoiler-free-strip";
+import { HomeSpoilerChrome, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 
 export default async function TodayPage() {
@@ -169,32 +170,49 @@ export default async function TodayPage() {
     ],
   });
 
-  return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
-      <TopBar {...accountSettingsData} email={user.email ?? ""} />
+  const dashboard = (
+    <HomeDashboard
+      leagues={leagues}
+      deadlines={deadlines}
+      recentActivity={recentActivity}
+      spoilerFreeStrip={spoilerFreeStrip}
+      episodeBanner={{ input: episodeBannerInput, initialState: episodeBannerState }}
+    />
+  );
 
-      <ScrollRevealBar
-        className="-mb-4"
-        bar={
-          <SlimTopBar
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col px-4">
+      {spoilerFreeStrip ? (
+        <>
+          <HomeSpoilerChrome
+            key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
             {...accountSettingsData}
             email={user.email ?? ""}
-            left={<span className="font-heading text-lg font-semibold">Home</span>}
+            state={spoilerFreeStrip}
           />
-        }
-      >
-        <PageHeader title="Home" />
-      </ScrollRevealBar>
-
-      <div className={BOTTOM_NAV_CLEARANCE}>
-        <HomeDashboard
-          leagues={leagues}
-          deadlines={deadlines}
-          recentActivity={recentActivity}
-          spoilerFreeStrip={spoilerFreeStrip}
-          episodeBanner={{ input: episodeBannerInput, initialState: episodeBannerState }}
-        />
-      </div>
+          <div className={cn("flex flex-col gap-4 pt-4", BOTTOM_NAV_CLEARANCE)}>
+            <PageHeader title="Home" />
+            {dashboard}
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-col gap-4 py-8">
+          <TopBar {...accountSettingsData} email={user.email ?? ""} />
+          <ScrollRevealBar
+            className="-mb-4"
+            bar={
+              <SlimTopBar
+                {...accountSettingsData}
+                email={user.email ?? ""}
+                left={<span className="font-heading text-lg font-semibold">Home</span>}
+              />
+            }
+          >
+            <PageHeader title="Home" />
+          </ScrollRevealBar>
+          <div className={BOTTOM_NAV_CLEARANCE}>{dashboard}</div>
+        </div>
+      )}
 
       <RevealAutoRefresh active={autoRefresh} />
       <FanBottomNav active="home" leagueId={firstLeagueId} />
