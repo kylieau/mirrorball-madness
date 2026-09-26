@@ -40,16 +40,17 @@ export function LiveScoresPrompt({ weekNumber, earlierWeeks }: { weekNumber: num
         <SheetHeader className="items-center">
           <SheetTitle className="font-heading text-xl font-semibold">Scores Have Started Posting</SheetTitle>
           <SheetDescription className="text-pretty">
-            {weekLabel} judges&apos; scores are going up. Follow live, catch up fully, or stay blind — you can return.
-            {earlierWeeks.length > 0 && " Both mark previous weeks as watched."}
+            {`${weekLabel} judges' scores are going up. Follow live, catch up fully, or stay blind${
+              earlierWeeks.length > 0 ? " — mark previous weeks as watched" : ""
+            }.`}
           </SheetDescription>
         </SheetHeader>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button size="lg" className="w-full" onClick={handleMark} disabled={pending}>
-          {pending ? "Marking..." : "Stay Updated — I'm Watching Live"}
+          {pending ? "Marking..." : "Stay Updated — I'm Watching Live (PT)"}
         </Button>
         <Button size="lg" variant="outline" className="w-full" onClick={handleMark} disabled={pending}>
-          Mark {weekLabel} Watched
+          Finished {weekLabel} (ET)
         </Button>
         <Button
           variant="ghost"
