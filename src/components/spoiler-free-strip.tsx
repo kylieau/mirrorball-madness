@@ -1,20 +1,24 @@
 "use client";
 
 // One Spoiler-Free status line for Home, shown only while there is a week to
-// unlock (caught-up viewers see nothing extra). It replaces the old in-flow callout
-// and its auto-opening dialog: the strip pins under the top bar, and marking a
-// week watched is always confirmed in a bottom sheet. "Mark Week N Watched"
-// advances last_watched_week, then lands on This Week for a finished week so
-// the newly revealed episode is the one on screen; a week still being posted
-// stays on the page.
+// unlock (caught-up viewers see nothing). Pattern B: it sits in HomeSpoilerChrome
+// directly under the sticky wordmark + avatar, and that stack stays stuck on
+// scroll. Soft inset (docs/design/spoiler-free-strip-styles): tinted mauve fill,
+// a single hairline under the stack, gold status dot, gold Mark Watched pill.
+// Marking a week watched is always confirmed in a bottom sheet. "Mark Week N
+// Watched" advances last_watched_week, then lands on This Week for a finished
+// week so the newly revealed episode is the one on screen; a week still being
+// posted stays on the page.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { TopBar } from "@/components/top-bar";
 import { markEpisodesWatchedThrough } from "@/app/this-week/actions";
 import { formatEpisodeCasual } from "@/lib/format-week";
+import type { AccountSettingsData } from "@/lib/account-settings-data";
 
 // weekNumber is the latest week that can be unlocked; earlierWeeks are the
 // unmarked weeks before it, which marking a later week unlocks too.
@@ -24,16 +28,39 @@ export type SpoilerFreeStripState =
 
 type MarkableState = Extract<SpoilerFreeStripState, { earlierWeeks: number[] }>;
 
+// Full-bleed row. Stickiness belongs to HomeSpoilerChrome so the wordmark and
+// this line move as one stack; a hairline under the mauve is the stack's only edge.
 const STRIP_CLASSES =
-  "sticky top-[var(--sticky-header-h,0px)] z-30 -mx-4 mb-4 flex items-center gap-2 border-y border-l-2 border-border border-l-primary bg-card px-3 py-2";
+  "flex min-h-[34px] items-center gap-1.5 border-b border-foreground/15 bg-[#1e1420] bg-[image:linear-gradient(180deg,rgba(52,34,50,0.92),rgba(36,24,40,0.88))] px-4 py-1.5";
+
+const DOT_CLASSES = "size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_0_2px_rgba(201,162,75,0.22)]";
+
+const PILL_CLASSES = "h-6 shrink-0 rounded-full px-2.5 text-[11px] font-bold";
+
+// Sticky wordmark + avatar, then the strip. The Home title stays in page flow
+// and scrolls away underneath. Rendered only while there is a week to unlock.
+export function HomeSpoilerChrome({
+  state,
+  email,
+  ...accountSettingsData
+}: AccountSettingsData & { email: string; state: SpoilerFreeStripState }) {
+  return (
+    <div className="sticky top-0 z-30 -mx-4 bg-background pt-[env(safe-area-inset-top)]">
+      <div className="px-4 py-2">
+        <TopBar {...accountSettingsData} email={email} />
+      </div>
+      <SpoilerFreeStrip state={state} />
+    </div>
+  );
+}
 
 export function SpoilerFreeStrip({ state }: { state: SpoilerFreeStripState }) {
   if (state.kind === "watching") {
     return (
       <div className={STRIP_CLASSES}>
-        <span className="size-2 shrink-0 animate-pulse rounded-full bg-primary" aria-hidden />
-        <p className="min-w-0 flex-1 truncate whitespace-nowrap text-xs text-muted-foreground">
-          <span className="font-semibold text-primary">Watching live</span> · {formatEpisodeCasual(state.weekNumber)}
+        <span className={cn(DOT_CLASSES, "animate-pulse")} aria-hidden />
+        <p className="min-w-0 flex-1 truncate text-xs font-medium text-foreground/90">
+          <span className="font-semibold text-accent">Watching live</span> · {formatEpisodeCasual(state.weekNumber)}
         </p>
       </div>
     );
@@ -80,14 +107,11 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
   return (
     <>
       <div className={STRIP_CLASSES}>
-        <span
-          className={cn("size-2 shrink-0 rounded-full bg-primary", state.kind === "posting" && "animate-pulse")}
-          aria-hidden
-        />
-        <p className="min-w-0 flex-1 truncate whitespace-nowrap text-xs text-muted-foreground">
-          <span className="font-semibold text-primary">Spoiler-Free</span> · {message}
+        <span className={cn(DOT_CLASSES, state.kind === "posting" && "animate-pulse")} aria-hidden />
+        <p className="min-w-0 flex-1 truncate text-xs font-medium text-foreground/90">
+          <span className="font-semibold text-accent">Spoiler-Free</span> · {message}
         </p>
-        <Button size="xs" className="shrink-0" onClick={() => handleOpenChange(true)}>
+        <Button size="xs" className={PILL_CLASSES} onClick={() => handleOpenChange(true)}>
           Mark Watched
         </Button>
       </div>
