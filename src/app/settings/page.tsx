@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SettingsSection } from "@/components/settings-section";
 import { ChevronRightIcon, XIcon } from "lucide-react";
 import { safeRelativePath } from "@/lib/safe-relative-path";
+import { loadSpoilerProgress } from "@/lib/spoiler-progress";
 import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
 import { SiteAdminNav } from "@/components/site-admin-nav";
 import { ResultsNav } from "@/components/results-nav";
@@ -47,8 +48,8 @@ export default async function SettingsPage({
     redirect("/login");
   }
 
-  const { isSuperAdmin, spoilerFreeMode, leagues, canProposeResults } =
-    await getAccountSettingsData(supabase, user.id);
+  const { isSuperAdmin, spoilerFreeMode, leagues, canProposeResults } = await getAccountSettingsData(supabase, user.id);
+  const spoilerProgress = spoilerFreeMode ? await loadSpoilerProgress(supabase, user.id) : null;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
@@ -79,7 +80,7 @@ export default async function SettingsPage({
                 <ChevronRightIcon className="size-4 text-muted-foreground" />
               </Link>
             ))}
-            <SpoilerModeToggle initialEnabled={spoilerFreeMode} />
+            <SpoilerModeToggle initialEnabled={spoilerFreeMode} progress={spoilerProgress} />
         </SettingsSection>
 
         <LeagueSettingsLinks leagues={leagues} fromHref={backHref} />

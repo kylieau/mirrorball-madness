@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { loadSpoilerProgress, type SpoilerProgress } from "@/lib/spoiler-progress";
 
 export async function markEpisodesWatchedThrough(weekNumber: number): Promise<{ error: string | null }> {
   const supabase = await createClient();
@@ -21,19 +22,11 @@ export async function unmarkEpisodesWatchedFrom(weekNumber: number): Promise<{ e
   return { error: null };
 }
 
-export async function getWatchedThroughWeek(): Promise<number> {
+export async function getSpoilerProgress(): Promise<SpoilerProgress> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { data: seasonId } = await supabase.rpc("active_season_id");
-  if (!user || !seasonId) return 0;
-
-  const { data } = await supabase
-    .from("spoiler_watch_progress")
-    .select("last_watched_week")
-    .eq("user_id", user.id)
-    .eq("season_id", seasonId)
-    .maybeSingle();
-  return data?.last_watched_week ?? 0;
+  if (!user) return { watchedThroughWeek: 0, weekNumbers: [] };
+  return loadSpoilerProgress(supabase, user.id);
 }

@@ -23,6 +23,7 @@ import { ChevronRightIcon } from "lucide-react";
 import { ProfileForm } from "@/components/profile-form";
 import { AccountDataForm } from "@/components/account-data-form";
 import { SpoilerModeToggle } from "@/components/spoiler-mode-toggle";
+import { useSpoilerProgress } from "@/lib/use-spoiler-progress";
 import { ADD_TO_HOME_SCREEN_COPY } from "@/lib/add-to-home-screen";
 import { SiteAdminNav } from "@/components/site-admin-nav";
 import { ResultsNav } from "@/components/results-nav";
@@ -61,9 +62,15 @@ export function AccountSettingsSheet({
   // Links that stay on the same page (e.g. Enter Results while already on
   // /admin/results) don't unmount the sheet, so close it on any link tap.
   const [open, setOpen] = useState(false);
+  const { progress, load: reloadProgress } = useSpoilerProgress(spoilerFreeMode);
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next && spoilerFreeMode) reloadProgress();
+  }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger
         render={
           <Button size="icon-sm" aria-label="Account settings" className="rounded-full font-bold" />
@@ -96,7 +103,7 @@ export function AccountSettingsSheet({
               </DialogContent>
             </Dialog>
 
-            <SpoilerModeToggle initialEnabled={spoilerFreeMode} />
+            <SpoilerModeToggle initialEnabled={spoilerFreeMode} progress={progress} onEnabled={reloadProgress} />
 
             <Link href="/notifications" className={ROW_CLASSES}>
               <span>Notifications</span>
