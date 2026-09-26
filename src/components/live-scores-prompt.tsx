@@ -56,9 +56,9 @@ export function LiveScoresPrompt({
             <Dialog>
               <DialogTrigger
                 aria-label="About live scores"
-                className="inline-grid size-8 translate-y-1 place-items-center rounded-full align-middle text-muted-foreground"
+                className="relative -top-1.5 ml-0.5 inline-flex size-3 align-baseline text-muted-foreground before:absolute before:-inset-2.5 before:content-['']"
               >
-                <InfoIcon className="size-4" />
+                <InfoIcon className="size-3" />
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
