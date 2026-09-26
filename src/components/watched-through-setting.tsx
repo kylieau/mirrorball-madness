@@ -13,10 +13,11 @@ export function WatchedThroughSetting({ progress }: { progress: SpoilerProgress 
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Four newest published weeks, then None. A mark outside that window stays
-  // listed so the closed value still resolves.
+  // Four most recent options, with None as week 0. A later week mark stays
+  // listed so the closed value still resolves; week 0 does not.
   const options = watchedThroughOptions(progress?.weekNumbers ?? [], lastWatched, progress != null);
   const items = Object.fromEntries(options.map((option) => [option.value, option.label]));
+  if (lastWatched === 0 && items["0"] == null) items["0"] = progress ? "None" : "…";
 
   async function handleChange(value: string | null) {
     if (value === null || Number(value) === lastWatched) return;

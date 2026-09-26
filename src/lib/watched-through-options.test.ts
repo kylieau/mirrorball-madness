@@ -4,21 +4,44 @@ import { watchedThroughOptions } from "./watched-through-options";
 const weeks = [8, 7, 6, 5, 4, 3, 2, 1];
 
 describe("watchedThroughOptions", () => {
-  it("keeps the four newest weeks, newest first, plus None", () => {
+  it("shows the four newest weeks and leaves None out once four weeks exist", () => {
     expect(watchedThroughOptions(weeks, 8, true).map((option) => option.label)).toEqual([
       "Week 8",
       "Week 7",
       "Week 6",
       "Week 5",
-      "None",
     ]);
   });
 
-  it("shows every available week when fewer than four exist", () => {
+  it("shows weeks 6 through 3 with no None in a mid-season window", () => {
+    expect(watchedThroughOptions([6, 5, 4, 3, 2, 1], 6, true).map((option) => option.label)).toEqual([
+      "Week 6",
+      "Week 5",
+      "Week 4",
+      "Week 3",
+    ]);
+  });
+
+  it("includes None while week 0 is still among the four most recent", () => {
     expect(watchedThroughOptions([2, 1], 2, true).map((option) => option.label)).toEqual([
       "Week 2",
       "Week 1",
       "None",
+    ]);
+    expect(watchedThroughOptions([3, 2, 1], 3, true).map((option) => option.label)).toEqual([
+      "Week 3",
+      "Week 2",
+      "Week 1",
+      "None",
+    ]);
+  });
+
+  it("drops None once a fourth published week fills the window", () => {
+    expect(watchedThroughOptions([4, 3, 2, 1], 4, true).map((option) => option.label)).toEqual([
+      "Week 4",
+      "Week 3",
+      "Week 2",
+      "Week 1",
     ]);
   });
 
@@ -28,18 +51,16 @@ describe("watchedThroughOptions", () => {
       "5",
       "4",
       "3",
-      "0",
     ]);
   });
 
-  it("keeps the current mark when it sits outside the four-week window", () => {
+  it("keeps a current week mark that sits outside the four-week window", () => {
     expect(watchedThroughOptions(weeks, 2, true).map((option) => option.label)).toEqual([
       "Week 8",
       "Week 7",
       "Week 6",
       "Week 5",
       "Week 2",
-      "None",
     ]);
   });
 
@@ -49,7 +70,15 @@ describe("watchedThroughOptions", () => {
       "Week 7",
       "Week 6",
       "Week 5",
-      "None",
+    ]);
+  });
+
+  it("does not add None just because the current mark is week 0", () => {
+    expect(watchedThroughOptions([6, 5, 4, 3], 0, true).map((option) => option.label)).toEqual([
+      "Week 6",
+      "Week 5",
+      "Week 4",
+      "Week 3",
     ]);
   });
 
