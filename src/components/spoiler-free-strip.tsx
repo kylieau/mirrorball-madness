@@ -75,7 +75,7 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
     router.refresh();
   }
 
-  const message = state.kind === "ready" ? `${weekLabel} results are in` : `${weekLabel} scores posting now`;
+  const message = state.kind === "ready" ? `${weekLabel} results are in` : `${weekLabel} posting live`;
 
   return (
     <>
