@@ -25,11 +25,15 @@ Shipped in `b4254a8`; the user checked it on their phone. Still open:
 
 `SpoilerFreeStrip` is live on Home and replaces the old callout and auto-opening dialog; the curtain's own sticky bar is gone (its `Week N · status` is now the curtain's top chip). Still open, pending the user's judgement of Home: the same strip on Results / Picks / Standings (under the league switcher there), and retiring the in-context mark buttons (`WeeklyResultsView`, `AllResultsView`, `PastPicksCard`, `RecastCatchUpCard`). Those mark a specific week, so decide which week a global strip marks when a viewer is 2+ weeks behind before removing them.
 
-## Spoiler-Free "watching live" prompt (spec from the designer, not built)
+## To check on the Tuesday episode (Spoiler-Free strip and curtain)
 
-Spoiler-Free-on only. On the first score publish for a week (`findRevealingWeek`), Home prompts in a bottom sheet: **Stay updated — I'm watching live** / **Mark week watched** / **Dismiss**. Live and Mark run the same `markEpisodesWatchedThrough` (same reveals, points and standings); only the framing differs, and both also unlock earlier unmarked weeks (say so in the copy). Dismiss stays blind, is remembered per week and per device (`usePersistedState`), and the strip's Mark Watched button is the way back. After the final publish the live option is dropped and the Ready strip's Mark remains. A viewer who accepted sees the strip read "Watching live · Week N" with no button until the final publish (derived: the mark is already at or past the week still being posted). Not shipping: per-couple marks, a separate Live strip, a Follow live toggle, LIVE chips, End-session chrome. Board: the designer's "SF watching live · override" mock. Build order agreed: after the curtain chip copy.
+- The "Spoiler-Free · Week N scores posting now" strip stays on one line at 390px, and its sheet works mid-reveal.
+- The curtain's two-line titles ("Hold the Curtain", 💃Let's Dance🕺) fit the fixed height, and each of the seven chip states fits on one line with its dot.
 
-- Needs the Home auto-refresh (`RevealAutoRefresh`) to also run for Spoiler-Free viewers during the West window and any revealing week, or the prompt only appears on the next load.
+## Spoiler-Free "watching live" prompt (built, unchecked on a real episode night)
+
+Built from the designer's "SF watching live · override" board: `LiveScoresPrompt` (Home sheet, once per week per device) and the "Watching live · Week N" strip state, derived from the viewer's mark already covering a still-posting week (so opting in through either button looks the same afterward). Home auto-refreshes every 20s while any week is revealing or the West window is open, so the prompt shows up without a reload. Not shipping: per-couple marks, a Follow live toggle, LIVE chips, End-session chrome, the board's "marked watched" toast.
+
 - **Open: multi-night weeks.** The mark is week-level, so watching live on Night 1 also unlocks Night 2's scores and outcomes with no second prompt. Only Season 35's Week 1 (episodes 1+2) is multi-night and it has aired, so this is dormant unless a later week or a future season uses two nights. Game plan when it matters: (1) accept it (opting in live for a week is opting in for the week; nothing to build); (2) key the prompt and Dismiss per episode so Night 2 re-prompts, leaving the week-level mark alone (small; outcomes for Night 2 still unlock with Night 1's mark); (3) track the high-water per episode (`last_watched_episode`), which touches `spoiler_watch_progress`, the cutoff resolver and every reader keyed off week. Recommend (1), or (2) if Night 2 leaks turn out to bother anyone.
 
 ## Results / Picks week carousel

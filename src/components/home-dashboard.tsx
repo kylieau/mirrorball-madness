@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { DeadlineStub } from "@/components/deadline-stub";
 import { EpisodeBanner } from "@/components/episode-banner";
+import { LiveScoresPrompt } from "@/components/live-scores-prompt";
 import { LeagueStatusPill } from "@/components/league-status-pill";
 import { leagueTapHref } from "@/lib/league-triage";
 import { ScrollFade } from "@/components/scroll-fade";
@@ -49,10 +50,17 @@ export function HomeDashboard({
 
   return (
     <div>
-      {spoilerFreeStrip && <SpoilerFreeStrip
-          key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${spoilerFreeStrip.earlierWeeks.join()}`}
-          state={spoilerFreeStrip}
-        />}
+      {spoilerFreeStrip && (
+        <>
+          {spoilerFreeStrip.kind === "posting" && (
+            <LiveScoresPrompt weekNumber={spoilerFreeStrip.weekNumber} earlierWeeks={spoilerFreeStrip.earlierWeeks} />
+          )}
+          <SpoilerFreeStrip
+            key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
+            state={spoilerFreeStrip}
+          />
+        </>
+      )}
 
       <EpisodeBanner {...episodeBanner} />
 

@@ -18,11 +18,30 @@ import { formatEpisodeCasual } from "@/lib/format-week";
 
 // weekNumber is the latest week that can be unlocked; earlierWeeks are the
 // unmarked weeks before it, which marking a later week unlocks too.
-export type SpoilerFreeStripState = { kind: "ready" | "posting"; weekNumber: number; earlierWeeks: number[] };
+export type SpoilerFreeStripState =
+  | { kind: "ready" | "posting"; weekNumber: number; earlierWeeks: number[] }
+  | { kind: "watching"; weekNumber: number };
 
-const listFormat = new Intl.ListFormat("en");
+type MarkableState = Extract<SpoilerFreeStripState, { earlierWeeks: number[] }>;
+
+const STRIP_CLASSES =
+  "sticky top-[var(--sticky-header-h,0px)] z-30 -mx-4 mb-4 flex items-center gap-2 border-y border-l-2 border-border border-l-primary bg-card px-3 py-2";
 
 export function SpoilerFreeStrip({ state }: { state: SpoilerFreeStripState }) {
+  if (state.kind === "watching") {
+    return (
+      <div className={STRIP_CLASSES}>
+        <span className="size-2 shrink-0 animate-pulse rounded-full bg-primary" aria-hidden />
+        <p className="min-w-0 flex-1 truncate whitespace-nowrap text-xs text-muted-foreground">
+          <span className="font-semibold text-primary">Watching live</span> · {formatEpisodeCasual(state.weekNumber)}
+        </p>
+      </div>
+    );
+  }
+  return <MarkWatchedStrip state={state} />;
+}
+
+function MarkWatchedStrip({ state }: { state: MarkableState }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -33,7 +52,6 @@ export function SpoilerFreeStrip({ state }: { state: SpoilerFreeStripState }) {
   const [through, setThrough] = useState(state.weekNumber);
   const [picking, setPicking] = useState(false);
   const throughLabel = formatEpisodeCasual(through);
-  const alsoMarked = choices.filter((week) => week < through);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -61,7 +79,7 @@ export function SpoilerFreeStrip({ state }: { state: SpoilerFreeStripState }) {
 
   return (
     <>
-      <div className="sticky top-[var(--sticky-header-h,0px)] z-30 -mx-4 mb-4 flex items-center gap-2 border-y border-l-2 border-border border-l-primary bg-card px-3 py-2">
+      <div className={STRIP_CLASSES}>
         <span
           className={cn("size-2 shrink-0 rounded-full bg-primary", state.kind === "posting" && "animate-pulse")}
           aria-hidden
@@ -81,13 +99,7 @@ export function SpoilerFreeStrip({ state }: { state: SpoilerFreeStripState }) {
             <SheetDescription className="text-pretty">
               {state.kind === "posting" && through === state.weekNumber
                 ? "You'll see scores already posted, plus anything else posted tonight, including who goes home."
-                : alsoMarked.length > 0
-                  ? `Catch up through ${throughLabel} — scores, dances, and who went home will show.`
-                  : "Scores, dances, and who went home will show."}
-              {state.kind === "posting" &&
-                through === state.weekNumber &&
-                alsoMarked.length > 0 &&
-                ` Also marks ${alsoMarked.length === 1 ? "Week" : "Weeks"} ${listFormat.format(alsoMarked.map(String))} watched.`}
+                : "Scores, dances, and eliminations will show through this week."}
             </SheetDescription>
           </SheetHeader>
           {picking && (
@@ -131,11 +143,11 @@ export function SpoilerFreeStrip({ state }: { state: SpoilerFreeStripState }) {
             {pending ? "Marking..." : picking ? `Mark Through ${throughLabel}` : `Mark ${throughLabel} Watched`}
           </Button>
           {choices.length > 1 && !picking && (
-            <Button variant="ghost" className="w-full text-primary" onClick={() => setPicking(true)} disabled={pending}>
+            <Button variant="ghost" className="w-full text-primary hover:bg-transparent hover:text-primary dark:hover:bg-transparent" onClick={() => setPicking(true)} disabled={pending}>
               Choose an Earlier Week ›
             </Button>
           )}
-          <Button variant="ghost" className="w-full" onClick={() => handleOpenChange(false)} disabled={pending}>
+          <Button variant="ghost" className="w-full hover:bg-transparent dark:hover:bg-transparent" onClick={() => handleOpenChange(false)} disabled={pending}>
             Not Yet
           </Button>
         </SheetContent>

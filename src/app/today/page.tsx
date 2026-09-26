@@ -97,16 +97,20 @@ export default async function TodayPage() {
     .filter((week) => week.status === "completed" && week.week_number > (cutoff.lastWatchedWeek ?? 0))
     .map((week) => week.week_number)
     .sort((a, b) => a - b);
+  const lastWatchedWeek = cutoff.lastWatchedWeek ?? 0;
   const stripWeek =
-    revealing && (cutoff.lastWatchedWeek ?? 0) < revealing.week.week_number
+    revealing && lastWatchedWeek < revealing.week.week_number
       ? { kind: "posting" as const, weekNumber: revealing.week.week_number }
       : cutoff.pendingRevealEpisode
         ? { kind: "ready" as const, weekNumber: cutoff.pendingRevealEpisode.week_number }
         : null;
-  const spoilerFreeStrip: SpoilerFreeStripState | null =
-    accountSettingsData.spoilerFreeMode && stripWeek
+  const spoilerFreeStrip: SpoilerFreeStripState | null = !accountSettingsData.spoilerFreeMode
+    ? null
+    : stripWeek
       ? { ...stripWeek, earlierWeeks: unmarkedWeeks.filter((week) => week < stripWeek.weekNumber) }
-      : null;
+      : revealing
+        ? { kind: "watching", weekNumber: revealing.week.week_number }
+        : null;
 
   const leagues = summaries.map((s) => ({
     id: s.id,
@@ -144,7 +148,7 @@ export default async function TodayPage() {
     .sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime());
 
   const westWindow = episodeBannerState?.kind === "west_soon" || episodeBannerState?.kind === "west_watching";
-  const autoRefresh = accountSettingsData.spoilerFreeMode ? revealingVisible : !!revealing || westWindow;
+  const autoRefresh = !!revealing || westWindow;
 
   const recentActivity = buildRecentActivity({
     weeks: [...activityWeeks.values()],
