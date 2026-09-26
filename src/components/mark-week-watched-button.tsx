@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { markEpisodesWatchedThrough } from "@/app/this-week/actions";
+import { markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
 import { formatEpisodeCasual } from "@/lib/format-week";
 
 export function MarkWeekWatchedButton({ weekNumber }: { weekNumber: number }) {
@@ -14,7 +14,7 @@ export function MarkWeekWatchedButton({ weekNumber }: { weekNumber: number }) {
   async function handleClick() {
     setError(null);
     setPending(true);
-    const result = await markEpisodesWatchedThrough(weekNumber);
+    const result = await markWatchedAndUnlockDrafts(weekNumber);
     if (result.error) {
       setError(result.error);
       setPending(false);

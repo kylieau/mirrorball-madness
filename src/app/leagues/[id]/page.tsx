@@ -28,6 +28,8 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
+import { draftManagerScoresForLeague, loadDraftScoreContext } from "@/lib/draft-scores-data";
+import { replaceWeekDanceScores, scoresReplacingDraftWeek } from "@/lib/draft-scores";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { partitionRecastSlots } from "@/lib/recast-framing";
@@ -199,7 +201,17 @@ export default async function LeaguePage({
     completedEpisodes ?? []
   );
 
-  const { revealing, scoredIds, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
+  const [{ revealing, scoredIds, visible: revealingVisible }, draftContext] = await Promise.all([
+    loadRevealingWeek(supabase, groupedWeeks, cutoff),
+    loadDraftScoreContext(supabase, user.id),
+  ]);
+  const draftNight = draftContext.night;
+  const draftManagers =
+    draftNight && scoringSettings ? await draftManagerScoresForLeague(supabase, id, draftNight) : [];
+  const scoreRows =
+    draftNight && draftManagers.length > 0
+      ? scoresReplacingDraftWeek(allScores ?? [], draftNight.weekId, draftManagers)
+      : (allScores ?? []);
 
   const pointsByManager = new Map<string, number>();
   const rosterPointsByManager = new Map<string, number>();
@@ -209,8 +221,8 @@ export default async function LeaguePage({
     string,
     { managerId: string; rosterPoints: number; predictionPoints: number; grandFinalePoints: number; totalPoints: number }[]
   > = {};
-  for (const row of allScores ?? []) {
-    if (!scoredIds.has(row.week_id)) continue;
+  for (const row of scoreRows) {
+    if (!scoredIds.has(row.week_id) && row.week_id !== draftNight?.weekId) continue;
     pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
     rosterPointsByManager.set(row.manager_id, (rosterPointsByManager.get(row.manager_id) ?? 0) + row.roster_points);
     predictionPointsByManager.set(
@@ -249,12 +261,17 @@ export default async function LeaguePage({
 
   // Rank arrows and the week column compare against the week being revealed
   // while there is one, else the latest completed week.
-  const changeFocusWeekId = revealing && revealingVisible ? revealing.week.id : latestCompletedWeekId;
+  const changeFocusWeekId =
+    draftNight && draftManagers.length > 0
+      ? draftNight.weekId
+      : revealing && revealingVisible
+        ? revealing.week.id
+        : latestCompletedWeekId;
 
   const previousPointsByManager = new Map<string, number>();
   if (changeFocusWeekId) {
-    for (const row of allScores ?? []) {
-      if (!scoredIds.has(row.week_id)) continue;
+    for (const row of scoreRows) {
+      if (!scoredIds.has(row.week_id) && row.week_id !== draftNight?.weekId) continue;
       if (row.week_id === changeFocusWeekId) continue;
       previousPointsByManager.set(
         row.manager_id,
@@ -274,8 +291,8 @@ export default async function LeaguePage({
   const previousRanks = changeFocusWeekId ? ranksFromPoints(previousPointsByManager) : null;
 
   const latestWeekPointsByManager = new Map<string, number>();
-  for (const row of allScores ?? []) {
-    if (row.week_id === changeFocusWeekId && scoredIds.has(row.week_id)) {
+  for (const row of scoreRows) {
+    if (row.week_id === changeFocusWeekId && (scoredIds.has(row.week_id) || row.week_id === draftNight?.weekId)) {
       latestWeekPointsByManager.set(row.manager_id, row.total_points);
     }
   }
@@ -337,7 +354,7 @@ export default async function LeaguePage({
     totalMembers: standings.length,
     isTiedForFirst,
     isTiedForLast,
-    isPreSeason: (allScores ?? []).length === 0,
+    isPreSeason: scoreRows.length === 0,
   });
 
   const flatCouples = (allCouples ?? []).map((c) => ({
@@ -519,16 +536,36 @@ export default async function LeaguePage({
           },
         ]
       : [];
-  const visibleDanceWeeks = [...completedEpisodes.filter((w) => cutoff.allowedEpisodeIds.has(w.id)), ...revealingDanceWeek]
-    .sort((a, b) => a.week_number - b.week_number);
+  const draftDanceWeek =
+    draftNight && draftNight.dances.length > 0 && !revealingDanceWeek.some((week) => week.id === draftNight.weekId) && !completedEpisodes.some((week) => week.id === draftNight.weekId)
+      ? groupedWeeks
+          .filter((week) => week.id === draftNight.weekId)
+          .map((week) => ({
+            id: week.id,
+            week_number: week.week_number,
+            theme: week.theme,
+            is_double_elimination_week: week.is_double_elimination_week,
+            nightsLabel: week.nightsLabel,
+            results_published_at: null,
+            episodeIds: draftNight.episodeIds,
+          }))
+      : [];
+  const visibleDanceWeeks = [
+    ...completedEpisodes.filter((w) => cutoff.allowedEpisodeIds.has(w.id)),
+    ...revealingDanceWeek,
+    ...draftDanceWeek,
+  ].sort((a, b) => a.week_number - b.week_number);
   const latestVisibleDanceWeek = visibleDanceWeeks[visibleDanceWeeks.length - 1] ?? null;
   const yourRosterWeek =
     visibleDanceWeeks.find((w) => w.id === rosterWeekParam) ?? latestVisibleDanceWeek;
 
   const episodeWeekNumber = new Map<string, number>();
   for (const week of groupedWeeks) {
-    if (!scoredIds.has(week.id)) continue;
+    if (!scoredIds.has(week.id) && week.id !== draftNight?.weekId) continue;
     for (const episode of week.episodes) episodeWeekNumber.set(episode.id, week.week_number);
+  }
+  if (draftNight) {
+    for (const episodeId of draftNight.episodeIds) episodeWeekNumber.set(episodeId, draftNight.weekNumber);
   }
   const { data: leagueDanceScores } =
     leagueSlotPeriods.length > 0 && episodeWeekNumber.size > 0
@@ -539,11 +576,20 @@ export default async function LeaguePage({
           .in("couple_id", [...new Set(leagueSlotPeriods.map((slot) => slot.coupleId))])
       : { data: [] as { couple_id: string; episode_id: string; total_score: number }[] };
   const judgePointsInputs = {
-    scores: (leagueDanceScores ?? []).map((row) => ({
-      coupleId: row.couple_id,
-      weekNumber: episodeWeekNumber.get(row.episode_id) ?? 0,
-      totalScore: row.total_score,
-    })),
+    scores: [
+      ...(leagueDanceScores ?? [])
+        .filter((row) => !draftNight || episodeWeekNumber.get(row.episode_id) !== draftNight.weekNumber)
+        .map((row) => ({
+          coupleId: row.couple_id,
+          weekNumber: episodeWeekNumber.get(row.episode_id) ?? 0,
+          totalScore: row.total_score,
+        })),
+      ...(draftNight?.dances.map((dance) => ({
+        coupleId: dance.coupleId,
+        weekNumber: draftNight.weekNumber,
+        totalScore: dance.total,
+      })) ?? []),
+    ],
     judgesScoreStartsWeek: scoringSettings?.judges_score_starts_week ?? 1,
     multiplier: scoringSettings?.judges_score_multiplier ?? 1,
     categoryWeight: scoringSettings?.judges_score_category_weight ?? 1,
@@ -563,7 +609,7 @@ export default async function LeaguePage({
     : undefined;
   const yourRosterWeekBonusPoints = yourRosterWeek
     ? weeklyBonusPoints(
-        (allScores ?? [])
+        scoreRows
           .filter(
             (row) =>
               row.manager_id === myTeamId &&
@@ -629,7 +675,7 @@ export default async function LeaguePage({
   if (showLeagueRosters && yourRosterWeek) {
     const weekNumberById = new Map(groupedWeeks.map((w) => [w.id, w.week_number]));
     const weekPointsByManager = new Map<string, number>();
-    for (const row of allScores ?? []) {
+    for (const row of scoreRows) {
       const weekNumber = weekNumberById.get(row.week_id);
       if (weekNumber !== yourRosterWeek.week_number) continue;
       weekPointsByManager.set(row.manager_id, (weekPointsByManager.get(row.manager_id) ?? 0) + row.roster_points);
@@ -695,7 +741,12 @@ export default async function LeaguePage({
           },
           anchorWeek: scoringSettings.judges_score_starts_week,
           categoryWeight: scoringSettings.judges_score_category_weight,
-          weeks: await loadCoupleWeekResults(supabase, visibleDanceWeeks),
+          weeks: replaceWeekDanceScores(await loadCoupleWeekResults(supabase, visibleDanceWeeks), draftNight && draftNight.dances.length > 0
+            ? {
+                weekNumber: draftNight.weekNumber,
+                danceScores: draftNight.dances.map((dance) => ({ coupleId: dance.coupleId, totalScore: dance.total })),
+              }
+            : null),
           couples: seasonCouplesSpoilerSafe,
           slots: leagueSlotPeriods,
         }).map((standing) => {
@@ -891,7 +942,7 @@ export default async function LeaguePage({
         episodeOutcomes,
         danceScores,
         predictionPoints:
-          (allScores ?? []).find((row) => row.week_id === curtainCallEpisode.id && row.manager_id === managerId)
+          scoreRows.find((row) => row.week_id === curtainCallEpisode.id && row.manager_id === managerId)
             ?.prediction_points ?? 0,
         inJeopardyCoupleIds,
         nearMissEnabled,

@@ -16,7 +16,7 @@ import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TopBar } from "@/components/top-bar";
-import { markEpisodesWatchedThrough } from "@/app/this-week/actions";
+import { markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
@@ -91,7 +91,7 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
   async function handleMark() {
     setError(null);
     setPending(true);
-    const result = await markEpisodesWatchedThrough(through);
+    const result = await markWatchedAndUnlockDrafts(through);
     setPending(false);
     if (result.error) {
       setError(result.error);
