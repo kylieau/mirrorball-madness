@@ -976,6 +976,58 @@ export type Database = {
           },
         ]
       }
+      grand_finale_late_unlocks: {
+        Row: {
+          ineligible_couple_ids: string[]
+          late_factor: number
+          league_id: string
+          manager_id: string
+          submitted_at: string | null
+          unlocked_at: string
+          unlocked_by: string
+        }
+        Insert: {
+          ineligible_couple_ids?: string[]
+          late_factor?: number
+          league_id: string
+          manager_id: string
+          submitted_at?: string | null
+          unlocked_at?: string
+          unlocked_by: string
+        }
+        Update: {
+          ineligible_couple_ids?: string[]
+          late_factor?: number
+          league_id?: string
+          manager_id?: string
+          submitted_at?: string | null
+          unlocked_at?: string
+          unlocked_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grand_finale_late_unlocks_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_finale_late_unlocks_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_finale_late_unlocks_unlocked_by_fkey"
+            columns: ["unlocked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       judge_scores: {
         Row: {
           dance_score_id: string
@@ -2079,6 +2131,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      unlock_grand_finale_late: {
+        Args: {
+          p_acknowledge_resolved: boolean
+          p_late_factor: number
+          p_league_id: string
+          p_manager_id: string
+        }
+        Returns: undefined
       }
       unmark_episodes_watched_from: {
         Args: { p_week_number: number }

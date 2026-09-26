@@ -6,6 +6,7 @@ import { GrandFinaleOrderList, type GrandFinaleCouple, type GrandFinaleScoring }
 import { coupleNameNode } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { nextPredictedElimination } from "@/lib/grand-finale-pins";
+import { formatLateFactor } from "@/lib/grand-finale-late";
 import type { LeagueGrandFinalePrediction } from "@/lib/grand-finale-predictions";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
@@ -56,6 +57,7 @@ export function GrandFinaleLeagueList({
                   {m.displayName}
                   <span className="block text-xs font-normal text-muted-foreground">
                     Next elim: {nameFor(nextPredictedElimination(m.order, couples))}
+                    {m.penalizedLateFactor != null && <> · Late {formatLateFactor(m.penalizedLateFactor)}</>}
                   </span>
                 </span>
               </span>

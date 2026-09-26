@@ -85,6 +85,7 @@ export async function loadScoreHistory(
     { data: slots },
     { data: predictions },
     { data: grandFinalePredictions },
+    { data: lateUnlock },
     { data: danceRows },
     { data: outcomeRows },
     { data: jeopardyRows },
@@ -109,6 +110,12 @@ export async function loadScoreHistory(
       .select("couple_id, predicted_position")
       .eq("league_id", leagueId)
       .eq("manager_id", managerId),
+    supabase
+      .from("grand_finale_late_unlocks")
+      .select("late_factor, ineligible_couple_ids, submitted_at")
+      .eq("league_id", leagueId)
+      .eq("manager_id", managerId)
+      .maybeSingle(),
     supabase.from("dance_scores").select("episode_id, couple_id, total_score").in("episode_id", episodeIds),
     supabase.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
     supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id").in("episode_id", episodeIds),
@@ -200,6 +207,12 @@ export async function loadScoreHistory(
       coupleId: p.couple_id,
       predictedPosition: p.predicted_position,
     })),
+    ...(lateUnlock?.submitted_at
+      ? {
+          grandFinaleLateFactor: Number(lateUnlock.late_factor),
+          grandFinaleIneligibleCoupleIds: new Set(lateUnlock.ineligible_couple_ids ?? []),
+        }
+      : {}),
   });
 
   return { lines, error: null };

@@ -1,4 +1,5 @@
 import { roundPoints } from "./format-points";
+import { latePenaltySuffix } from "./grand-finale-late";
 import {
   DANCE_CARD_PLACEMENT_KEY,
   NO_SURVIVAL_OUTCOMES,
@@ -93,6 +94,10 @@ export type ManagerHistoryInput = {
     topScorerCoupleId: string | null;
   }[];
   grandFinalePredictions: { coupleId: string; predictedPosition: number }[];
+  // Set only for a bracket submitted through a late unlock. Couples already
+  // resolved at that submit never pay. Factor 1 is full weight and stays quiet.
+  grandFinaleLateFactor?: number;
+  grandFinaleIneligibleCoupleIds?: ReadonlySet<string>;
   // Every week of the season with its *planned* eliminations. Doubles are only
   // known once an episode airs, so this is just the default shape; weeks the
   // viewer can see use the real count instead (see effectiveSchedule).
@@ -159,15 +164,17 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
     label: string,
     rawPoints: number,
     weight: number,
-    result?: string
+    result?: string,
+    lateFactor = 1
   ) => {
-    const points = roundPoints(rawPoints * weight);
+    const points = roundPoints(rawPoints * weight * lateFactor);
     if (points === 0) return;
+    const penalty = latePenaltySuffix(lateFactor);
     lines.push({
       id: `${module}:${weekNumber}:${key}`,
       weekNumber,
       module,
-      label: `${label}${weightSuffix(weight)}`,
+      label: `${label}${weightSuffix(weight)}${penalty ? ` · ${penalty}` : ""}`,
       result,
       points,
     });
@@ -272,7 +279,10 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       }
     }
 
+    const lateFactor = input.grandFinaleLateFactor ?? 1;
+    const ineligible = input.grandFinaleIneligibleCoupleIds;
     for (const resolved of resolvedThisWeek) {
+      if (ineligible?.has(resolved.coupleId)) continue;
       const prediction = input.grandFinalePredictions.find((p) => p.coupleId === resolved.coupleId);
       const range = positionRanges.get(resolved.coupleId);
       if (!prediction || !range) continue;
@@ -292,7 +302,8 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
         `${nameOf(resolved.coupleId)}: ${plannedWeek === null ? "Finale" : `Elim W${plannedWeek}`}`,
         raw,
         categoryWeights.bonus,
-        spotsOff === 0 ? "Exact" : `Off ${spotsOff}`
+        spotsOff === 0 ? "Exact" : `Off ${spotsOff}`,
+        lateFactor
       );
     }
   }

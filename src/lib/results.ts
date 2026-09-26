@@ -11,6 +11,7 @@ import {
   type Outcome,
   type TierPayStyle,
 } from "@/lib/scoring";
+import { eligibleGrandFinalePredictions, scaleGrandFinaleLateFactors } from "@/lib/grand-finale-late";
 import { participantIdsToPersist, selectableCast } from "@/lib/episode-cast";
 import { sortJudgesForDisplay } from "@/lib/couple-display";
 import type { ScoringJudge } from "@/lib/scoring-judges";
@@ -452,7 +453,8 @@ async function recomputeWeekScores(
   }
 
   for (const league of leagues ?? []) {
-    const [{ data: scoringSettings }, { data: rosterSlots }, { data: predictions }] = await Promise.all([
+    const [{ data: scoringSettings }, { data: rosterSlots }, { data: predictions }, { data: lateUnlocks, error: lateErr }] =
+      await Promise.all([
       admin.from("scoring_settings").select("*").eq("league_id", league.id).single(),
       admin
         .from("roster_slots")
@@ -465,7 +467,12 @@ async function recomputeWeekScores(
         .select("manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
         .eq("league_id", league.id)
         .eq("week_id", week.id),
+      admin
+        .from("grand_finale_late_unlocks")
+        .select("manager_id, late_factor, ineligible_couple_ids, submitted_at")
+        .eq("league_id", league.id),
     ]);
+    if (lateErr) return lateErr.message;
 
     if (!scoringSettings || !rosterSlots) continue;
 
@@ -482,12 +489,30 @@ async function recomputeWeekScores(
         .in("couple_id", newlyResolvedCoupleIds);
       if (gfpErr) return gfpErr.message;
 
-      grandFinalePointsByManager = computeGrandFinalePoints({
-        predictions: (grandFinalePredictions ?? []).map((p) => ({
-          managerId: p.manager_id,
-          coupleId: p.couple_id,
-          predictedPosition: p.predicted_position,
-        })),
+      const lateByManager = new Map(
+        (lateUnlocks ?? [])
+          .filter((row) => row.submitted_at)
+          .map((row) => [
+            row.manager_id,
+            {
+              lateFactor: Number(row.late_factor),
+              ineligibleCoupleIds: new Set(row.ineligible_couple_ids ?? []),
+            },
+          ])
+      );
+      // Couples already resolved when a late bracket was saved never pay,
+      // including if this week is republished. The factor scales the raw
+      // total; category weight is applied in computeWeeklyScores.
+      grandFinalePointsByManager = scaleGrandFinaleLateFactors(
+        computeGrandFinalePoints({
+        predictions: eligibleGrandFinalePredictions(
+          (grandFinalePredictions ?? []).map((p) => ({
+            managerId: p.manager_id,
+            coupleId: p.couple_id,
+            predictedPosition: p.predicted_position,
+          })),
+          lateByManager
+        ),
         resolvedCouples: newlyResolvedCoupleIds
           .filter((id) => actualPositionByCouple.has(id))
           .map((id) => ({
@@ -501,7 +526,9 @@ async function recomputeWeekScores(
         tierSize: scoringSettings.bonus_picks_tier_size,
         tierPayStyle: scoringSettings.bonus_picks_tier_pay_style as TierPayStyle,
         pointsPerCorrect: scoringSettings.bonus_picks_points_per_correct,
-      });
+      }),
+        lateByManager
+      );
     }
 
     const scores = computeWeeklyScores({

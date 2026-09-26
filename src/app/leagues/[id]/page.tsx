@@ -439,6 +439,8 @@ export default async function LeaguePage({
   }
 
   let grandFinaleOrder: string[] | null = null;
+  let ownLateEntry: { factor: number; open: boolean } | null = null;
+  let lateFactorByManager: Record<string, number> = {};
   if (grandFinaleOn) {
     const { data: ownGrandFinalePicks } = await supabase
       .from("grand_finale_predictions")
@@ -449,6 +451,18 @@ export default async function LeaguePage({
     grandFinaleOrder = ownGrandFinalePicks && ownGrandFinalePicks.length > 0
       ? ownGrandFinalePicks.map((p) => p.couple_id)
       : null;
+  }
+
+  if (grandFinaleOn && grandFinaleLocked) {
+    const { data: lateRows } = await supabase
+      .from("grand_finale_late_unlocks")
+      .select("manager_id, late_factor, submitted_at")
+      .eq("league_id", id);
+    lateFactorByManager = Object.fromEntries(
+      (lateRows ?? []).map((row) => [row.manager_id, Number(row.late_factor)])
+    );
+    const own = (lateRows ?? []).find((row) => row.manager_id === myTeamId);
+    if (own) ownLateEntry = { factor: Number(own.late_factor), open: own.submitted_at == null };
   }
 
   // League at a Glance is visible to everyone once the season-wide deadline
@@ -464,6 +478,7 @@ export default async function LeaguePage({
       predictions: allGrandFinalePicks ?? [],
       members: members ?? [],
       viewerTeamId: myTeamId,
+      lateFactorByManager,
     });
   }
 
@@ -1143,7 +1158,8 @@ export default async function LeaguePage({
                   coupleDisplayNames={Object.fromEntries(allDisplayNames)}
                   existingOrder={grandFinaleOrder}
                   deadline={grandFinaleDeadline}
-                  isLocked={grandFinaleLocked}
+                  isLocked={grandFinaleLocked && !ownLateEntry?.open}
+                  lateEntry={ownLateEntry ? { factor: ownLateEntry.factor } : null}
                   otherLeagues={otherLeaguePicks.grandFinale}
                   scoring={grandFinaleScoring}
                   leagueGrandFinale={leagueGrandFinale}

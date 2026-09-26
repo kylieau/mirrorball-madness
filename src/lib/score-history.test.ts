@@ -16,6 +16,7 @@ import {
   type CategoryWeights,
   type ScoringSettings,
 } from "./scoring";
+import { eligibleGrandFinalePredictions, scaleGrandFinaleLateFactors } from "./grand-finale-late";
 
 const scoring: ScoringSettings = {
   judgesScoreMultiplier: 0.15,
@@ -149,16 +150,29 @@ function engineWeek(input: ManagerHistoryInput, week: HistoryWeekData) {
   const ranges = eliminationPositionRanges(input.couples);
   const total = input.couples.length;
   const resolved = week.outcomes.filter((o) => RESOLVING_OUTCOMES.has(o.outcome));
-  const grandFinalePointsByManager = computeGrandFinalePoints({
-    predictions: input.grandFinalePredictions.map((p) => ({ managerId: "m", ...p })),
-    resolvedCouples: resolved.map((o) => ({
-      coupleId: o.coupleId,
-      actualPosition: ranges.get(o.coupleId)!.start,
-      actualPositionEnd: ranges.get(o.coupleId)!.end,
-    })),
-    totalCouples: total,
-    ...input.grandFinale,
-  });
+  const lateByManager = new Map<string, { lateFactor: number; ineligibleCoupleIds: ReadonlySet<string> }>();
+  if (input.grandFinaleLateFactor != null || input.grandFinaleIneligibleCoupleIds) {
+    lateByManager.set("m", {
+      lateFactor: input.grandFinaleLateFactor ?? 1,
+      ineligibleCoupleIds: input.grandFinaleIneligibleCoupleIds ?? new Set<string>(),
+    });
+  }
+  const grandFinalePointsByManager = scaleGrandFinaleLateFactors(
+    computeGrandFinalePoints({
+      predictions: eligibleGrandFinalePredictions(
+        input.grandFinalePredictions.map((p) => ({ managerId: "m", ...p })),
+        lateByManager
+      ),
+      resolvedCouples: resolved.map((o) => ({
+        coupleId: o.coupleId,
+        actualPosition: ranges.get(o.coupleId)!.start,
+        actualPositionEnd: ranges.get(o.coupleId)!.end,
+      })),
+      totalCouples: total,
+      ...input.grandFinale,
+    }),
+    lateByManager
+  );
   const prediction = input.predictions.find((p) => p.weekNumber === week.weekNumber);
   const started = week.weekNumber >= input.anchorWeek;
   return computeWeeklyScores({
@@ -287,6 +301,33 @@ describe("buildScoreHistory lines", () => {
       points: 2.25,
     });
     expect(lines.some((l) => l.label.includes("Wt"))).toBe(false);
+  });
+
+  it("scales a penalized late bracket and skips couples already resolved at submit", () => {
+    const late = buildScoreHistory({
+      ...base,
+      grandFinaleLateFactor: 0.5,
+      grandFinaleIneligibleCoupleIds: new Set(["E"]),
+    });
+    const gf = late.filter((l) => l.module === "grandFinale");
+    expect(gf.some((l) => l.label.includes("Ezra"))).toBe(false);
+    const danny = gf.find((l) => l.label.includes("Danny"))!;
+    expect(danny.label).toContain("Late 0.50");
+    expect(danny.points).toBeCloseTo(
+      buildScoreHistory(base).find((l) => l.module === "grandFinale" && l.label.includes("Danny"))!.points * 0.5,
+      2
+    );
+    const week = weeks.find((w) => w.weekNumber === 2)!;
+    const engine = engineWeek(
+      { ...base, grandFinaleLateFactor: 0.5, grandFinaleIneligibleCoupleIds: new Set(["E"]) },
+      week
+    )!;
+    expect(sumLines(late, 2, "grandFinale")).toBeCloseTo(engine.grandFinalePoints * base.categoryWeights.bonus, 1);
+  });
+
+  it("leaves full-weight late brackets unlabeled for peers", () => {
+    const late = buildScoreHistory({ ...base, grandFinaleLateFactor: 1 });
+    expect(late.filter((l) => l.module === "grandFinale").every((l) => !l.label.includes("Late"))).toBe(true);
   });
 
   it("pays nothing in any module before the league's Anchor Week", () => {

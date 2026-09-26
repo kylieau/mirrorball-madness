@@ -8,7 +8,9 @@ import {
   demoteMember,
   generateCoManagerInviteCode,
   removeCoManager,
+  unlockGrandFinaleLate,
 } from "@/app/leagues/[id]/settings/actions";
+import { formatLateFactor, lateEntryLabel, lateUnlockWarning, parseLateFactor } from "@/lib/grand-finale-late";
 import { formatManagerName } from "@/lib/manager-display";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -23,6 +25,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 type Member = {
   userId: string;
@@ -32,6 +36,13 @@ type Member = {
   coManagerDisplayName: string | null;
   isOwnRow: boolean;
   inviteCode: string | null;
+  hasGrandFinaleBracket: boolean;
+  lateUnlock: { lateFactor: number; submitted: boolean } | null;
+};
+
+export type LateGrandFinaleControls = {
+  canUnlock: boolean;
+  resolvedCount: number;
 };
 
 function PromoteMemberButton({ leagueId, member }: { leagueId: string; member: Member }) {
@@ -205,6 +216,126 @@ function InviteCoManagerButton({ leagueId, member }: { leagueId: string; member:
   );
 }
 
+function AllowLateGrandFinaleButton({
+  leagueId,
+  member,
+  resolvedCount,
+}: {
+  leagueId: string;
+  member: Member;
+  resolvedCount: number;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [factor, setFactor] = useState("1");
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const warning = lateUnlockWarning(resolvedCount);
+  const parsed = parseLateFactor(factor);
+  const canConfirm = parsed !== null && (!warning || acknowledged) && !submitting;
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setFactor("1");
+      setAcknowledged(false);
+      setError(null);
+    }
+  }
+
+  async function handleUnlock() {
+    if (parsed === null) return;
+    setError(null);
+    setSubmitting(true);
+    const result = await unlockGrandFinaleLate(leagueId, member.userId, factor, acknowledged);
+    setSubmitting(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setOpen(false);
+    router.refresh();
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => handleOpenChange(true)}
+        className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+      >
+        Allow Late Grand Finale
+      </button>
+      <Sheet open={open} onOpenChange={handleOpenChange}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-3xl px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+        >
+          <SheetHeader className="px-0">
+            <SheetTitle className="font-heading text-xl font-semibold">Allow Late Grand Finale</SheetTitle>
+            <SheetDescription className="text-pretty">
+              {member.displayName} can submit one Grand Finale bracket after the deadline. It locks again after that save.
+            </SheetDescription>
+          </SheetHeader>
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium">Late Factor</span>
+            <Input
+              inputMode="decimal"
+              value={factor}
+              onChange={(event) => setFactor(event.target.value)}
+              aria-invalid={factor.trim() !== "" && parsed === null}
+            />
+            <span className="text-xs text-muted-foreground">
+              1 is full weight. A lower number scales this manager&apos;s Grand Finale points.
+            </span>
+          </label>
+          {factor.trim() !== "" && parsed === null && (
+            <p className="text-sm text-destructive">Enter a factor from 0 to 1, with up to two decimals.</p>
+          )}
+          {warning && (
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+              <p className="text-pretty text-muted-foreground">{warning}</p>
+              <label className="mt-3 flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={acknowledged}
+                  onChange={(event) => setAcknowledged(event.target.checked)}
+                />
+                <span>I understand resolved couples will not be paid.</span>
+              </label>
+            </div>
+          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button className="w-full" onClick={handleUnlock} disabled={!canConfirm}>
+            {submitting ? "Allowing..." : "Allow Late Grand Finale"}
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full hover:bg-transparent dark:hover:bg-transparent"
+            onClick={() => handleOpenChange(false)}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
+
+function LateGrandFinaleStatus({ member }: { member: Member }) {
+  if (!member.lateUnlock) return null;
+  const { lateFactor, submitted } = member.lateUnlock;
+  const text = submitted
+    ? lateEntryLabel(lateFactor)
+    : lateFactor < 1
+      ? `Late entry open · ${formatLateFactor(lateFactor)}`
+      : "Late entry open";
+  return <p className="text-xs text-muted-foreground">{text}</p>;
+}
+
 function RemoveCoManagerButton({ leagueId, member }: { leagueId: string; member: Member }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -249,10 +380,12 @@ export function LeagueMembersSection({
   leagueId,
   members,
   canEdit,
+  lateGrandFinale = null,
 }: {
   leagueId: string;
   members: Member[];
   canEdit: boolean;
+  lateGrandFinale?: LateGrandFinaleControls | null;
 }) {
   return (
     <Card>
@@ -266,11 +399,21 @@ export function LeagueMembersSection({
             key={m.userId}
             className="flex items-center justify-between gap-3 border-t border-border py-2.5 text-sm first:border-t-0"
           >
-            <div>
-              <span className="font-medium">
-                {formatManagerName({ displayName: m.displayName, coManagerDisplayName: m.coManagerDisplayName })}
-              </span>
-              <span className="ml-2 capitalize text-muted-foreground">{m.role}</span>
+            <div className="min-w-0">
+              <div>
+                <span className="font-medium">
+                  {formatManagerName({ displayName: m.displayName, coManagerDisplayName: m.coManagerDisplayName })}
+                </span>
+                <span className="ml-2 capitalize text-muted-foreground">{m.role}</span>
+              </div>
+              <LateGrandFinaleStatus member={m} />
+              {lateGrandFinale?.canUnlock && !m.hasGrandFinaleBracket && !m.lateUnlock && (
+                <AllowLateGrandFinaleButton
+                  leagueId={leagueId}
+                  member={m}
+                  resolvedCount={lateGrandFinale.resolvedCount}
+                />
+              )}
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               {canEdit &&

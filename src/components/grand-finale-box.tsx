@@ -35,6 +35,7 @@ import {
 import { GrandFinaleLeagueList } from "@/components/grand-finale-league-list";
 import type { LeagueGrandFinalePrediction } from "@/lib/grand-finale-predictions";
 import { adaptGrandFinaleOrder, defaultSelection, type GrandFinaleDestination } from "@/lib/copy-picks";
+import { lateEntryLabel, lateEntryNote } from "@/lib/grand-finale-late";
 
 export function GrandFinaleBox({
   leagueId,
@@ -43,6 +44,7 @@ export function GrandFinaleBox({
   existingOrder,
   deadline,
   isLocked,
+  lateEntry = null,
   otherLeagues,
   scoring,
   leagueGrandFinale,
@@ -53,6 +55,9 @@ export function GrandFinaleBox({
   existingOrder: string[] | null;
   deadline: string | null;
   isLocked: boolean;
+  // Set when this manager has a late window. isLocked is false only while
+  // that one submit is still open.
+  lateEntry?: { factor: number } | null;
   otherLeagues: GrandFinaleDestination[];
   scoring: GrandFinaleScoring;
   leagueGrandFinale: LeagueGrandFinalePrediction[];
@@ -81,6 +86,10 @@ export function GrandFinaleBox({
   // next-predicted-elimination row so the card doesn't dominate the page once
   // there's a permanent League at a Glance list underneath it.
   const [collapsed, setCollapsed] = useState(true);
+  // The late window re-locks on the server after this save. Flip locally so
+  // the card doesn't stay editable until the next refresh.
+  const [submittedLate, setSubmittedLate] = useState(false);
+  const locked = isLocked || submittedLate;
 
   const coupleById = new Map(couples.map((c) => [c.id, c]));
   const rowContext = grandFinaleRowContext(couples);
@@ -138,7 +147,10 @@ export function GrandFinaleBox({
     const results = await submitGrandFinalePredictionToLeagues([leagueId, ...alsoSaveTo], order);
     const own = results.find((r) => r.leagueId === leagueId);
     if (own?.error) setError(own.error);
-    else setReviewing(true);
+    else {
+      setReviewing(true);
+      if (lateEntry && !isLocked) setSubmittedLate(true);
+    }
     setOtherResults(results.filter((r) => r.leagueId !== leagueId));
     setSubmitting(false);
   }
@@ -149,10 +161,16 @@ export function GrandFinaleBox({
   // regardless of which other modules are on. Keeps GrandFinaleBox a single
   // card shape everywhere it renders rather than a Grand-Finale-only
   // variant and a combined-with-other-modules variant.
-  function renderSummary(locked: boolean) {
+  function renderSummary(summaryLocked: boolean) {
     const winnerId = order[order.length - 1];
     const highlightId = nextPredictedElimination(order, couples);
-    const isCollapsed = locked && collapsed;
+    const isCollapsed = summaryLocked && collapsed;
+    const statusLabel = lateEntry && summaryLocked ? lateEntryLabel(lateEntry.factor) : summaryLocked ? "Locked" : "Saved";
+    const lockCopy = lateEntry
+      ? ` ${lateEntryNote(lateEntry.factor, summaryLocked ? "locked" : "open")}`
+      : summaryLocked
+        ? " Predictions are locked."
+        : " Can still be edited before the deadline.";
 
     return (
       <Card>
@@ -160,12 +178,12 @@ export function GrandFinaleBox({
           <div className="flex items-center justify-between gap-2">
             <CardTitle>Your Season Bracket</CardTitle>
             <span className="shrink-0 rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-semibold text-accent">
-              {locked ? "Locked" : "Saved"}
+              {statusLabel}
             </span>
           </div>
           <CardDescription>
             {nameFor(winnerId)} to take the mirrorball.
-            {locked ? " Predictions are locked." : " Can still be edited before the deadline."}
+            {lockCopy}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
@@ -201,9 +219,9 @@ export function GrandFinaleBox({
                 totalCouples={totalCouples}
                 showStatus
                 showNextEliminationHighlight
-                windowed={locked}
+                windowed={summaryLocked}
               />
-              {locked && (
+              {summaryLocked && (
                 <Button variant="ghost" size="sm" className="mt-1 self-end" onClick={() => setCollapsed(true)}>
                   Collapse Surrounding Picks
                   <ChevronUpIcon className="size-3.5" />
@@ -212,7 +230,7 @@ export function GrandFinaleBox({
             </>
           )}
 
-          {!locked && (
+          {!summaryLocked && (
             <Button variant="outline" size="sm" className="mt-2 self-start" onClick={() => {
                 setOrder(pinEliminatedFirst(order, pinnedIds));
                 setReviewing(false);
@@ -221,7 +239,7 @@ export function GrandFinaleBox({
             </Button>
           )}
 
-          {locked && <GrandFinaleLeagueList
+          {summaryLocked && <GrandFinaleLeagueList
             leagueId={leagueId}
             managers={leagueGrandFinale}
             couples={couples}
@@ -233,8 +251,8 @@ export function GrandFinaleBox({
     );
   }
 
-  if (isLocked) {
-    if (!existingOrder) {
+  if (locked) {
+    if (!existingOrder && !submittedLate) {
       return (
         <Card>
           <CardHeader>
@@ -268,7 +286,7 @@ export function GrandFinaleBox({
           <CardTitle>Your Season Bracket</CardTitle>
           <CardDescription>
             Tap couples in the order you think they&apos;ll be eliminated — first tap is who goes home first, last is your predicted winner. Saving needs every couple placed.
-            {deadline ? ` Locks at ${formattedDeadline}.` : ""}
+            {lateEntry ? ` ${lateEntryNote(lateEntry.factor, "open")}` : deadline ? ` Locks at ${formattedDeadline}.` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -343,7 +361,7 @@ export function GrandFinaleBox({
         <CardTitle>Your Season Bracket</CardTitle>
         <CardDescription>
           Review your predicted order, season winner to first eliminated. Use the arrows to fine-tune.
-          {deadline ? ` Locks at ${formattedDeadline}.` : ""}
+          {lateEntry ? ` ${lateEntryNote(lateEntry.factor, "open")}` : deadline ? ` Locks at ${formattedDeadline}.` : ""}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

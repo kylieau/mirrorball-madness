@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncSeasonClockAnchor as writeSeasonClockAnchor } from "@/lib/season-clock-sync";
+import { parseLateFactor } from "@/lib/grand-finale-late";
 import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
 
 export async function renameLeague(
@@ -86,6 +87,29 @@ export async function removeCoManager(
   const { error } = await supabase.rpc("remove_co_manager", {
     p_league_id: leagueId,
     p_team_user_id: teamUserId,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}/settings`);
+  return { error: null };
+}
+
+export async function unlockGrandFinaleLate(
+  leagueId: string,
+  managerId: string,
+  lateFactorRaw: string,
+  acknowledgeResolved: boolean
+): Promise<{ error: string | null }> {
+  const lateFactor = parseLateFactor(lateFactorRaw);
+  if (lateFactor === null) return { error: "Late factor must be between 0 and 1" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("unlock_grand_finale_late", {
+    p_league_id: leagueId,
+    p_manager_id: managerId,
+    p_late_factor: lateFactor,
+    p_acknowledge_resolved: acknowledgeResolved,
   });
   if (error) return { error: error.message };
 
