@@ -15,8 +15,6 @@ import { markEpisodesWatchedThrough } from "@/app/this-week/actions";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
-const listFormat = new Intl.ListFormat("en");
-
 export function LiveScoresPrompt({ weekNumber, earlierWeeks }: { weekNumber: number; earlierWeeks: number[] }) {
   const router = useRouter();
   const [dismissed, setDismissed, hydrated] = usePersistedState(`sf-live-prompt-dismissed-week-${weekNumber}`, false);
@@ -43,8 +41,7 @@ export function LiveScoresPrompt({ weekNumber, earlierWeeks }: { weekNumber: num
           <SheetTitle className="font-heading text-xl font-semibold">Scores Have Started Posting</SheetTitle>
           <SheetDescription className="text-pretty">
             {weekLabel} judges&apos; scores are going up. Follow live, catch up fully, or stay blind — you can return.
-            {earlierWeeks.length > 0 &&
-              ` Either choice also marks ${earlierWeeks.length === 1 ? "Week" : "Weeks"} ${listFormat.format(earlierWeeks.map(String))} watched.`}
+            {earlierWeeks.length > 0 && " Both mark previous weeks as watched."}
           </SheetDescription>
         </SheetHeader>
         {error && <p className="text-sm text-destructive">{error}</p>}
