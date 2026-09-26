@@ -18,7 +18,7 @@ import { formatEpisodeCasual } from "@/lib/format-week";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
 const LIVE_SCORES_NOTE =
-  "Site Admin has posted the first dance\u2019s scores of the night and will continue posting couples\u2019 scores as they watch. Choosing to follow along live (with the Site Admin, which may be live on the west coast or delayed) or marking the episode as completed will post scores/update standings immediately and mark previous weeks as watched.";
+  "Site Admin has posted the first dance\u2019s scores and will keep posting as they watch (live West or delayed). Follow along live or mark the episode finished to see scores and standings now. Either choice also marks previous weeks as watched.";
 
 export function LiveScoresPrompt({
   weekNumber,
