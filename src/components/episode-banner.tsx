@@ -109,15 +109,22 @@ function SeasonTrack({ weeksDone, currentWeek, marker }: SeasonTrackModel) {
 export function EpisodeBanner({
   input,
   initialState,
+  nowIso,
 }: {
   input: EpisodeBannerInput;
   initialState: EpisodeBannerState | null;
+  // Frozen clock for the dev preview harness. The app omits it and follows the wall clock.
+  nowIso?: string;
 }) {
   // The state moves with the clock, so it is re-derived here rather than only
   // at render time on the server. The first paint uses the server's state to
   // stay hydration-safe.
   const [state, setState] = useState(initialState);
   useEffect(() => {
+    if (nowIso) {
+      setState(computeEpisodeBannerState(input, new Date(nowIso)));
+      return;
+    }
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
       setState(computeEpisodeBannerState(input));
@@ -125,7 +132,7 @@ export function EpisodeBanner({
     };
     tick();
     return () => clearTimeout(timer);
-  }, [input]);
+  }, [input, nowIso]);
 
   const timeIso =
     state?.kind === "picks_open" || state?.kind === "picks_locked"
@@ -135,8 +142,8 @@ export function EpisodeBanner({
         : null;
   const [timeLabel, setTimeLabel] = useState("");
   useEffect(() => {
-    setTimeLabel(timeIso ? formatAirsAt(timeIso) : "");
-  }, [timeIso, state]);
+    setTimeLabel(timeIso ? formatAirsAt(timeIso, nowIso ? new Date(nowIso) : undefined) : "");
+  }, [timeIso, state, nowIso]);
 
   if (!state) return null;
 
