@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { markEpisodesWatchedThrough, unmarkEpisodesWatchedFrom } from "@/app/this-week/actions";
 import type { SpoilerProgress } from "@/lib/spoiler-progress";
-import { formatEpisodeCasual } from "@/lib/format-week";
+import { watchedThroughOptions } from "@/lib/watched-through-options";
 
 export function WatchedThroughSetting({ progress }: { progress: SpoilerProgress | null }) {
   const router = useRouter();
@@ -13,12 +13,11 @@ export function WatchedThroughSetting({ progress }: { progress: SpoilerProgress 
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Newest week first, None last; every week stays pickable so a wrong pick can be fixed here.
-  const options = [
-    ...(progress?.weekNumbers ?? []).map((week) => ({ value: String(week), label: formatEpisodeCasual(week) })),
-    { value: "0", label: progress ? "None" : "…" },
-  ];
+  // Four most recent options, with None as week 0. A later week mark stays
+  // listed so the closed value still resolves; week 0 does not.
+  const options = watchedThroughOptions(progress?.weekNumbers ?? [], lastWatched, progress != null);
   const items = Object.fromEntries(options.map((option) => [option.value, option.label]));
+  if (lastWatched === 0 && items["0"] == null) items["0"] = progress ? "None" : "…";
 
   async function handleChange(value: string | null) {
     if (value === null || Number(value) === lastWatched) return;
@@ -38,7 +37,7 @@ export function WatchedThroughSetting({ progress }: { progress: SpoilerProgress 
 
   return (
     <div className="flex flex-col gap-2 px-4 pb-3 text-sm">
-      <p className="text-xs text-foreground">Choose the last week you&apos;ve watched. Later results stay hidden.</p>
+      <p className="text-xs text-foreground">Fell behind? Hide unwatched results.</p>
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground">I last watched</span>
         <Select items={items} value={String(lastWatched)} onValueChange={handleChange} disabled={pending || !progress}>

@@ -9,15 +9,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { InfoIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { markEpisodesWatchedThrough } from "@/app/this-week/actions";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
-const listFormat = new Intl.ListFormat("en");
+const LIVE_SCORES_NOTE =
+  "Site Admin has posted the first dance\u2019s scores and will keep posting as they watch (live West or delayed). Follow along live or mark the episode finished to see scores and standings now. Either choice also marks previous weeks as watched.";
 
-export function LiveScoresPrompt({ weekNumber, earlierWeeks }: { weekNumber: number; earlierWeeks: number[] }) {
+export function LiveScoresPrompt({
+  weekNumber,
+}: {
+  weekNumber: number;
+  earlierWeeks: number[];
+}) {
   const router = useRouter();
   const [dismissed, setDismissed, hydrated] = usePersistedState(`sf-live-prompt-dismissed-week-${weekNumber}`, false);
   const [pending, setPending] = useState(false);
@@ -41,18 +49,34 @@ export function LiveScoresPrompt({ weekNumber, earlierWeeks }: { weekNumber: num
       <SheetContent side="bottom" className="items-center rounded-t-3xl px-5 pb-8 text-center">
         <SheetHeader className="items-center">
           <SheetTitle className="font-heading text-xl font-semibold">Scores Have Started Posting</SheetTitle>
-          <SheetDescription className="text-pretty">
-            {weekLabel} judges&apos; scores are going up. Follow live, catch up fully, or stay blind — you can return.
-            {earlierWeeks.length > 0 &&
-              ` Either choice also marks ${earlierWeeks.length === 1 ? "Week" : "Weeks"} ${listFormat.format(earlierWeeks.map(String))} watched.`}
-          </SheetDescription>
+          <div className="text-center">
+            <SheetDescription className="inline text-pretty">
+              {weekLabel} judges&apos; scores are going up. Follow live, catch up fully, or stay blind.
+            </SheetDescription>{" "}
+            <Dialog>
+              <DialogTrigger
+                aria-label="About live scores"
+                className="relative -top-1.5 ml-0.5 inline-flex size-3 align-baseline text-muted-foreground before:absolute before:-inset-2.5 before:content-['']"
+              >
+                <InfoIcon className="size-3" />
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="sr-only">About live scores</DialogTitle>
+                  <DialogDescription className="text-left text-pretty text-popover-foreground">
+                    {LIVE_SCORES_NOTE}
+                  </DialogDescription>
+                </DialogHeader>
+              </DialogContent>
+            </Dialog>
+          </div>
         </SheetHeader>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button size="lg" className="w-full" onClick={handleMark} disabled={pending}>
-          {pending ? "Marking..." : "Stay Updated — I'm Watching Live"}
+          {pending ? "Marking..." : "Stay Updated — I'm Watching Live (PT)"}
         </Button>
         <Button size="lg" variant="outline" className="w-full" onClick={handleMark} disabled={pending}>
-          Mark {weekLabel} Watched
+          Mark Watched — I&apos;ve Finished It (ET)
         </Button>
         <Button
           variant="ghost"
