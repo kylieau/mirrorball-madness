@@ -312,7 +312,7 @@ describe("buildScoreHistory lines", () => {
     const gf = late.filter((l) => l.module === "grandFinale");
     expect(gf.some((l) => l.label.includes("Ezra"))).toBe(false);
     const danny = gf.find((l) => l.label.includes("Danny"))!;
-    expect(danny.label).toContain("Late 0.50");
+    expect(danny.label).toContain("× 0.5 late");
     expect(danny.points).toBeCloseTo(
       buildScoreHistory(base).find((l) => l.module === "grandFinale" && l.label.includes("Danny"))!.points * 0.5,
       2
@@ -327,7 +327,7 @@ describe("buildScoreHistory lines", () => {
 
   it("leaves full-weight late brackets unlabeled for peers", () => {
     const late = buildScoreHistory({ ...base, grandFinaleLateFactor: 1 });
-    expect(late.filter((l) => l.module === "grandFinale").every((l) => !l.label.includes("Late"))).toBe(true);
+    expect(late.filter((l) => l.module === "grandFinale").every((l) => !/late/i.test(l.label))).toBe(true);
   });
 
   it("pays nothing in any module before the league's Anchor Week", () => {

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { LeagueMembersSection, type LateGrandFinaleControls } from "@/components/league-members-section";
+import { LeagueMembersSection } from "@/components/league-members-section";
+import { ScoringByModule, type LateMisser } from "@/components/scoring-by-module";
 import { LeagueInfoSection } from "@/components/league-info-section";
 import { LeagueModulesForm } from "@/components/league-modules-form";
 import { LeaveLeagueButton } from "@/components/leave-league-button";
@@ -10,6 +11,7 @@ import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { findOwnMembership } from "@/lib/acting-manager";
 import { resolvedCoupleCount } from "@/lib/grand-finale-late";
+import { formatManagerName } from "@/lib/manager-display";
 import { XIcon } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
@@ -114,8 +116,13 @@ export default async function LeagueSettingsPage({
     effectiveGrandFinaleDeadline != null &&
     new Date(effectiveGrandFinaleDeadline).getTime() <= Date.now();
   const lateGrandFinale = grandFinaleLocked
-    ? await loadLateGrandFinale(supabase, id, activeSeasonId, isCommissioner || isSuperAdmin)
+    ? await loadLateGrandFinale(supabase, id, activeSeasonId)
     : null;
+  const memberRows = (members ?? []).map((m) => ({
+    userId: m.user_id,
+    displayName: m.profiles?.display_name ?? "Unknown",
+    coManagerDisplayName: m.co_manager?.display_name ?? null,
+  }));
 
   return (
     <div
@@ -150,12 +157,24 @@ export default async function LeagueSettingsPage({
               // invite code — anyone else in the league can already read
               // the row via RLS, but the code isn't theirs to use or leak.
               inviteCode: m.user_id === user.id ? m.co_manager_invite_code : null,
-              hasGrandFinaleBracket: lateGrandFinale?.bracketManagerIds.has(m.user_id) ?? false,
-              lateUnlock: lateGrandFinale?.unlockByManager.get(m.user_id) ?? null,
             };
           })}
           canEdit={isCommissioner}
-          lateGrandFinale={lateGrandFinale?.controls ?? null}
+        />
+        <ScoringByModule
+          leagueId={id}
+          curtainCall={scoringSettings?.eliminations_category_enabled ?? true}
+          danceCard={scoringSettings?.judges_score_category_enabled ?? true}
+          grandFinale={scoringSettings?.bonus_picks_category_enabled ?? false}
+          grandFinaleLocked={grandFinaleLocked}
+          memberCount={memberRows.length}
+          lockedCount={lockedManagerCount(
+            memberRows.map((m) => m.userId),
+            lateGrandFinale
+          )}
+          canUnlock={isCommissioner || isSuperAdmin}
+          resolvedCount={lateGrandFinale?.resolvedCount ?? 0}
+          missers={lateMissers(memberRows, lateGrandFinale)}
         />
         <LeagueInfoSection
           leagueId={id}
@@ -192,12 +211,36 @@ export default async function LeagueSettingsPage({
   );
 }
 
+type LateGrandFinale = {
+  resolvedCount: number;
+  bracketManagerIds: Set<string>;
+  unlockByManager: Map<string, { lateFactor: number; submitted: boolean }>;
+};
+
+function lockedManagerCount(memberIds: string[], late: LateGrandFinale | null) {
+  if (!late) return 0;
+  return memberIds.filter((id) => late.bracketManagerIds.has(id)).length;
+}
+
+function lateMissers(
+  members: { userId: string; displayName: string; coManagerDisplayName: string | null }[],
+  late: LateGrandFinale | null
+): LateMisser[] {
+  if (!late) return [];
+  return members
+    .filter((member) => !late.bracketManagerIds.has(member.userId))
+    .map((member) => ({
+      userId: member.userId,
+      displayName: formatManagerName(member),
+      lateUnlock: late.unlockByManager.get(member.userId) ?? null,
+    }));
+}
+
 async function loadLateGrandFinale(
   supabase: SupabaseClient<Database>,
   leagueId: string,
-  seasonId: string | null,
-  canUnlock: boolean
-) {
+  seasonId: string | null
+): Promise<LateGrandFinale> {
   const [{ data: coupleRows }, { data: bracketRows }, { data: unlockRows }] = await Promise.all([
     supabase.from("couples").select("status").eq("season_id", seasonId ?? ""),
     supabase.from("grand_finale_predictions").select("manager_id").eq("league_id", leagueId),
@@ -206,12 +249,8 @@ async function loadLateGrandFinale(
       .select("manager_id, late_factor, submitted_at")
       .eq("league_id", leagueId),
   ]);
-  const controls: LateGrandFinaleControls = {
-    canUnlock,
-    resolvedCount: resolvedCoupleCount((coupleRows ?? []).map((row) => row.status)),
-  };
   return {
-    controls,
+    resolvedCount: resolvedCoupleCount((coupleRows ?? []).map((row) => row.status)),
     bracketManagerIds: new Set((bracketRows ?? []).map((row) => row.manager_id)),
     unlockByManager: new Map(
       (unlockRows ?? []).map((row) => [
@@ -230,7 +269,11 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
   if (!league) notFound();
 
   const [{ data: settings }, { data: deadline }, { data: seasonId }, { data: members }] = await Promise.all([
-    admin.from("scoring_settings").select("bonus_picks_category_enabled").eq("league_id", leagueId).maybeSingle(),
+    admin
+      .from("scoring_settings")
+      .select("bonus_picks_category_enabled, judges_score_category_enabled, eliminations_category_enabled")
+      .eq("league_id", leagueId)
+      .maybeSingle(),
     admin.rpc("effective_grand_finale_deadline", { p_league_id: leagueId }),
     admin.rpc("active_season_id"),
     admin
@@ -245,7 +288,12 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
     (settings?.bonus_picks_category_enabled ?? false) &&
     deadline != null &&
     new Date(deadline).getTime() <= Date.now();
-  const late = grandFinaleLocked ? await loadLateGrandFinale(admin, leagueId, seasonId, true) : null;
+  const late = grandFinaleLocked ? await loadLateGrandFinale(admin, leagueId, seasonId) : null;
+  const memberRows = (members ?? []).map((m) => ({
+    userId: m.user_id,
+    displayName: m.profiles?.display_name ?? "Unknown",
+    coManagerDisplayName: m.co_manager?.display_name ?? null,
+  }));
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-8">
@@ -262,7 +310,6 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
         <LeagueMembersSection
           leagueId={leagueId}
           canEdit={false}
-          lateGrandFinale={late?.controls ?? null}
           members={(members ?? []).map((m) => ({
             userId: m.user_id,
             displayName: m.profiles?.display_name ?? "Unknown",
@@ -271,9 +318,22 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
             coManagerDisplayName: m.co_manager?.display_name ?? null,
             isOwnRow: false,
             inviteCode: null,
-            hasGrandFinaleBracket: late?.bracketManagerIds.has(m.user_id) ?? false,
-            lateUnlock: late?.unlockByManager.get(m.user_id) ?? null,
           }))}
+        />
+        <ScoringByModule
+          leagueId={leagueId}
+          curtainCall={settings?.eliminations_category_enabled ?? true}
+          danceCard={settings?.judges_score_category_enabled ?? true}
+          grandFinale={settings?.bonus_picks_category_enabled ?? false}
+          grandFinaleLocked={grandFinaleLocked}
+          memberCount={memberRows.length}
+          lockedCount={lockedManagerCount(
+            memberRows.map((m) => m.userId),
+            late
+          )}
+          canUnlock
+          resolvedCount={late?.resolvedCount ?? 0}
+          missers={lateMissers(memberRows, late)}
         />
       </div>
     </div>

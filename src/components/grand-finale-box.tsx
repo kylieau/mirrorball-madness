@@ -35,7 +35,17 @@ import {
 import { GrandFinaleLeagueList } from "@/components/grand-finale-league-list";
 import type { LeagueGrandFinalePrediction } from "@/lib/grand-finale-predictions";
 import { adaptGrandFinaleOrder, defaultSelection, type GrandFinaleDestination } from "@/lib/copy-picks";
-import { lateEntryLabel, lateEntryNote } from "@/lib/grand-finale-late";
+import { lateEntryBanner, lateEntryLabel, lateEntryNote } from "@/lib/grand-finale-late";
+
+function LateEntryBanner({ factor }: { factor: number }) {
+  const [lead, rest] = lateEntryBanner(factor).split(" · ");
+  return (
+    <p className="rounded-lg border border-primary/35 bg-primary/10 px-3 py-2 text-sm">
+      <span className="font-semibold text-accent">{lead}</span>
+      {rest ? ` · ${rest}` : null}
+    </p>
+  );
+}
 
 export function GrandFinaleBox({
   leagueId,
@@ -187,6 +197,7 @@ export function GrandFinaleBox({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
+          {lateEntry && <LateEntryBanner factor={lateEntry.factor} />}
           <OtherLeagueSaveSummary results={otherResults} destinations={otherLeagues} />
           {isCollapsed ? (
             <div className="flex flex-col gap-2">
@@ -290,6 +301,7 @@ export function GrandFinaleBox({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          {lateEntry && <LateEntryBanner factor={lateEntry.factor} />}
           <GrandFinaleScoringExplainer scoring={scoring} totalCouples={totalCouples} />
 
           {order.length === pinnedCount && <UsePicksFrom sources={pickSources} onPick={fillFrom} />}
@@ -365,6 +377,7 @@ export function GrandFinaleBox({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {lateEntry && <LateEntryBanner factor={lateEntry.factor} />}
         <GrandFinaleScoringExplainer scoring={scoring} totalCouples={totalCouples} />
         {error && <p className="text-sm text-destructive">{error}</p>}
         {filledFrom && (
