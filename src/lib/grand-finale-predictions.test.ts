@@ -38,4 +38,19 @@ describe("buildLeagueGrandFinalePredictions", () => {
     const result = buildLeagueGrandFinalePredictions({ predictions, members, viewerTeamId: "m2" });
     expect(result.map((r) => r.displayName)).toEqual(["Bea & Cal", "Zed"]);
   });
+
+  it("marks a penalized late bracket and stays quiet at full weight", () => {
+    const predictions = [
+      { manager_id: "m1", couple_id: "a", predicted_position: 1 },
+      { manager_id: "m3", couple_id: "a", predicted_position: 1 },
+    ];
+    const result = buildLeagueGrandFinalePredictions({
+      predictions,
+      members,
+      viewerTeamId: "m2",
+      lateFactorByManager: { m1: 0.5, m3: 1 },
+    });
+    expect(result.find((r) => r.managerId === "m1")?.penalizedLateFactor).toBe(0.5);
+    expect(result.find((r) => r.managerId === "m3")?.penalizedLateFactor).toBeNull();
+  });
 });

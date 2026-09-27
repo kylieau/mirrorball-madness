@@ -4,6 +4,8 @@ export type LeagueGrandFinalePrediction = {
   managerId: string;
   displayName: string;
   order: string[]; // couple ids, elimination-ascending, same convention as GrandFinaleBox's existingOrder
+  // Set only when this peer's late bracket is penalized (factor below 1).
+  penalizedLateFactor: number | null;
 };
 
 // Pure grouping/sort — the raw league-wide grand_finale_predictions query
@@ -14,6 +16,7 @@ export function buildLeagueGrandFinalePredictions({
   predictions,
   members,
   viewerTeamId,
+  lateFactorByManager,
 }: {
   predictions: { manager_id: string; couple_id: string; predicted_position: number }[];
   members: {
@@ -22,6 +25,7 @@ export function buildLeagueGrandFinalePredictions({
     co_manager: { display_name: string } | null;
   }[];
   viewerTeamId: string;
+  lateFactorByManager?: Record<string, number>;
 }): LeagueGrandFinalePrediction[] {
   const orderByManager = new Map<string, { position: number; coupleId: string }[]>();
   for (const p of predictions) {
@@ -43,10 +47,12 @@ export function buildLeagueGrandFinalePredictions({
   const result: LeagueGrandFinalePrediction[] = [];
   for (const [managerId, entries] of orderByManager) {
     if (managerId === viewerTeamId) continue;
+    const factor = lateFactorByManager?.[managerId];
     result.push({
       managerId,
       displayName: nameByManager.get(managerId) ?? "Unknown",
       order: [...entries].sort((a, b) => a.position - b.position).map((e) => e.coupleId),
+      penalizedLateFactor: factor != null && factor < 1 ? factor : null,
     });
   }
 

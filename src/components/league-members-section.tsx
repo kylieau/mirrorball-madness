@@ -266,11 +266,13 @@ export function LeagueMembersSection({
             key={m.userId}
             className="flex items-center justify-between gap-3 border-t border-border py-2.5 text-sm first:border-t-0"
           >
-            <div>
-              <span className="font-medium">
-                {formatManagerName({ displayName: m.displayName, coManagerDisplayName: m.coManagerDisplayName })}
-              </span>
-              <span className="ml-2 capitalize text-muted-foreground">{m.role}</span>
+            <div className="min-w-0">
+              <div>
+                <span className="font-medium">
+                  {formatManagerName({ displayName: m.displayName, coManagerDisplayName: m.coManagerDisplayName })}
+                </span>
+                <span className="ml-2 capitalize text-muted-foreground">{m.role}</span>
+              </div>
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               {canEdit &&

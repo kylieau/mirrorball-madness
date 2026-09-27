@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>GF late-entry commissioner flow — Mirrorball Madness</title>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="phone-common.css"/>
+<style>
+  body.board-page { padding: 28px 24px 36px; }
+  .board {
+    width: 1680px;
+    background: #08050a;
+    border-radius: 18px;
+    padding: 28px 28px 24px;
+  }
+  .board > h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .board .sub {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.45;
+    max-width: 1400px;
+    margin-bottom: 18px;
+  }
+  .board .sub strong { color: #E8D5E4; font-weight: 600; }
+  .board .sub .gold { color: var(--gold-bright); }
+  .phones {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .col { display: flex; flex-direction: column; gap: 8px; }
+  .col-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 4px 2px;
+    min-height: 58px;
+  }
+  .col-top { display: flex; align-items: baseline; gap: 7px; }
+  .col-letter {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 18px;
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .col-name { font-size: 13px; font-weight: 600; color: #F3EAF2; }
+  .col-desc { font-size: 11px; color: var(--muted); line-height: 1.35; }
+
+  .phone.mini {
+    width: 100%;
+    height: 720px;
+    border-radius: 28px;
+  }
+  .phone.mini .status-bar { height: 36px; font-size: 13px; padding: 0 20px 6px; }
+  .phone.mini .bottom-nav { height: 58px; padding: 5px 2px 10px; }
+  .phone.mini .nav-item { font-size: 8.5px; }
+  .phone.mini .nav-item svg { width: 16px; height: 16px; }
+  .phone.mini .nav-logo { width: 18px; height: 18px; }
+  .phone.mini .settings-title h1 { font-size: 22px; }
+  .phone.mini .page-title-row h1 { font-size: 22px; }
+  .phone.mini .late-sheet h2 { font-size: 17px; }
+  .phone.mini .pct-chip { height: 34px; font-size: 12.5px; }
+  .phone.mini .pct-thumb { width: 16px; height: 16px; margin-left: -8px; margin-top: -8px; }
+  .phone.mini .pct-field { height: 34px; }
+  .phone.mini .btn-primary { height: 40px; font-size: 13px; }
+  .phone.mini .btn-ghost { height: 34px; font-size: 12px; }
+  .phone.mini .late-sheet { border-radius: 18px 18px 28px 28px; }
+  .phone.mini .sheet-scrim { border-radius: 28px; }
+
+  .locked-bar {
+    margin-top: 18px;
+    padding: 12px 14px;
+    background: rgba(34,26,36,0.9);
+    border: 1px solid rgba(212,175,55,0.22);
+    border-radius: 12px;
+    font-size: 12.5px;
+    color: #D4C4D2;
+    line-height: 1.45;
+  }
+  .locked-bar b { color: #F0D070; }
+  .locked-bar .path { color: var(--gold-bright); font-weight: 600; }
+</style>
+</head>
+<body class="board-page">
+<div class="board" id="shot">
+  <h1>Grand Finale late entry — commissioner unlock</h1>
+  <div class="sub">
+    Locked (2026-09-27): <strong class="gold">A</strong> IA Members → Scoring by module ·
+    <strong class="gold">B</strong> free % <strong>slider + type-in field</strong> (0–100, default 100) ·
+    <strong class="gold">C</strong> skip for eng (same GF sheet) ·
+    <strong class="gold">D</strong> locked as-is (<strong>× 0.5 late</strong>) ·
+    unlock <strong class="gold">League settings → Scoring / Grand Finale</strong> · one-shot · resolved warning + opt-in.
+  </div>
+
+  <div class="phones">
+    <!-- A -->
+    <div class="col">
+      <div class="col-label">
+        <div class="col-top"><span class="col-letter">A</span><span class="col-name">Settings · Missed the lock</span></div>
+        <div class="col-desc">IA locked · Members → Scoring by module · Missed the lock</div>
+      </div>
+      <div class="phone mini">
+        <div class="status-bar"><span>9:41</span><span class="right">●●●</span></div>
+        <div class="logo-row-mini">
+          <div class="wordmark"><span class="orb"></span>Mirrorball Madness</div>
+          <div class="avatar" style="width:26px;height:26px;font-size:11px">K</div>
+        </div>
+        <div class="settings-head">
+          <div class="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+          <div class="crumb" style="font-size:11px"><b>#supportSWEKylie</b> · Settings</div>
+        </div>
+        <div class="settings-title" style="padding:2px 12px 8px">
+          <h1>League settings</h1>
+          <div class="league-name">Commissioner · Scoring / Grand Finale</div>
+        </div>
+        <div class="settings-scroll" style="padding:0 12px 8px;gap:10px">
+          <div>
+            <div class="sec-label">Members</div>
+            <div class="settings-card quiet">
+              <div class="settings-row" style="padding:10px 12px">
+                <div class="ico" style="width:28px;height:28px;font-size:13px">👥</div>
+                <div class="body"><div class="name" style="font-size:13px">Managers</div><div class="meta">7 members</div></div>
+                <span class="chev">›</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="sec-label">Scoring by module</div>
+            <div class="gf-card">
+              <div class="gf-head" style="padding:12px">
+                <div class="trophy" style="width:32px;height:32px;font-size:15px">🏆</div>
+                <div>
+                  <div class="gf-title" style="font-size:15px">Grand Finale</div>
+                  <div class="gf-sub">Season bracket · lock at GF deadline</div>
+                </div>
+              </div>
+              <div class="gf-meta-row" style="padding:8px 12px;font-size:11px">
+                <span>Deadline passed</span>
+                <span class="dot-sep"></span>
+                <span>6 of 7 locked</span>
+                <span class="lock-tag">Locked</span>
+              </div>
+              <div class="missed-block" style="padding:10px 12px 12px">
+                <div class="missed-label">Missed the lock</div>
+                <div class="misser-row" style="padding:8px">
+                  <div class="av" style="width:30px;height:30px;font-size:11px">JL</div>
+                  <div class="who">
+                    <div class="nm" style="font-size:12.5px">Jordan Lee</div>
+                    <div class="st">No bracket submitted</div>
+                  </div>
+                  <button class="btn-allow-late" type="button" style="font-size:11px;padding:6px 10px">Allow late…</button>
+                </div>
+                <div class="commish-note">Commish / super-admin · one-shot</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item"><div class="nav-logo"></div></div>
+          <div class="nav-item">Home</div>
+          <div class="nav-item">Results</div>
+          <div class="nav-item">Picks</div>
+          <div class="nav-item active">Standings</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B -->
+    <div class="col">
+      <div class="col-label">
+        <div class="col-top"><span class="col-letter">B</span><span class="col-name">Sheet · 50% + warning</span></div>
+        <div class="col-desc">Slider + % field · Score History helper · resolved opt-in</div>
+      </div>
+      <div class="phone mini" style="position:relative">
+        <div class="status-bar"><span>9:41</span><span class="right">●●●</span></div>
+        <div class="dim-behind" style="display:flex;flex-direction:column;flex:1;min-height:0">
+          <div class="logo-row-mini">
+            <div class="wordmark"><span class="orb"></span>Mirrorball Madness</div>
+            <div class="avatar" style="width:26px;height:26px;font-size:11px">K</div>
+          </div>
+          <div class="settings-title" style="padding:6px 12px"><h1>League settings</h1></div>
+          <div class="settings-scroll" style="padding:0 12px">
+            <div class="gf-card">
+              <div class="gf-head" style="padding:10px 12px">
+                <div class="trophy" style="width:28px;height:28px;font-size:14px">🏆</div>
+                <div><div class="gf-title" style="font-size:14px">Grand Finale</div><div class="gf-sub">Missed the lock</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-item"><div class="nav-logo"></div></div>
+            <div class="nav-item active">Home</div>
+            <div class="nav-item">Results</div>
+            <div class="nav-item">Picks</div>
+            <div class="nav-item">Standings</div>
+          </div>
+        </div>
+        <div class="sheet-scrim"></div>
+        <div class="late-sheet" style="padding-bottom:12px">
+          <div class="handle"></div>
+          <div class="sheet-top" style="padding:2px 14px 6px">
+            <h2>Allow late entry</h2>
+            <div class="sheet-close" style="width:24px;height:24px;font-size:15px">×</div>
+          </div>
+          <div class="sheet-body" style="padding:0 14px 6px;gap:10px">
+            <div class="mgr-chip" style="padding:8px 10px">
+              <div class="av" style="width:30px;height:30px;font-size:11px">JL</div>
+              <div class="txt"><div class="nm" style="font-size:13px">Jordan Lee</div><div class="sub">Missed GF lock</div></div>
+              <span class="one-shot">One-shot</span>
+            </div>
+            <div class="ctrl-block">
+              <div class="ctrl-label" style="font-size:12px;margin-bottom:6px">
+                Weight as % of Grand Finale
+                <span>Slider + type-in · 0–100%</span>
+              </div>
+              <div class="pct-control">
+                <div class="pct-control-row">
+                  <div class="pct-slider">
+                    <div class="pct-track">
+                      <div class="pct-fill" style="width:50%"></div>
+                      <div class="pct-thumb" style="left:50%"></div>
+                    </div>
+                  </div>
+                  <div class="pct-field" style="height:34px;min-width:64px;padding:0 8px 0 10px">
+                    <span class="pct-num" style="font-size:14px">50</span><span class="pct-unit" style="font-size:12px">%</span>
+                  </div>
+                </div>
+                <div class="pct-ends"><span>0%</span><span>100%</span></div>
+              </div>
+            </div>
+            <div class="helper-box" style="padding:8px 10px">
+              <div class="h-title">Score History</div>
+              <div class="h-body" style="font-size:11.5px">Scores as <b>50% of Grand Finale</b> (× 0.5 late).</div>
+              <div class="h-math" style="font-size:10.5px">Managers see × 0.5 late on Score History</div>
+            </div>
+            <div class="warn-box" style="padding:8px 10px">
+              <div class="w-title" style="font-size:11.5px"><span class="ico">⚠</span> Outcomes resolving</div>
+              <div class="w-body" style="font-size:11px">Some couples already decided — not a hard block.</div>
+              <div class="opt-in" style="margin-top:8px;gap:8px">
+                <div class="box" style="width:18px;height:18px;font-size:11px">✓</div>
+                <div class="lbl" style="font-size:11px">I understand · still allow late entry</div>
+              </div>
+            </div>
+            <div class="sheet-actions" style="gap:6px">
+              <div class="btn-primary">Allow late entry · 50%</div>
+              <div class="btn-ghost">Cancel</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- C -->
+    <div class="col">
+      <div class="col-label">
+        <div class="col-top"><span class="col-letter">C</span><span class="col-name">Misser · reference only</span></div>
+        <div class="col-desc">Skip for eng · same GF sheet + late banner</div>
+      </div>
+      <div class="phone mini">
+        <div class="status-bar"><span>9:41</span><span class="right">●●●</span></div>
+        <div class="picks-head" style="padding:2px 12px 4px">
+          <div class="league-dd" style="font-size:12px">#supportSWEKylie <span class="chev">▾</span></div>
+          <div class="avatar" style="width:26px;height:26px;font-size:11px">JL</div>
+        </div>
+        <div class="page-title-row" style="padding:0 12px 6px">
+          <h1>Grand Finale</h1>
+          <div class="sub">Your season bracket · late unlock</div>
+        </div>
+        <div class="late-banner" style="margin:0 12px 8px;padding:7px 10px">
+          <span class="dot"></span>
+          <div class="copy" style="font-size:11.5px"><b>Late entry</b> · 50% of Grand Finale</div>
+        </div>
+        <div class="mod-tabs" style="padding:0 12px 6px">
+          <div class="mod-tab" style="font-size:10px;padding:5px 8px">Curtain Call</div>
+          <div class="mod-tab" style="font-size:10px;padding:5px 8px">Dance Card</div>
+          <div class="mod-tab on" style="font-size:10px;padding:5px 8px">Grand Finale</div>
+        </div>
+        <div class="bracket-scroll" style="padding:0 12px 6px;gap:6px">
+          <div class="slot-card" style="padding:8px 10px;gap:6px">
+            <div class="slot-label">Champion</div>
+            <div class="couple-pick filled" style="padding:6px 8px"><span class="ph" style="font-size:12px">Couple A</span><span class="tag">1st</span></div>
+          </div>
+          <div class="slot-card" style="padding:8px 10px;gap:6px">
+            <div class="slot-label">Runner-up</div>
+            <div class="couple-pick filled" style="padding:6px 8px"><span class="ph" style="font-size:12px">Couple B</span><span class="tag">2nd</span></div>
+          </div>
+          <div class="slot-card" style="padding:8px 10px;gap:6px">
+            <div class="slot-label">Elim order · Spot 4</div>
+            <div class="couple-pick" style="padding:6px 8px"><span class="ph" style="font-size:12px">Tap to pick · Couple …</span></div>
+          </div>
+          <div style="font-size:10.5px;color:var(--muted);line-height:1.3;padding:2px">
+            One-shot · <b style="color:#F0D070">50% of Grand Finale</b>
+          </div>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item"><div class="nav-logo"></div></div>
+          <div class="nav-item">Home</div>
+          <div class="nav-item">Results</div>
+          <div class="nav-item active">Picks</div>
+          <div class="nav-item">Standings</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- D -->
+    <div class="col">
+      <div class="col-label">
+        <div class="col-top"><span class="col-letter">D</span><span class="col-name">Score History · late suffix</span></div>
+        <div class="col-desc">Layout locked as-is · × 0.5 late suffix</div>
+      </div>
+      <div class="phone mini hist-phone">
+        <div class="status-bar"><span>9:41</span><span class="right">●●●</span></div>
+        <div class="settings-head" style="padding:2px 12px">
+          <div class="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg></div>
+          <div class="crumb" style="font-size:11px">Standings · Score History</div>
+        </div>
+        <div class="settings-title" style="padding:2px 12px 6px"><h1>Score History</h1></div>
+        <div class="peer-banner-inline" style="margin:0 12px 8px;padding:8px 10px">
+          <div class="av" style="width:28px;height:28px;font-size:10px">JL</div>
+          <div><div class="nm" style="font-size:12.5px">Jordan Lee</div><div class="sub">72.40 pts · GF weighted</div></div>
+          <span class="late-pill" style="font-size:9px;padding:3px 7px">50% GF</span>
+        </div>
+        <div class="hist-sticky" style="padding:0 12px 6px">
+          <div class="filter-row" style="gap:4px;margin-bottom:6px">
+            <span class="filter-chip" style="font-size:10px;padding:4px 8px">All</span>
+            <span class="filter-chip on" style="font-size:10px;padding:4px 8px">Grand Finale</span>
+          </div>
+          <div class="sticky-totals" style="padding:6px 8px">
+            <span class="st-label" style="font-size:10px">Grand Finale · late 50%</span>
+            <span class="st-pts" style="font-size:14px">9.00<small>pts</small></span>
+          </div>
+        </div>
+        <div class="hist-feed" style="padding:6px 12px">
+          <div class="week-divider" style="margin:4px 0 2px"><span class="wd-label">Finale</span><span class="wd-line"></span></div>
+          <div class="act-row" style="padding:6px 2px">
+            <div class="act-mod" style="font-size:12px">🏆</div>
+            <div class="act-body">
+              <div class="act-label" style="font-size:11.5px">Champion · Couple A</div>
+              <div class="act-meta" style="font-size:10px"><span class="wt-dim">GF</span> · <span class="late-sfx">× 0.5 late</span></div>
+            </div>
+            <div class="act-pts halved" style="font-size:12px">+4.50</div>
+          </div>
+          <div class="act-row" style="padding:6px 2px">
+            <div class="act-mod" style="font-size:12px">🏆</div>
+            <div class="act-body">
+              <div class="act-label" style="font-size:11.5px">Runner-up · Couple B</div>
+              <div class="act-meta" style="font-size:10px"><span class="wt-dim">GF</span> · <span class="late-sfx">× 0.5 late</span></div>
+            </div>
+            <div class="act-pts halved" style="font-size:12px">+3.00</div>
+          </div>
+          <div class="act-row" style="padding:6px 2px">
+            <div class="act-mod" style="font-size:12px">🏆</div>
+            <div class="act-body">
+              <div class="act-label" style="font-size:11.5px">Spot 4 · Couple D</div>
+              <div class="act-meta" style="font-size:10px"><span class="wt-dim">GF</span> · <span class="late-sfx">× 0.5 late</span></div>
+            </div>
+            <div class="act-pts halved" style="font-size:12px">+1.50</div>
+          </div>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item"><div class="nav-logo"></div></div>
+          <div class="nav-item">Home</div>
+          <div class="nav-item">Results</div>
+          <div class="nav-item">Picks</div>
+          <div class="nav-item active">Standings</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="locked-bar">
+    <b>Locked:</b> <b>A</b> Members → Scoring by module (GF · Missed the lock) ·
+    <b>B</b> free <b>slider + % field</b> (0–100, default 100) + Score History helper ·
+    <b>C</b> not a separate eng surface ·
+    <b>D</b> locked as-is (<b>× 0.5 late</b>).
+    Path: <span class="path">League settings → Scoring / Grand Finale</span> · one-shot · resolved warning + opt-in.
+  </div>
+</div>
+</body>
+</html>
