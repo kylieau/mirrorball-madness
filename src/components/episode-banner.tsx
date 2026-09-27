@@ -45,7 +45,7 @@ function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
       return { chip: "Curtain Up Soon", title: "Picks Locked", sub: at("Live On Air"), live: false };
     case "on_air":
       return {
-        chip: "On Air Live ET",
+        chip: "On Air (Live ET)",
         title: LETS_DANCE,
         sub: state.picksModuleOn ? "Picks Locked · Time to Vote" : "Time to Vote",
         live: true,
@@ -53,7 +53,7 @@ function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
     case "west_soon":
       return { chip: "Spoiler Lockdown", title: "Hold the Curtain", sub: at("West Coast Showtime"), live: false };
     case "west_watching":
-      return { chip: "On Air · Live PT", title: LETS_DANCE, sub: "No spoilers, darling", live: true };
+      return { chip: "On Air (Live PT)", title: LETS_DANCE, sub: "No spoilers, darling", live: true };
     case "results_soon":
       return { chip: "Curtain Closed", title: "Results Soon", sub: "Tallying the scores", live: false };
     case "results_in":
