@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { markEpisodesWatchedThrough, unmarkEpisodesWatchedFrom } from "@/app/this-week/actions";
+import { markWatchedAndUnlockDrafts, unmarkEpisodesWatchedFrom } from "@/app/this-week/actions";
 import type { SpoilerProgress } from "@/lib/spoiler-progress";
 import { watchedThroughOptions } from "@/lib/watched-through-options";
 
@@ -25,7 +25,7 @@ export function WatchedThroughSetting({ progress }: { progress: SpoilerProgress 
     setError(null);
     setPending(true);
     // The unmark function takes the first unwatched week, so "I last watched N" is N + 1.
-    const result = week > lastWatched ? await markEpisodesWatchedThrough(week) : await unmarkEpisodesWatchedFrom(week + 1);
+    const result = week > lastWatched ? await markWatchedAndUnlockDrafts(week) : await unmarkEpisodesWatchedFrom(week + 1);
     if (result.error) {
       setError(result.error);
     } else {

@@ -13,6 +13,8 @@ import {
   addDraftCustomMoment,
   removeDraftCustomMoment,
   publishEpisodeDraft,
+  releaseEpisodeScoreDraft,
+  withdrawEpisodeScoreDraft,
   startCorrection,
   applySeasonSettings,
   type SaveDraftResultsInput,
@@ -104,6 +106,24 @@ export async function removeEpisodeCustomMoment(momentId: string): Promise<{ err
 
   const result = await removeDraftCustomMoment(createAdminClient(), momentId);
   if (!result.error) revalidatePath("/admin/results");
+  return result;
+}
+
+export async function releaseDraftScores(episodeId: string): Promise<{ error: string | null }> {
+  const access = await requireAdminAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await releaseEpisodeScoreDraft(createAdminClient(), episodeId, access.userId);
+  if (!result.error) revalidatePath("/", "layout");
+  return result;
+}
+
+export async function withdrawDraftScores(episodeId: string): Promise<{ error: string | null }> {
+  const access = await requireAdminAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await withdrawEpisodeScoreDraft(createAdminClient(), episodeId);
+  if (!result.error) revalidatePath("/", "layout");
   return result;
 }
 

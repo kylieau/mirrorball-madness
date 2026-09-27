@@ -9,7 +9,9 @@ import {
   addEpisodeCustomMoment,
   removeEpisodeCustomMoment,
   publishEpisodeResults,
+  releaseDraftScores,
   startEpisodeCorrection,
+  withdrawDraftScores,
 } from "@/app/admin/results/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +64,7 @@ type ScheduledEpisode = {
   expected_dance_count: number;
   judges_save_available: boolean;
   results_published_at: string | null;
+  scores_drafted_at: string | null;
 };
 type CompetitionWeek = {
   id: string;
@@ -269,6 +272,8 @@ export function ResultsForm({
 
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [releasing, setReleasing] = useState(false);
+  const [scoresDraftedAt, setScoresDraftedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState(false);
   const [seedingCorrection, setSeedingCorrection] = useState(false);
@@ -337,6 +342,7 @@ export function ResultsForm({
     }
     const wasSelfTriggered = justSavedEpisodeId.current === selectedEpisode.id;
     justSavedEpisodeId.current = null;
+    if (!wasSelfTriggered) setScoresDraftedAt(selectedEpisode.scores_drafted_at);
     if (wasSelfTriggered) return;
     const draft = draftsByEpisode[selectedEpisode.id];
 
@@ -496,6 +502,27 @@ export function ResultsForm({
     void handlePublish();
   }
 
+  async function handleReleaseDraft() {
+    if (!selectedEpisode) return;
+    setError(null);
+    setReleasing(true);
+    const saveResult = await flushDraft();
+    if (saveResult.error) {
+      setReleasing(false);
+      return;
+    }
+    const result = scoresDraftedAt
+      ? await withdrawDraftScores(selectedEpisode.id)
+      : await releaseDraftScores(selectedEpisode.id);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setScoresDraftedAt(scoresDraftedAt ? null : new Date().toISOString());
+      router.refresh();
+    }
+    setReleasing(false);
+  }
+
   async function handlePublish() {
     if (!selectedEpisode) return;
     setError(null);
@@ -511,6 +538,7 @@ export function ResultsForm({
       setError(publishResult.error);
     } else {
       setHasDraft(false);
+      setScoresDraftedAt(null);
       setJustPublished(true);
       router.refresh();
     }
@@ -1206,7 +1234,9 @@ export function ResultsForm({
                 {canPublish
                   ? published
                     ? "Publishing updates Results & Standings across every league immediately."
-                    : "Publish each couple as their scores are in. Finish Week posts safe and eliminated."
+                    : scoresDraftedAt
+                      ? "Draft scores are visible to fans who marked this week watched. They can still change until you publish."
+                      : "Publish each couple as their scores are in. Finish Week posts safe and eliminated."
                   : "Your draft is saved for a site admin to review and publish."}
               </p>
               <div className="flex gap-2 sm:w-auto">
@@ -1214,12 +1244,22 @@ export function ResultsForm({
                   variant="outline"
                   className="flex-1 sm:flex-none"
                   onClick={() => void flushDraft()}
-                  disabled={savingDraft || publishing}
+                  disabled={savingDraft || publishing || releasing}
                 >
                   {savingDraft ? "Saving..." : "Save Draft"}
                 </Button>
+                {canPublish && !published && (
+                  <Button
+                    variant="outline"
+                    className="flex-1 sm:flex-none"
+                    onClick={() => void handleReleaseDraft()}
+                    disabled={savingDraft || publishing || releasing || !hasDraft}
+                  >
+                    {releasing ? "Saving..." : scoresDraftedAt ? "Withdraw Draft" : "Draft Scores"}
+                  </Button>
+                )}
                 {canPublish && published && (
-                  <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing}>
+                  <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing || releasing}>
                     {publishing ? "Publishing..." : "Publish Results"}
                   </Button>
                 )}

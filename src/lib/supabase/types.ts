@@ -855,6 +855,8 @@ export type Database = {
           judges_save_available: boolean
           results_published_at: string | null
           results_published_by: string | null
+          scores_drafted_at: string | null
+          scores_drafted_by: string | null
           season_id: string
           status: string
           theme: string | null
@@ -870,6 +872,8 @@ export type Database = {
           judges_save_available?: boolean
           results_published_at?: string | null
           results_published_by?: string | null
+          scores_drafted_at?: string | null
+          scores_drafted_by?: string | null
           season_id: string
           status?: string
           theme?: string | null
@@ -885,6 +889,8 @@ export type Database = {
           judges_save_available?: boolean
           results_published_at?: string | null
           results_published_by?: string | null
+          scores_drafted_at?: string | null
+          scores_drafted_by?: string | null
           season_id?: string
           status?: string
           theme?: string | null
@@ -894,6 +900,13 @@ export type Database = {
           {
             foreignKeyName: "episodes_results_published_by_fkey"
             columns: ["results_published_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episodes_scores_drafted_by_fkey"
+            columns: ["scores_drafted_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1455,18 +1468,21 @@ export type Database = {
       }
       spoiler_watch_progress: {
         Row: {
+          draft_unlocked_week: number
           last_watched_week: number
           season_id: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          draft_unlocked_week?: number
           last_watched_week?: number
           season_id: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          draft_unlocked_week?: number
           last_watched_week?: number
           season_id?: string
           updated_at?: string
@@ -1814,6 +1830,10 @@ export type Database = {
         Args: { p_week_number: number }
         Returns: undefined
       }
+      unlock_draft_scores_through: {
+        Args: { p_week_number: number }
+        Returns: undefined
+      }
       prediction_lock_at: {
         Args: { p_league_id: string; p_week_id: string }
         Returns: string
@@ -2063,6 +2083,18 @@ export type Database = {
       unmark_episodes_watched_from: {
         Args: { p_week_number: number }
         Returns: undefined
+      }
+      visible_draft_dance_scores: {
+        Args: never
+        Returns: {
+          couple_id: string
+          created_at: string
+          dance_style_name: string
+          episode_id: string
+          total_score: number
+          week_id: string
+          week_number: number
+        }[]
       }
       update_scoring_categories: {
         Args: {

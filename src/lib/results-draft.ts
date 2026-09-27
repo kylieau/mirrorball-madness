@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { resultsEntryCoupleIds, selectableCast } from "@/lib/episode-cast";
 import { inJeopardyIdsToPersist, type Outcome } from "@/lib/scoring";
 import { applyEpisodeResults, replaceInJeopardyCouples, type EntrySubmission } from "@/lib/results";
 import { loadRevealedCouples, loadRevealedDances } from "@/lib/results-reveal";
@@ -327,6 +328,8 @@ export async function publishEpisodeDraft(
       judges_save_available: draft.judgesSaveAvailable,
       results_published_at: new Date().toISOString(),
       results_published_by: publishedBy,
+      scores_drafted_at: null,
+      scores_drafted_by: null,
     })
     .eq("id", episodeId);
   if (publishErr) return { error: publishErr.message };
@@ -346,6 +349,73 @@ export async function publishEpisodeDraft(
 
   await deleteAllDraftRows(admin, episodeId);
   return { error: null };
+}
+
+// Releases the night's draft for fans who marked the week watched. Does not
+// copy dances into the live tables or recompute weekly_manager_scores —
+// those stay official-publish / per-couple reveal. Every couple on the card
+// needs a scored dance first.
+export async function releaseEpisodeScoreDraft(
+  admin: SupabaseClient<Database>,
+  episodeId: string,
+  releasedBy: string
+): Promise<{ error: string | null }> {
+  const { data: episode, error: episodeErr } = await admin
+    .from("episodes")
+    .select("id, season_id, week_id, results_published_at")
+    .eq("id", episodeId)
+    .single();
+  if (episodeErr || !episode) return { error: episodeErr?.message ?? "Episode not found" };
+  if (episode.results_published_at) return { error: "This night is already published" };
+  if (!episode.week_id) return { error: "This episode is not a scoring night" };
+
+  const draft = await loadDraftForEpisode(admin, episodeId);
+  const scoredCoupleIds = [
+    ...new Set(draft.dances.filter((dance) => dance.judgeScores.length > 0).map((dance) => dance.coupleId)),
+  ];
+  if (!draft.hasDraft || scoredCoupleIds.length === 0) {
+    return { error: "Draft the night's scores before releasing them" };
+  }
+
+  const [{ data: week, error: weekErr }, { data: couples, error: couplesErr }, { data: participants, error: participantsErr }] =
+    await Promise.all([
+      admin.from("competition_weeks").select("week_number").eq("id", episode.week_id).single(),
+      admin.from("couples").select("id, status, elimination_week").eq("season_id", episode.season_id),
+      admin.from("episode_participants").select("couple_id").eq("episode_id", episodeId),
+    ]);
+  if (weekErr || !week) return { error: weekErr?.message ?? "Competition week not found" };
+  if (couplesErr) return { error: couplesErr.message };
+  if (participantsErr) return { error: participantsErr.message };
+
+  const selectableIds = selectableCast(couples ?? [], week.week_number, { published: false }).map((couple) => couple.id);
+  const required = resultsEntryCoupleIds({
+    selectableIds,
+    participantIds: (participants ?? []).map((row) => row.couple_id),
+    draftCoupleIds: scoredCoupleIds,
+    published: false,
+  });
+  const scored = new Set(scoredCoupleIds);
+  const missing = required.filter((coupleId) => !scored.has(coupleId));
+  if (missing.length > 0) {
+    return { error: `Draft a scored dance for every couple before releasing (${missing.length} still to score).` };
+  }
+
+  const { error } = await admin
+    .from("episodes")
+    .update({ scores_drafted_at: new Date().toISOString(), scores_drafted_by: releasedBy })
+    .eq("id", episodeId);
+  return { error: error?.message ?? null };
+}
+
+export async function withdrawEpisodeScoreDraft(
+  admin: SupabaseClient<Database>,
+  episodeId: string
+): Promise<{ error: string | null }> {
+  const { error } = await admin
+    .from("episodes")
+    .update({ scores_drafted_at: null, scores_drafted_by: null })
+    .eq("id", episodeId);
+  return { error: error?.message ?? null };
 }
 
 // Unconditionally overwrites the draft tables with copies of the live

@@ -13,7 +13,7 @@ import { InfoIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { markEpisodesWatchedThrough } from "@/app/this-week/actions";
+import { markEpisodesWatchedThrough, markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
@@ -32,10 +32,14 @@ export function LiveScoresPrompt({
   const [error, setError] = useState<string | null>(null);
   const weekLabel = formatEpisodeCasual(weekNumber);
 
-  async function handleMark() {
+  // Stay Updated follows scores as they are posted. Mark Watched means the
+  // East broadcast is finished, which is what unlocks a released score draft.
+  async function handleChoice(unlockDrafts: boolean) {
     setError(null);
     setPending(true);
-    const result = await markEpisodesWatchedThrough(weekNumber);
+    const result = unlockDrafts
+      ? await markWatchedAndUnlockDrafts(weekNumber)
+      : await markEpisodesWatchedThrough(weekNumber);
     if (result.error) {
       setError(result.error);
       setPending(false);
@@ -72,10 +76,10 @@ export function LiveScoresPrompt({
           </div>
         </SheetHeader>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button size="lg" className="w-full" onClick={handleMark} disabled={pending}>
+        <Button size="lg" className="w-full" onClick={() => handleChoice(false)} disabled={pending}>
           {pending ? "Marking..." : "Stay Updated — I'm Watching Live (PT)"}
         </Button>
-        <Button size="lg" variant="outline" className="w-full" onClick={handleMark} disabled={pending}>
+        <Button size="lg" variant="outline" className="w-full" onClick={() => handleChoice(true)} disabled={pending}>
           Mark Watched — I&apos;ve Finished It (ET)
         </Button>
         <Button

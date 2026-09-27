@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
+import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { buildScoreHistory, weekResults, type HistoryWeekData, type ScoreHistoryLine } from "@/lib/score-history";
 import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
@@ -58,12 +59,22 @@ export async function loadScoreHistory(
   // A week being revealed has judges points but no outcomes yet: it is listed
   // (posted episodes only), and Curtain Call / Grand Finale lines stay out
   // until the final publish.
-  const { revealing, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
+  const [{ revealing, visible: revealingVisible }, draftContext] = await Promise.all([
+    loadRevealingWeek(supabase, groupedWeeks, cutoff),
+    loadDraftScoreContext(supabase, userId),
+  ]);
+  const draftNight = draftContext.night;
   const revealingWeek =
     revealing && revealingVisible
       ? { ...revealing.week, episodes: revealing.week.episodes.filter((e) => revealing.episodeIds.includes(e.id)) }
       : null;
-  const allowedWeeks = revealingWeek ? [...completedAllowedWeeks, revealingWeek] : completedAllowedWeeks;
+  const draftHistoryWeek =
+    draftNight && !revealingWeek && !completedAllowedWeeks.some((week) => week.id === draftNight.weekId)
+      ? groupedWeeks
+          .filter((week) => week.id === draftNight.weekId)
+          .map((week) => ({ ...week, episodes: week.episodes.filter((episode) => draftNight.episodeIds.includes(episode.id)) }))
+      : [];
+  const allowedWeeks = [...completedAllowedWeeks, ...(revealingWeek ? [revealingWeek] : []), ...draftHistoryWeek];
   if (allowedWeeks.length === 0) return { lines: [], error: null };
 
   const episodeIds = allowedWeeks.flatMap((week) => week.episodes.map((episode) => episode.id));
@@ -108,12 +119,26 @@ export async function loadScoreHistory(
   );
   const coupleNames = new Map([...nameParts].map(([id, parts]) => [id, parts.celebrity]));
 
+  const draftEpisodeIds = new Set(draftNight?.episodeIds ?? []);
+  const historyDanceRows = [
+    ...(danceRows ?? []).filter((row) => !draftEpisodeIds.has(row.episode_id)),
+    ...(draftNight?.dances.map((dance) => ({
+      episode_id: dance.episodeId,
+      couple_id: dance.coupleId,
+      total_score: dance.total,
+    })) ?? []),
+  ];
   const weeks: HistoryWeekData[] = allowedWeeks.map((week) => {
     const inWeek = new Set(week.episodes.map((episode) => episode.id));
+    const results = weekResults(week.episodes.map((episode) => episode.id), historyDanceRows, outcomeRows ?? []);
     return {
       weekNumber: week.week_number,
-      isDoubleElimination: week.is_double_elimination_week,
-      ...weekResults(week.episodes.map((episode) => episode.id), danceRows ?? [], outcomeRows ?? []),
+      isDoubleElimination: draftNight?.weekId === week.id ? draftNight.isDoubleElimination : week.is_double_elimination_week,
+      ...results,
+      danceScores:
+        draftNight && week.week_number === draftNight.weekNumber
+          ? draftNight.dances.map((dance) => ({ coupleId: dance.coupleId, totalScore: dance.total }))
+          : results.danceScores,
       inJeopardyCoupleIds: [
         ...new Set((jeopardyRows ?? []).filter((row) => inWeek.has(row.episode_id)).map((row) => row.couple_id)),
       ],

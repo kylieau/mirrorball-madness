@@ -2,7 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
 import { hasCurtainCallPicks } from "@/lib/curtain-call-picks";
+import { draftWeekManagerScores } from "@/lib/draft-scores";
 import type { CurtainCallState } from "@/lib/league-triage";
+import { slotActiveInWeek } from "@/lib/roster-couple-points";
 
 export type LeagueHomeSummary = {
   id: string;
@@ -45,12 +47,17 @@ export async function computeLeagueHomeSummary(
   allowedWeekIds: Set<string> | null = null,
   // The week being revealed is not yet a completed week, so a "previous rank"
   // must leave it out the same way it leaves out the latest completed one.
-  revealingWeekId: string | null = null
+  revealingWeekId: string | null = null,
+  // Released draft this viewer unlocked. Replaces that week's stored total
+  // (a partial live reveal) with judges points from the full draft.
+  draftNight: { weekId: string; weekNumber: number; dances: { coupleId: string; totalScore: number }[] } | null = null
 ): Promise<LeagueHomeSummary> {
   const [{ data: scoringSettings }, { data: members }, { data: scores }] = await Promise.all([
     supabase
       .from("scoring_settings")
-      .select("judges_score_category_enabled, eliminations_category_enabled, bonus_picks_category_enabled")
+      .select(
+        "judges_score_category_enabled, eliminations_category_enabled, bonus_picks_category_enabled, judges_score_multiplier, judges_score_category_weight, judges_score_starts_week"
+      )
       .eq("league_id", league.id)
       .single(),
     supabase
@@ -65,16 +72,53 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
   // below resolves through myTeamId instead of the raw viewer id.
   const myTeamId = findOwnMembership(members ?? [], userId)?.user_id ?? userId;
 
-  // The week the "change" compares against: the one being revealed, else the latest completed.
-  const focusWeekId = revealingWeekId ?? latestCompletedWeekId;
+  let draftTotals: Map<string, number> | null = null;
+  if (draftNight && draftNight.dances.length > 0 && scoringSettings) {
+    const { data: slots } = await supabase
+      .from("roster_slots")
+      .select("manager_id, couple_id, start_week, end_week")
+      .eq("league_id", league.id);
+    const rosterSlots = (slots ?? []).flatMap((slot) => {
+      if (!slot.couple_id) return [];
+      const period = {
+        managerId: slot.manager_id,
+        coupleId: slot.couple_id,
+        startWeek: slot.start_week,
+        endWeek: slot.end_week,
+      };
+      return slotActiveInWeek(period, draftNight.weekNumber)
+        ? [{ managerId: period.managerId, coupleId: period.coupleId }]
+        : [];
+    });
+    const managers = draftWeekManagerScores({
+      weekNumber: draftNight.weekNumber,
+      anchorWeek: scoringSettings.judges_score_starts_week,
+      judgesScoreMultiplier: scoringSettings.judges_score_multiplier,
+      judgesCategoryWeight: scoringSettings.judges_score_category_weight,
+      rosterSlots,
+      danceScores: draftNight.dances,
+    });
+    if (managers.length > 0) draftTotals = new Map(managers.map((manager) => [manager.managerId, manager.totalPoints]));
+  }
+  const draftWeekId = draftTotals ? draftNight!.weekId : null;
+
+  // The week the "change" compares against: the draft the viewer unlocked,
+  // else the one being revealed, else the latest completed.
+  const focusWeekId = draftWeekId ?? revealingWeekId ?? latestCompletedWeekId;
 
   const pointsByManager = new Map<string, number>();
   const previousPointsByManager = new Map<string, number>();
   for (const row of scores ?? []) {
+    if (draftWeekId && row.week_id === draftWeekId) continue;
     if (allowedWeekIds && !allowedWeekIds.has(row.week_id)) continue;
     pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
     if (row.week_id !== focusWeekId) {
       previousPointsByManager.set(row.manager_id, (previousPointsByManager.get(row.manager_id) ?? 0) + row.total_points);
+    }
+  }
+  if (draftTotals) {
+    for (const [managerId, points] of draftTotals) {
+      pointsByManager.set(managerId, (pointsByManager.get(managerId) ?? 0) + points);
     }
   }
   const standings = (members ?? []).map((m) => ({

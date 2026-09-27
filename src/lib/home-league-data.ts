@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
+import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 
@@ -46,8 +47,18 @@ export async function loadHomeLeagueData(
 
   const cutoff = await resolveSpoilerCutoff(supabase, userId, activeSeasonId ?? null, spoilerFreeMode, completedWeeks);
 
-  const { revealing, scoredIds, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
+  const [{ revealing, scoredIds, visible: revealingVisible }, draftContext] = await Promise.all([
+    loadRevealingWeek(supabase, groupedWeeks, cutoff),
+    loadDraftScoreContext(supabase, userId),
+  ]);
   const revealingWeek = revealing && revealingVisible ? revealing.week : null;
+  const draftNight = draftContext.night
+    ? {
+        weekId: draftContext.night.weekId,
+        weekNumber: draftContext.night.weekNumber,
+        dances: draftContext.night.dances.map((dance) => ({ coupleId: dance.coupleId, totalScore: dance.total })),
+      }
+    : null;
 
   const trueLatestCompletedWeek = completedWeeks[0] ?? null;
   const latestCompletedWeekId = cutoff.effectiveLatestEpisode?.id ?? null;
@@ -69,7 +80,8 @@ export async function loadHomeLeagueData(
         latestCompletedResultsPublishedAt,
         joinCutoffMs,
         scoredIds,
-        revealingWeek?.id ?? null
+        revealingWeek?.id ?? null,
+        draftNight
       )
     )
   );
@@ -82,6 +94,7 @@ export async function loadHomeLeagueData(
     weeksBehind,
     summaries,
     liveWeekNumber: upcomingEpisode?.week_number ?? null,
+    draftContext,
     activeSeasonId: activeSeasonId ?? null,
     finaleWeekNumber: groupedWeeks.find((week) => week.is_finale)?.week_number ?? null,
   };

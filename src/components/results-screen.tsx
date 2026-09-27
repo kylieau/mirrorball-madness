@@ -48,6 +48,7 @@ type Episode = {
   status: string;
   results_published_at: string | null;
   results_published_by: string | null;
+  scores_drafted_at: string | null;
 };
 type CompetitionWeek = {
   id: string;
