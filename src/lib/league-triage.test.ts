@@ -93,10 +93,8 @@ describe("buildModuleStack", () => {
       expect(line("not_started")).toMatchObject({ lines: ["Draft not started"], locked: false });
       expect(line("in_progress")).toMatchObject({ lines: ["Draft in progress"], locked: false });
       expect(line("completed", [])).toMatchObject({ lines: ["No couples"], locked: true });
-      expect(
-        line("completed", ["Tatyana Ali & Jan Ravnik", "Jordan Smith & Alan Bersten", "Sarah Jane Nader & Hailey Bills"])
-      ).toMatchObject({
-        lines: ["Tatyana Ali & Jan Ravnik", "Jordan Smith & Alan Bersten", "Sarah Jane Nader & Hailey Bills"],
+      expect(line("completed", ["Tatyana & Jan", "Jordan S. & Alan", "Sarah Jane & Hailey"])).toMatchObject({
+        lines: ["Tatyana & Jan", "Jordan S. & Alan", "Sarah Jane & Hailey"],
         locked: true,
       });
     });
@@ -133,22 +131,22 @@ describe("danceCardRosterNames", () => {
     { id: "3", celebrityName: "Jordan Chiles", proName: "Val Chmerkovskiy" },
   ];
 
-  it("keeps each couple's full celebrity and pro name, in slot order", () => {
-    expect(danceCardRosterNames(["3", "1"], couples)).toEqual([
-      "Jordan Chiles & Val Chmerkovskiy",
-      "Tatyana Ali & Jan Ravnik",
-    ]);
+  it("uses first names for both partners, in slot order", () => {
+    expect(danceCardRosterNames(["3", "1"], couples)).toEqual(["Jordan C. & Val", "Tatyana & Jan"]);
   });
 
-  it("does not shorten a shared first name to a last initial", () => {
-    expect(danceCardRosterNames(["2", "3"], couples)).toEqual([
-      "Jordan Smith & Alan Bersten",
-      "Jordan Chiles & Val Chmerkovskiy",
-    ]);
+  it("disambiguates a shared first name the same way couple display names do", () => {
+    expect(danceCardRosterNames(["2", "3"], couples)).toEqual(["Jordan S. & Alan", "Jordan C. & Val"]);
+  });
+
+  it("keeps a compound first name together", () => {
+    expect(
+      danceCardRosterNames(["4"], [{ id: "4", celebrityName: "Sarah Jane Nader", proName: "Hailey Bills" }])
+    ).toEqual(["Sarah Jane & Hailey"]);
   });
 
   it("drops a slot whose couple is missing", () => {
-    expect(danceCardRosterNames(["missing", "1"], couples)).toEqual(["Tatyana Ali & Jan Ravnik"]);
+    expect(danceCardRosterNames(["missing", "1"], couples)).toEqual(["Tatyana & Jan"]);
   });
 });
 

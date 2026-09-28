@@ -1,4 +1,4 @@
-import { formatCoupleName } from "./couple-display";
+import { buildCoupleDisplayNames, formatCoupleName } from "./couple-display";
 import { SCORING_MODULES, type ScoringModuleKey } from "./scoring-modules";
 
 export function leagueTapHref(leagueId: string, picksDue: boolean): string {
@@ -44,18 +44,18 @@ export type ModuleLine = {
 
 type LineBody = Pick<ModuleLine, "lines" | "tone" | "locked" | "locksAt"> & { needText?: string };
 
-// Dance Card triage rows name both partners in full. First-name display
-// labels collide (and read as a truncated roster) once each couple has its own line.
+// First names for both partners, via the same display helper the rest of the
+// app uses — last initial only when that helper finds a collision in this pool.
 export function danceCardRosterNames(
   coupleIds: readonly string[],
   couples: readonly { id: string; celebrityName: string; proName: string }[]
 ): string[] {
-  const label = new Map(
-    couples.map((c) => [c.id, formatCoupleName({ celebrity: c.celebrityName, pro: c.proName })])
+  const display = buildCoupleDisplayNames(
+    couples.map((c) => ({ id: c.id, celebrity_name: c.celebrityName, pro_name: c.proName }))
   );
   return coupleIds.flatMap((id) => {
-    const name = label.get(id);
-    return name ? [name] : [];
+    const parts = display.get(id);
+    return parts ? [formatCoupleName(parts)] : [];
   });
 }
 
