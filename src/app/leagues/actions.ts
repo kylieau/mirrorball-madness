@@ -19,7 +19,7 @@ export async function createLeague(formData: FormData) {
   }
 
   revalidatePath("/leagues", "layout");
-  revalidatePath("/today");
+  revalidatePath("/", "page");
   revalidatePath("/this-week");
   redirect(`/leagues/${data.id}?justCreated=1`);
 }
@@ -36,7 +36,7 @@ export async function joinLeague(formData: FormData) {
   }
 
   revalidatePath("/leagues", "layout");
-  revalidatePath("/today");
+  revalidatePath("/", "page");
   revalidatePath("/this-week");
   redirect(`/leagues/${data.id}`);
 }
@@ -56,7 +56,7 @@ export async function joinWithCode(formData: FormData) {
 
   if (!error) {
     revalidatePath("/leagues", "layout");
-    revalidatePath("/today");
+    revalidatePath("/", "page");
     revalidatePath("/this-week");
     redirect(`/leagues/${data.id}`);
   }
@@ -74,7 +74,7 @@ export async function joinWithCode(formData: FormData) {
   }
 
   revalidatePath("/leagues", "layout");
-  revalidatePath("/today");
+  revalidatePath("/", "page");
   revalidatePath("/this-week");
   redirect(`/leagues/${coManagerLeague.id}`);
 }
@@ -91,7 +91,7 @@ export async function joinAsCoManager(formData: FormData) {
   }
 
   revalidatePath("/leagues", "layout");
-  revalidatePath("/today");
+  revalidatePath("/", "page");
   revalidatePath("/this-week");
   redirect(`/leagues/${data.id}`);
 }
@@ -104,7 +104,7 @@ export async function leaveLeague(leagueId: string): Promise<{ error: string | n
 
   revalidatePath("/settings");
   revalidatePath("/leagues", "layout");
-  revalidatePath("/today");
+  revalidatePath("/", "page");
   revalidatePath("/this-week");
   return { error: null };
 }

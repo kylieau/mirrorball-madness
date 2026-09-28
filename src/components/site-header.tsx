@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 
-// Logged-out chrome only (marketing page, login, sign-up). Authenticated
+// Logged-out chrome only (login, sign-up). Authenticated
 // routes each render their own header (in-league topbar, or a back-nav
 // elsewhere) — see design/mockups.html, which has no persistent global chrome.
 export async function SiteHeader() {

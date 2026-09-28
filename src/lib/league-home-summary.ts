@@ -29,7 +29,7 @@ export type LeagueHomeSummary = {
   tookLead: boolean;
 };
 
-// Shared by /today (every league at once) and the per-league switcher sheet
+// Shared by Home (`/`, every league at once) and the per-league switcher sheet
 // (every league *other than* the one currently being viewed) — one manager's
 // rank/points/module status/pending-deadline/recent-history within a single
 // league, computed the same way regardless of which page is asking.

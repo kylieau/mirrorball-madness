@@ -3,7 +3,7 @@ const LAST_PLACE = "🫵🏻🤣";
 export const NEUTRAL_BADGE = "🚼";
 
 // Last place always wins over a medal, even when it would otherwise be bronze
-// (e.g. a 3-person league) — see the /today rank badge brief.
+// (e.g. a 3-person league) — see the Home rank badge brief.
 export function getRankBadge(userPoints: number, allPoints: number[]): string {
   const maxPoints = Math.max(...allPoints);
   const minPoints = Math.min(...allPoints);

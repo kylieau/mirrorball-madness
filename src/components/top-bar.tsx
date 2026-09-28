@@ -20,7 +20,7 @@ export function TopBar({
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <Link href="/today" className="flex h-7 items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+      <Link href="/" className="flex h-7 items-center gap-1.5 text-sm font-semibold text-muted-foreground">
         <span className="text-lg leading-none">🪩</span>
         Mirrorball Madness
       </Link>
