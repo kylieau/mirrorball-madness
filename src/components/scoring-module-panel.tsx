@@ -85,16 +85,16 @@ export function ScoringModulePanel({
                   <Input
                     id={weightInputId}
                     type="number"
-                    step="0.1"
+                    step="any"
                     min={0}
                     value={weight}
                     aria-label={`${name} weight`}
                     onChange={(e) => onWeightChange?.(Number(e.target.value))}
                     disabled={weightDisabled}
-                    className="h-11 w-[4.5rem] shrink-0 text-center text-base font-semibold text-accent"
+                    className="h-11 w-24 shrink-0 text-center text-base font-semibold text-accent"
                   />
                 ) : (
-                  <span className="flex h-11 w-[4.5rem] shrink-0 items-center justify-center rounded-lg border border-border text-base font-semibold">
+                  <span className="flex h-11 w-24 shrink-0 items-center justify-center rounded-lg border border-border text-base font-semibold">
                     {formatWeight(weight)}
                   </span>
                 )}
