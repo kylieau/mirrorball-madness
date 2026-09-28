@@ -126,8 +126,36 @@ export function buildModuleStack(input: ModuleStackInput): ModuleLine[] {
 
 export type PicksAction = "make" | "edit" | "locked" | "none";
 
-// Left button on a league card: Make when something still needs a pick, Edit
-// while any pick module is still open, Locked once one has shut and none is open.
+// Locked keeps the Make Picks label and renders muted, so a caught-up card
+// doesn't grow a second "Picks Locked" label.
+export function picksButtonLabel(action: PicksAction): "Make Picks" | "Edit Picks" | null {
+  if (action === "make" || action === "locked") return "Make Picks";
+  if (action === "edit") return "Edit Picks";
+  return null;
+}
+
+// Caught-up cards omit the status pill. A viewer who is behind still needs
+// the weeks-behind pill, and a due card still needs Picks Due.
+export function showHybridStatusPill(picksDue: boolean, weeksBehind: number): boolean {
+  return picksDue || weeksBehind > 0;
+}
+
+// Home section chrome from the hybrid decision table (2026-09-28). One league
+// keeps create/join quiet under the card. Two or more get Manage › for
+// housekeeping; triage itself stays on the cards.
+export function homeLeagueChrome(leagueCount: number): { showManage: boolean; quietCreateJoin: boolean } {
+  return { showManage: leagueCount >= 2, quietCreateJoin: leagueCount === 1 };
+}
+
+// Week N on each Home hybrid card. Hidden while a Spoiler-Free viewer is
+// behind, same rule as the Week line under Manage Leagues' title.
+export function hybridWeekLabel(weekNumber: number | null, weeksBehind: number): string | null {
+  if (weekNumber === null || weeksBehind > 0) return null;
+  return `Week ${weekNumber}`;
+}
+
+// Left button: Make when something still needs a pick, Edit while any pick
+// module is still open, Locked once one has shut and none is open.
 export function picksAction(
   picksDue: boolean,
   input: Pick<ModuleStackInput, "curtainCall" | "grandFinale">

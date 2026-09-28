@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildModuleStack,
   danceCardRosterNames,
+  homeLeagueChrome,
+  hybridWeekLabel,
   leagueTapHref,
   picksAction,
+  picksButtonLabel,
+  showHybridStatusPill,
   type ModuleStackInput,
 } from "./league-triage";
 
@@ -147,6 +151,33 @@ describe("danceCardRosterNames", () => {
 
   it("drops a slot whose couple is missing", () => {
     expect(danceCardRosterNames(["missing", "1"], couples)).toEqual(["Tatyana & Jan"]);
+  });
+});
+
+describe("home hybrid chrome", () => {
+  it("hides Manage and keeps create/join quiet for one league", () => {
+    expect(homeLeagueChrome(1)).toEqual({ showManage: false, quietCreateJoin: true });
+  });
+
+  it("shows Manage and leaves create/join off Home once there are two leagues", () => {
+    expect(homeLeagueChrome(2)).toEqual({ showManage: true, quietCreateJoin: false });
+    expect(homeLeagueChrome(4).showManage).toBe(true);
+  });
+
+  it("shows a due or weeks-behind pill and hides the caught-up pill", () => {
+    expect(showHybridStatusPill(true, 0)).toBe(true);
+    expect(showHybridStatusPill(false, 2)).toBe(true);
+    expect(showHybridStatusPill(false, 0)).toBe(false);
+  });
+
+  it("keeps Make Picks as the locked label and names the live week unless the viewer is behind", () => {
+    expect(picksButtonLabel("make")).toBe("Make Picks");
+    expect(picksButtonLabel("locked")).toBe("Make Picks");
+    expect(picksButtonLabel("edit")).toBe("Edit Picks");
+    expect(picksButtonLabel("none")).toBeNull();
+    expect(hybridWeekLabel(3, 0)).toBe("Week 3");
+    expect(hybridWeekLabel(3, 1)).toBeNull();
+    expect(hybridWeekLabel(null, 0)).toBeNull();
   });
 });
 

@@ -13,7 +13,10 @@ import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display"
 import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
 import { HomeSpoilerChrome, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
 import { HomeDraftChrome } from "@/components/draft-scores-strip";
+import type { LeagueTriage } from "@/components/league-triage-card";
 import { homeStripChoice, postingWeekNumber } from "@/lib/draft-scores";
+import { hybridWeekLabel, type ModuleStackInput } from "@/lib/league-triage";
+import { loadModuleStackInputs } from "@/lib/league-module-stack-data";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 
 export default async function Home() {
@@ -29,13 +32,14 @@ export default async function Home() {
   const [{ data: memberships }, accountSettingsData] = await Promise.all([
     supabase
       .from("league_members")
-      .select("joined_at, leagues(id, name)")
+      .select("role, joined_at, leagues(id, name)")
       .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`)
       .order("joined_at", { ascending: true }),
     getAccountSettingsData(supabase, user.id),
   ]);
 
-  const leagueRefs = (memberships ?? []).map((m) => m.leagues!).filter(Boolean);
+  const rows = (memberships ?? []).filter((m) => m.leagues);
+  const leagueRefs = rows.map((m) => m.leagues!);
 
   if (leagueRefs.length === 0) {
     redirect("/leagues");
@@ -43,13 +47,18 @@ export default async function Home() {
 
   const firstLeagueId = leagueRefs[0].id;
 
-  const { groupedWeeks, cutoff, revealing, revealingVisible, weeksBehind, summaries, draftContext } =
-    await loadHomeLeagueData(
-    supabase,
-    user.id,
-    accountSettingsData.spoilerFreeMode,
-    leagueRefs
-  );
+  const {
+    groupedWeeks,
+    cutoff,
+    revealing,
+    revealingVisible,
+    weeksBehind,
+    summaries,
+    draftContext,
+    liveWeekNumber,
+    activeSeasonId,
+    finaleWeekNumber,
+  } = await loadHomeLeagueData(supabase, user.id, accountSettingsData.spoilerFreeMode, leagueRefs);
 
   // Results are season-global, so they're fetched once and shared by every league.
   const visibleWeeks = [
@@ -152,15 +161,27 @@ export default async function Home() {
   const draftVisible = homeStripChoice(!!draftNight, !!spoilerFreeStrip) === "draft";
   const spoilerStrip = draftVisible ? null : spoilerFreeStrip;
 
-  const leagues = summaries.map((s) => ({
+  const moduleInputs =
+    summaries.length > 0
+      ? await loadModuleStackInputs(supabase, summaries, {
+          activeSeasonId,
+          spoilerCutoffWeek: cutoff.effectiveLatestEpisode?.week_number ?? null,
+          finaleWeekNumber,
+        })
+      : new Map<string, ModuleStackInput>();
+  const weekLabel = hybridWeekLabel(liveWeekNumber, weeksBehind);
+  const leagues: LeagueTriage[] = summaries.map((s, i) => ({
     id: s.id,
     name: s.name,
+    isCommissioner: rows[i].role === "commissioner",
     rank: s.rank,
     totalMembers: s.totalMembers,
     totalPoints: s.totalPoints,
     picksDue: s.picksDue,
-    curtainCallOn: s.curtainCallOn,
     weeksBehind,
+    weekLabel,
+    settingsFrom: "/",
+    modules: moduleInputs.get(s.id)!,
   }));
 
   const episodeBannerInput: EpisodeBannerInput = {
@@ -173,7 +194,7 @@ export default async function Home() {
         publishedAt: episode.results_published_at ?? null,
       })),
     })),
-    picksModuleOn: leagues.some((l) => l.curtainCallOn),
+    picksModuleOn: summaries.some((s) => s.curtainCallOn),
     curtainCallLockAtIso:
       summaries
         .flatMap((s) => (s.curtainCallLockAt ? [s.curtainCallLockAt] : []))
