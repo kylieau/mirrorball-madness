@@ -51,6 +51,10 @@ import {
 } from "@/lib/past-picks";
 import { couplesRemainingAtWeek, curtainCallPayout, type GrandFinaleMethod, type TierPayStyle } from "@/lib/scoring";
 import {
+  ELIMINATION_PREDICTION_POINTS_DEFAULT,
+  TOP_SCORER_PREDICTION_POINTS_DEFAULT,
+} from "@/lib/scoring-defaults";
+import {
   GRAND_FINALE_DEFAULT_METHOD,
   GRAND_FINALE_DEFAULT_TIER_PAY_STYLE,
   defaultPointsPerCorrect,
@@ -934,12 +938,12 @@ export default async function LeaguePage({
     const danceScores = (pastDanceScores ?? []).map((s) => ({ coupleId: s.couple_id, totalScore: Number(s.total_score) }));
     const inJeopardyCoupleIds = (pastJeopardy ?? []).map((row) => row.couple_id);
     const eliminationExactPayout = curtainCallPayout(
-      scoringSettings?.elimination_prediction_points ?? 17.1,
+      scoringSettings?.elimination_prediction_points ?? ELIMINATION_PREDICTION_POINTS_DEFAULT,
       remaining,
       seasonCouples.length
     );
     const topScorerExactPayout = curtainCallPayout(
-      scoringSettings?.top_scorer_prediction_points ?? 11.4,
+      scoringSettings?.top_scorer_prediction_points ?? TOP_SCORER_PREDICTION_POINTS_DEFAULT,
       remaining,
       seasonCouples.length
     );
@@ -1039,8 +1043,12 @@ export default async function LeaguePage({
                       lockAt={lockAt}
                       activeCouples={activeCouples}
                       totalCouples={seasonCouples.length}
-                      eliminationPredictionPoints={scoringSettings?.elimination_prediction_points ?? 17.1}
-                      topScorerPredictionPoints={scoringSettings?.top_scorer_prediction_points ?? 11.4}
+                      eliminationPredictionPoints={
+                        scoringSettings?.elimination_prediction_points ?? ELIMINATION_PREDICTION_POINTS_DEFAULT
+                      }
+                      topScorerPredictionPoints={
+                        scoringSettings?.top_scorer_prediction_points ?? TOP_SCORER_PREDICTION_POINTS_DEFAULT
+                      }
                       nearMissEnabled={scoringSettings?.curtain_call_near_miss_enabled !== false}
                       coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
                       existingPrediction={ownPrediction}

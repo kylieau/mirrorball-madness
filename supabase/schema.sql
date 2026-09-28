@@ -191,10 +191,14 @@ create unique index league_members_co_manager_invite_code_unique
 -- but it paid out for the same roster-luck event Dance Card already
 -- rewards, not anything Grand Finale's full-order prediction actually
 -- measures — removed. Every point value below is an ordinary
--- commissioner-editable default, calibrated (not hand-set) by
--- scripts/monte-carlo-calibration/ — see that script for how, and
--- judges_score_multiplier_customized below for why judges_score_multiplier
--- is the one column with special write semantics.
+-- commissioner-editable default. The numbers are strong-play season
+-- ceilings (src/lib/strong-play-ceilings.ts, printed by
+-- scripts/monte-carlo-calibration/run.mjs): a category weight of 1 is one
+-- full share, and Dance Card, Curtain Call, and Grand Finale each ceiling
+-- at that same share. Grand Finale is not capped below the others. It stays
+-- off by default; create_league seeds its weight at 1 when it is turned on.
+-- judges_score_multiplier is the roster-size lever that keeps Dance Card's
+-- ceiling flat — see judges_score_multiplier_customized below.
 --
 -- Every commissioner-editable field on this table EXCEPT judges_score_multiplier
 -- locks together the moment effective_grand_finale_deadline() passes — the
@@ -215,23 +219,20 @@ create unique index league_members_co_manager_invite_code_unique
 -- returns the league to not_started. locking_exempt does not lift that lock.
 create table scoring_settings (
   league_id uuid primary key references leagues(id) on delete cascade,
-  judges_score_multiplier numeric not null default 1.0,
+  judges_score_multiplier numeric not null default 0.1421,
   -- Flips true (and stays true) the moment a commissioner explicitly saves a
   -- value for judges_score_multiplier via update_scoring_categories — so
   -- start_draft's roster-size-keyed calibrated default (see
   -- dance_card_calibration below) only overwrites this column while nobody
   -- has customized it yet, never clobbering an intentional pre-draft choice.
   judges_score_multiplier_customized boolean not null default false,
-  -- 2026-09-23: every point value below (and dance_card_calibration's
-  -- multipliers) is the scripts/monte-carlo-calibration/ output times a flat
-  -- POINT_SCALE = 0.1 — a pure linear rescale of the whole calibrated system
-  -- (preserves every relative-influence ratio the calibration solved for;
-  -- see run.mjs's POINT_SCALE comment) adopted because the pre-scale
-  -- defaults put a single week's score in the 1000s, unrecognizable next to
-  -- typical fantasy-sports point totals.
-  survival_points numeric not null default 1.5,
-  elimination_prediction_points numeric not null default 17.1, -- 0 disables
-  top_scorer_prediction_points numeric not null default 11.4, -- 0 disables
+  -- 2026-09-28: strong-play ceilings, then POINT_SCALE = 0.1, so one full
+  -- share is 100 season points rather than 1000. See
+  -- src/lib/strong-play-ceilings.ts. (The 2026-09-23 ÷10 was the same unit
+  -- change applied to the retired variance calibration.)
+  survival_points numeric not null default 1.56,
+  elimination_prediction_points numeric not null default 10.35, -- 0 disables
+  top_scorer_prediction_points numeric not null default 6.9, -- 0 disables
   -- Curtain Call In Jeopardy. On for every league (including ones that already
   -- exist when the column is added). A wrong elimination guess of a couple in
   -- episode_in_jeopardy_couples, or a wrong top-scorer guess whose weekly
@@ -241,11 +242,11 @@ create table scoring_settings (
   -- Clock fields in update_scoring_categories. Turning it on does not rewrite
   -- historical weekly_manager_scores — the next publish/correct recomputes.
   curtain_call_near_miss_enabled boolean not null default true,
-  first_place_points numeric not null default 10.6,
-  second_place_points numeric not null default 5.3,
-  third_place_points numeric not null default 2.8,
-  fourth_place_points numeric not null default 1.4,
-  fifth_place_points numeric not null default 0.7,
+  first_place_points numeric not null default 26.09,
+  second_place_points numeric not null default 13.04,
+  third_place_points numeric not null default 6.96,
+  fourth_place_points numeric not null default 3.48,
+  fifth_place_points numeric not null default 1.74,
 
   judges_score_category_enabled boolean not null default true,
   eliminations_category_enabled boolean not null default true,
@@ -260,11 +261,13 @@ create table scoring_settings (
   bonus_picks_distance_penalty numeric, -- points docked per position off; only used by 'distance_based'
   bonus_picks_tier_size int, -- couples per band (3 = 1st-3rd, 4th-6th, ...); only used by 'band_tier'
   bonus_picks_tier_pay_style text not null default 'equal' check (bonus_picks_tier_pay_style in ('equal', 'graded')), -- 'graded': lower bands pay 75/50/25% (floor 25%); only used by 'band_tier'
-  -- Base value a correctly-placed couple earns. Calibrated per method
-  -- (scripts/monte-carlo-calibration/, POINT_SCALE-adjusted, see above):
-  -- exact_position 26.4, distance_based 20.7, band_tier 16.6 equal / 25.9
-  -- graded — the column default matches the distance_based default method.
-  bonus_picks_points_per_correct numeric not null default 20.7,
+  -- Base value a correctly-placed couple earns. Solved so a perfect bracket
+  -- hits one full share under every method (strong-play ceilings, above):
+  -- exact_position, distance_based, and band_tier equal are 8.33; band_tier
+  -- graded is 13.33 because lower bands pay a fraction. The column default
+  -- matches the distance_based default method. Distance credit hits 0 at 4
+  -- spots off (penalty 2.08). No 3/5 Grand Finale cap.
+  bonus_picks_points_per_correct numeric not null default 8.33,
 
   -- Every new league gets this row with defaults on insert (create_league),
   -- but the commissioner never explicitly reviewed them until they save this
@@ -290,12 +293,14 @@ create table scoring_settings (
   )
 );
 
--- Monte Carlo-derived (scripts/monte-carlo-calibration/), one row per swept
--- roster size (couples per manager). start_draft() reads this once, at the
--- moment roster_size is fixed, to seed scoring_settings.judges_score_multiplier
--- for that league. Never queried anywhere else — update_scoring_categories()
--- only ever writes judges_score_multiplier directly, this table is
--- read-only reference data.
+-- Strong-play Dance Card ceilings (src/lib/strong-play-ceilings.ts), one row
+-- per roster size (couples per manager). The multiplier is the only
+-- roster-size lever: survival and placement stay the global defaults, and
+-- this column is solved so a strong roster of that size still ceilings at
+-- one full share. start_draft() reads it once, when roster_size is fixed,
+-- to seed scoring_settings.judges_score_multiplier. Never queried anywhere
+-- else — update_scoring_categories() only ever writes the multiplier
+-- directly, so this table is read-only reference data.
 create table dance_card_calibration (
   roster_size int primary key check (roster_size > 0),
   judges_score_multiplier_default numeric not null
@@ -307,12 +312,12 @@ on public.dance_card_calibration for select
 using (true);
 
 insert into public.dance_card_calibration (roster_size, judges_score_multiplier_default) values
-  (1, 0.2362),
-  (2, 0.1618),
-  (3, 0.1332),
-  (4, 0.1168),
-  (5, 0.1072),
-  (6, 0.1053);
+  (1, 0.5735),
+  (2, 0.2449),
+  (3, 0.1421),
+  (4, 0.0859),
+  (5, 0.0293),
+  (6, 0.0274);
 
 -- ============================================================
 -- Couples (global for the active season)
@@ -818,13 +823,20 @@ begin
   -- The commissioner explicitly reviewed these toggles during creation
   -- (unlike the old name-only flow), so scoring_configured is true right
   -- away — no post-creation "finish setup" prompt for new leagues.
+  -- Enabling Grand Finale seeds weight 1 (one full share, same ceiling as
+  -- the other modules). It does not redistribute the weights already chosen
+  -- for Dance Card and Curtain Call. Points-per-correct and the distance
+  -- penalty are the strong-play defaults even when the module is off, so
+  -- turning it on later starts from the calibrated base.
   insert into public.scoring_settings (
     league_id,
     judges_score_category_enabled,
     eliminations_category_enabled,
     bonus_picks_category_enabled,
+    bonus_picks_category_weight,
     bonus_picks_scoring_method,
     bonus_picks_distance_penalty,
+    bonus_picks_points_per_correct,
     scoring_configured
   )
   values (
@@ -832,8 +844,10 @@ begin
     p_dance_card_enabled,
     p_curtain_call_enabled,
     v_grand_finale_enabled,
+    1,
     case when v_grand_finale_enabled then 'distance_based' end,
-    case when v_grand_finale_enabled then 5 end,
+    case when v_grand_finale_enabled then 2.08 end,
+    8.33,
     true
   );
 
