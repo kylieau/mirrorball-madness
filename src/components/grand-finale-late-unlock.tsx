@@ -16,7 +16,6 @@ import {
   managerInitials,
   parseLatePercent,
 } from "@/lib/grand-finale-late";
-import { scoringModule } from "@/lib/scoring-modules";
 
 export type LateMisser = {
   userId: string;
@@ -24,11 +23,14 @@ export type LateMisser = {
   lateUnlock: { lateFactor: number; submitted: boolean } | null;
 };
 
-const MODULE_META = {
-  curtainCall: "Weekly elim picks",
-  danceCard: "Judges · survival · placement",
-  grandFinale: "Season bracket · lock at GF deadline",
-} as const;
+export type GrandFinaleLateUnlockInput = {
+  grandFinaleLocked: boolean;
+  memberCount: number;
+  lockedCount: number;
+  canUnlock: boolean;
+  resolvedCount: number;
+  missers: LateMisser[];
+};
 
 function misserStatus(misser: LateMisser): string {
   if (!misser.lateUnlock) return "No bracket submitted";
@@ -36,43 +38,15 @@ function misserStatus(misser: LateMisser): string {
   return `Late entry open · ${latePercent(misser.lateUnlock.lateFactor)}%`;
 }
 
-function ModuleRow({ icon, name, meta }: { icon: string; name: string; meta: string }) {
-  return (
-    <div className="flex items-center gap-3 border-t border-border px-3.5 py-3 first:border-t-0">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-base">
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold">{name}</span>
-        <span className="mt-0.5 block text-xs text-muted-foreground">{meta}</span>
-      </span>
-    </div>
-  );
-}
-
-export function ScoringByModule({
+export function GrandFinaleLateUnlock({
   leagueId,
-  curtainCall,
-  danceCard,
-  grandFinale,
   grandFinaleLocked,
   memberCount,
   lockedCount,
   canUnlock,
   resolvedCount,
   missers,
-}: {
-  leagueId: string;
-  curtainCall: boolean;
-  danceCard: boolean;
-  grandFinale: boolean;
-  grandFinaleLocked: boolean;
-  memberCount: number;
-  lockedCount: number;
-  canUnlock: boolean;
-  resolvedCount: number;
-  missers: LateMisser[];
-}) {
+}: GrandFinaleLateUnlockInput & { leagueId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [misser, setMisser] = useState<LateMisser | null>(null);
@@ -82,16 +56,9 @@ export function ScoringByModule({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (!curtainCall && !danceCard && !grandFinale) return null;
+  if (!grandFinaleLocked) return null;
 
-  const curtain = scoringModule("curtainCall");
-  const dance = scoringModule("danceCard");
-  const finale = scoringModule("grandFinale");
-  const quietModules = [
-    curtainCall ? { icon: curtain.icon, name: curtain.name, meta: MODULE_META.curtainCall } : null,
-    danceCard ? { icon: dance.icon, name: dance.name, meta: MODULE_META.danceCard } : null,
-  ].filter((row) => row !== null);
-  const showMissed = grandFinale && grandFinaleLocked && canUnlock && missers.length > 0;
+  const showMissed = canUnlock && missers.length > 0;
   const warning = lateUnlockWarning(resolvedCount);
   const parsed = parseLatePercent(percentText);
   const helper = lateScoreHistoryHelper(parsed ?? percent);
@@ -142,69 +109,40 @@ export function ScoringByModule({
   }
 
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="px-0.5 text-[11px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
-        Scoring by module
-      </h2>
-      {quietModules.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          {quietModules.map((row) => (
-            <ModuleRow key={row.name} icon={row.icon} name={row.name} meta={row.meta} />
-          ))}
-        </div>
-      )}
-      {grandFinale && (
-        <div className="overflow-hidden rounded-xl border border-primary/40 bg-card">
-          <div className="flex items-start gap-3 border-b border-primary/20 px-3.5 py-3.5">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-primary/40 bg-primary/15 text-lg">
-              {finale.icon}
-            </span>
-            <span>
-              <span className="block font-heading text-lg leading-tight font-semibold">Grand Finale</span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">{MODULE_META.grandFinale}</span>
-            </span>
-          </div>
-          {grandFinaleLocked && (
-            <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5 text-xs">
-              <span>Deadline passed</span>
-              <span className="size-[3px] rounded-full bg-muted-foreground" />
-              <span>
-                {lockedCount} of {memberCount} locked
-              </span>
-              <span className="ml-auto text-[10px] font-bold tracking-wider text-accent uppercase">Locked</span>
-            </div>
-          )}
-          {showMissed && (
-            <div className="px-3.5 py-3">
-              <p className="mb-2 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
-                Missed the lock
-              </p>
-              <div className="flex flex-col gap-2">
-                {missers.map((row) => (
-                  <div
-                    key={row.userId}
-                    className="flex items-center gap-2.5 rounded-xl border border-border bg-background/60 px-2.5 py-2.5"
-                  >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/25 text-xs font-bold">
-                      {managerInitials(row.displayName)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{row.displayName}</span>
-                      <span className="block text-[11px] text-muted-foreground">{misserStatus(row)}</span>
-                    </span>
-                    {!row.lateUnlock && (
-                      <Button size="sm" className="rounded-full px-3" onClick={() => openFor(row)}>
-                        Allow late…
-                      </Button>
-                    )}
-                  </div>
-                ))}
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2 border-y border-border py-2.5 text-xs">
+        <span>Deadline passed</span>
+        <span className="size-[3px] rounded-full bg-muted-foreground" />
+        <span>
+          {lockedCount} of {memberCount} locked
+        </span>
+        <span className="ml-auto text-[10px] font-bold tracking-wider text-accent uppercase">Locked</span>
+      </div>
+      {showMissed && (
+        <div>
+          <p className="mb-2 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Missed the lock</p>
+          <div className="flex flex-col gap-2">
+            {missers.map((row) => (
+              <div
+                key={row.userId}
+                className="flex items-center gap-2.5 rounded-xl border border-border bg-background/60 px-2.5 py-2.5"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/25 text-xs font-bold">
+                  {managerInitials(row.displayName)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{row.displayName}</span>
+                  <span className="block text-[11px] text-muted-foreground">{misserStatus(row)}</span>
+                </span>
+                {!row.lateUnlock && (
+                  <Button size="sm" className="rounded-full px-3" onClick={() => openFor(row)}>
+                    Allow late…
+                  </Button>
+                )}
               </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Commissioner / super-admin only · one-shot late entry
-              </p>
-            </div>
-          )}
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">Commissioner / super-admin only · one-shot late entry</p>
         </div>
       )}
 
@@ -309,6 +247,6 @@ export function ScoringByModule({
           </Button>
         </SheetContent>
       </Sheet>
-    </section>
+    </div>
   );
 }

@@ -1,5 +1,7 @@
 # GF late-entry commissioner flow — UX mocks
 
+The live League Settings page was flattened after these mocks. Missed the lock sits in the Grand Finale section (the section opens onto the weight, then Scoring Details, then Missed the lock once the deadline has passed). There is no Scoring Mix accordion. The Allow late sheet is unchanged. See `docs/design/league-settings-scoring/`. The mocks below record the earlier layout.
+
 UX mocks for **Mirrorball Madness** (designer Mock Mosaic / Kylie Au). Grand Finale late-entry unlock for commissioners after the GF deadline.
 
 Committed in this repo at `docs/design/gf-late-entry/`.

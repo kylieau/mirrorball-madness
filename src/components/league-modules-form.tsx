@@ -39,8 +39,14 @@ import {
   type TierPayStyle,
 } from "@/lib/grand-finale-explainer";
 import { formatEpisodeCasual } from "@/lib/format-week";
-import { SCORING_MODULES } from "@/lib/scoring-modules";
+import { SCORING_MODULES, scoringModule } from "@/lib/scoring-modules";
 import { BottomNav } from "@/components/bottom-nav";
+import { Switch } from "@/components/ui/switch";
+import { ScoringModulePanel } from "@/components/scoring-module-panel";
+import {
+  GrandFinaleLateUnlock,
+  type GrandFinaleLateUnlockInput,
+} from "@/components/grand-finale-late-unlock";
 import {
   airsAtForWeek,
   explainGrandFinaleDeadline,
@@ -135,6 +141,7 @@ export function LeagueModulesForm({
   scoringLocked,
   totalCouples,
   exitHref,
+  lateUnlock,
 }: {
   leagueId: string;
   league: League;
@@ -156,6 +163,7 @@ export function LeagueModulesForm({
   totalCouples: number;
   // Where "Save & exit" lands (the page the settings were opened from).
   exitHref: string;
+  lateUnlock: GrandFinaleLateUnlockInput | null;
 }) {
   const router = useRouter();
   const browserTimeZone = useBrowserTimeZone();
@@ -405,6 +413,9 @@ export function LeagueModulesForm({
   }
 
   const isRequired = !scoringSettings?.scoring_configured;
+  const lateUnlockNode =
+    bonusEnabled && lateUnlock ? <GrandFinaleLateUnlock leagueId={leagueId} {...lateUnlock} /> : null;
+  const finaleLocked = Boolean(lateUnlock?.grandFinaleLocked);
 
   if (!canEdit) {
     return (
@@ -417,12 +428,26 @@ export function LeagueModulesForm({
           <CardContent className="flex flex-col">
             {SCORING_MODULES.map((m) => (
               <div
-                key={m.name}
-                className="grid grid-cols-[1fr_1fr_auto] items-center gap-4 border-b border-border py-2 text-sm last:border-b-0"
+                key={m.key}
+                className="flex items-center gap-3 border-b border-border py-2.5 text-sm last:border-b-0"
               >
-                <span className="font-medium">{m.name}</span>
-                <span className="text-muted-foreground">{m.description}</span>
-                <span className="font-medium">
+                <span
+                  aria-hidden
+                  className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-base"
+                >
+                  {m.icon}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{m.name}</span>
+                  <span className="block text-xs text-muted-foreground">{m.description}</span>
+                </span>
+                <span
+                  className={
+                    moduleEnabled[m.key]
+                      ? "text-[10px] font-bold tracking-wide text-accent uppercase"
+                      : "text-[10px] font-bold tracking-wide text-muted-foreground uppercase"
+                  }
+                >
                   {moduleEnabled[m.key] ? "On" : "Off"}
                 </span>
               </div>
@@ -430,56 +455,31 @@ export function LeagueModulesForm({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Season Clock</CardTitle>
-            <CardDescription>Your league&apos;s Hard Deadline — the one week everything else locks around.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col">
-            <SettingRow label="Anchor Week" value={formatEpisodeCasual(judgesStartsWeek)} />
-            <SettingRow
-              label="Currently Locks"
-              value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}
-            />
-            <p className="pt-2 text-sm text-muted-foreground">{seasonClockCopy}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Scoring Mix</CardTitle>
-            <CardDescription>How much each active module counts toward Standings.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col">
-            {eliminationsEnabled && <SettingRow label="Curtain Call" value={eliminationsWeight} />}
-            {judgesEnabled && <SettingRow label="Dance Card" value={judgesWeight} />}
-            {bonusEnabled && <SettingRow label="Grand Finale" value={bonusWeight} />}
-          </CardContent>
-        </Card>
-
         {eliminationsEnabled && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Curtain Call</CardTitle>
-              <CardDescription>Weekly elimination and top-scorer picks.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col">
+          <ScoringModulePanel
+            name={scoringModule("curtainCall").name}
+            icon={scoringModule("curtainCall").icon}
+            weight={eliminationsWeight}
+            detailsHint="Elim picks · In Jeopardy"
+          >
+            <div className="flex flex-col">
               <SettingRow label="Elimination Prediction Points" value={formatPoints(eliminationPredictionPoints)} />
               <SettingRow label="Top Scorer Prediction Points" value={formatPoints(topScorerPredictionPoints)} />
               <SettingRow label="In Jeopardy" value={nearMissEnabled ? "On" : "Off"} />
               <SettingRow label="Pick 'Em Lock" value={`${predictionLockHoursBeforeAir}h before air`} />
               <p className="pt-2 text-sm text-muted-foreground">{CURTAIN_CALL_PAYOUT_NOTE}</p>
-            </CardContent>
-          </Card>
+            </div>
+          </ScoringModulePanel>
         )}
 
         {judgesEnabled && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Dance Card</CardTitle>
-              <CardDescription>Draft, roster, Recast, and judges&apos; score points.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col">
+          <ScoringModulePanel
+            name={scoringModule("danceCard").name}
+            icon={scoringModule("danceCard").icon}
+            weight={judgesWeight}
+            detailsHint="Judges · survival · placement"
+          >
+            <div className="flex flex-col">
               <SettingRow label="Judges' Score Multiplier" value={judgesScoreMultiplier.toFixed(2)} />
               <SettingRow label="Survival Points" value={formatPoints(survivalPoints)} />
               <SettingRow label="1st Place Bonus" value={formatPoints(firstPlacePoints)} />
@@ -496,17 +496,20 @@ export function LeagueModulesForm({
               {draftScheduledAt && (
                 <SettingRow label="Draft Scheduled For" value={formattedDraftScheduledAt || "—"} />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ScoringModulePanel>
         )}
 
         {bonusEnabled && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Grand Finale</CardTitle>
-              <CardDescription>Points from a season-long guess of the full elimination order.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col">
+          <ScoringModulePanel
+            name={scoringModule("grandFinale").name}
+            icon={scoringModule("grandFinale").icon}
+            weight={bonusWeight}
+            detailsHint="Bracket · method · points"
+            locked={finaleLocked}
+            footer={lateUnlockNode}
+          >
+            <div className="flex flex-col">
               <SettingRow
                 label="Deadline"
                 value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}
@@ -523,9 +526,24 @@ export function LeagueModulesForm({
                 </>
               )}
               <p className="pt-2 text-sm text-muted-foreground">{explainMethod()}</p>
-            </CardContent>
-          </Card>
+            </div>
+          </ScoringModulePanel>
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Season Clock</CardTitle>
+            <CardDescription>Your league&apos;s Hard Deadline — the one week everything else locks around.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col">
+            <SettingRow label="Anchor Week" value={formatEpisodeCasual(judgesStartsWeek)} />
+            <SettingRow
+              label="Currently Locks"
+              value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}
+            />
+            <p className="pt-2 text-sm text-muted-foreground">{seasonClockCopy}</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -553,135 +571,44 @@ export function LeagueModulesForm({
           )}
           <div className="flex flex-col">
             {SCORING_MODULES.map((m) => (
-              <label
+              <div
                 key={m.key}
-                className="grid grid-cols-[1fr_1fr] items-center gap-4 border-b border-border py-2 text-sm last:border-b-0"
+                className="flex items-center gap-3 border-b border-border py-2.5 last:border-b-0"
               >
-                <span className="flex items-center gap-2 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={moduleEnabled[m.key]}
-                    onChange={(e) => setModuleEnabled[m.key](e.target.checked)}
-                    disabled={scoringLocked}
-                  />
-                  {m.name}
+                <span
+                  aria-hidden
+                  className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-base"
+                >
+                  {m.icon}
                 </span>
-                <span className="text-muted-foreground">{m.description}</span>
-              </label>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{m.name}</span>
+                  <span className="block text-xs text-muted-foreground">{m.description}</span>
+                </span>
+                <Switch
+                  checked={moduleEnabled[m.key]}
+                  onCheckedChange={(checked) => setModuleEnabled[m.key](checked)}
+                  disabled={scoringLocked}
+                  aria-label={m.name}
+                />
+              </div>
             ))}
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Season Clock</CardTitle>
-          <CardDescription>Your league&apos;s Hard Deadline — the one week everything else locks around.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="judgesStartsWeek">Anchor Week</Label>
-              <Select
-                items={startsWeekItems}
-                value={String(judgesStartsWeek)}
-                onValueChange={(v) => v && setJudgesStartsWeek(Number(v))}
-                disabled={scoringLocked}
-              >
-                <SelectTrigger id="judgesStartsWeek" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(startsWeekItems).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Currently Locks</Label>
-              <p className="flex min-h-8 items-center text-sm">{lockDisplay}</p>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">{seasonClockCopy}</p>
-          {showAnchorSync && !scoringLocked && (
-            <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="self-start"
-                disabled={syncingAnchor || submitting}
-                onClick={handleSyncAnchor}
-              >
-                {syncingAnchor ? "Updating..." : "Update Anchor to match lock"}
-              </Button>
-              {syncError && <p className="text-sm text-destructive">{syncError}</p>}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Scoring Mix</CardTitle>
-          <CardDescription>How much each active module counts toward Standings.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {eliminationsEnabled && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="eliminationsWeight">Curtain Call</Label>
-              <Input
-                id="eliminationsWeight"
-                type="number"
-                step="0.1"
-                min={0}
-                value={eliminationsWeight}
-                onChange={(e) => setEliminationsWeight(Number(e.target.value))}
-                disabled={scoringLocked}
-              />
-            </div>
-          )}
-          {judgesEnabled && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="judgesWeight">Dance Card</Label>
-              <Input
-                id="judgesWeight"
-                type="number"
-                step="0.1"
-                min={0}
-                value={judgesWeight}
-                onChange={(e) => setJudgesWeight(Number(e.target.value))}
-                disabled={scoringLocked}
-              />
-            </div>
-          )}
-          {bonusEnabled && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="bonusWeight">Grand Finale</Label>
-              <Input
-                id="bonusWeight"
-                type="number"
-                step="0.1"
-                min={0}
-                value={bonusWeight}
-                onChange={(e) => setBonusWeight(Number(e.target.value))}
-                disabled={scoringLocked}
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {eliminationsEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Curtain Call</CardTitle>
-            <CardDescription>Weekly elimination and top-scorer picks.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+        <ScoringModulePanel
+          name={scoringModule("curtainCall").name}
+          icon={scoringModule("curtainCall").icon}
+          weight={eliminationsWeight}
+          canEdit
+          weightInputId="eliminationsWeight"
+          onWeightChange={setEliminationsWeight}
+          weightDisabled={scoringLocked}
+          detailsHint="Elim picks · In Jeopardy"
+        >
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="predictionLockHoursBeforeAir">Pick &apos;Em Lock (Hours Before Air)</Label>
@@ -733,20 +660,25 @@ export function LeagueModulesForm({
               </div>
             </div>
             <p className="text-xs text-muted-foreground">{CURTAIN_CALL_PAYOUT_NOTE}</p>
-          </CardContent>
-        </Card>
+          </div>
+        </ScoringModulePanel>
       )}
 
       {judgesEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Dance Card</CardTitle>
-            <CardDescription>
-              Draft, roster, Recast, and judges&apos; score points. Roster size is set
-              automatically when the draft starts (couples ÷ members).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+        <ScoringModulePanel
+          name={scoringModule("danceCard").name}
+          icon={scoringModule("danceCard").icon}
+          weight={judgesWeight}
+          canEdit
+          weightInputId="judgesWeight"
+          onWeightChange={setJudgesWeight}
+          weightDisabled={scoringLocked}
+          detailsHint="Judges · survival · placement"
+        >
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground">
+              Roster size is set automatically when the draft starts (couples ÷ members).
+            </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="judgesScoreMultiplier">Judges&apos; Score Multiplier</Label>
@@ -927,17 +859,24 @@ export function LeagueModulesForm({
                 Draft Type and Scheduled For can only be changed before the draft starts.
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ScoringModulePanel>
       )}
 
       {bonusEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Grand Finale</CardTitle>
-            <CardDescription>Points from a season-long guess of the full elimination order.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+        <ScoringModulePanel
+          name={scoringModule("grandFinale").name}
+          icon={scoringModule("grandFinale").icon}
+          weight={bonusWeight}
+          canEdit
+          weightInputId="bonusWeight"
+          onWeightChange={setBonusWeight}
+          weightDisabled={scoringLocked}
+          detailsHint="Bracket · method · points"
+          locked={finaleLocked}
+          footer={lateUnlockNode}
+        >
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label>Deadline{browserTimeZone ? ` (${browserTimeZone})` : ""}</Label>
@@ -1031,9 +970,59 @@ export function LeagueModulesForm({
               )}
             </div>
             <p className="text-sm text-muted-foreground">{explainMethod()}</p>
-          </CardContent>
-        </Card>
+          </div>
+        </ScoringModulePanel>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Season Clock</CardTitle>
+          <CardDescription>Your league&apos;s Hard Deadline — the one week everything else locks around.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="judgesStartsWeek">Anchor Week</Label>
+              <Select
+                items={startsWeekItems}
+                value={String(judgesStartsWeek)}
+                onValueChange={(v) => v && setJudgesStartsWeek(Number(v))}
+                disabled={scoringLocked}
+              >
+                <SelectTrigger id="judgesStartsWeek" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(startsWeekItems).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label>Currently Locks</Label>
+              <p className="flex min-h-8 items-center text-sm">{lockDisplay}</p>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">{seasonClockCopy}</p>
+          {showAnchorSync && !scoringLocked && (
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={syncingAnchor || submitting}
+                onClick={handleSyncAnchor}
+              >
+                {syncingAnchor ? "Updating..." : "Update Anchor to match lock"}
+              </Button>
+              {syncError && <p className="text-sm text-destructive">{syncError}</p>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <BottomNav>
         <div className="flex flex-col gap-2 py-3">

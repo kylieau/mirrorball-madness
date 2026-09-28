@@ -3,9 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LeagueMembersSection } from "@/components/league-members-section";
-import { ScoringByModule, type LateMisser } from "@/components/scoring-by-module";
 import { LeagueInfoSection } from "@/components/league-info-section";
 import { LeagueModulesForm } from "@/components/league-modules-form";
+import type { GrandFinaleLateUnlockInput, LateMisser } from "@/components/grand-finale-late-unlock";
 import { LeaveLeagueButton } from "@/components/leave-league-button";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { safeRelativePath } from "@/lib/safe-relative-path";
@@ -68,56 +68,17 @@ export default async function LeagueSettingsPage({
 
   const isCommissioner = viewerMembership.role === "commissioner";
 
-  const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [
-    { data: weekRows },
-    { data: episodeRows },
-    { data: activeSeason },
-    { data: effectiveHardDeadlineWeek },
-    { data: effectiveGrandFinaleDeadline },
-    { count: totalCouples },
-  ] =
-    await Promise.all([
-      supabase
-        .from("competition_weeks")
-        .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
-        .eq("season_id", activeSeasonId ?? "")
-        .order("week_number"),
-      supabase
-        .from("episodes")
-        .select("id, episode_number, week_id, airs_at, theme, status")
-        .eq("season_id", activeSeasonId ?? ""),
-      supabase.from("seasons").select("season_number").eq("id", activeSeasonId ?? "").maybeSingle(),
-      supabase.rpc("effective_hard_deadline_week", { p_league_id: id }),
-      supabase.rpc("effective_grand_finale_deadline", { p_league_id: id }),
-      supabase
-        .from("couples")
-        .select("id", { count: "exact", head: true })
-        .eq("season_id", activeSeasonId ?? ""),
-    ]);
+  const season = await loadSeasonContext(supabase, id);
   // Same trigger update_scoring_categories enforces server-side — this is
   // just a UI hint to avoid a confusing failed-save, not the source of
   // truth. Computed here (real request-time "now", not a client re-guess)
   // so no client-side date hydration dance is needed for a plain boolean.
-  const scoringLocked =
-    !(scoringSettings?.locking_exempt ?? false) &&
-    effectiveGrandFinaleDeadline != null &&
-    new Date(effectiveGrandFinaleDeadline).getTime() <= Date.now();
-  const seasonNumber = activeSeason?.season_number ?? null;
-  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
-  const seasonEpisodes = groupedWeeks.map((week) => ({
-    week_number: week.week_number,
-    theme: week.theme,
-    airs_at: week.earliestAirsAt ?? "",
-  }));
-
+  const scoringLocked = scoringIsLocked(scoringSettings?.locking_exempt ?? false, season.effectiveGrandFinaleDeadline);
   const grandFinaleLocked =
     (scoringSettings?.bonus_picks_category_enabled ?? false) &&
-    effectiveGrandFinaleDeadline != null &&
-    new Date(effectiveGrandFinaleDeadline).getTime() <= Date.now();
-  const lateGrandFinale = grandFinaleLocked
-    ? await loadLateGrandFinale(supabase, id, activeSeasonId)
-    : null;
+    season.effectiveGrandFinaleDeadline != null &&
+    new Date(season.effectiveGrandFinaleDeadline).getTime() <= Date.now();
+  const lateGrandFinale = grandFinaleLocked ? await loadLateGrandFinale(supabase, id, season.activeSeasonId) : null;
   const memberRows = (members ?? []).map((m) => ({
     userId: m.user_id,
     displayName: m.profiles?.display_name ?? "Unknown",
@@ -161,21 +122,6 @@ export default async function LeagueSettingsPage({
           })}
           canEdit={isCommissioner}
         />
-        <ScoringByModule
-          leagueId={id}
-          curtainCall={scoringSettings?.eliminations_category_enabled ?? true}
-          danceCard={scoringSettings?.judges_score_category_enabled ?? true}
-          grandFinale={scoringSettings?.bonus_picks_category_enabled ?? false}
-          grandFinaleLocked={grandFinaleLocked}
-          memberCount={memberRows.length}
-          lockedCount={lockedManagerCount(
-            memberRows.map((m) => m.userId),
-            lateGrandFinale
-          )}
-          canUnlock={isCommissioner || isSuperAdmin}
-          resolvedCount={lateGrandFinale?.resolvedCount ?? 0}
-          missers={lateMissers(memberRows, lateGrandFinale)}
-        />
         <LeagueInfoSection
           leagueId={id}
           leagueName={league.name}
@@ -199,12 +145,13 @@ export default async function LeagueSettingsPage({
           league={league}
           scoringSettings={scoringSettings}
           canEdit={isCommissioner}
-          seasonEpisodes={seasonEpisodes ?? []}
-          seasonNumber={seasonNumber}
-          effectiveHardDeadlineWeek={effectiveHardDeadlineWeek ?? null}
+          seasonEpisodes={season.seasonEpisodes}
+          seasonNumber={season.seasonNumber}
+          effectiveHardDeadlineWeek={season.effectiveHardDeadlineWeek}
           scoringLocked={scoringLocked}
-          totalCouples={totalCouples ?? 12}
+          totalCouples={season.totalCouples}
           exitHref={closeHref}
+          lateUnlock={buildLateUnlock(grandFinaleLocked, memberRows, lateGrandFinale, isCommissioner || isSuperAdmin)}
         />
       </div>
     </div>
@@ -220,6 +167,71 @@ type LateGrandFinale = {
 function lockedManagerCount(memberIds: string[], late: LateGrandFinale | null) {
   if (!late) return 0;
   return memberIds.filter((id) => late.bracketManagerIds.has(id)).length;
+}
+
+function buildLateUnlock(
+  grandFinaleLocked: boolean,
+  members: { userId: string; displayName: string; coManagerDisplayName: string | null }[],
+  late: LateGrandFinale | null,
+  canUnlock: boolean
+): GrandFinaleLateUnlockInput | null {
+  if (!grandFinaleLocked || !late) return null;
+  return {
+    grandFinaleLocked: true,
+    memberCount: members.length,
+    lockedCount: lockedManagerCount(
+      members.map((member) => member.userId),
+      late
+    ),
+    canUnlock,
+    resolvedCount: late.resolvedCount,
+    missers: lateMissers(members, late),
+  };
+}
+
+function scoringIsLocked(lockingExempt: boolean, deadline: string | null) {
+  return !lockingExempt && deadline != null && new Date(deadline).getTime() <= Date.now();
+}
+
+async function loadSeasonContext(supabase: SupabaseClient<Database>, leagueId: string) {
+  const { data: activeSeasonId } = await supabase.rpc("active_season_id");
+  const [
+    { data: weekRows },
+    { data: episodeRows },
+    { data: activeSeason },
+    { data: effectiveHardDeadlineWeek },
+    { data: effectiveGrandFinaleDeadline },
+    { count: totalCouples },
+  ] = await Promise.all([
+    supabase
+      .from("competition_weeks")
+      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
+      .eq("season_id", activeSeasonId ?? "")
+      .order("week_number"),
+    supabase
+      .from("episodes")
+      .select("id, episode_number, week_id, airs_at, theme, status")
+      .eq("season_id", activeSeasonId ?? ""),
+    supabase.from("seasons").select("season_number").eq("id", activeSeasonId ?? "").maybeSingle(),
+    supabase.rpc("effective_hard_deadline_week", { p_league_id: leagueId }),
+    supabase.rpc("effective_grand_finale_deadline", { p_league_id: leagueId }),
+    supabase
+      .from("couples")
+      .select("id", { count: "exact", head: true })
+      .eq("season_id", activeSeasonId ?? ""),
+  ]);
+  return {
+    activeSeasonId,
+    seasonNumber: activeSeason?.season_number ?? null,
+    effectiveHardDeadlineWeek: effectiveHardDeadlineWeek ?? null,
+    effectiveGrandFinaleDeadline,
+    totalCouples: totalCouples ?? 12,
+    seasonEpisodes: groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []).map((week) => ({
+      week_number: week.week_number,
+      theme: week.theme,
+      airs_at: week.earliestAirsAt ?? "",
+    })),
+  };
 }
 
 function lateMissers(
@@ -265,17 +277,11 @@ async function loadLateGrandFinale(
 // can't see a league they aren't in, so this read uses the service role.
 async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; closeHref: string }) {
   const admin = createAdminClient();
-  const { data: league } = await admin.from("leagues").select("name").eq("id", leagueId).maybeSingle();
+  const { data: league } = await admin.from("leagues").select("*").eq("id", leagueId).maybeSingle();
   if (!league) notFound();
 
-  const [{ data: settings }, { data: deadline }, { data: seasonId }, { data: members }] = await Promise.all([
-    admin
-      .from("scoring_settings")
-      .select("bonus_picks_category_enabled, judges_score_category_enabled, eliminations_category_enabled")
-      .eq("league_id", leagueId)
-      .maybeSingle(),
-    admin.rpc("effective_grand_finale_deadline", { p_league_id: leagueId }),
-    admin.rpc("active_season_id"),
+  const [{ data: settings }, { data: members }, season] = await Promise.all([
+    admin.from("scoring_settings").select("*").eq("league_id", leagueId).maybeSingle(),
     admin
       .from("league_members")
       .select(
@@ -283,12 +289,13 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
       )
       .eq("league_id", leagueId)
       .order("joined_at"),
+    loadSeasonContext(admin, leagueId),
   ]);
   const grandFinaleLocked =
     (settings?.bonus_picks_category_enabled ?? false) &&
-    deadline != null &&
-    new Date(deadline).getTime() <= Date.now();
-  const late = grandFinaleLocked ? await loadLateGrandFinale(admin, leagueId, seasonId) : null;
+    season.effectiveGrandFinaleDeadline != null &&
+    new Date(season.effectiveGrandFinaleDeadline).getTime() <= Date.now();
+  const late = grandFinaleLocked ? await loadLateGrandFinale(admin, leagueId, season.activeSeasonId) : null;
   const memberRows = (members ?? []).map((m) => ({
     userId: m.user_id,
     displayName: m.profiles?.display_name ?? "Unknown",
@@ -320,20 +327,18 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
             inviteCode: null,
           }))}
         />
-        <ScoringByModule
+        <LeagueModulesForm
           leagueId={leagueId}
-          curtainCall={settings?.eliminations_category_enabled ?? true}
-          danceCard={settings?.judges_score_category_enabled ?? true}
-          grandFinale={settings?.bonus_picks_category_enabled ?? false}
-          grandFinaleLocked={grandFinaleLocked}
-          memberCount={memberRows.length}
-          lockedCount={lockedManagerCount(
-            memberRows.map((m) => m.userId),
-            late
-          )}
-          canUnlock
-          resolvedCount={late?.resolvedCount ?? 0}
-          missers={lateMissers(memberRows, late)}
+          league={league}
+          scoringSettings={settings}
+          canEdit={false}
+          seasonEpisodes={season.seasonEpisodes}
+          seasonNumber={season.seasonNumber}
+          effectiveHardDeadlineWeek={season.effectiveHardDeadlineWeek}
+          scoringLocked={scoringIsLocked(settings?.locking_exempt ?? false, season.effectiveGrandFinaleDeadline)}
+          totalCouples={season.totalCouples}
+          exitHref={closeHref}
+          lateUnlock={buildLateUnlock(grandFinaleLocked, memberRows, late, true)}
         />
       </div>
     </div>
