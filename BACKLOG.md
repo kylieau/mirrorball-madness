@@ -162,7 +162,6 @@ Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Hom
 
 ## Scoring calibration follow-ups
 
-- **Lock `judges_score_multiplier` with the other scoring settings** (wanted, not built). It's excluded from the Grand Finale-deadline lock in `update_scoring_categories` on purpose: `start_draft` calibrates it by roster size, and drafts often run after that deadline, so a plain lock would stop a commissioner adjusting it before a late draft. Needs a rule first, e.g. "locked once the draft is complete and the deadline has passed."
 - **Dance Card ~25% calibration overshoot** — known; needs a product conversation before any fix, not a quiet patch.
 - **Full Monte Carlo recalibration against real Season 35 data** — blocked on live SQL / `SUPABASE_ACCESS_TOKEN`, and the season isn't over. Re-running `scripts/monte-carlo-calibration/` already bakes in `POINT_SCALE`.
 - **Equal-EV / neutral fair scoring defaults** — parked.
