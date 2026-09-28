@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CrownIcon, LockIcon, SettingsIcon } from "lucide-react";
+import { CrownIcon, SettingsIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +7,14 @@ import { LeagueStatusPill } from "@/components/league-status-pill";
 import { formatCountdown } from "@/lib/format-countdown";
 import { formatPoints } from "@/lib/format-points";
 import { scoringModule } from "@/lib/scoring-modules";
-import { buildModuleStack, leagueTapHref, picksAction, type ModuleStackInput } from "@/lib/league-triage";
+import {
+  buildModuleStack,
+  leagueTapHref,
+  picksAction,
+  picksButtonLabel,
+  showHybridStatusPill,
+  type ModuleStackInput,
+} from "@/lib/league-triage";
 
 export type LeagueTriage = {
   id: string;
@@ -18,17 +25,20 @@ export type LeagueTriage = {
   totalPoints: number;
   picksDue: boolean;
   weeksBehind: number;
+  weekLabel?: string | null;
+  settingsFrom?: string;
   modules: ModuleStackInput;
 };
 
 const GOLD_OUTLINE =
   "border-primary/60 bg-transparent text-accent hover:bg-primary/10 hover:text-accent dark:border-primary/60 dark:bg-transparent dark:hover:bg-primary/10";
 
-const PICKS_LABEL = { make: "Make Picks", edit: "Edit Picks" } as const;
-
 export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
   const stack = buildModuleStack(league.modules);
   const action = picksAction(league.picksDue, league.modules);
+  const picksLabel = picksButtonLabel(action);
+  const standingsPrimary = action === "locked";
+  const settingsFrom = league.settingsFrom ?? "/leagues";
   return (
     <Card className={cn("ring-primary/40", league.picksDue && "border-l-[3px] border-l-primary")}>
       <CardContent className="flex flex-col gap-3">
@@ -38,12 +48,15 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
               {league.isCommissioner && <CrownIcon className="size-3.5 shrink-0 text-primary" aria-hidden />}
               <span className="truncate">{league.name}</span>
             </p>
-            <LeagueStatusPill picksDue={league.picksDue} weeksBehind={league.weeksBehind} />
+            {showHybridStatusPill(league.picksDue, league.weeksBehind) && (
+              <LeagueStatusPill picksDue={league.picksDue} weeksBehind={league.weeksBehind} />
+            )}
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Rank {league.rank} of {league.totalMembers} ·{" "}
             <span className="font-heading font-semibold">{formatPoints(league.totalPoints)}</span> pts
           </p>
+          {league.weekLabel && <p className="mt-1 text-xs font-semibold text-accent">{league.weekLabel}</p>}
         </div>
 
         {stack.length > 0 && (
@@ -116,17 +129,16 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
         )}
 
         <div className="flex gap-2">
-          {action === "locked" && (
+          {picksLabel && action === "locked" && (
             <Button
               size="lg"
               className="flex-1 border-transparent bg-muted/40 text-muted-foreground disabled:opacity-100 dark:bg-muted/40"
               disabled
             >
-              <LockIcon aria-hidden />
-              Picks Locked
+              {picksLabel}
             </Button>
           )}
-          {(action === "make" || action === "edit") && (
+          {picksLabel && action !== "locked" && (
             <Button
               size="lg"
               variant={action === "make" ? "default" : "outline"}
@@ -137,13 +149,13 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
               nativeButton={false}
               render={<Link href={leagueTapHref(league.id, true)} />}
             >
-              {PICKS_LABEL[action]}
+              {picksLabel}
             </Button>
           )}
           <Button
             size="lg"
-            variant="outline"
-            className={cn("flex-1", GOLD_OUTLINE)}
+            variant={standingsPrimary ? "default" : "outline"}
+            className={cn("flex-1", !standingsPrimary && GOLD_OUTLINE)}
             nativeButton={false}
             render={<Link href={leagueTapHref(league.id, false)} />}
           >
@@ -155,7 +167,7 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
             className={GOLD_OUTLINE}
             aria-label="League settings"
             nativeButton={false}
-            render={<Link href={`/leagues/${league.id}/settings?from=/leagues`} />}
+            render={<Link href={`/leagues/${league.id}/settings?from=${encodeURIComponent(settingsFrom)}`} />}
           >
             <SettingsIcon aria-hidden />
           </Button>
