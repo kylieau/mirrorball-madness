@@ -76,6 +76,12 @@ function SeasonSettingsCard({ season, readOnly }: { season: Season; readOnly: bo
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // A season that already has all three fields set opens locked, so the lock
+  // survives a page reload instead of resetting every visit; one still being
+  // configured opens editable.
+  const [locked, setLocked] = useState(
+    Boolean(season?.premiere_date) && Boolean(season?.total_episodes) && Boolean(season?.finale_date)
+  );
 
   if (!season) return null;
 
@@ -90,7 +96,10 @@ function SeasonSettingsCard({ season, readOnly }: { season: Season; readOnly: bo
       finaleDate: finaleDate || null,
     });
     if (result.error) setError(result.error);
-    else setSaved(true);
+    else {
+      setSaved(true);
+      setLocked(true);
+    }
     setSubmitting(false);
   }
 
@@ -108,7 +117,7 @@ function SeasonSettingsCard({ season, readOnly }: { season: Season; readOnly: bo
               type="date"
               value={premiereDate}
               placeholder="TBD"
-              disabled={readOnly}
+              disabled={readOnly || locked}
               onChange={(e) => {
                 setPremiereDate(e.target.value);
                 setSaved(false);
@@ -122,7 +131,7 @@ function SeasonSettingsCard({ season, readOnly }: { season: Season; readOnly: bo
               min={1}
               value={totalEpisodes}
               placeholder="TBD"
-              disabled={readOnly}
+              disabled={readOnly || locked}
               onChange={(e) => {
                 setTotalEpisodes(e.target.value);
                 setSaved(false);
@@ -135,7 +144,7 @@ function SeasonSettingsCard({ season, readOnly }: { season: Season; readOnly: bo
               type="date"
               value={finaleDate}
               placeholder="TBD"
-              disabled={readOnly}
+              disabled={readOnly || locked}
               onChange={(e) => {
                 setFinaleDate(e.target.value);
                 setSaved(false);
@@ -145,10 +154,21 @@ function SeasonSettingsCard({ season, readOnly }: { season: Season; readOnly: bo
         </div>
         {!readOnly && (
           <div className="flex items-center gap-3">
-            <Button size="sm" onClick={handleSave} disabled={submitting}>
-              {submitting ? "Saving..." : "Save"}
-            </Button>
-            {saved && <p className="text-sm text-muted-foreground">Saved.</p>}
+            {locked ? (
+              <>
+                <Badge>Saved</Badge>
+                <Button size="sm" variant="outline" onClick={() => setLocked(false)}>
+                  Edit
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button size="sm" onClick={handleSave} disabled={submitting}>
+                  {submitting ? "Saving..." : "Save"}
+                </Button>
+                {saved && <p className="text-sm text-muted-foreground">Saved.</p>}
+              </>
+            )}
           </div>
         )}
       </CardContent>
@@ -484,7 +504,7 @@ export function ScheduleManager({
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingId ? "Edit Scheduled Episode" : "Schedule a New Episode"}</SheetTitle>
+            <SheetTitle>{editingId ? "Edit Episode" : "Add Episode"}</SheetTitle>
             <SheetDescription>
               Each row is one TV airing. Assign it to a competition week to put it on Results and
               Picks, or leave the week blank for exhibition / interview nights.
