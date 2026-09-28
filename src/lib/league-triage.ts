@@ -1,3 +1,4 @@
+import { buildCoupleDisplayNames, formatCoupleName } from "./couple-display";
 import { SCORING_MODULES, type ScoringModuleKey } from "./scoring-modules";
 
 export function leagueTapHref(leagueId: string, picksDue: boolean): string {
@@ -31,7 +32,9 @@ export type ModuleStackInput = {
 export type ModuleLine = {
   key: ScoringModuleKey;
   name: string;
-  text: string;
+  // One string per visual row under the module name. Curtain Call Home/High
+  // and Dance Card couples are never joined onto a single row.
+  lines: string[];
   tone: "needed" | "normal" | "dim";
   // A gold "Need …" tacked onto an otherwise normal line.
   needText: string | null;
@@ -39,60 +42,75 @@ export type ModuleLine = {
   locksAt: string | null;
 };
 
-type LineBody = Pick<ModuleLine, "text" | "tone" | "locked" | "locksAt"> & { needText?: string };
+type LineBody = Pick<ModuleLine, "lines" | "tone" | "locked" | "locksAt"> & { needText?: string };
 
-// One line per module that's on, in the canonical module order.
+// First names for both partners, via the same display helper the rest of the
+// app uses — last initial only when that helper finds a collision in this pool.
+export function danceCardRosterNames(
+  coupleIds: readonly string[],
+  couples: readonly { id: string; celebrityName: string; proName: string }[]
+): string[] {
+  const display = buildCoupleDisplayNames(
+    couples.map((c) => ({ id: c.id, celebrity_name: c.celebrityName, pro_name: c.proName }))
+  );
+  return coupleIds.flatMap((id) => {
+    const parts = display.get(id);
+    return parts ? [formatCoupleName(parts)] : [];
+  });
+}
+
+// One entry per module that's on, in the canonical module order.
 export function buildModuleStack(input: ModuleStackInput): ModuleLine[] {
   const { curtainCall: cc, danceCard: dc, grandFinale: gf } = input;
 
   const curtainCall = ((): LineBody => {
     const home = cc.eliminatedName && `Home: ${cc.eliminatedName}`;
     const high = cc.topScorerName && `High: ${cc.topScorerName}`;
-    const picks = [home, high].filter(Boolean).join(" / ");
+    const picks = [home, high].filter((line): line is string => !!line);
     switch (cc.state) {
       case "no_week":
-        return { text: "Not open yet", tone: "dim", locked: false, locksAt: null };
+        return { lines: ["Not open yet"], tone: "dim", locked: false, locksAt: null };
       case "awaiting_results":
         return {
-          text: cc.afterWeek ? `Opens after Week ${cc.afterWeek} results` : "Opens after results",
+          lines: [cc.afterWeek ? `Opens after Week ${cc.afterWeek} results` : "Opens after results"],
           tone: "dim",
           locked: false,
           locksAt: null,
         };
       case "locked":
-        return picks
-          ? { text: picks, tone: "normal", locked: true, locksAt: null }
-          : { text: "Missed your cue", tone: "dim", locked: true, locksAt: null };
+        return picks.length
+          ? { lines: picks, tone: "normal", locked: true, locksAt: null }
+          : { lines: ["Missed your cue"], tone: "dim", locked: true, locksAt: null };
       case "open":
-        if (home && high) return { text: picks, tone: "normal", locked: false, locksAt: cc.lockAt };
-        if (!home && !high) return { text: "Need Home & High picks", tone: "needed", locked: false, locksAt: cc.lockAt };
-        return { text: picks, needText: `Need ${home ? "High" : "Home"}`, tone: "normal", locked: false, locksAt: cc.lockAt };
+        if (home && high) return { lines: picks, tone: "normal", locked: false, locksAt: cc.lockAt };
+        if (!home && !high) return { lines: ["Need Home & High picks"], tone: "needed", locked: false, locksAt: cc.lockAt };
+        return { lines: picks, needText: `Need ${home ? "High" : "Home"}`, tone: "normal", locked: false, locksAt: cc.lockAt };
     }
   })();
 
   const danceCard = ((): LineBody => {
-    const text =
+    const lines =
       dc.draftStatus === "not_started"
-        ? "Draft not started"
+        ? ["Draft not started"]
         : dc.draftStatus === "in_progress"
-          ? "Draft in progress"
+          ? ["Draft in progress"]
           : dc.rosterNames.length
-            ? dc.rosterNames.join(", ")
-            : "No couples";
-    return { text, tone: "normal", locked: dc.draftStatus === "completed", locksAt: null };
+            ? dc.rosterNames
+            : ["No couples"];
+    return { lines, tone: "normal", locked: dc.draftStatus === "completed", locksAt: null };
   })();
 
   const grandFinale = ((): LineBody => {
     if (gf.hasPrediction) {
       return {
-        text: gf.nextElimName ? `Next elim: ${gf.nextElimName}` : "Prediction in",
+        lines: [gf.nextElimName ? `Next elim: ${gf.nextElimName}` : "Prediction in"],
         tone: "normal",
         locked: gf.locked,
         locksAt: gf.open ? gf.deadlineAt : null,
       };
     }
-    if (gf.locked) return { text: "Missed your cue", tone: "dim", locked: true, locksAt: null };
-    return { text: "Need predictions", tone: "needed", locked: false, locksAt: gf.deadlineAt };
+    if (gf.locked) return { lines: ["Missed your cue"], tone: "dim", locked: true, locksAt: null };
+    return { lines: ["Need predictions"], tone: "needed", locked: false, locksAt: gf.deadlineAt };
   })();
 
   const bodies: Record<ScoringModuleKey, LineBody & { on: boolean }> = {
@@ -101,8 +119,8 @@ export function buildModuleStack(input: ModuleStackInput): ModuleLine[] {
     grandFinale: { ...grandFinale, on: gf.on },
   };
   return SCORING_MODULES.filter((m) => bodies[m.key].on).map((m) => {
-    const { text, tone, locked, locksAt, needText } = bodies[m.key];
-    return { key: m.key, name: m.name, text, tone, needText: needText ?? null, locked, locksAt };
+    const { lines, tone, locked, locksAt, needText } = bodies[m.key];
+    return { key: m.key, name: m.name, lines, tone, needText: needText ?? null, locked, locksAt };
   });
 }
 

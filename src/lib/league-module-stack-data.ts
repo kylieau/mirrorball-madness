@@ -3,7 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { nextPredictedElimination } from "@/lib/grand-finale-pins";
 import type { LeagueHomeSummary } from "@/lib/league-home-summary";
-import type { ModuleStackInput } from "@/lib/league-triage";
+import { danceCardRosterNames, type ModuleStackInput } from "@/lib/league-triage";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 
 // The viewer's own per-module state for each league, batched into one query per table.
@@ -18,7 +18,7 @@ export async function loadModuleStackInputs(
   const leagueIds = summaries.map((s) => s.id);
   const [{ data: leagues }, { data: slots }, { data: couples }, { data: predictions }] = await Promise.all([
     supabase.from("leagues").select("id, draft_status").in("id", leagueIds),
-    supabase.from("roster_slots").select("league_id, manager_id, couple_id").in("league_id", leagueIds).is("end_week", null),
+    supabase.from("roster_slots").select("league_id, manager_id, couple_id, slot_number").in("league_id", leagueIds).is("end_week", null),
     supabase
       .from("couples")
       .select(
@@ -76,10 +76,20 @@ export async function loadModuleStackInputs(
           danceCard: {
             on: s.danceCardOn,
             draftStatus: draftStatusByLeague.get(s.id) ?? "not_started",
-            rosterNames: (slots ?? [])
-              .filter((slot) => slot.league_id === s.id && slot.manager_id === s.myTeamId)
-              .map((slot) => nameOf(slot.couple_id))
-              .filter((name): name is string => !!name),
+            rosterNames: danceCardRosterNames(
+              (slots ?? [])
+                .filter(
+                  (slot): slot is typeof slot & { couple_id: string } =>
+                    slot.league_id === s.id && slot.manager_id === s.myTeamId && slot.couple_id !== null
+                )
+                .sort((a, b) => a.slot_number - b.slot_number)
+                .map((slot) => slot.couple_id),
+              (couples ?? []).map((c) => ({
+                id: c.id,
+                celebrityName: c.celebrity?.name ?? "Unknown",
+                proName: c.pro?.name ?? "Unknown",
+              }))
+            ),
           },
           grandFinale: {
             on: s.grandFinaleOn,

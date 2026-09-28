@@ -48,36 +48,70 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
 
         {stack.length > 0 && (
           <dl className="flex flex-col gap-1.5 border-y border-border py-3 text-sm">
-            {stack.map((line) => (
-              <div key={line.key} className="grid grid-cols-[6.5rem_1fr] items-baseline gap-0">
-                <dt className="whitespace-nowrap text-[13px] text-muted-foreground">
-                  <span aria-hidden>{scoringModule(line.key).icon}</span> {line.name}
-                </dt>
-                <dd className="flex min-w-0 items-baseline justify-between gap-2">
-                  <span
-                    className={cn(
-                      "min-w-0",
-                      line.tone === "needed" && "font-semibold text-accent",
-                      line.tone === "normal" && "text-foreground",
-                      line.tone === "dim" && "text-muted-foreground"
-                    )}
-                  >
-                    {line.text}
-                    {line.needText && (
-                      <>
-                        , <span className="font-semibold text-accent">{line.needText}</span>
-                      </>
-                    )}
-                  </span>
+            {stack.map((line) => {
+              const toneClass = cn(
+                "min-w-0 break-words",
+                line.tone === "needed" && "font-semibold text-accent",
+                line.tone === "normal" && "text-foreground",
+                line.tone === "dim" && "text-muted-foreground"
+              );
+              const need = line.needText && (
+                <>
+                  , <span className="font-semibold text-accent">{line.needText}</span>
+                </>
+              );
+              const status = (
+                <>
                   {line.locked && <span className="shrink-0 text-xs italic text-muted-foreground">Locked</span>}
                   {line.locksAt && (
                     <span className="shrink-0 text-xs italic text-muted-foreground">
                       Locks in {formatCountdown(line.locksAt)}
                     </span>
                   )}
-                </dd>
-              </div>
-            ))}
+                </>
+              );
+              return (
+                <div
+                  key={line.key}
+                  className={cn(
+                    "grid grid-cols-[6.5rem_1fr] gap-0",
+                    line.lines.length > 1 ? "items-start" : "items-baseline"
+                  )}
+                >
+                  <dt className="whitespace-nowrap text-[13px] text-muted-foreground">
+                    <span aria-hidden>{scoringModule(line.key).icon}</span> {line.name}
+                  </dt>
+                  <dd
+                    className={cn(
+                      "min-w-0",
+                      line.lines.length > 1 ? "flex flex-col gap-0.5" : "flex items-baseline justify-between gap-2"
+                    )}
+                  >
+                    {line.lines.length === 1 ? (
+                      <span className={cn(toneClass, "flex-1")}>
+                        {line.lines[0]}
+                        {need}
+                      </span>
+                    ) : (
+                      line.lines.map((row, i) =>
+                        i === 0 ? (
+                          <span key={i} className="flex items-baseline justify-between gap-2">
+                            <span className={cn(toneClass, "flex-1")}>{row}</span>
+                            {status}
+                          </span>
+                        ) : (
+                          <span key={i} className={cn(toneClass, "block")}>
+                            {row}
+                            {i === line.lines.length - 1 && need}
+                          </span>
+                        )
+                      )
+                    )}
+                    {line.lines.length === 1 && status}
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
         )}
 
