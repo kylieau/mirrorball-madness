@@ -50,7 +50,7 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
           <dl className="flex flex-col gap-1.5 border-y border-border py-3 text-sm">
             {stack.map((line) => {
               const toneClass = cn(
-                "min-w-0 flex-1 break-words",
+                "min-w-0 break-words",
                 line.tone === "needed" && "font-semibold text-accent",
                 line.tone === "normal" && "text-foreground",
                 line.tone === "dim" && "text-muted-foreground"
@@ -58,6 +58,16 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
               const need = line.needText && (
                 <>
                   , <span className="font-semibold text-accent">{line.needText}</span>
+                </>
+              );
+              const status = (
+                <>
+                  {line.locked && <span className="shrink-0 text-xs italic text-muted-foreground">Locked</span>}
+                  {line.locksAt && (
+                    <span className="shrink-0 text-xs italic text-muted-foreground">
+                      Locks in {formatCountdown(line.locksAt)}
+                    </span>
+                  )}
                 </>
               );
               return (
@@ -73,31 +83,31 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
                   </dt>
                   <dd
                     className={cn(
-                      "flex min-w-0 justify-between gap-2",
-                      line.lines.length > 1 ? "items-start" : "items-baseline"
+                      "min-w-0",
+                      line.lines.length > 1 ? "flex flex-col gap-0.5" : "flex items-baseline justify-between gap-2"
                     )}
                   >
                     {line.lines.length === 1 ? (
-                      <span className={toneClass}>
+                      <span className={cn(toneClass, "flex-1")}>
                         {line.lines[0]}
                         {need}
                       </span>
                     ) : (
-                      <span className={cn(toneClass, "flex flex-col gap-0.5")}>
-                        {line.lines.map((row, i) => (
-                          <span key={i} className="block">
+                      line.lines.map((row, i) =>
+                        i === 0 ? (
+                          <span key={i} className="flex items-baseline justify-between gap-2">
+                            <span className={cn(toneClass, "flex-1")}>{row}</span>
+                            {status}
+                          </span>
+                        ) : (
+                          <span key={i} className={cn(toneClass, "block")}>
                             {row}
                             {i === line.lines.length - 1 && need}
                           </span>
-                        ))}
-                      </span>
+                        )
+                      )
                     )}
-                    {line.locked && <span className="shrink-0 text-xs italic text-muted-foreground">Locked</span>}
-                    {line.locksAt && (
-                      <span className="shrink-0 text-xs italic text-muted-foreground">
-                        Locks in {formatCountdown(line.locksAt)}
-                      </span>
-                    )}
+                    {line.lines.length === 1 && status}
                   </dd>
                 </div>
               );
