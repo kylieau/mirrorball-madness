@@ -30,7 +30,7 @@ export function LeagueSettingsLinks({
         ))}
       </SettingsSection>
       <div className="mt-3">
-        <CreateJoinLeagueDialogs quiet />
+        <CreateJoinLeagueDialogs />
       </div>
     </>
   );
