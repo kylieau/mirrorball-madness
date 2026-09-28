@@ -29,9 +29,7 @@ export function LeagueSettingsLinks({
             </Link>
         ))}
       </SettingsSection>
-      <div className="mt-3">
-        <CreateJoinLeagueDialogs />
-      </div>
+      <CreateJoinLeagueDialogs />
     </>
   );
 }
