@@ -173,7 +173,7 @@ export function GrandFinaleLateUnlock({
           )}
           <div className="flex flex-col gap-2">
             <div>
-              <p className="text-sm font-medium">Weight as % of Grand Finale</p>
+              <p className="text-sm font-medium">Penalty Weight</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 How much of a full GF score this late entry earns · free 0–100%
               </p>
