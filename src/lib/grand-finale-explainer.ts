@@ -1,27 +1,36 @@
 import { formatPoints, roundPoints } from "./format-points";
+import {
+  GRAND_FINALE_BAND_EQUAL_POINTS_PER_CORRECT,
+  GRAND_FINALE_BAND_GRADED_POINTS_PER_CORRECT,
+  GRAND_FINALE_DISTANCE_PENALTY_DEFAULT,
+  GRAND_FINALE_DISTANCE_POINTS_PER_CORRECT,
+  GRAND_FINALE_EXACT_POINTS_PER_CORRECT,
+} from "./scoring-defaults";
 import { bandPayoutFraction, type GrandFinaleMethod, type TierPayStyle } from "./scoring";
 
 export type { GrandFinaleMethod, TierPayStyle };
 
-// Points-per-correct is solved per method (and per band pay style) so every
-// option hands Grand Finale the same standings-deciding spread — see
-// scripts/monte-carlo-calibration/ (values are its POINT_SCALE = 0.1
-// output, matching scoring_settings' schema.sql defaults). Distance credit
-// reaches 0 at exactly 4 spots off (20.7 / 5.2). Re-run the script and
-// re-paste on a re-fit.
+// Points-per-correct is solved per method so a perfect bracket hits the same
+// strong-play ceiling under every option (src/lib/strong-play-ceilings.ts).
+// Exact, distance, and equal bands share one base: a perfect pick pays full
+// credit either way. Graded bands pay a fraction on lower bands, so their
+// base is higher. Distance credit reaches 0 at 4 spots off. There is no
+// Grand Finale 3/5 cap — weight 1 is a full share, same as the other modules.
 export const GRAND_FINALE_DEFAULT_METHOD: GrandFinaleMethod = "distance_based";
 export const GRAND_FINALE_DEFAULT_TIER_PAY_STYLE: TierPayStyle = "equal";
-export const GRAND_FINALE_DEFAULT_DISTANCE_PENALTY = 5.2;
+export const GRAND_FINALE_DEFAULT_DISTANCE_PENALTY = GRAND_FINALE_DISTANCE_PENALTY_DEFAULT;
 export const GRAND_FINALE_DEFAULT_TIER_SIZE = 3;
 
 export function defaultPointsPerCorrect(method: GrandFinaleMethod, tierPayStyle: TierPayStyle): number {
   switch (method) {
     case "exact_position":
-      return 26.4;
+      return GRAND_FINALE_EXACT_POINTS_PER_CORRECT;
     case "distance_based":
-      return 20.7;
+      return GRAND_FINALE_DISTANCE_POINTS_PER_CORRECT;
     case "band_tier":
-      return tierPayStyle === "graded" ? 25.9 : 16.6;
+      return tierPayStyle === "graded"
+        ? GRAND_FINALE_BAND_GRADED_POINTS_PER_CORRECT
+        : GRAND_FINALE_BAND_EQUAL_POINTS_PER_CORRECT;
   }
 }
 

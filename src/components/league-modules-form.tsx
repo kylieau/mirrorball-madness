@@ -38,6 +38,17 @@ import {
   type GrandFinaleMethod,
   type TierPayStyle,
 } from "@/lib/grand-finale-explainer";
+import {
+  ELIMINATION_PREDICTION_POINTS_DEFAULT,
+  FIFTH_PLACE_POINTS_DEFAULT,
+  FIRST_PLACE_POINTS_DEFAULT,
+  FOURTH_PLACE_POINTS_DEFAULT,
+  JUDGES_SCORE_MULTIPLIER_DEFAULT,
+  SECOND_PLACE_POINTS_DEFAULT,
+  SURVIVAL_POINTS_DEFAULT,
+  THIRD_PLACE_POINTS_DEFAULT,
+  TOP_SCORER_PREDICTION_POINTS_DEFAULT,
+} from "@/lib/scoring-defaults";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { SCORING_MODULES, scoringModule } from "@/lib/scoring-modules";
 import { BottomNav } from "@/components/bottom-nav";
@@ -205,23 +216,25 @@ export function LeagueModulesForm({
       : [[String(judgesStartsWeek), formatEpisodeCasual(judgesStartsWeek)]]
   );
   const [judgesScoreMultiplier, setJudgesScoreMultiplier] = useState(
-    scoringSettings?.judges_score_multiplier ?? 1
+    scoringSettings?.judges_score_multiplier ?? JUDGES_SCORE_MULTIPLIER_DEFAULT
   );
-  const [survivalPoints, setSurvivalPoints] = useState(scoringSettings?.survival_points ?? 1.5);
+  const [survivalPoints, setSurvivalPoints] = useState(
+    scoringSettings?.survival_points ?? SURVIVAL_POINTS_DEFAULT
+  );
   const [firstPlacePoints, setFirstPlacePoints] = useState(
-    scoringSettings?.first_place_points ?? 10.6
+    scoringSettings?.first_place_points ?? FIRST_PLACE_POINTS_DEFAULT
   );
   const [secondPlacePoints, setSecondPlacePoints] = useState(
-    scoringSettings?.second_place_points ?? 5.3
+    scoringSettings?.second_place_points ?? SECOND_PLACE_POINTS_DEFAULT
   );
   const [thirdPlacePoints, setThirdPlacePoints] = useState(
-    scoringSettings?.third_place_points ?? 2.8
+    scoringSettings?.third_place_points ?? THIRD_PLACE_POINTS_DEFAULT
   );
   const [fourthPlacePoints, setFourthPlacePoints] = useState(
-    scoringSettings?.fourth_place_points ?? 1.4
+    scoringSettings?.fourth_place_points ?? FOURTH_PLACE_POINTS_DEFAULT
   );
   const [fifthPlacePoints, setFifthPlacePoints] = useState(
-    scoringSettings?.fifth_place_points ?? 0.7
+    scoringSettings?.fifth_place_points ?? FIFTH_PLACE_POINTS_DEFAULT
   );
   const [waiverMode, setWaiverMode] = useState<WaiverMode>(
     (league.waiver_mode as WaiverMode) ?? "reverse_standings"
@@ -240,10 +253,10 @@ export function LeagueModulesForm({
   const multiplierHelp = judgesScoreMultiplierHelp(league.draft_status);
 
   const [eliminationPredictionPoints, setEliminationPredictionPoints] = useState(
-    scoringSettings?.elimination_prediction_points ?? 17.1
+    scoringSettings?.elimination_prediction_points ?? ELIMINATION_PREDICTION_POINTS_DEFAULT
   );
   const [topScorerPredictionPoints, setTopScorerPredictionPoints] = useState(
-    scoringSettings?.top_scorer_prediction_points ?? 11.4
+    scoringSettings?.top_scorer_prediction_points ?? TOP_SCORER_PREDICTION_POINTS_DEFAULT
   );
   const [nearMissEnabled, setNearMissEnabled] = useState(
     scoringSettings?.curtain_call_near_miss_enabled ?? true

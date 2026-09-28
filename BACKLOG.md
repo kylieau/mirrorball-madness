@@ -162,9 +162,11 @@ Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Hom
 
 ## Scoring calibration follow-ups
 
-- **Dance Card ~25% calibration overshoot** — known; needs a product conversation before any fix, not a quiet patch.
-- **Full Monte Carlo recalibration against real Season 35 data** — blocked on live SQL / `SUPABASE_ACCESS_TOKEN`, and the season isn't over. Re-running `scripts/monte-carlo-calibration/` already bakes in `POINT_SCALE`.
-- **Equal-EV / neutral fair scoring defaults** — parked.
+- **Draft-complete judges multiplier lock** — shipped (#44). `update_scoring_categories` rejects a different `judges_score_multiplier` once `draft_status = completed`. It is not part of the Season Clock lock, so a late `start_draft` can still write the roster-size calibration. `reset_draft` lifts it.
+- **Strong-play ceiling recalibration** — shipped in code (2026-09-28). Weights are shares of a strong-play season ceiling, not Monte Carlo standings spread, and the baked Grand Finale 3/5 cap is gone. New leagues take the defaults. The four live leagues are updated by `supabase/apply-strong-play-ceilings.sql`, which the owner runs in the SQL editor: it keeps each league's module on/off and category weights, writes the new point budgets, and recomputes `weekly_manager_scores`. Toggle auto-redistribute and Reset-to-neutral are a later change, not part of this one.
+- **Dance Card ~25% calibration overshoot** — a finding from the retired variance model. Do not patch those old multipliers; the ceiling solve replaced them.
+- **Refit the ceiling parameters against a finished Season 35** — cast size, finale field, and the judge band in `src/lib/strong-play-ceilings.ts`, once results are final. The variance Monte Carlo script is gone. Not blocked on a database token.
+- **Equal-EV / neutral fair scoring defaults** — parked. Separate from equal strong-play ceilings, which shipped.
 
 ## Draft order editing placement
 
