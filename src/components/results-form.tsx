@@ -138,7 +138,11 @@ function isPerfectScore(dance: RowDance, judgeCount: number): boolean {
   return entered.every((v) => Number(v) === 10);
 }
 
-function buildRowsFromDraft(draft: DraftState | undefined, couples: Couple[]): Record<string, CoupleRow> {
+function buildRowsFromDraft(
+  draft: DraftState | undefined,
+  couples: Couple[],
+  expectedDanceCount: number
+): Record<string, CoupleRow> {
   const inJeopardy = new Set(draft?.inJeopardyCoupleIds ?? []);
   const rows: Record<string, CoupleRow> = {};
   for (const c of couples) rows[c.id] = { ...emptyRow(), inJeopardy: inJeopardy.has(c.id) };
@@ -167,6 +171,28 @@ function buildRowsFromDraft(draft: DraftState | undefined, couples: Couple[]): R
       },
     ];
     rows[d.coupleId] = row;
+  }
+
+  // A couple's dance rows default to however many dances the episode expects,
+  // so entry is fill-in-the-blanks rather than a "+ Dance" click per row. A
+  // Did Not Dance couple gets none.
+  for (const coupleId of Object.keys(rows)) {
+    const row = rows[coupleId];
+    if (row.outcome === "bye") continue;
+    const fillCount = expectedDanceCount - row.dances.length;
+    if (fillCount <= 0) continue;
+    rows[coupleId] = {
+      ...row,
+      dances: [
+        ...row.dances,
+        ...Array.from({ length: fillCount }, (_, i) => ({
+          key: `slot-${coupleId}-${row.dances.length + i}`,
+          danceStyleId: "",
+          songTitle: "",
+          scores: {},
+        })),
+      ],
+    };
   }
 
   return rows;
@@ -369,7 +395,7 @@ export function ResultsForm({
     }
     seedingEpisodeId.current = null;
     setSeedingCorrection(false);
-    setRows(buildRowsFromDraft(draft, episodeCouples));
+    setRows(buildRowsFromDraft(draft, episodeCouples, expectedDanceCount));
     setCustomMoments(draft?.customMoments ?? []);
     setDraftSavedAt(draft?.updatedAt ?? null);
     setHasDraft(draft?.hasDraft ?? false);
@@ -580,13 +606,6 @@ export function ResultsForm({
     });
   }
 
-  function addDance(coupleId: string) {
-    const row = rows[coupleId] ?? emptyRow();
-    updateRow(coupleId, {
-      dances: [...row.dances, { key: `new-${Date.now()}-${Math.random()}`, danceStyleId: "", songTitle: "", scores: {} }],
-    });
-  }
-
   function updateDance(coupleId: string, danceKey: string, patch: Partial<RowDance>) {
     const row = rows[coupleId] ?? emptyRow();
     updateRow(coupleId, {
@@ -697,7 +716,6 @@ export function ResultsForm({
 
   function renderDanceEntry(c: Couple, rank?: number) {
     const row = rows[c.id] ?? emptyRow();
-    const canAddDance = row.dances.length < expectedDanceCount;
     const revealState = publishPerCouple ? revealStates.get(c.id) : undefined;
     const locked = revealState === "posted";
     const postedAtIso = revealedAtByCouple[c.id];
@@ -764,17 +782,6 @@ export function ResultsForm({
               </Button>
             </div>
           ))}
-          {canAddDance && (
-            <Button
-              size="xs"
-              variant="outline"
-              className="self-start"
-              disabled={row.outcome === "bye"}
-              onClick={() => addDance(c.id)}
-            >
-              + Dance
-            </Button>
-          )}
         </fieldset>
 
         {publishPerCouple && (
