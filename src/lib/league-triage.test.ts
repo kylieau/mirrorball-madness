@@ -3,7 +3,6 @@ import {
   buildModuleStack,
   danceCardRosterNames,
   homeLeagueChrome,
-  hybridWeekLabel,
   leagueTapHref,
   picksAction,
   picksButtonLabel,
@@ -170,14 +169,11 @@ describe("home hybrid chrome", () => {
     expect(showHybridStatusPill(false, 0)).toBe(false);
   });
 
-  it("keeps Make Picks as the locked label and names the live week unless the viewer is behind", () => {
+  it("keeps Make Picks as the locked label", () => {
     expect(picksButtonLabel("make")).toBe("Make Picks");
     expect(picksButtonLabel("locked")).toBe("Make Picks");
     expect(picksButtonLabel("edit")).toBe("Edit Picks");
     expect(picksButtonLabel("none")).toBeNull();
-    expect(hybridWeekLabel(3, 0)).toBe("Week 3");
-    expect(hybridWeekLabel(3, 1)).toBeNull();
-    expect(hybridWeekLabel(null, 0)).toBeNull();
   });
 });
 

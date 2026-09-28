@@ -147,13 +147,6 @@ export function homeLeagueChrome(leagueCount: number): { showManage: boolean; qu
   return { showManage: leagueCount >= 2, quietCreateJoin: leagueCount === 1 };
 }
 
-// Week N on each Home hybrid card. Hidden while a Spoiler-Free viewer is
-// behind, same rule as the Week line under Manage Leagues' title.
-export function hybridWeekLabel(weekNumber: number | null, weeksBehind: number): string | null {
-  if (weekNumber === null || weeksBehind > 0) return null;
-  return `Week ${weekNumber}`;
-}
-
 // Left button: Make when something still needs a pick, Edit while any pick
 // module is still open, Locked once one has shut and none is open.
 export function picksAction(

@@ -13,7 +13,6 @@ export type LeagueHomeSummary = {
   totalMembers: number;
   totalPoints: number;
   picksDue: boolean;
-  nextDeadline: { label: string; iso: string } | null;
   curtainCallLockAt: string | null;
   danceCardOn: boolean;
   curtainCallOn: boolean;
@@ -185,15 +184,6 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
   }
   const grandFinalePicksDue = grandFinaleOn && !grandFinaleLocked && !hasGrandFinalePrediction;
 
-  const deadlineCandidates: { label: string; iso: string }[] = [];
-  if (curtainCallPicksDue && lockAt && new Date(lockAt) > new Date()) {
-    deadlineCandidates.push({ label: "Curtain Call", iso: lockAt });
-  }
-  if (grandFinalePicksDue && grandFinaleDeadline && new Date(grandFinaleDeadline) > new Date()) {
-    deadlineCandidates.push({ label: "Grand Finale", iso: grandFinaleDeadline });
-  }
-  deadlineCandidates.sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime());
-
   return {
     id: league.id,
     name: league.name,
@@ -201,7 +191,6 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
     totalMembers: standings.length,
     totalPoints: pointsByManager.get(myTeamId) ?? 0,
     picksDue: curtainCallPicksDue || grandFinalePicksDue,
-    nextDeadline: deadlineCandidates[0] ?? null,
     curtainCallLockAt: lockAt,
     danceCardOn,
     curtainCallOn,

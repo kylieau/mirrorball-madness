@@ -15,7 +15,7 @@ import { HomeSpoilerChrome, type SpoilerFreeStripState } from "@/components/spoi
 import { HomeDraftChrome } from "@/components/draft-scores-strip";
 import type { LeagueTriage } from "@/components/league-triage-card";
 import { homeStripChoice, postingWeekNumber } from "@/lib/draft-scores";
-import { hybridWeekLabel, type ModuleStackInput } from "@/lib/league-triage";
+import type { ModuleStackInput } from "@/lib/league-triage";
 import { loadModuleStackInputs } from "@/lib/league-module-stack-data";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 
@@ -55,7 +55,6 @@ export default async function Home() {
     weeksBehind,
     summaries,
     draftContext,
-    liveWeekNumber,
     activeSeasonId,
     finaleWeekNumber,
   } = await loadHomeLeagueData(supabase, user.id, accountSettingsData.spoilerFreeMode, leagueRefs);
@@ -169,7 +168,6 @@ export default async function Home() {
           finaleWeekNumber,
         })
       : new Map<string, ModuleStackInput>();
-  const weekLabel = hybridWeekLabel(liveWeekNumber, weeksBehind);
   const leagues: LeagueTriage[] = summaries.map((s, i) => ({
     id: s.id,
     name: s.name,
@@ -179,7 +177,6 @@ export default async function Home() {
     totalPoints: s.totalPoints,
     picksDue: s.picksDue,
     weeksBehind,
-    weekLabel,
     settingsFrom: "/",
     modules: moduleInputs.get(s.id)!,
   }));
@@ -202,11 +199,6 @@ export default async function Home() {
         .at(0) ?? null,
   };
   const episodeBannerState = computeEpisodeBannerState(episodeBannerInput);
-
-  const deadlines = summaries
-    .filter((s) => s.picksDue && s.nextDeadline)
-    .map((s) => ({ leagueId: s.id, leagueName: s.name, iso: s.nextDeadline!.iso }))
-    .sort((a, b) => new Date(a.iso).getTime() - new Date(b.iso).getTime());
 
   const westWindow = episodeBannerState?.kind === "west_soon" || episodeBannerState?.kind === "west_watching";
   const autoRefresh = !!revealing || westWindow;
@@ -233,7 +225,6 @@ export default async function Home() {
   const dashboard = (
     <HomeDashboard
       leagues={leagues}
-      deadlines={deadlines}
       recentActivity={recentActivity}
       spoilerFreeStrip={spoilerStrip}
       episodeBanner={{ input: episodeBannerInput, initialState: episodeBannerState }}

@@ -25,7 +25,6 @@ export type LeagueTriage = {
   totalPoints: number;
   picksDue: boolean;
   weeksBehind: number;
-  weekLabel?: string | null;
   settingsFrom?: string;
   modules: ModuleStackInput;
 };
@@ -56,7 +55,6 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
             Rank {league.rank} of {league.totalMembers} ·{" "}
             <span className="font-heading font-semibold">{formatPoints(league.totalPoints)}</span> pts
           </p>
-          {league.weekLabel && <p className="mt-1 text-xs font-semibold text-accent">{league.weekLabel}</p>}
         </div>
 
         {stack.length > 0 && (

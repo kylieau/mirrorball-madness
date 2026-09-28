@@ -9,25 +9,21 @@ import { ScrollFade } from "@/components/scroll-fade";
 import type { SpoilerFreeStripState } from "@/components/spoiler-free-strip";
 import type { EpisodeBannerInput, EpisodeBannerState } from "@/lib/episode-banner";
 import type { ActivityLine } from "@/lib/home-activity";
-import { formatCountdown } from "@/lib/format-countdown";
 import { homeLeagueChrome } from "@/lib/league-triage";
 
 export function HomeDashboard({
   leagues,
-  deadlines,
   recentActivity,
   spoilerFreeStrip,
   episodeBanner,
 }: {
   leagues: LeagueTriage[];
-  deadlines: { leagueId: string; leagueName: string; iso: string }[];
   recentActivity: ActivityLine[];
   spoilerFreeStrip: SpoilerFreeStripState | null;
   episodeBanner: { input: EpisodeBannerInput; initialState: EpisodeBannerState | null };
 }) {
   const shownLeagues = [...leagues].sort((a, b) => Number(b.picksDue) - Number(a.picksDue));
   const chrome = homeLeagueChrome(shownLeagues.length);
-  const sharedCountdown = deadlines[0] ? formatCountdown(deadlines[0].iso) : "";
 
   return (
     <div>
@@ -36,10 +32,6 @@ export function HomeDashboard({
       )}
 
       <EpisodeBanner {...episodeBanner} />
-
-      {deadlines.length > 0 && (
-        <p className="mb-4 font-heading text-base font-semibold">Picks close in {sharedCountdown}</p>
-      )}
 
       <div className="mb-2 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
         <span>Your Leagues</span>
