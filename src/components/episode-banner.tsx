@@ -38,11 +38,11 @@ function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
       return {
         chip: "Curtain Up Soon",
         title: state.picksModuleOn ? "Picks Open" : "Curtain Up Soon",
-        sub: at("Live On Air"),
+        sub: at("Live"),
         live: false,
       };
     case "picks_locked":
-      return { chip: "Curtain Up Soon", title: "Picks Locked", sub: at("Live On Air"), live: false };
+      return { chip: "Curtain Up Soon", title: "Picks Locked", sub: at("Live"), live: false };
     case "on_air":
       return {
         chip: "On Air (Live ET)",
