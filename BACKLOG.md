@@ -160,12 +160,25 @@ The Add to Home Screen / enable-notifications *how-to* is a top-level Settings r
 
 Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Home Screen, Account & data. Site Admin and Sign out stay below. No further account-nav edits currently queued.
 
-## Scoring calibration follow-ups
+## Scoring recalibration
 
-- **Lock `judges_score_multiplier` with the other scoring settings** (wanted, not built). It's excluded from the Grand Finale-deadline lock in `update_scoring_categories` on purpose: `start_draft` calibrates it by roster size, and drafts often run after that deadline, so a plain lock would stop a commissioner adjusting it before a late draft. Needs a rule first, e.g. "locked once the draft is complete and the deadline has passed."
-- **Dance Card ~25% calibration overshoot** — known; needs a product conversation before any fix, not a quiet patch.
-- **Full Monte Carlo recalibration against real Season 35 data** — blocked on live SQL / `SUPABASE_ACCESS_TOKEN`, and the season isn't over. Re-running `scripts/monte-carlo-calibration/` already bakes in `POINT_SCALE`.
-- **Equal-EV / neutral fair scoring defaults** — parked.
+**Core fair defaults shipped.** New leagues already get the neutral baseline from `scripts/monte-carlo-calibration/` (pasted into `scoring_settings` column defaults and `dance_card_calibration`, then scaled by `POINT_SCALE = 0.1`). Category weights default to 1 / 1 / 1. `start_draft` writes `judges_score_multiplier` from roster size until a commissioner customizes it. That equal-EV pass is in production.
+
+**Open target: recalibrate those budgets to strong-play season ceilings.** The shipped solve equalizes Monte Carlo standings-spread (variance of final manager points). Grand Finale is solved to 3/5 of a full share (`GRAND_FINALE_CAP_FRACTION = 0.6` in `run.mjs`). The next pass uses a different objective: module point budgets should make category weights line up with the total points available under good play. The known Dance Card ~25% calibration overshoot belongs to this pass — it came out of the standings-spread solve, and the fix is the ceiling model below. Re-running `scripts/monte-carlo-calibration/` still solves standings-spread (and already bakes in `POINT_SCALE`); it is the wrong tool for this target.
+
+Ceilings, before category weight:
+
+- **Dance Card "perfect"** is the expected strong roster at that league's roster size. Survival follows a realistic deep-run curve. The format keeps a full roster from all going the distance, so the ceiling uses a partial survival path for that roster size and does not assume 100% survival. Judges' points and placement bonuses use season-average scores, or historical averages by week type, on that same path.
+- **Curtain Call** and **Grand Finale** ceilings are perfect picks on those modules.
+
+Weight 1 / 1 / 1 means those three ceilings match numerically. Whether Grand Finale keeps a separate fraction of that ceiling (the shipped solve uses 3/5) is **TBD**. Engineering has not decided it.
+
+**Rollout.** Apply the new numbers to new-league defaults (`scoring_settings` column defaults and `dance_card_calibration`). Optionally migrating leagues that already exist — weight-aware scaling of the underlying point values, then a score recompute — is a follow-up. Weight-aware means a commissioner who set 2 / 1 / 0.5 keeps that mix; the migration scales the point budgets underneath the weights, then republishes.
+
+**Still open, beside the recalibration:**
+
+- **Auto-redistribute toggle and Reset to neutral** — still open on League Settings. Reset to neutral returns category weights to the fair 1 / 1 / 1 baseline. Auto-redistribute is the companion toggle for rebalancing the other modules' weights when one changes. Neither is built.
+- **Post-draft `judges_score_multiplier` lock** — wanted; a separate engineering change is in flight. The multiplier stays outside the Grand Finale-deadline lock in `update_scoring_categories` on purpose: `start_draft` calibrates it by roster size, and drafts often run after that deadline, so locking it with every other scoring field would freeze it before a late draft. The in-flight rule locks it once the draft is complete.
 
 ## Draft order editing placement
 
