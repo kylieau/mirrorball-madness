@@ -196,7 +196,12 @@ create unique index league_members_co_manager_invite_code_unique
 -- scripts/monte-carlo-calibration/run.mjs): a category weight of 1 is one
 -- full share, and Dance Card, Curtain Call, and Grand Finale each ceiling
 -- at that same share. Grand Finale is not capped below the others. It stays
--- off by default; create_league seeds its weight at 1 when it is turned on.
+-- off by default. create_league seeds weight 1 for every module it turns
+-- on and does not redistribute — that insert is the first enable, before
+-- League Settings. Toggling a module later splits weight evenly across the
+-- modules that stay on (src/lib/scoring-neutral.ts) and leaves point values
+-- alone. Reset to Neutral restores these defaults plus that even split, and
+-- both stop once the Season Clock lock has passed.
 -- judges_score_multiplier is the roster-size lever that keeps Dance Card's
 -- ceiling flat — see judges_score_multiplier_customized below.
 --
@@ -220,11 +225,12 @@ create unique index league_members_co_manager_invite_code_unique
 create table scoring_settings (
   league_id uuid primary key references leagues(id) on delete cascade,
   judges_score_multiplier numeric not null default 0.1421,
-  -- Flips true (and stays true) the moment a commissioner explicitly saves a
-  -- value for judges_score_multiplier via update_scoring_categories — so
-  -- start_draft's roster-size-keyed calibrated default (see
-  -- dance_card_calibration below) only overwrites this column while nobody
-  -- has customized it yet, never clobbering an intentional pre-draft choice.
+  -- True once a commissioner saves a judges_score_multiplier that is not
+  -- this league's dance_card_calibration value. Saving that calibration
+  -- again (Reset to Neutral, or typing it back) clears the flag, so
+  -- start_draft may seed the roster-size default again. A completed draft
+  -- does not change the flag; the multiplier itself stays locked until
+  -- reset_draft. See update_scoring_categories.
   judges_score_multiplier_customized boolean not null default false,
   -- 2026-09-28: strong-play ceilings, then POINT_SCALE = 0.1, so one full
   -- share is 100 season points rather than 1000. See
@@ -824,10 +830,12 @@ begin
   -- (unlike the old name-only flow), so scoring_configured is true right
   -- away — no post-creation "finish setup" prompt for new leagues.
   -- Enabling Grand Finale seeds weight 1 (one full share, same ceiling as
-  -- the other modules). It does not redistribute the weights already chosen
-  -- for Dance Card and Curtain Call. Points-per-correct and the distance
-  -- penalty are the strong-play defaults even when the module is off, so
-  -- turning it on later starts from the calibrated base.
+  -- the other modules). Creation does not redistribute Dance Card or
+  -- Curtain Call — this insert is the first enable, before League Settings.
+  -- Toggling a module in Settings later splits weight evenly across the
+  -- modules that stay on. Points-per-correct and the distance penalty are
+  -- the strong-play defaults even when the module is off, so turning it on
+  -- later starts from the calibrated base.
   insert into public.scoring_settings (
     league_id,
     judges_score_category_enabled,
@@ -1421,7 +1429,10 @@ $$;
 -- across two functions/forms — the UI groups everything by category, so the
 -- write path matches. Every per-event point value is included regardless of
 -- which categories are on; the UI only shows/edits the ones that apply, and
--- an inactive category's fields just keep round-tripping their last value.
+-- an inactive category's point fields just keep round-tripping their last
+-- value. League Settings sends an even weight for each module that is on
+-- and 0 for each module that is off when the commissioner toggles or
+-- resets; a plain resave round-trips whatever weights are already stored.
 create function public.update_scoring_categories(
   p_league_id uuid,
   p_judges_score_category_enabled boolean,
@@ -1530,12 +1541,32 @@ begin
     bonus_picks_distance_penalty = p_bonus_picks_distance_penalty,
     bonus_picks_tier_size = p_bonus_picks_tier_size,
     bonus_picks_tier_pay_style = p_bonus_picks_tier_pay_style,
-    -- Right-hand sides here still see the pre-update row, even though
-    -- judges_score_multiplier is also being overwritten in this same
-    -- statement — so this correctly flags "did the commissioner just change
-    -- it" without a separate select.
-    judges_score_multiplier_customized = judges_score_multiplier_customized
-      or (judges_score_multiplier is distinct from p_judges_score_multiplier),
+    -- Right-hand sides here still see the pre-update row. Saving the
+    -- roster-size calibration clears the flag so Reset to Neutral (or
+    -- typing that number back) lets a later start_draft seed again. Any
+    -- other change marks it customized and it stays that way. A
+    -- draft-complete resave does not touch the flag — the lock above
+    -- already rejects a different multiplier.
+    judges_score_multiplier_customized = case
+      when exists (
+        select 1 from public.leagues
+        where id = p_league_id and draft_status = 'completed'
+      ) then judges_score_multiplier_customized
+      when p_judges_score_multiplier is not distinct from (
+        select c.judges_score_multiplier_default
+        from public.dance_card_calibration c
+        where c.roster_size = (
+          select c2.roster_size
+          from public.dance_card_calibration c2
+          order by abs(c2.roster_size - (
+            select l.roster_size from public.leagues l where l.id = p_league_id
+          )), c2.roster_size
+          limit 1
+        )
+      ) then false
+      when judges_score_multiplier is distinct from p_judges_score_multiplier then true
+      else judges_score_multiplier_customized
+    end,
     judges_score_multiplier = p_judges_score_multiplier,
     survival_points = p_survival_points,
     first_place_points = p_first_place_points,

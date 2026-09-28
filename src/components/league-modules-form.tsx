@@ -50,7 +50,8 @@ import {
   TOP_SCORER_PREDICTION_POINTS_DEFAULT,
 } from "@/lib/scoring-defaults";
 import { formatEpisodeCasual } from "@/lib/format-week";
-import { SCORING_MODULES, scoringModule } from "@/lib/scoring-modules";
+import { SCORING_MODULES, scoringModule, type ScoringModuleKey } from "@/lib/scoring-modules";
+import { neutralPointDefaults, redistributeModuleWeights } from "@/lib/scoring-neutral";
 import { BottomNav } from "@/components/bottom-nav";
 import { Switch } from "@/components/ui/switch";
 import { ScoringModulePanel } from "@/components/scoring-module-panel";
@@ -107,6 +108,7 @@ type League = {
   draft_status: string;
   draft_type: string;
   draft_scheduled_at: string | null;
+  roster_size: number;
 };
 
 type SeasonEpisode = { week_number: number; theme: string | null; airs_at: string };
@@ -313,6 +315,64 @@ export function LeagueModulesForm({
   const [error, setError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [weightNote, setWeightNote] = useState<string | null>(null);
+
+  function applyEvenWeights(enabled: { curtainCall: boolean; danceCard: boolean; grandFinale: boolean }) {
+    const weights = redistributeModuleWeights(enabled);
+    setEliminationsWeight(weights.curtainCall);
+    setJudgesWeight(weights.danceCard);
+    setBonusWeight(weights.grandFinale);
+  }
+
+  function toggleModule(key: ScoringModuleKey, checked: boolean) {
+    if (scoringLocked) return;
+    const next = { ...moduleEnabled, [key]: checked };
+    setModuleEnabled[key](checked);
+    applyEvenWeights(next);
+    setWeightNote("Weights are split evenly across the modules that are on. Point values stay as you set them.");
+    setSuccess(false);
+  }
+
+  function editWeight(setWeight: (value: number) => void) {
+    return (value: number) => {
+      setWeight(value);
+      setWeightNote(null);
+      setSuccess(false);
+    };
+  }
+
+  function handleResetNeutral() {
+    if (scoringLocked) return;
+    applyEvenWeights(moduleEnabled);
+    const neutral = neutralPointDefaults({
+      rosterSize: league.roster_size,
+      multiplierLocked,
+      currentMultiplier: judgesScoreMultiplier,
+    });
+    setJudgesScoreMultiplier(neutral.judgesScoreMultiplier);
+    setSurvivalPoints(neutral.survivalPoints);
+    setFirstPlacePoints(neutral.firstPlacePoints);
+    setSecondPlacePoints(neutral.secondPlacePoints);
+    setThirdPlacePoints(neutral.thirdPlacePoints);
+    setFourthPlacePoints(neutral.fourthPlacePoints);
+    setFifthPlacePoints(neutral.fifthPlacePoints);
+    setEliminationPredictionPoints(neutral.eliminationPredictionPoints);
+    setTopScorerPredictionPoints(neutral.topScorerPredictionPoints);
+    setNearMissEnabled(neutral.nearMissEnabled);
+    setBonusMethod(neutral.bonusMethod);
+    setBonusDistancePenalty(neutral.bonusDistancePenalty);
+    setBonusTierSize(neutral.bonusTierSize);
+    setBonusTierPayStyle(neutral.bonusTierPayStyle);
+    setBonusPicksPointsPerCorrect(neutral.bonusPicksPointsPerCorrect);
+    setPointsPerCorrectEdited(false);
+    setError(null);
+    setSuccess(false);
+    setWeightNote(
+      multiplierLocked
+        ? "Calibrated point defaults are restored, with an even weight split for the modules that are on. Judges' Score Multiplier stays as it is — the draft is complete."
+        : "Calibrated point defaults are restored, with an even weight split for the modules that are on."
+    );
+  }
 
   const lockWeek = previewLockWeek({
     anchorWeek: judgesStartsWeek,
@@ -586,7 +646,9 @@ export function LeagueModulesForm({
         <CardHeader>
           <CardTitle>Modules</CardTitle>
           <CardDescription>
-            Turn each module on or off. A section for its settings appears below once it&apos;s on.
+            Turn each module on or off. Weight splits evenly across the modules that stay on, and a module
+            you turn off is weighted 0. Point values stay as you set them. A section for its settings appears
+            below once it&apos;s on.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -619,12 +681,34 @@ export function LeagueModulesForm({
                 </span>
                 <Switch
                   checked={moduleEnabled[m.key]}
-                  onCheckedChange={(checked) => setModuleEnabled[m.key](checked)}
+                  onCheckedChange={(checked) => toggleModule(m.key, checked)}
                   disabled={scoringLocked}
                   aria-label={m.name}
                 />
               </div>
             ))}
+          </div>
+          {weightNote && (
+            <p role="status" className="text-sm text-muted-foreground">
+              {weightNote}
+            </p>
+          )}
+          <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={scoringLocked || submitting}
+              onClick={handleResetNeutral}
+            >
+              Reset to Neutral
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Restores the calibrated point defaults and an even weight split for the modules that are on.
+              {multiplierLocked && !scoringLocked
+                ? " Judges' Score Multiplier stays as it is — the draft is complete."
+                : ""}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -636,7 +720,7 @@ export function LeagueModulesForm({
           weight={eliminationsWeight}
           canEdit
           weightInputId="eliminationsWeight"
-          onWeightChange={setEliminationsWeight}
+          onWeightChange={editWeight(setEliminationsWeight)}
           weightDisabled={scoringLocked}
           detailsHint="Elim picks · In Jeopardy"
         >
@@ -703,7 +787,7 @@ export function LeagueModulesForm({
           weight={judgesWeight}
           canEdit
           weightInputId="judgesWeight"
-          onWeightChange={setJudgesWeight}
+          onWeightChange={editWeight(setJudgesWeight)}
           weightDisabled={scoringLocked}
           detailsHint="Judges · survival · placement"
         >
@@ -901,7 +985,7 @@ export function LeagueModulesForm({
           weight={bonusWeight}
           canEdit
           weightInputId="bonusWeight"
-          onWeightChange={setBonusWeight}
+          onWeightChange={editWeight(setBonusWeight)}
           weightDisabled={scoringLocked}
           detailsHint="Bracket · method · points"
           locked={finaleLocked}
