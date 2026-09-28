@@ -197,15 +197,22 @@ create unique index league_members_co_manager_invite_code_unique
 -- is the one column with special write semantics.
 --
 -- Every commissioner-editable field on this table EXCEPT judges_score_multiplier
--- (which has its own draft-start auto-calibration, above) locks together the
--- moment effective_grand_finale_deadline() passes — the same Season Clock
--- anchor that already starts Judges' Scores counting and locks Grand Finale
--- predictions, just also now covering the settings that scored them. One
--- shared trigger, not one per category — a per-category lock would let a
--- commissioner see one category's real results before finalizing another's
--- weight, which defeats the point of locking at all. See
--- update_scoring_categories for the check. locking_exempt grandfathers in
--- leagues that already existed when this locking behavior shipped.
+-- locks together the moment effective_grand_finale_deadline() passes — the
+-- same Season Clock anchor that already starts Judges' Scores counting and
+-- locks Grand Finale predictions, just also now covering the settings that
+-- scored them. One shared trigger, not one per category — a per-category
+-- lock would let a commissioner see one category's real results before
+-- finalizing another's weight, which defeats the point of locking at all.
+-- See update_scoring_categories for the check. locking_exempt grandfathers
+-- in leagues that already existed when this Season Clock lock shipped.
+--
+-- judges_score_multiplier is not part of that Season Clock lock. start_draft
+-- still writes the roster-size calibration (unless customized) while the
+-- draft has not started, and a commissioner can still edit it through setup
+-- and while the draft is in progress — including after the Grand Finale
+-- deadline, which is when late drafts usually run. It locks once
+-- leagues.draft_status = 'completed' and stays locked until a draft reset
+-- returns the league to not_started. locking_exempt does not lift that lock.
 create table scoring_settings (
   league_id uuid primary key references leagues(id) on delete cascade,
   judges_score_multiplier numeric not null default 1.0,
@@ -1459,6 +1466,8 @@ begin
   -- one category's real results before finalizing another's weight. A no-op
   -- resave (every value already matches) still succeeds, since the Settings
   -- form always round-trips every field regardless of what actually changed.
+  -- judges_score_multiplier has its own lock, below: draft complete, not
+  -- this deadline.
   v_deadline := public.effective_grand_finale_deadline(p_league_id);
   if not v_current.locking_exempt and v_deadline is not null and now() >= v_deadline then
     if (
@@ -1480,6 +1489,18 @@ begin
     ) then
       raise exception 'Scoring settings are locked for the season — the Grand Finale deadline has passed';
     end if;
+  end if;
+
+  -- Draft-complete lock, independent of the Season Clock check above and of
+  -- locking_exempt. A matching resave still succeeds so the rest of the
+  -- form can save. start_draft writes this column itself and only runs
+  -- while draft_status is not_started, so calibration is unaffected.
+  if v_current.judges_score_multiplier is distinct from p_judges_score_multiplier
+     and exists (
+       select 1 from public.leagues
+       where id = p_league_id and draft_status = 'completed'
+     ) then
+    raise exception 'Judges'' Score Multiplier is locked — the draft is complete';
   end if;
 
   update public.scoring_settings
@@ -2248,7 +2269,9 @@ $$;
 -- not_started. Keeps draft_position / draft_autopilot (one click to restart),
 -- predictions, and scoring settings — including the frozen
 -- judges_score_starts_week, a floor so a redraft can't score weeks that
--- already aired. judges_score_multiplier re-derives at the next start_draft.
+-- already aired. Returning to not_started lifts the draft-complete lock on
+-- judges_score_multiplier; it re-derives at the next start_draft only while
+-- it has not been customized.
 create function public.reset_draft(p_league_id uuid)
 returns void
 language plpgsql

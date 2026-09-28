@@ -55,6 +55,7 @@ import {
   previewLockWeek,
   shouldShowAnchorSyncControl,
 } from "@/lib/season-clock";
+import { judgesScoreMultiplierHelp, judgesScoreMultiplierLocked } from "@/lib/judges-score-multiplier";
 
 type ScoringMethod = GrandFinaleMethod;
 type WaiverMode = "locked" | "waivers";
@@ -158,6 +159,8 @@ export function LeagueModulesForm({
   // (past the Season Clock anchor, not grandfathered in). Disables the
   // module toggles/weights/point-value fields specifically — waiver, draft,
   // and Pick 'Em-lock settings aren't part of this lock and stay editable.
+  // Judges' Score Multiplier is not part of this lock; it locks when the
+  // draft is complete (judgesScoreMultiplierLocked).
   scoringLocked: boolean;
   // Active-season cast size, so the band preview shows real place ranges.
   totalCouples: number;
@@ -233,6 +236,8 @@ export function LeagueModulesForm({
   );
   const formattedDraftScheduledAt = useFormattedDeadline(draftScheduledAt || null);
   const draftNotStarted = league.draft_status === "not_started";
+  const multiplierLocked = judgesScoreMultiplierLocked(league.draft_status);
+  const multiplierHelp = judgesScoreMultiplierHelp(league.draft_status);
 
   const [eliminationPredictionPoints, setEliminationPredictionPoints] = useState(
     scoringSettings?.elimination_prediction_points ?? 17.1
@@ -480,7 +485,21 @@ export function LeagueModulesForm({
             detailsHint="Judges · survival · placement"
           >
             <div className="flex flex-col">
-              <SettingRow label="Judges' Score Multiplier" value={judgesScoreMultiplier.toFixed(2)} />
+              <SettingRow
+                label="Judges' Score Multiplier"
+                value={
+                  multiplierLocked ? (
+                    <span className="max-w-[60%] text-right leading-snug">
+                      {judgesScoreMultiplier.toFixed(2)}
+                      <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                        {multiplierHelp}
+                      </span>
+                    </span>
+                  ) : (
+                    judgesScoreMultiplier.toFixed(2)
+                  )
+                }
+              />
               <SettingRow label="Survival Points" value={formatPoints(survivalPoints)} />
               <SettingRow label="1st Place Bonus" value={formatPoints(firstPlacePoints)} />
               <SettingRow label="2nd Place Bonus" value={formatPoints(secondPlacePoints)} />
@@ -689,10 +708,9 @@ export function LeagueModulesForm({
                   min={0}
                   value={judgesScoreMultiplier}
                   onChange={(e) => setJudgesScoreMultiplier(Number(e.target.value))}
+                  disabled={multiplierLocked}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Auto-calibrated to your roster size once the draft starts, unless you change it here first.
-                </p>
+                <p className="text-xs text-muted-foreground">{multiplierHelp}</p>
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="survivalPoints">Survival Points</Label>
