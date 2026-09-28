@@ -39,8 +39,13 @@ import {
   type TierPayStyle,
 } from "@/lib/grand-finale-explainer";
 import { formatEpisodeCasual } from "@/lib/format-week";
-import { SCORING_MODULES } from "@/lib/scoring-modules";
+import { SCORING_MODULES, scoringModule } from "@/lib/scoring-modules";
 import { BottomNav } from "@/components/bottom-nav";
+import { ScoringModulePanel } from "@/components/scoring-module-panel";
+import {
+  GrandFinaleLateUnlock,
+  type GrandFinaleLateUnlockInput,
+} from "@/components/grand-finale-late-unlock";
 import {
   airsAtForWeek,
   explainGrandFinaleDeadline,
@@ -135,6 +140,7 @@ export function LeagueModulesForm({
   scoringLocked,
   totalCouples,
   exitHref,
+  lateUnlock,
 }: {
   leagueId: string;
   league: League;
@@ -156,6 +162,7 @@ export function LeagueModulesForm({
   totalCouples: number;
   // Where "Save & exit" lands (the page the settings were opened from).
   exitHref: string;
+  lateUnlock: GrandFinaleLateUnlockInput | null;
 }) {
   const router = useRouter();
   const browserTimeZone = useBrowserTimeZone();
@@ -405,6 +412,11 @@ export function LeagueModulesForm({
   }
 
   const isRequired = !scoringSettings?.scoring_configured;
+  const lateUnlockNode =
+    bonusEnabled && lateUnlock ? <GrandFinaleLateUnlock leagueId={leagueId} {...lateUnlock} /> : null;
+  const finaleLockedBadge = lateUnlock?.grandFinaleLocked ? (
+    <span className="text-[10px] font-bold tracking-wider text-accent uppercase">Locked</span>
+  ) : null;
 
   if (!canEdit) {
     return (
@@ -445,41 +457,31 @@ export function LeagueModulesForm({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Scoring Mix</CardTitle>
-            <CardDescription>How much each active module counts toward Standings.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col">
-            {eliminationsEnabled && <SettingRow label="Curtain Call" value={eliminationsWeight} />}
-            {judgesEnabled && <SettingRow label="Dance Card" value={judgesWeight} />}
-            {bonusEnabled && <SettingRow label="Grand Finale" value={bonusWeight} />}
-          </CardContent>
-        </Card>
-
         {eliminationsEnabled && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Curtain Call</CardTitle>
-              <CardDescription>Weekly elimination and top-scorer picks.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col">
+          <ScoringModulePanel
+            name={scoringModule("curtainCall").name}
+            icon={scoringModule("curtainCall").icon}
+            weight={eliminationsWeight}
+            detailsDescription="Weekly elimination and top-scorer picks."
+          >
+            <div className="flex flex-col">
               <SettingRow label="Elimination Prediction Points" value={formatPoints(eliminationPredictionPoints)} />
               <SettingRow label="Top Scorer Prediction Points" value={formatPoints(topScorerPredictionPoints)} />
               <SettingRow label="In Jeopardy" value={nearMissEnabled ? "On" : "Off"} />
               <SettingRow label="Pick 'Em Lock" value={`${predictionLockHoursBeforeAir}h before air`} />
               <p className="pt-2 text-sm text-muted-foreground">{CURTAIN_CALL_PAYOUT_NOTE}</p>
-            </CardContent>
-          </Card>
+            </div>
+          </ScoringModulePanel>
         )}
 
         {judgesEnabled && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Dance Card</CardTitle>
-              <CardDescription>Draft, roster, Recast, and judges&apos; score points.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col">
+          <ScoringModulePanel
+            name={scoringModule("danceCard").name}
+            icon={scoringModule("danceCard").icon}
+            weight={judgesWeight}
+            detailsDescription="Draft, roster, Recast, and judges' score points."
+          >
+            <div className="flex flex-col">
               <SettingRow label="Judges' Score Multiplier" value={judgesScoreMultiplier.toFixed(2)} />
               <SettingRow label="Survival Points" value={formatPoints(survivalPoints)} />
               <SettingRow label="1st Place Bonus" value={formatPoints(firstPlacePoints)} />
@@ -496,17 +498,20 @@ export function LeagueModulesForm({
               {draftScheduledAt && (
                 <SettingRow label="Draft Scheduled For" value={formattedDraftScheduledAt || "—"} />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ScoringModulePanel>
         )}
 
         {bonusEnabled && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Grand Finale</CardTitle>
-              <CardDescription>Points from a season-long guess of the full elimination order.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col">
+          <ScoringModulePanel
+            name={scoringModule("grandFinale").name}
+            icon={scoringModule("grandFinale").icon}
+            weight={bonusWeight}
+            detailsDescription="Points from a season-long guess of the full elimination order."
+            trailing={finaleLockedBadge}
+            belowMix={lateUnlockNode}
+          >
+            <div className="flex flex-col">
               <SettingRow
                 label="Deadline"
                 value={<span className="max-w-[60%] text-right leading-snug">{lockDisplay}</span>}
@@ -523,8 +528,8 @@ export function LeagueModulesForm({
                 </>
               )}
               <p className="pt-2 text-sm text-muted-foreground">{explainMethod()}</p>
-            </CardContent>
-          </Card>
+            </div>
+          </ScoringModulePanel>
         )}
       </div>
     );
@@ -624,64 +629,18 @@ export function LeagueModulesForm({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Scoring Mix</CardTitle>
-          <CardDescription>How much each active module counts toward Standings.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {eliminationsEnabled && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="eliminationsWeight">Curtain Call</Label>
-              <Input
-                id="eliminationsWeight"
-                type="number"
-                step="0.1"
-                min={0}
-                value={eliminationsWeight}
-                onChange={(e) => setEliminationsWeight(Number(e.target.value))}
-                disabled={scoringLocked}
-              />
-            </div>
-          )}
-          {judgesEnabled && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="judgesWeight">Dance Card</Label>
-              <Input
-                id="judgesWeight"
-                type="number"
-                step="0.1"
-                min={0}
-                value={judgesWeight}
-                onChange={(e) => setJudgesWeight(Number(e.target.value))}
-                disabled={scoringLocked}
-              />
-            </div>
-          )}
-          {bonusEnabled && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="bonusWeight">Grand Finale</Label>
-              <Input
-                id="bonusWeight"
-                type="number"
-                step="0.1"
-                min={0}
-                value={bonusWeight}
-                onChange={(e) => setBonusWeight(Number(e.target.value))}
-                disabled={scoringLocked}
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {eliminationsEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Curtain Call</CardTitle>
-            <CardDescription>Weekly elimination and top-scorer picks.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+        <ScoringModulePanel
+          name={scoringModule("curtainCall").name}
+          icon={scoringModule("curtainCall").icon}
+          weight={eliminationsWeight}
+          canEdit
+          weightInputId="eliminationsWeight"
+          onWeightChange={setEliminationsWeight}
+          weightDisabled={scoringLocked}
+          detailsDescription="Weekly elimination and top-scorer picks."
+        >
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="predictionLockHoursBeforeAir">Pick &apos;Em Lock (Hours Before Air)</Label>
@@ -733,20 +692,22 @@ export function LeagueModulesForm({
               </div>
             </div>
             <p className="text-xs text-muted-foreground">{CURTAIN_CALL_PAYOUT_NOTE}</p>
-          </CardContent>
-        </Card>
+          </div>
+        </ScoringModulePanel>
       )}
 
       {judgesEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Dance Card</CardTitle>
-            <CardDescription>
-              Draft, roster, Recast, and judges&apos; score points. Roster size is set
-              automatically when the draft starts (couples ÷ members).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+        <ScoringModulePanel
+          name={scoringModule("danceCard").name}
+          icon={scoringModule("danceCard").icon}
+          weight={judgesWeight}
+          canEdit
+          weightInputId="judgesWeight"
+          onWeightChange={setJudgesWeight}
+          weightDisabled={scoringLocked}
+          detailsDescription="Draft, roster, Recast, and judges' score points. Roster size is set automatically when the draft starts (couples ÷ members)."
+        >
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="judgesScoreMultiplier">Judges&apos; Score Multiplier</Label>
@@ -927,17 +888,24 @@ export function LeagueModulesForm({
                 Draft Type and Scheduled For can only be changed before the draft starts.
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </ScoringModulePanel>
       )}
 
       {bonusEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Grand Finale</CardTitle>
-            <CardDescription>Points from a season-long guess of the full elimination order.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+        <ScoringModulePanel
+          name={scoringModule("grandFinale").name}
+          icon={scoringModule("grandFinale").icon}
+          weight={bonusWeight}
+          canEdit
+          weightInputId="bonusWeight"
+          onWeightChange={setBonusWeight}
+          weightDisabled={scoringLocked}
+          detailsDescription="Points from a season-long guess of the full elimination order."
+          trailing={finaleLockedBadge}
+          belowMix={lateUnlockNode}
+        >
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label>Deadline{browserTimeZone ? ` (${browserTimeZone})` : ""}</Label>
@@ -1031,8 +999,8 @@ export function LeagueModulesForm({
               )}
             </div>
             <p className="text-sm text-muted-foreground">{explainMethod()}</p>
-          </CardContent>
-        </Card>
+          </div>
+        </ScoringModulePanel>
       )}
 
       <BottomNav>
