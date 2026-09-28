@@ -1,22 +1,12 @@
--- Lock judges_score_multiplier once the league's draft is complete.
+-- Reset to Neutral can save the roster-size calibration without leaving
+-- judges_score_multiplier_customized set, so a later start_draft may seed
+-- again. The draft-complete multiplier lock is unchanged: a different value
+-- is still rejected once leagues.draft_status = 'completed'.
 --
--- The customized-flag assignment below is superseded by
--- apply-reset-scoring-neutral.sql, which keeps this draft-complete lock.
--- Re-running this file after that one would put the old flag logic back.
---
--- The Season Clock / Grand Finale deadline lock is unchanged and still
--- excludes this column: start_draft may auto-write the roster-size value
--- from dance_card_calibration (unless judges_score_multiplier_customized)
--- while draft_status is not_started, and a commissioner may still edit the
--- multiplier before and during the draft, including after that deadline.
---
--- After draft_status = 'completed', update_scoring_categories rejects a
--- different multiplier. A resave of the current value still succeeds.
--- locking_exempt does not lift this lock. reset_draft returns the league
--- to not_started, which lifts it.
---
--- Same signature as the live function, so create or replace is enough.
--- Run once in the Supabase Dashboard SQL Editor. No types.ts change.
+-- League Settings does the even weight split in the client
+-- (src/lib/scoring-neutral.ts). This function still stores the weights it
+-- is given. Same signature as the live function, so create or replace is
+-- enough. Run once in the Supabase Dashboard SQL Editor. No types.ts change.
 
 create or replace function public.update_scoring_categories(
   p_league_id uuid,
@@ -126,12 +116,32 @@ begin
     bonus_picks_distance_penalty = p_bonus_picks_distance_penalty,
     bonus_picks_tier_size = p_bonus_picks_tier_size,
     bonus_picks_tier_pay_style = p_bonus_picks_tier_pay_style,
-    -- Right-hand sides here still see the pre-update row, even though
-    -- judges_score_multiplier is also being overwritten in this same
-    -- statement — so this correctly flags "did the commissioner just change
-    -- it" without a separate select.
-    judges_score_multiplier_customized = judges_score_multiplier_customized
-      or (judges_score_multiplier is distinct from p_judges_score_multiplier),
+    -- Right-hand sides here still see the pre-update row. Saving the
+    -- roster-size calibration clears the flag so Reset to Neutral (or
+    -- typing that number back) lets a later start_draft seed again. Any
+    -- other change marks it customized and it stays that way. A
+    -- draft-complete resave does not touch the flag — the lock above
+    -- already rejects a different multiplier.
+    judges_score_multiplier_customized = case
+      when exists (
+        select 1 from public.leagues
+        where id = p_league_id and draft_status = 'completed'
+      ) then judges_score_multiplier_customized
+      when p_judges_score_multiplier is not distinct from (
+        select c.judges_score_multiplier_default
+        from public.dance_card_calibration c
+        where c.roster_size = (
+          select c2.roster_size
+          from public.dance_card_calibration c2
+          order by abs(c2.roster_size - (
+            select l.roster_size from public.leagues l where l.id = p_league_id
+          )), c2.roster_size
+          limit 1
+        )
+      ) then false
+      when judges_score_multiplier is distinct from p_judges_score_multiplier then true
+      else judges_score_multiplier_customized
+    end,
     judges_score_multiplier = p_judges_score_multiplier,
     survival_points = p_survival_points,
     first_place_points = p_first_place_points,
