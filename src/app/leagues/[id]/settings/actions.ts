@@ -18,7 +18,7 @@ export async function renameLeague(
 
   revalidatePath(`/leagues/${leagueId}`);
   revalidatePath("/leagues", "layout");
-  revalidatePath("/today");
+  revalidatePath("/", "page");
   return { error: null };
 }
 
@@ -29,7 +29,7 @@ export async function deleteLeague(leagueId: string): Promise<{ error: string | 
   if (error) return { error: error.message };
 
   revalidatePath("/leagues", "layout");
-  revalidatePath("/today");
+  revalidatePath("/", "page");
   redirect("/leagues");
 }
 
@@ -232,7 +232,7 @@ export async function updateScoringCategories(
   if (error) return { error: error.message };
 
   revalidatePath(`/leagues/${leagueId}`);
-  revalidatePath("/today");
+  revalidatePath("/", "page");
   return { error: null };
 }
 
@@ -244,7 +244,7 @@ export async function syncSeasonClockAnchor(
   if (!result.error) {
     revalidatePath(`/leagues/${leagueId}/settings`);
     revalidatePath(`/leagues/${leagueId}`);
-    revalidatePath("/today");
+    revalidatePath("/", "page");
   }
   return result;
 }

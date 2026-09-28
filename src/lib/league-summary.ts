@@ -10,7 +10,7 @@ export type LeagueSummary = {
   statusText: string;
 };
 
-// Used by /notifications for its "needs attention" signal. /today has its
+// Used by /notifications for its "needs attention" signal. Home (`/`) has its
 // own richer per-league computation (src/lib/league-home-summary.ts) since
 // it needs rank/points/module flags this simpler summary doesn't carry.
 export async function computeLeagueSummary(

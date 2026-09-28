@@ -65,7 +65,7 @@ export function FanBottomNav({
   return (
     <BottomNav>
       <div className={BOTTOM_NAV_TABS_CLASS}>
-        <FanTabItem href="/today" active={active === "home"} icon={HomeIcon} label="Home" />
+        <FanTabItem href="/" active={active === "home"} icon={HomeIcon} label="Home" />
         <FanTabItem href="/this-week" active={active === "results"} icon={ListChecksIcon} label="Results" />
         <FanTabItem
           href={`/leagues/${leagueId}?tab=yourpicks`}

@@ -67,7 +67,7 @@ export default async function LeaguesPage({
         <TopBar {...accountSettingsData} email={user.email ?? ""} />
 
         {leagues.length > 0 && (
-          <Link href="/today" className="text-sm font-medium text-muted-foreground">
+          <Link href="/" className="text-sm font-medium text-muted-foreground">
             ‹ Back
           </Link>
         )}
