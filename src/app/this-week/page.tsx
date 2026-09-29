@@ -11,6 +11,8 @@ import { SlimTopBar, TopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { coupleLeagueNotes } from "@/lib/couple-league-notes";
+import { nextPredictedElimination } from "@/lib/grand-finale-pins";
+import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import {
@@ -83,6 +85,9 @@ export default async function ThisWeekPage({
   const completedWeeks = [...seasonWeeks]
     .filter((week) => week.status === "completed")
     .sort((a, b) => b.week_number - a.week_number);
+  // No separate "semi-final" flag exists — the week immediately before the
+  // finale is what that means here, per Schedule's own theme naming.
+  const finaleWeekNumber = groupedWeeks.find((week) => week.is_finale)?.week_number ?? null;
 
   const cutoff = await resolveSpoilerCutoff(
     supabase,
@@ -134,7 +139,9 @@ export default async function ThisWeekPage({
       supabase.from("dance_styles").select("id, name").order("name"),
       supabase
         .from("couples")
-        .select("id, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"),
+        .select(
+          "id, status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
+        ),
     ]);
 
   const flatCouples = (allCouples ?? []).map((c) => ({
@@ -151,7 +158,7 @@ export default async function ThisWeekPage({
   // show news. Picks are looked up against the episode being shown here
   // (whichever week is selected), not the upcoming episode Your Picks deals
   // with — a past call, not a pending one.
-  const [{ data: rosterSlots }, { data: pastPredictions }] = await Promise.all([
+  const [{ data: rosterSlots }, { data: pastPredictions }, { data: grandFinaleRows }] = await Promise.all([
     supabase
       .from("roster_slots")
       .select("league_id, couple_id")
@@ -166,6 +173,13 @@ export default async function ThisWeekPage({
           .eq("week_id", selectedWeekId)
           .in("league_id", leagueIds)
       : Promise.resolve({ data: [] }),
+    selectedMode === "results" && selectedWeekId
+      ? supabase
+          .from("grand_finale_predictions")
+          .select("league_id, couple_id, predicted_position")
+          .in("manager_id", myTeamIds)
+          .in("league_id", leagueIds)
+      : Promise.resolve({ data: [] as { league_id: string; couple_id: string; predicted_position: number }[] }),
   ]);
 
   const rosterLeaguesByCouple: Record<string, string[]> = {};
@@ -189,13 +203,63 @@ export default async function ThisWeekPage({
     }
   }
 
+  // Grand Finale stakes, same idea: which couple sits in the viewer's own
+  // "next predicted elimination" slot per league, computed against couple
+  // statuses clamped to the selected week (never ahead of what this results
+  // page is already showing) — the predicted winner is a separate, rarer
+  // note that only means anything once the season's actually deciding
+  // itself, so it's gated to the semi-final/finale window.
+  const gfCouples = (allCouples ?? []).map((c) => ({
+    id: c.id,
+    celebrity_name: c.celebrity?.name ?? "Unknown",
+    status: selectedWeek
+      ? spoilerSafeCoupleStatus(
+          { status: c.status, eliminationWeek: c.elimination_week },
+          selectedWeek.week_number,
+          finaleWeekNumber
+        )
+      : c.status,
+    elimination_week: c.elimination_week,
+  }));
+  const isSemiFinalOrFinaleWeek =
+    finaleWeekNumber !== null && !!selectedWeek && selectedWeek.week_number >= finaleWeekNumber - 1;
+
+  const grandFinaleRowsByLeague = new Map<string, { coupleId: string; position: number }[]>();
+  for (const row of grandFinaleRows ?? []) {
+    const list = grandFinaleRowsByLeague.get(row.league_id) ?? [];
+    list.push({ coupleId: row.couple_id, position: row.predicted_position });
+    grandFinaleRowsByLeague.set(row.league_id, list);
+  }
+
+  const grandFinaleNextElimLeaguesByCouple: Record<string, string[]> = {};
+  const grandFinaleWinnerLeaguesByCouple: Record<string, string[]> = {};
+  for (const [leagueId, rows] of grandFinaleRowsByLeague) {
+    const leagueName = leagueNameById.get(leagueId);
+    if (!leagueName || rows.length === 0) continue;
+    const order = [...rows].sort((a, b) => a.position - b.position).map((r) => r.coupleId);
+    const nextElimId = nextPredictedElimination(order, gfCouples);
+    if (nextElimId) {
+      (grandFinaleNextElimLeaguesByCouple[nextElimId] ??= []).push(leagueName);
+    }
+    if (isSemiFinalOrFinaleWeek) {
+      const winnerId = order[order.length - 1];
+      (grandFinaleWinnerLeaguesByCouple[winnerId] ??= []).push(leagueName);
+    }
+  }
+
+  const totalLeagueCount = leagueIds.length;
   const leaguesByCouple: Record<string, string[]> = {};
   for (const coupleId of new Set([
     ...Object.keys(rosterLeaguesByCouple),
     ...Object.keys(eliminationPickLeaguesByCouple),
     ...Object.keys(topScorerPickLeaguesByCouple),
+    ...Object.keys(grandFinaleNextElimLeaguesByCouple),
+    ...Object.keys(grandFinaleWinnerLeaguesByCouple),
   ])) {
     leaguesByCouple[coupleId] = coupleLeagueNotes({
+      totalLeagueCount,
+      grandFinaleNextElimLeagues: grandFinaleNextElimLeaguesByCouple[coupleId],
+      grandFinaleWinnerLeagues: grandFinaleWinnerLeaguesByCouple[coupleId],
       rosterLeagues: rosterLeaguesByCouple[coupleId],
       eliminationPickLeagues: eliminationPickLeaguesByCouple[coupleId],
       topScorerPickLeagues: topScorerPickLeaguesByCouple[coupleId],
