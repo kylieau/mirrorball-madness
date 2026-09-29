@@ -51,7 +51,7 @@ export default async function WaiversPage({
   // A co-manager's roster/claims live under the primary's user_id.
   const myTeamId = membership?.user_id ?? user.id;
 
-  const closeHref = safeRelativePath(from, `/leagues/${id}?tab=yourpicks`);
+  const closeHref = safeRelativePath(from, `/leagues/${id}/picks`);
   const closeLink = (
     <Link
       href={closeHref}

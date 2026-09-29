@@ -16,7 +16,7 @@ export async function renameLeague(
   const { error } = await supabase.rpc("rename_league", { p_league_id: leagueId, p_name: name });
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   revalidatePath("/leagues", "layout");
   revalidatePath("/", "page");
   return { error: null };
@@ -45,7 +45,7 @@ export async function removeMember(
   });
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   return { error: null };
 }
 
@@ -61,7 +61,7 @@ export async function promoteMember(
   });
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   return { error: null };
 }
 
@@ -90,8 +90,7 @@ export async function removeCoManager(
   });
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
-  revalidatePath(`/leagues/${leagueId}/settings`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   return { error: null };
 }
 
@@ -114,8 +113,7 @@ export async function unlockGrandFinaleLate(
   });
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
-  revalidatePath(`/leagues/${leagueId}/settings`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   return { error: null };
 }
 
@@ -129,8 +127,7 @@ export async function closeGrandFinaleLate(leagueId: string, managerId: string):
   });
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
-  revalidatePath(`/leagues/${leagueId}/settings`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   return { error: null };
 }
 
@@ -146,7 +143,7 @@ export async function demoteMember(
   });
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   return { error: null };
 }
 
@@ -181,7 +178,7 @@ export async function updateLeagueSettings(
 
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   return { error: null };
 }
 
@@ -246,7 +243,7 @@ export async function updateScoringCategories(
 
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   revalidatePath("/", "page");
   return { error: null };
 }
@@ -257,8 +254,7 @@ export async function syncSeasonClockAnchor(
   const supabase = await createClient();
   const result = await writeSeasonClockAnchor(supabase, leagueId);
   if (!result.error) {
-    revalidatePath(`/leagues/${leagueId}/settings`);
-    revalidatePath(`/leagues/${leagueId}`);
+    revalidatePath(`/leagues/${leagueId}`, "layout");
     revalidatePath("/", "page");
   }
   return result;

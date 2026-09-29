@@ -2,7 +2,7 @@ import { buildCoupleDisplayNames, formatCoupleName } from "./couple-display";
 import { SCORING_MODULES, type ScoringModuleKey } from "./scoring-modules";
 
 export function leagueTapHref(leagueId: string, picksDue: boolean): string {
-  return `/leagues/${leagueId}?tab=${picksDue ? "yourpicks" : "standings"}`;
+  return `/leagues/${leagueId}/${picksDue ? "picks" : "standings"}`;
 }
 
 // open = picks can be made; awaiting_results = the previous week isn't published yet;

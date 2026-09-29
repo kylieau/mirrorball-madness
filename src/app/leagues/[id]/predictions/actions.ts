@@ -25,7 +25,7 @@ export async function submitPrediction(
 
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   return { error: null };
 }
 
@@ -41,7 +41,7 @@ export async function submitGrandFinalePrediction(
 
   if (error) return { error: error.message };
 
-  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   return { error: null };
 }
 

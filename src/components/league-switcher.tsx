@@ -6,6 +6,7 @@ import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/co
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { LeagueStatusPill } from "@/components/league-status-pill";
 import { cn } from "cn";
+import type { LeagueTab } from "@/components/league-header";
 
 export type SwitcherLeague = {
   id: string;
@@ -22,11 +23,11 @@ export type SwitcherLeague = {
 export function LeagueSwitcher({
   currentLeagueId,
   leagues,
-  activeTab,
+  tab,
 }: {
   currentLeagueId: string;
   leagues: SwitcherLeague[];
-  activeTab: string;
+  tab: LeagueTab;
 }) {
   const current = leagues.find((l) => l.id === currentLeagueId);
 
@@ -50,7 +51,7 @@ export function LeagueSwitcher({
                 key={l.id}
                 className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
               >
-                <Link href={`/leagues/${l.id}?tab=${activeTab}`} className="flex-1">
+                <Link href={`/leagues/${l.id}/${tab}`} className="flex-1">
                   <p className={cn("text-sm font-semibold", isCurrent && "text-accent")}>{l.name}</p>
                   <p className="text-xs text-muted-foreground">
                     Rank {l.rank} of {l.totalMembers}

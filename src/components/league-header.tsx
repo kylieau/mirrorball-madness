@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -12,7 +11,10 @@ import { HomeSpoilerChrome, type SpoilerFreeStripState } from "@/components/spoi
 import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
+export type LeagueTab = "picks" | "standings";
+
 export function LeagueHeader({
+  tab,
   leagueId,
   danceCardOn,
   waiversOn,
@@ -25,6 +27,7 @@ export function LeagueHeader({
   viewerEmail,
   spoilerFreeStrip,
 }: {
+  tab: LeagueTab;
   leagueId: string;
   danceCardOn: boolean;
   waiversOn: boolean;
@@ -40,10 +43,8 @@ export function LeagueHeader({
   // is skipped — one sticky mechanism at a time, matching Home exactly.
   spoilerFreeStrip: SpoilerFreeStripState | null;
 }) {
-  const searchParams = useSearchParams();
-  const activeTab = searchParams.get("tab") ?? "yourpicks";
-  const title = activeTab === "standings" ? "Standings" : "Picks";
-  const currentPath = `/leagues/${leagueId}?tab=${activeTab}`;
+  const title = tab === "standings" ? "Standings" : "Picks";
+  const currentPath = `/leagues/${leagueId}/${tab}`;
   const leagueSettingsHref = `/leagues/${leagueId}/settings?from=${encodeURIComponent(currentPath)}`;
 
   const recastAction =
@@ -62,7 +63,7 @@ export function LeagueHeader({
   const pageHeader = (
     <PageHeader title={title}>
       {switcherLeagues.length > 1 && (
-        <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
+        <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} tab={tab} />
       )}
     </PageHeader>
   );
@@ -90,7 +91,7 @@ export function LeagueHeader({
                 email={viewerEmail}
                 left={
                   switcherLeagues.length > 1 ? (
-                    <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
+                    <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} tab={tab} />
                   ) : (
                     <span className="font-heading text-lg font-semibold">{title}</span>
                   )

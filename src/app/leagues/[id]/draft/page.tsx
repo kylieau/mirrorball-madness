@@ -37,7 +37,7 @@ export default async function DraftPage({
     notFound();
   }
 
-  const closeHref = safeRelativePath(from, `/leagues/${id}?tab=yourpicks`);
+  const closeHref = safeRelativePath(from, `/leagues/${id}/picks`);
 
   const { data: scoringSettings } = await supabase
     .from("scoring_settings")

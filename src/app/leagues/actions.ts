@@ -21,7 +21,7 @@ export async function createLeague(formData: FormData) {
   revalidatePath("/leagues", "layout");
   revalidatePath("/", "page");
   revalidatePath("/this-week");
-  redirect(`/leagues/${data.id}?justCreated=1`);
+  redirect(`/leagues/${data.id}/picks?justCreated=1`);
 }
 
 export async function joinLeague(formData: FormData) {
@@ -38,7 +38,7 @@ export async function joinLeague(formData: FormData) {
   revalidatePath("/leagues", "layout");
   revalidatePath("/", "page");
   revalidatePath("/this-week");
-  redirect(`/leagues/${data.id}`);
+  redirect(`/leagues/${data.id}/picks`);
 }
 
 // One "Join with Code" entry point for both code types — a league invite
@@ -58,7 +58,7 @@ export async function joinWithCode(formData: FormData) {
     revalidatePath("/leagues", "layout");
     revalidatePath("/", "page");
     revalidatePath("/this-week");
-    redirect(`/leagues/${data.id}`);
+    redirect(`/leagues/${data.id}/picks`);
   }
 
   if (error.message !== "Invite code not found") {
@@ -76,7 +76,7 @@ export async function joinWithCode(formData: FormData) {
   revalidatePath("/leagues", "layout");
   revalidatePath("/", "page");
   revalidatePath("/this-week");
-  redirect(`/leagues/${coManagerLeague.id}`);
+  redirect(`/leagues/${coManagerLeague.id}/picks`);
 }
 
 export async function joinAsCoManager(formData: FormData) {
@@ -93,7 +93,7 @@ export async function joinAsCoManager(formData: FormData) {
   revalidatePath("/leagues", "layout");
   revalidatePath("/", "page");
   revalidatePath("/this-week");
-  redirect(`/leagues/${data.id}`);
+  redirect(`/leagues/${data.id}/picks`);
 }
 
 export async function leaveLeague(leagueId: string): Promise<{ error: string | null }> {

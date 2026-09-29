@@ -736,12 +736,12 @@ export function DraftRoom({
         />
 
         <div className="flex flex-col gap-2">
-          <Button render={<Link href={`/leagues/${league.id}`} />} nativeButton={false}>
+          <Button render={<Link href={`/leagues/${league.id}/picks`} />} nativeButton={false}>
             Back to {league.name}
           </Button>
           <Button
             variant="outline"
-            render={<Link href={`/leagues/${league.id}?tab=standings#rosters`} />}
+            render={<Link href={`/leagues/${league.id}/standings`} />}
             nativeButton={false}
           >
             See Standings

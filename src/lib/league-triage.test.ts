@@ -27,8 +27,8 @@ const withGf = (gf: Partial<ModuleStackInput["grandFinale"]>): ModuleStackInput 
 
 describe("leagueTapHref", () => {
   it("opens Picks when picks are due and Standings otherwise", () => {
-    expect(leagueTapHref("abc", true)).toBe("/leagues/abc?tab=yourpicks");
-    expect(leagueTapHref("abc", false)).toBe("/leagues/abc?tab=standings");
+    expect(leagueTapHref("abc", true)).toBe("/leagues/abc/picks");
+    expect(leagueTapHref("abc", false)).toBe("/leagues/abc/standings");
   });
 });
 

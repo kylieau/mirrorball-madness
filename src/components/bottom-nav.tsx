@@ -68,13 +68,13 @@ export function FanBottomNav({
         <FanTabItem href="/" active={active === "home"} icon={HomeIcon} label="Home" />
         <FanTabItem href="/this-week" active={active === "results"} icon={ListChecksIcon} label="Results" />
         <FanTabItem
-          href={`/leagues/${leagueId}?tab=yourpicks`}
+          href={`/leagues/${leagueId}/picks`}
           active={active === "picks"}
           icon={PencilLineIcon}
           label="Picks"
         />
         <FanTabItem
-          href={`/leagues/${leagueId}?tab=standings`}
+          href={`/leagues/${leagueId}/standings`}
           active={active === "standings"}
           icon={TrophyIcon}
           label="Standings"

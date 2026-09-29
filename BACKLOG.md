@@ -10,7 +10,7 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 4. **Check everything in "Built but not checked" below**, starting with Tuesday's episode (live score reveal, curtain states, Spoiler-Free strip and prompt).
 5. **Dance Card League at a Glance: show the viewer's own points.** Every other manager's row shows the points gained that week, but the viewer is excluded (their picks are the card above), so their own week total isn't in the list. Add the viewer's own row/total so the list reads complete.
 6. **Split Scores and Enter Results into genuinely separate pages.** Both still live on one page, `/admin/results`, switched by `?tab=`. They are separate things (Scores is the read/view side; Enter Results is entry/propose/publish), and sharing one page risks state or behavior leaking between them. Give each its own route and keep the three access tiers (View / Propose / Publish) enforced per action as today.
-7. **Split fan-facing Picks and Standings into genuinely separate tabs**, not sub-tabs of one shared page. They currently both render from `/leagues/[id]` (switched by `?tab=`), sharing `LeagueHeader`/`LeagueTabs` — the user wants them to be their own top-level tabs, same peer level as Home and Results, not grouped together. Explicitly deferred (user's call, 2026-09-29) as bigger than a single pass: touches routing, `FanBottomNav`, and the shared `LeagueHeader`/`LeagueTabs` components. Distinct from item 6 above (that's the admin Scores/Enter-Results pair, a different page entirely).
+7. **Click through the Picks / Standings route split on a phone.** Picks and Standings are now separate routes (`/leagues/[id]/picks`, `/leagues/[id]/standings`; `/leagues/[id]?tab=` redirects). Checked without a browser: build, redirects with params carried over, and a signed-in fetch of both pages (titles, bottom-nav links, Standings free of picks content, justCreated card, Home/Results nav links, Settings close link). Not yet seen: tapping between the tabs, Back button behaviour, the league switcher sheet keeping you on the same tab, the Curtain Call / roster carousels paging on `/picks?week=…&rosterWeek=…`, and a pick or Recast submit refreshing the page.
 8. **CLAUDE.md doesn't document the Results page's cross-league gold-copy feature at all** (`couple-league-notes.ts`, wired up in `this-week/page.tsx`) — a pre-existing gap, not just from tonight's session. Now has real behavior worth capturing: spoiler-clamped Grand Finale status, the module-distinguishing wording ("bracket next-elim pick" vs. Curtain Call's "elim pick"), and the league-list collapsing rules (all-leagues / "N leagues'" / named).
 9. **`scratch/` still has ~8 leftover files** from earlier today (timestamps around 01:44–02:31), never confirmed for deletion — flagged to the user once, no decision made. Check before assuming they're safe to clear.
 
@@ -63,13 +63,13 @@ Built from the designer's "SF watching live · override" board: `LiveScoresPromp
 Shared slim ← `Week N — {theme}` → control (`EpisodeCarousel` / `formatEpisodeCasualWithTheme`). Not on Home. `?week=` is `competition_weeks.id`. Multi-episode weeks may show a subtle `Night One + Night Two` under the label.
 
 - **Results** (`/this-week`): prev/next are `/this-week?week=` links. Carousel weeks = spoiler-visible completed **weeks** **plus** upcoming/locked for a theme peek. Unwatched completed weeks are omitted so `?week=` cannot leak results. Completed + visible → results; upcoming/locked → theme peek. Default is the latest visible completed week; before premiere, the first peek week. Pending reveal stays `WeeklyResultsView`'s mark-as-watched card. A week is complete only when every assigned TV episode is complete.
-- **Picks / Curtain Call**: one card (`CurtainCallCard`), titled **Curtain Call**. Same carousel; hrefs are `?tab=yourpicks&week=`. Live/upcoming week → pick form. Completed week → past recap in that same card. Unwatched completed weeks land on the lock card. No second Past picks card.
+- **Picks / Curtain Call**: one card (`CurtainCallCard`), titled **Curtain Call**. Same carousel; hrefs are `/leagues/[id]/picks?week=`. Live/upcoming week → pick form. Completed week → past recap in that same card. Unwatched completed weeks land on the lock card. No second Past picks card.
 
 Out of scope (still): full season schedule dump, a new schedule page, lock-time hint, Home timeline.
 
 ## Bottom nav width + sticky desktop
 
-Implemented (PR #18) — fan and admin tab bars stay `fixed` to the viewport bottom on every width (same as phone) and span the `max-w-2xl` content column. Shared wrapper: `BottomNav` / `FanBottomNav` in `src/components/bottom-nav.tsx`. Surfaces: Home (`/today`), Results (`/this-week`), league tabs (`LeagueTabs`), admin (`AdminResultsTabs`).
+Implemented (PR #18) — fan and admin tab bars stay `fixed` to the viewport bottom on every width (same as phone) and span the `max-w-2xl` content column. Shared wrapper: `BottomNav` / `FanBottomNav` in `src/components/bottom-nav.tsx`. Surfaces: Home (`/today`), Results (`/this-week`), league Picks/Standings (`LeaguePageShell`), admin (`AdminResultsTabs`).
 
 Out of scope (still): redesigning icons/labels.
 
@@ -87,9 +87,9 @@ Code already maps `episode_results.outcome = 'bye'` → badge **DND**, pts **—
 
 ## Past picks vs results (Picks)
 
-Implemented on the league **Picks** tab (`?tab=yourpicks`), inside the single Curtain Call card (not a second card, not a new tab).
+Implemented on the league **Picks** tab (`/leagues/[id]/picks`), inside the single Curtain Call card (not a second card, not a new tab).
 
-- Episode switcher is the shared slim `EpisodeCarousel` (`?tab=yourpicks&week=`). Fan labels: `formatEpisodeCasualWithTheme` (`Week N — {theme}`), not `formatEpisodeLabel`. Card title is **Curtain Call**.
+- Episode switcher is the shared slim `EpisodeCarousel` (`/leagues/[id]/picks?week=`). Fan labels: `formatEpisodeCasualWithTheme` (`Week N — {theme}`), not `formatEpisodeLabel`. Card title is **Curtain Call**.
 - Per completed week: your elim pick(s) vs actual, top-scorer pick vs highest `dance_scores.total_score` sum across that week's episodes (same helper scoring uses), Curtain Call points from `weekly_manager_scores.prediction_points`.
 - Spoiler-Free: outcomes only for weeks in `resolveSpoilerCutoff` / `allowedEpisodeIds`. Unwatched completed weeks are selectable but locked (“Mark as watched to see how you did”) — no results leak.
 - v1 is **your** history only. Hidden when Curtain Call is off.

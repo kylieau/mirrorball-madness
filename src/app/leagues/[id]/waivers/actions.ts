@@ -15,8 +15,7 @@ export async function submitWaiverClaim(
     p_couple_id: coupleId,
   });
   if (error) return { error: error.message };
-  revalidatePath(`/leagues/${leagueId}/waivers`);
-  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}`, "layout");
   return { error: null };
 }
 

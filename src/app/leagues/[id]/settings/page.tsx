@@ -48,7 +48,7 @@ export default async function LeagueSettingsPage({
     supabase.from("profiles").select("is_super_admin").eq("id", user.id).maybeSingle(),
   ]);
   const isSuperAdmin = profile?.is_super_admin ?? false;
-  const closeHref = safeRelativePath(from, `/leagues/${id}?tab=yourpicks`);
+  const closeHref = safeRelativePath(from, `/leagues/${id}/picks`);
 
   // A non-member sees no league row (RLS). A super admin can still open
   // this page to allow a late Grand Finale in a league they don't belong to.
