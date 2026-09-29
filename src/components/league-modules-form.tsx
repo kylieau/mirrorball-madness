@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SettingRow } from "@/components/setting-row";
 import {
   Select,
@@ -316,6 +317,7 @@ export function LeagueModulesForm({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [weightNote, setWeightNote] = useState<string | null>(null);
+  const [confirmResetNeutral, setConfirmResetNeutral] = useState(false);
 
   function applyEvenWeights(enabled: { curtainCall: boolean; danceCard: boolean; grandFinale: boolean }) {
     const weights = redistributeModuleWeights(enabled);
@@ -699,7 +701,7 @@ export function LeagueModulesForm({
               variant="outline"
               className="w-full"
               disabled={scoringLocked || submitting}
-              onClick={handleResetNeutral}
+              onClick={() => setConfirmResetNeutral(true)}
             >
               Reset to Neutral
             </Button>
@@ -712,6 +714,32 @@ export function LeagueModulesForm({
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={confirmResetNeutral} onOpenChange={setConfirmResetNeutral}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset to Neutral?</DialogTitle>
+            <DialogDescription>
+              This replaces your current point values and weights with the calibrated defaults and an even split
+              across the modules that are on. Nothing saves until you submit this form, but your hand-tuned settings
+              are gone from the form the moment you confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmResetNeutral(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setConfirmResetNeutral(false);
+                handleResetNeutral();
+              }}
+            >
+              Reset to Neutral
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {eliminationsEnabled && (
         <ScoringModulePanel

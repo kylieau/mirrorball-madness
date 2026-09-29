@@ -7,8 +7,6 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 1. **Check everything in "Built but not checked" below**, starting with Tuesday's episode (live score reveal, curtain states, Spoiler-Free strip and prompt).
 2. **Dance Card League at a Glance: show the viewer's own points.** Every other manager's row shows the points gained that week, but the viewer is excluded (their picks are the card above), so their own week total isn't in the list. Add the viewer's own row/total so the list reads complete.
 3. **Split Scores and Enter Results into genuinely separate pages.** Both still live on one page, `/admin/results`, switched by `?tab=`. They are separate things (Scores is the read/view side; Enter Results is entry/propose/publish), and sharing one page risks state or behavior leaking between them. Give each its own route and keep the three access tiers (View / Propose / Publish) enforced per action as today.
-4. **Reset to Neutral needs a second confirmation.** League Settings' Reset to Neutral (Modules card) currently fires on one click; make it a danger-zone-style confirm (matching other destructive/hard-to-undo actions) since it overwrites a commissioner's hand-tuned point values and weights.
-5. **Move the judges' score boxes to their own line on Enter Results couple cards.** Currently inline with dance style/song title in the same flex-wrapped row; give them a dedicated row for readability.
 
 ## Built but not checked in a browser or on a real episode (needs a phone, or Tuesday's episode)
 

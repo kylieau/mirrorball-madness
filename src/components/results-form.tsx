@@ -333,6 +333,10 @@ export function ResultsForm({
   // own revalidatePath round trip is what actually brings the seeded draft
   // back into draftsByEpisode and re-triggers this effect.
   const seedingEpisodeId = useRef<string | null>(null);
+  // Couples edited since the last successful save. flushDraft only sends
+  // these, never the whole roster, so a concurrent save from someone else
+  // editing different couples can't silently wipe their rows.
+  const dirtyCoupleIds = useRef<Set<string>>(new Set());
 
   function coupleParts(c: Couple): CoupleNameParts {
     return (
@@ -366,6 +370,7 @@ export function ResultsForm({
       previousEpisodeId.current = selectedEpisode.id;
       setJustPublished(false);
       setByCoupleSelectedId("");
+      dirtyCoupleIds.current.clear();
     }
     const wasSelfTriggered = justSavedEpisodeId.current === selectedEpisode.id;
     justSavedEpisodeId.current = null;
@@ -381,6 +386,7 @@ export function ResultsForm({
         setCustomMoments([]);
         setHasDraft(false);
         setError(null);
+        dirtyCoupleIds.current.clear();
         startEpisodeCorrection(selectedEpisode.id).then((result) => {
           if (result.error) {
             seedingEpisodeId.current = null;
@@ -437,14 +443,18 @@ export function ResultsForm({
     return () => clearInterval(timer);
   }, [revealedCoupleIds.size]);
 
+  // Only the couples actually edited since the last save -- see
+  // dirtyCoupleIds' comment. A stale coupleId (removed from the entry list
+  // since it was marked dirty) is dropped rather than sent.
   function buildDraftInput() {
+    const dirtyCouples = episodeCouples.filter((c) => dirtyCoupleIds.current.has(c.id));
     return {
       episodeId: selectedEpisode!.id,
       // Caption column is no longer editable here (it never drove scores or
       // display). Pass through any stored value so a draft save doesn't wipe it.
       guestJudgeName: draftsByEpisode[selectedEpisode!.id]?.guestJudgeName ?? null,
       judgesSaveAvailable,
-      entries: episodeCouples.map((c) => {
+      entries: dirtyCouples.map((c) => {
         const row = rows[c.id] ?? emptyRow();
         return {
           coupleId: c.id,
@@ -464,7 +474,7 @@ export function ResultsForm({
           bonusNote: row.bonusNote.trim() || null,
         };
       }),
-      inJeopardyCoupleIds: episodeCouples
+      inJeopardyCoupleIds: dirtyCouples
         .filter((c) => {
           const row = rows[c.id] ?? emptyRow();
           return row.inJeopardy && row.outcome !== "eliminated";
@@ -474,14 +484,19 @@ export function ResultsForm({
   }
 
   async function flushDraft(): Promise<{ error: string | null }> {
-    if (!selectedEpisode) return { error: null };
+    if (!selectedEpisode || dirtyCoupleIds.current.size === 0) return { error: null };
     setSavingDraft(true);
     justSavedEpisodeId.current = selectedEpisode.id;
-    const result = await saveEpisodeDraft(buildDraftInput());
+    const input = buildDraftInput();
+    const result = await saveEpisodeDraft(input);
     if (result.error) {
       setError(result.error);
     } else {
       setError(null);
+      // Only the couples this save actually sent -- not a blind clear, so a
+      // couple edited again while this request was in flight stays dirty
+      // and gets picked up by the next flush.
+      for (const entry of input.entries) dirtyCoupleIds.current.delete(entry.coupleId);
       setDraftSavedAt(new Date().toISOString());
       setHasDraft(true);
     }
@@ -614,6 +629,7 @@ export function ResultsForm({
 
   function updateRow(coupleId: string, patch: Partial<CoupleRow>) {
     setRows((prev) => ({ ...prev, [coupleId]: { ...(prev[coupleId] ?? emptyRow()), ...patch } }));
+    dirtyCoupleIds.current.add(coupleId);
     scheduleAutosave();
   }
 
@@ -752,52 +768,56 @@ export function ResultsForm({
 
         <fieldset disabled={locked} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
           {row.dances.map((d) => (
-            <div key={d.key} className="flex flex-wrap items-end gap-1.5 rounded-lg bg-muted/50 p-1.5">
-              <Select
-                items={danceStyleItems}
-                value={d.danceStyleId}
-                onValueChange={(v) => updateDance(c.id, d.key, { danceStyleId: v ?? "" })}
-              >
-                <SelectTrigger className="h-8 w-36 text-xs">
-                  <SelectValue placeholder="Dance style" />
-                </SelectTrigger>
-                <SelectContent>
-                  {danceStyles.map((ds) => (
-                    <SelectItem key={ds.id} value={ds.id}>
-                      {ds.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                className="h-8 min-w-32 flex-1 text-xs"
-                placeholder="Song title"
-                value={d.songTitle}
-                onChange={(e) => updateDance(c.id, d.key, { songTitle: e.target.value })}
-              />
-              {judgesForDance(d).map((j) => (
-                <div key={j.id} className="flex flex-col gap-0.5">
-                  <Label className="text-[10px] text-muted-foreground">{judgeDisplayNames.get(j.id) ?? j.name}</Label>
-                  <Input
-                    className="h-8 w-12 px-1.5 text-center text-xs"
-                    placeholder="—"
-                    value={d.scores[j.id] ?? ""}
-                    onChange={(e) => updateDance(c.id, d.key, { scores: { ...d.scores, [j.id]: e.target.value } })}
-                  />
-                </div>
-              ))}
-              <div className="flex flex-col gap-0.5">
-                <Label className="text-[10px] text-muted-foreground">Total</Label>
-                <p className="flex h-8 items-center px-1 text-sm font-medium">{danceTotal(d)}</p>
+            <div key={d.key} className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-1.5">
+              <div className="flex flex-wrap items-end gap-1.5">
+                <Select
+                  items={danceStyleItems}
+                  value={d.danceStyleId}
+                  onValueChange={(v) => updateDance(c.id, d.key, { danceStyleId: v ?? "" })}
+                >
+                  <SelectTrigger className="h-8 w-36 text-xs">
+                    <SelectValue placeholder="Dance style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {danceStyles.map((ds) => (
+                      <SelectItem key={ds.id} value={ds.id}>
+                        {ds.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  className="h-8 min-w-32 flex-1 text-xs"
+                  placeholder="Song title"
+                  value={d.songTitle}
+                  onChange={(e) => updateDance(c.id, d.key, { songTitle: e.target.value })}
+                />
               </div>
-              <Button
-                size="xs"
-                variant="ghost"
-                className="text-destructive"
-                onClick={() => removeDance(c.id, d.key)}
-              >
-                Remove
-              </Button>
+              <div className="flex flex-wrap items-end gap-1.5">
+                {judgesForDance(d).map((j) => (
+                  <div key={j.id} className="flex flex-col gap-0.5">
+                    <Label className="text-[10px] text-muted-foreground">{judgeDisplayNames.get(j.id) ?? j.name}</Label>
+                    <Input
+                      className="h-8 w-12 px-1.5 text-center text-xs"
+                      placeholder="—"
+                      value={d.scores[j.id] ?? ""}
+                      onChange={(e) => updateDance(c.id, d.key, { scores: { ...d.scores, [j.id]: e.target.value } })}
+                    />
+                  </div>
+                ))}
+                <div className="flex flex-col gap-0.5">
+                  <Label className="text-[10px] text-muted-foreground">Total</Label>
+                  <p className="flex h-8 items-center px-1 text-sm font-medium">{danceTotal(d)}</p>
+                </div>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  className="text-destructive"
+                  onClick={() => removeDance(c.id, d.key)}
+                >
+                  Remove
+                </Button>
+              </div>
             </div>
           ))}
         </fieldset>
@@ -824,7 +844,7 @@ export function ResultsForm({
                 disabled={releasing || !row.dances.some((d) => Object.values(d.scores).some((v) => v !== ""))}
                 onClick={() => void handleReleaseDraftCouple(c.id)}
               >
-                {releasing ? "Saving..." : "Draft Scores"}
+                {releasing ? "Saving..." : "Save as Draft Score"}
               </Button>
             )}
           </div>

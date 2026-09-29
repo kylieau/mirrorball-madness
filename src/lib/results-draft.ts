@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { inJeopardyIdsToPersist, type Outcome } from "@/lib/scoring";
-import { applyEpisodeResults, replaceInJeopardyCouples, type EntrySubmission } from "@/lib/results";
+import { applyEpisodeResults, type EntrySubmission } from "@/lib/results";
 import { loadRevealedCouples, loadRevealedDances } from "@/lib/results-reveal";
 import { unpostedCoupleIds } from "@/lib/reveal-state";
 
@@ -73,10 +73,39 @@ const EMPTY_DRAFT_STATE: DraftState = {
   inJeopardyCoupleIds: [],
 };
 
+// Like replaceInJeopardyCouples (src/lib/results.ts), but scoped to
+// coupleIds instead of replacing the whole episode's list -- a concurrent
+// save from someone else touching other couples must not clobber theirs.
+async function replaceInJeopardyForCouples(
+  admin: SupabaseClient<Database>,
+  episodeId: string,
+  coupleIds: string[],
+  inJeopardyCoupleIds: string[]
+): Promise<string | null> {
+  if (coupleIds.length === 0) return null;
+  const { error: deleteError } = await admin
+    .from("draft_episode_in_jeopardy_couples")
+    .delete()
+    .eq("episode_id", episodeId)
+    .in("couple_id", coupleIds);
+  if (deleteError) return deleteError.message;
+  const toInsert = inJeopardyCoupleIds.filter((id) => coupleIds.includes(id));
+  if (toInsert.length === 0) return null;
+  const { error } = await admin
+    .from("draft_episode_in_jeopardy_couples")
+    .insert(toInsert.map((coupleId) => ({ episode_id: episodeId, couple_id: coupleId })));
+  return error?.message ?? null;
+}
+
 // Autosave path — cheap and draft-only. Does NOT touch couples.status or
 // call computeWeeklyScores; that only happens at Publish, via the existing
-// applyEpisodeResults. Same delete-then-reinsert pattern applyEpisodeResults
-// already uses for the live tables, just against the draft ones.
+// applyEpisodeResults. Scoped to only the couples in input.entries -- the
+// caller (buildDraftInput/flushDraft in results-form.tsx) sends only the
+// couples actually edited since the last save, never the whole roster, so
+// two commissioners entering different couples' scores at the same time
+// can't silently wipe each other's rows the way a whole-episode
+// delete-then-reinsert would. Same-couple simultaneous edits still resolve
+// last-write-wins, a much narrower collision.
 export async function saveDraftResults(
   admin: SupabaseClient<Database>,
   input: SaveDraftResultsInput
@@ -93,6 +122,9 @@ export async function saveDraftResults(
   );
   if (overrideErr) return { error: overrideErr.message };
 
+  if (input.entries.length === 0) return { error: null };
+  const coupleIds = input.entries.map((e) => e.coupleId);
+
   // Couples already revealed keep the scores viewers can see; the draft only
   // mirrors them until the episode is published.
   const revealedDances = await loadRevealedDances(admin, input.episodeId);
@@ -101,9 +133,10 @@ export async function saveDraftResults(
   );
 
   // draft_judge_scores cascades from draft_dance_scores, so clearing
-  // draft_dance_scores is enough — same as the live tables.
-  await admin.from("draft_dance_scores").delete().eq("episode_id", input.episodeId);
-  await admin.from("draft_episode_results").delete().eq("episode_id", input.episodeId);
+  // draft_dance_scores is enough — same as the live tables. Scoped to
+  // coupleIds, not the whole episode.
+  await admin.from("draft_dance_scores").delete().eq("episode_id", input.episodeId).in("couple_id", coupleIds);
+  await admin.from("draft_episode_results").delete().eq("episode_id", input.episodeId).in("couple_id", coupleIds);
 
   // Inserted one dance at a time (not a bulk insert) so each row's real id
   // is known before inserting its judge_scores — same reasoning as
@@ -151,10 +184,13 @@ export async function saveDraftResults(
     if (error) return { error: error.message };
   }
 
-  const jeopardyErr = await replaceInJeopardyCouples(
+  // Scoped to coupleIds too, via replaceInJeopardyForCouples below -- not
+  // the shared whole-episode replaceInJeopardyCouples publish uses, which
+  // is fine there since publish is a single, exclusive, admin-only action.
+  const jeopardyErr = await replaceInJeopardyForCouples(
     admin,
-    "draft_episode_in_jeopardy_couples",
     input.episodeId,
+    coupleIds,
     inJeopardyIdsToPersist(input.inJeopardyCoupleIds, entries)
   );
   if (jeopardyErr) return { error: jeopardyErr };
