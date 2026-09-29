@@ -3,10 +3,8 @@ import { cn } from "cn";
 import { Card } from "@/components/ui/card";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { EpisodeBanner } from "@/components/episode-banner";
-import { LiveScoresPrompt } from "@/components/live-scores-prompt";
 import { LeagueTriageCard, type LeagueTriage } from "@/components/league-triage-card";
 import { ScrollFade } from "@/components/scroll-fade";
-import type { SpoilerFreeStripState } from "@/components/spoiler-free-strip";
 import type { EpisodeBannerInput, EpisodeBannerState } from "@/lib/episode-banner";
 import type { ActivityLine } from "@/lib/home-activity";
 import { homeLeagueChrome } from "@/lib/league-triage";
@@ -14,12 +12,10 @@ import { homeLeagueChrome } from "@/lib/league-triage";
 export function HomeDashboard({
   leagues,
   recentActivity,
-  spoilerFreeStrip,
   episodeBanner,
 }: {
   leagues: LeagueTriage[];
   recentActivity: ActivityLine[];
-  spoilerFreeStrip: SpoilerFreeStripState | null;
   episodeBanner: { input: EpisodeBannerInput; initialState: EpisodeBannerState | null };
 }) {
   const shownLeagues = [...leagues].sort((a, b) => Number(b.picksDue) - Number(a.picksDue));
@@ -27,10 +23,6 @@ export function HomeDashboard({
 
   return (
     <div>
-      {spoilerFreeStrip?.kind === "posting" && (
-        <LiveScoresPrompt weekNumber={spoilerFreeStrip.weekNumber} earlierWeeks={spoilerFreeStrip.earlierWeeks} />
-      )}
-
       <EpisodeBanner {...episodeBanner} />
 
       <div className="mb-2 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">

@@ -13,7 +13,7 @@ export type DraftRelease = {
   releasedCoupleIdsByEpisode: Record<string, string[]>;
 };
 
-export const DRAFT_SCORES_STRIP_LABEL = "Draft scores · Not yet official";
+export const DRAFT_SCORES_STRIP_LABEL = "Draft scores · Unverified";
 
 export const DRAFT_SCORES_SHEET = {
   title: "Draft scores",

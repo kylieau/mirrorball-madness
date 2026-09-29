@@ -32,12 +32,9 @@ describe("scoredWeekIds", () => {
     expect([...scoredWeekIds({ spoilerFreeMode: false, lastWatchedWeek: null, allowedEpisodeIds: allowed }, null)]).toEqual(["w1", "w2"]);
   });
 
-  it("adds the revealing week for Spoiler-Free-off viewers", () => {
-    expect(scoredWeekIds({ spoilerFreeMode: false, lastWatchedWeek: null, allowedEpisodeIds: allowed }, revealing).has("w3")).toBe(true);
-  });
-
-  it("hides it from Spoiler-Free viewers until they mark that week watched", () => {
-    const base = { spoilerFreeMode: true, allowedEpisodeIds: allowed };
+  it.each([true, false])("hides it until the viewer opts in to that week (Spoiler-Free %s)", (spoilerFreeMode) => {
+    const base = { spoilerFreeMode, allowedEpisodeIds: allowed };
+    expect(scoredWeekIds({ ...base, lastWatchedWeek: null }, revealing).has("w3")).toBe(false);
     expect(scoredWeekIds({ ...base, lastWatchedWeek: 2 }, revealing).has("w3")).toBe(false);
     expect(scoredWeekIds({ ...base, lastWatchedWeek: 3 }, revealing).has("w3")).toBe(true);
   });

@@ -1,11 +1,12 @@
 "use client";
 
-// Offered once per week, on a Spoiler-Free viewer's first look at Home after
-// scores start posting. Staying updated and marking the week watched are the
-// same operation (the mark is a high-water week, so it also covers earlier
-// unmarked weeks); the difference is framing. Dismissing stays blind and is
-// remembered per week on this device, and the strip's Mark Watched button is
-// the way back.
+// "Scores Are Going Live": shown to everyone (Spoiler-Free on or off) who
+// opens the app during the East or West live window once that week has
+// something posted, before any live score shows. East Stay Updated unlocks
+// released drafts; West Stay Updated follows published scores only. Mark
+// Watched unlocks drafts and catches up, and is only offered once the East
+// broadcast is over. Dismiss stays gated and is remembered per week and
+// coast on this device; the sticky strip is the way back in.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,27 +14,40 @@ import { InfoIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { markEpisodesWatchedThrough, markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
+import { setSpoilerFreeMode } from "@/app/settings/actions";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
 const LIVE_SCORES_NOTE =
-  "Site Admin has posted the first dance\u2019s scores and will keep posting as they watch (live West or delayed). Follow along live or mark the episode finished to see scores and standings now. Either choice also marks previous weeks as watched.";
+  "Live means Site Admin posting scores as the show airs: drafts during the East Coast broadcast, published scores during the Pacific one. They stay hidden until you choose Stay Updated or Mark Watched. Either choice also marks earlier weeks watched.";
+
+const COAST = {
+  east: { chip: "Live Now · East Coast", stayNote: "Follow along as scores are entered" },
+  west: { chip: "Live Now · West Coast", stayNote: "Follow along as official scores post" },
+} as const;
 
 export function LiveScoresPrompt({
+  coast,
   weekNumber,
+  spoilerFreeMode,
 }: {
+  coast: "east" | "west";
   weekNumber: number;
-  earlierWeeks: number[];
+  spoilerFreeMode: boolean;
 }) {
   const router = useRouter();
-  const [dismissed, setDismissed, hydrated] = usePersistedState(`sf-live-prompt-dismissed-week-${weekNumber}`, false);
+  const [dismissed, setDismissed, hydrated] = usePersistedState(
+    `live-air-prompt-dismissed-week-${weekNumber}-${coast}`,
+    false
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const weekLabel = formatEpisodeCasual(weekNumber);
+  const [spoilerFree, setSpoilerFree] = useState(spoilerFreeMode);
+  const [togglePending, setTogglePending] = useState(false);
+  const markEnabled = coast === "west";
 
-  // Stay Updated follows scores as they are posted. Mark Watched means the
-  // East broadcast is finished, which is what unlocks a released score draft.
   async function handleChoice(unlockDrafts: boolean) {
     setError(null);
     setPending(true);
@@ -48,21 +62,34 @@ export function LiveScoresPrompt({
     router.refresh();
   }
 
+  async function handleSpoilerFree(checked: boolean) {
+    setSpoilerFree(checked);
+    setTogglePending(true);
+    const result = await setSpoilerFreeMode(checked);
+    if (result.error) {
+      setSpoilerFree(!checked);
+    } else {
+      router.refresh();
+    }
+    setTogglePending(false);
+  }
+
   return (
     <Sheet open={hydrated && !dismissed} onOpenChange={(next) => !next && setDismissed(true)}>
-      <SheetContent side="bottom" className="items-center rounded-t-3xl px-5 pb-8 text-center">
+      <SheetContent side="bottom" className="items-center gap-3 rounded-t-3xl px-5 pb-8 text-center">
         <SheetHeader className="items-center">
-          <SheetTitle className="font-heading text-xl font-semibold">Scores Have Started Posting</SheetTitle>
-          <div className="text-center">
-            <SheetDescription className="inline text-pretty">
-              {weekLabel} judges&apos; scores are going up. Follow live, catch up fully, or stay blind.
-            </SheetDescription>{" "}
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-accent">
+            <span className="size-1.5 animate-pulse rounded-full bg-red-500" aria-hidden />
+            {COAST[coast].chip}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <SheetTitle className="font-heading text-xl font-semibold">Scores Are Going Live</SheetTitle>
             <Dialog>
               <DialogTrigger
                 aria-label="About live scores"
-                className="relative -top-1.5 ml-0.5 inline-flex size-3 align-baseline text-muted-foreground before:absolute before:-inset-2.5 before:content-['']"
+                className="relative inline-flex size-4 text-accent before:absolute before:-inset-2.5 before:content-['']"
               >
-                <InfoIcon className="size-3" />
+                <InfoIcon className="size-4" />
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -74,14 +101,39 @@ export function LiveScoresPrompt({
               </DialogContent>
             </Dialog>
           </div>
+          <SheetDescription className="text-pretty">
+            {formatEpisodeCasual(weekNumber)} judges&apos; scores are going up. Follow live, catch up fully, or stay
+            blind.
+          </SheetDescription>
         </SheetHeader>
+
+        <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-left text-sm">
+          <div>
+            <p>Spoiler-Free Mode</p>
+            <p className="text-xs text-muted-foreground">Hide results until you mark a week as watched</p>
+          </div>
+          <Switch checked={spoilerFree} onCheckedChange={handleSpoilerFree} disabled={togglePending} />
+        </div>
+
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button size="lg" className="w-full" onClick={() => handleChoice(false)} disabled={pending}>
-          {pending ? "Marking..." : "Stay Updated — I'm Watching Live (PT)"}
-        </Button>
-        <Button size="lg" variant="outline" className="w-full" onClick={() => handleChoice(true)} disabled={pending}>
-          Mark Watched — I&apos;ve Finished It (ET)
-        </Button>
+        <div className="flex w-full flex-col gap-1">
+          <Button size="lg" className="w-full" onClick={() => handleChoice(coast === "east")} disabled={pending}>
+            {pending ? "Updating..." : "Stay Updated — I'm Watching Live"}
+          </Button>
+          <p className="text-xs text-muted-foreground">{COAST[coast].stayNote}</p>
+        </div>
+        <div className="flex w-full flex-col gap-1">
+          <Button
+            size="lg"
+            variant="outline"
+            className="w-full"
+            onClick={() => handleChoice(true)}
+            disabled={pending || !markEnabled}
+          >
+            Mark Watched — I&apos;ve Finished It
+          </Button>
+          {markEnabled && <p className="text-xs text-muted-foreground">You&apos;re caught up · scores unlock</p>}
+        </div>
         <Button
           variant="ghost"
           className="w-full hover:bg-transparent dark:hover:bg-transparent"

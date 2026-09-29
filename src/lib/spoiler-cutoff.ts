@@ -38,7 +38,7 @@ export async function resolveSpoilerCutoff<E extends { id: string; week_number: 
   spoilerFreeMode: boolean,
   completedEpisodesDesc: E[]
 ): Promise<SpoilerCutoff<E>> {
-  if (!spoilerFreeMode || !seasonId) {
+  if (!seasonId) {
     return {
       spoilerFreeMode: false,
       lastWatchedWeek: null,
@@ -49,6 +49,8 @@ export async function resolveSpoilerCutoff<E extends { id: string; week_number: 
     };
   }
 
+  // Loaded with Spoiler-Free off too: a live-posting week stays gated for
+  // everyone until they choose Stay Updated or Mark Watched (scoredWeekIds).
   const { data: progress } = await supabase
     .from("spoiler_watch_progress")
     .select("last_watched_week")
@@ -57,6 +59,17 @@ export async function resolveSpoilerCutoff<E extends { id: string; week_number: 
     .maybeSingle();
 
   const lastWatchedWeek = progress?.last_watched_week ?? 0;
+
+  if (!spoilerFreeMode) {
+    return {
+      spoilerFreeMode: false,
+      lastWatchedWeek,
+      allowedEpisodeIds: new Set(completedEpisodesDesc.map((e) => e.id)),
+      visibleEpisodes: completedEpisodesDesc,
+      effectiveLatestEpisode: completedEpisodesDesc[0] ?? null,
+      pendingRevealEpisode: null,
+    };
+  }
   const visibleEpisodes = completedEpisodesDesc.filter((e) => e.week_number <= lastWatchedWeek);
 
   return {

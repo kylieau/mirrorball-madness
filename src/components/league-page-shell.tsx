@@ -3,6 +3,7 @@ import { cn } from "cn";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { LeagueHeader, type LeagueTab } from "@/components/league-header";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
+import { LiveScoresPrompt } from "@/components/live-scores-prompt";
 import type { LeaguePageBase } from "@/lib/league-page-data";
 
 export function LeaguePageShell({
@@ -42,7 +43,10 @@ export function LeaguePageShell({
         {error && <p className="text-sm text-destructive">{error}</p>}
         {message && <p className="text-sm text-muted-foreground">{message}</p>}
 
-        <RevealAutoRefresh active={base.revealingVisible} />
+        {base.livePrompt && (
+          <LiveScoresPrompt {...base.livePrompt} spoilerFreeMode={base.accountSettingsData.spoilerFreeMode} />
+        )}
+        <RevealAutoRefresh active={base.revealingVisible || base.liveWindow} />
         <FanBottomNav active={tab} leagueId={league.id} />
         <div className={BOTTOM_NAV_CLEARANCE}>{children}</div>
       </div>

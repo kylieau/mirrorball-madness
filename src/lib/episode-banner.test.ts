@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   computeEpisodeBannerState,
+  eastBroadcastEnded,
+  liveAirPhase,
   nextBannerRefreshMs,
   seasonTrack,
   type BannerEpisode,
@@ -240,5 +242,32 @@ describe("seasonTrack", () => {
       currentWeek: null,
       marker: "next",
     });
+  });
+});
+
+describe("liveAirPhase", () => {
+  // AIRS is 5pm PT; East ends 7pm PT, West runs 8-10pm PT.
+  it.each([
+    ["2026-09-22T23:59:00Z", null],
+    ["2026-09-23T00:00:00Z", "east"],
+    ["2026-09-23T01:59:00Z", "east"],
+    ["2026-09-23T02:00:00Z", "gap"],
+    ["2026-09-23T03:00:00Z", "west"],
+    ["2026-09-23T04:59:00Z", "west"],
+    ["2026-09-23T05:00:00Z", null],
+  ])("at %s is %s", (now, kind) => {
+    const phase = liveAirPhase([live()], at(now));
+    expect(phase?.kind ?? null).toBe(kind);
+    if (phase) expect(phase.weekNumber).toBe(2);
+  });
+});
+
+describe("eastBroadcastEnded", () => {
+  it("is true only once every episode of the week has finished its East broadcast", () => {
+    const week = live([episode(), episode({ airsAt: "2026-09-30T00:00:00Z" })]);
+    expect(eastBroadcastEnded([live()], 2, at("2026-09-23T01:59:00Z"))).toBe(false);
+    expect(eastBroadcastEnded([live()], 2, at("2026-09-23T02:00:00Z"))).toBe(true);
+    expect(eastBroadcastEnded([week], 2, at("2026-09-23T02:00:00Z"))).toBe(false);
+    expect(eastBroadcastEnded([live()], 3, at("2026-09-23T02:00:00Z"))).toBe(false);
   });
 });

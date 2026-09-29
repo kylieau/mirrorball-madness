@@ -23,14 +23,14 @@ export function findRevealingWeek<W extends WeekLike>(
 
 // Weeks whose judge scores and points a viewer may see. Outcome-dependent
 // surfaces keep using the completed-only allowed set; score and point
-// surfaces add the revealing week for Spoiler-Free-off viewers, and for
-// Spoiler-Free viewers who have marked that week watched.
+// surfaces add the revealing week only once the viewer chose Stay Updated or
+// Mark Watched for it, whatever their Spoiler-Free setting.
 export function scoredWeekIds(
   cutoff: { spoilerFreeMode: boolean; lastWatchedWeek: number | null; allowedEpisodeIds: ReadonlySet<string> },
   revealing: { id: string; week_number: number } | null
 ): Set<string> {
   const ids = new Set(cutoff.allowedEpisodeIds);
   if (!revealing) return ids;
-  if (!cutoff.spoilerFreeMode || (cutoff.lastWatchedWeek ?? 0) >= revealing.week_number) ids.add(revealing.id);
+  if ((cutoff.lastWatchedWeek ?? 0) >= revealing.week_number) ids.add(revealing.id);
   return ids;
 }

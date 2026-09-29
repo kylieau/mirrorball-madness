@@ -11,7 +11,8 @@ import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { formatManagerName } from "@/lib/manager-display";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
-import { buildSpoilerFreeStripState } from "@/lib/spoiler-free-strip-state";
+import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
+import { toBannerWeeks } from "@/lib/episode-banner";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 
 export type LeaguePageBase = Awaited<ReturnType<typeof loadLeaguePageBase>>;
@@ -82,7 +83,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
       .order("week_number", { ascending: true }),
     supabase
       .from("episodes")
-      .select("id, episode_number, week_id, airs_at, theme, status, results_published_at")
+      .select("id, episode_number, week_id, airs_at, duration_minutes, theme, status, results_published_at")
       .eq("season_id", activeSeasonId ?? ""),
   ]);
   const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
@@ -129,14 +130,14 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     loadDraftScoreContext(supabase, user.id),
   ]);
   const draftNight = draftContext.night;
-  const spoilerFreeStrip = buildSpoilerFreeStripState({
+  const { strip: spoilerFreeStrip, prompt: livePrompt, liveWindow } = buildLiveAirChrome({
     spoilerFreeMode: accountSettingsData.spoilerFreeMode,
     lastWatchedWeek: cutoff.lastWatchedWeek ?? 0,
     completedWeekNumbers: groupedWeeks.filter((week) => week.status === "completed").map((week) => week.week_number),
     revealingWeekNumber: revealing?.week.week_number ?? null,
     pendingRevealWeekNumber: cutoff.pendingRevealEpisode?.week_number ?? null,
-    draftReleaseWeekNumber: draftContext.release?.weekNumber ?? null,
-    draftNightActive: !!draftNight,
+    draftContext,
+    bannerWeeks: toBannerWeeks(groupedWeeks),
   });
   const draftManagers =
     draftNight && scoringSettings ? await draftManagerScoresForLeague(supabase, id, draftNight) : [];
@@ -348,6 +349,8 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     draftNight,
     draftManagers,
     spoilerFreeStrip,
+    livePrompt,
+    liveWindow,
     scoreRows,
     pointsByManager,
     rosterPointsByManager,

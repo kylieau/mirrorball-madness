@@ -8,11 +8,12 @@ import { ScrollRevealBar } from "@/components/scroll-reveal-bar";
 import { SlimTopBar, TopBar } from "@/components/top-bar";
 import { loadHomeLeagueData } from "@/lib/home-league-data";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
-import { computeEpisodeBannerState, DEFAULT_EPISODE_DURATION_MINUTES, type EpisodeBannerInput } from "@/lib/episode-banner";
+import { computeEpisodeBannerState, toBannerWeeks, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
 import { HomeSpoilerChrome } from "@/components/spoiler-free-strip";
-import { buildSpoilerFreeStripState } from "@/lib/spoiler-free-strip-state";
+import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
+import { LiveScoresPrompt } from "@/components/live-scores-prompt";
 import { HomeDraftChrome } from "@/components/draft-scores-strip";
 import type { LeagueTriage } from "@/components/league-triage-card";
 import { excludeReleasedCoupleRows, homeStripChoice } from "@/lib/draft-scores";
@@ -132,17 +133,17 @@ export default async function Home() {
     }
   }
 
-  const spoilerFreeStrip = buildSpoilerFreeStripState({
+  const bannerWeeks = toBannerWeeks(groupedWeeks);
+  const { strip: spoilerFreeStrip, prompt: livePrompt, liveWindow } = buildLiveAirChrome({
     spoilerFreeMode: accountSettingsData.spoilerFreeMode,
     lastWatchedWeek: cutoff.lastWatchedWeek ?? 0,
     completedWeekNumbers: groupedWeeks.filter((week) => week.status === "completed").map((week) => week.week_number),
     revealingWeekNumber: revealing?.week.week_number ?? null,
     pendingRevealWeekNumber: cutoff.pendingRevealEpisode?.week_number ?? null,
-    draftReleaseWeekNumber: draftContext.release?.weekNumber ?? null,
-    draftNightActive: !!draftNight,
+    draftContext,
+    bannerWeeks,
   });
   const draftVisible = homeStripChoice(!!draftNight, !!spoilerFreeStrip) === "draft";
-  const spoilerStrip = draftVisible ? null : spoilerFreeStrip;
 
   const moduleInputs =
     summaries.length > 0
@@ -166,15 +167,7 @@ export default async function Home() {
   }));
 
   const episodeBannerInput: EpisodeBannerInput = {
-    weeks: groupedWeeks.map((week) => ({
-      weekNumber: week.week_number,
-      episodes: week.episodes.map((episode) => ({
-        airsAt: episode.airs_at,
-        durationMinutes: episode.duration_minutes ?? DEFAULT_EPISODE_DURATION_MINUTES,
-        completed: episode.status === "completed",
-        publishedAt: episode.results_published_at ?? null,
-      })),
-    })),
+    weeks: bannerWeeks,
     picksModuleOn: summaries.some((s) => s.curtainCallOn),
     curtainCallLockAtIso:
       summaries
@@ -185,7 +178,7 @@ export default async function Home() {
   const episodeBannerState = computeEpisodeBannerState(episodeBannerInput);
 
   const westWindow = episodeBannerState?.kind === "west_soon" || episodeBannerState?.kind === "west_watching";
-  const autoRefresh = !!revealing || westWindow;
+  const autoRefresh = !!revealing || westWindow || liveWindow;
 
   const recentActivity = buildRecentActivity({
     weeks: [...activityWeeks.values()],
@@ -210,7 +203,6 @@ export default async function Home() {
     <HomeDashboard
       leagues={leagues}
       recentActivity={recentActivity}
-      spoilerFreeStrip={spoilerStrip}
       episodeBanner={{ input: episodeBannerInput, initialState: episodeBannerState }}
     />
   );
@@ -257,6 +249,9 @@ export default async function Home() {
         </div>
       )}
 
+      {livePrompt && (
+        <LiveScoresPrompt {...livePrompt} spoilerFreeMode={accountSettingsData.spoilerFreeMode} />
+      )}
       <RevealAutoRefresh active={autoRefresh} />
       <FanBottomNav active="home" leagueId={firstLeagueId} />
     </div>

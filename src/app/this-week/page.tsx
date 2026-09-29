@@ -4,7 +4,9 @@ import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { HomeSpoilerChrome } from "@/components/spoiler-free-strip";
-import { buildSpoilerFreeStripState } from "@/lib/spoiler-free-strip-state";
+import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
+import { toBannerWeeks } from "@/lib/episode-banner";
+import { LiveScoresPrompt } from "@/components/live-scores-prompt";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
 import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
@@ -71,7 +73,7 @@ export default async function ThisWeekPage({
       .order("week_number", { ascending: false }),
     supabase
       .from("episodes")
-      .select("id, episode_number, week_id, airs_at, theme, status")
+      .select("id, episode_number, week_id, airs_at, duration_minutes, theme, status, results_published_at")
       .eq("season_id", activeSeasonId ?? ""),
   ]);
 
@@ -112,14 +114,14 @@ export default async function ThisWeekPage({
   const showResults = selectedMode === "results" || selectedMode === "scores";
   const selectedEpisodeIds = selectedWeek?.episodes.map((episode) => episode.id) ?? [];
 
-  const spoilerFreeStrip = buildSpoilerFreeStripState({
+  const { strip: spoilerFreeStrip, prompt: livePrompt, liveWindow } = buildLiveAirChrome({
     spoilerFreeMode: accountSettingsData.spoilerFreeMode,
     lastWatchedWeek: cutoff.lastWatchedWeek ?? 0,
     completedWeekNumbers: completedWeeks.map((week) => week.week_number),
     revealingWeekNumber: revealing?.week.week_number ?? null,
     pendingRevealWeekNumber: cutoff.pendingRevealEpisode?.week_number ?? null,
-    draftReleaseWeekNumber: draftContext.release?.weekNumber ?? null,
-    draftNightActive: !!draftContext.night,
+    draftContext,
+    bannerWeeks: toBannerWeeks(groupedWeeks),
   });
 
   const pendingReveal = cutoff.pendingRevealEpisode
@@ -382,7 +384,10 @@ export default async function ThisWeekPage({
         </div>
       )}
 
-      <RevealAutoRefresh active={revealingVisible} />
+      {livePrompt && (
+        <LiveScoresPrompt {...livePrompt} spoilerFreeMode={accountSettingsData.spoilerFreeMode} />
+      )}
+      <RevealAutoRefresh active={revealingVisible || liveWindow} />
       <FanBottomNav active="results" leagueId={firstLeagueId} />
     </div>
   );

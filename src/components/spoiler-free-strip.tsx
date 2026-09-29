@@ -22,9 +22,13 @@ import type { AccountSettingsData } from "@/lib/account-settings-data";
 
 // weekNumber is the latest week that can be unlocked; earlierWeeks are the
 // unmarked weeks before it, which marking a later week unlocks too.
+// Posting also shows with Spoiler-Free off (spoilerFree false), since a
+// live-posting week is gated for everyone until they opt in; draft_gap is
+// Spoiler-Free-agnostic for the same reason.
 export type SpoilerFreeStripState =
-  | { kind: "ready" | "posting"; weekNumber: number; earlierWeeks: number[] }
-  | { kind: "watching"; weekNumber: number };
+  | { kind: "ready" | "posting"; weekNumber: number; earlierWeeks: number[]; spoilerFree: boolean }
+  | { kind: "watching"; weekNumber: number }
+  | { kind: "draft_gap"; weekNumber: number; latestCouple: string | null };
 
 type MarkableState = Extract<SpoilerFreeStripState, { earlierWeeks: number[] }>;
 
@@ -67,6 +71,9 @@ export function SpoilerFreeStrip({ state }: { state: SpoilerFreeStripState }) {
         </p>
       </div>
     );
+  }
+  if (state.kind === "draft_gap") {
+    return <DraftGapStrip weekNumber={state.weekNumber} latestCouple={state.latestCouple} />;
   }
   return <MarkWatchedStrip state={state} />;
 }
@@ -112,7 +119,13 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
       <div className={STRIP_CLASSES}>
         <span className={cn(DOT_CLASSES, state.kind === "posting" && "animate-pulse")} aria-hidden />
         <p className="min-w-0 flex-1 truncate text-xs font-medium text-foreground/90">
-          <span className="font-semibold text-accent">Spoiler-Free</span> · {message}
+          {state.spoilerFree ? (
+            <>
+              <span className="font-semibold text-accent">Spoiler-Free</span> · {message}
+            </>
+          ) : (
+            message
+          )}
         </p>
         <Button size="xs" className={PILL_CLASSES} onClick={() => handleOpenChange(true)}>
           Mark Watched
@@ -180,5 +193,44 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+// After the East broadcast, while released drafts exist and the viewer hasn't
+// chosen Stay Updated or Mark Watched: drafts may be ahead of where they are.
+// Follow along is the same unlock as East Stay Updated, after which the amber
+// draft strip takes this one's place.
+
+function DraftGapStrip({ weekNumber, latestCouple }: { weekNumber: number; latestCouple: string | null }) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFollow() {
+    setError(null);
+    setPending(true);
+    const result = await markWatchedAndUnlockDrafts(weekNumber);
+    setPending(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <div className={cn(STRIP_CLASSES, "items-start")}>
+      <span className={cn(DOT_CLASSES, "mt-1.5")} aria-hidden />
+      <div className="min-w-0 flex-1 text-xs font-medium text-foreground/90">
+        <p className="truncate">
+          <span className="font-semibold text-accent">Draft scores available</span> · may be ahead of you
+        </p>
+        {latestCouple && <p className="truncate text-muted-foreground">Latest: {latestCouple}</p>}
+        {error && <p className="text-destructive">{error}</p>}
+      </div>
+      <Button size="xs" className={PILL_CLASSES} onClick={handleFollow} disabled={pending}>
+        {pending ? "Unlocking..." : "Follow Along"}
+      </Button>
+    </div>
   );
 }

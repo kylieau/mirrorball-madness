@@ -81,6 +81,52 @@ function westFeedState(weeks: BannerWeek[], now: Date): EpisodeBannerState | nul
   return null;
 }
 
+export type LiveAirPhase = { kind: "east" | "gap" | "west"; weekNumber: number };
+
+// Where tonight's broadcast is for everyone: the East live window, the gap
+// before the West feed, or the West window (8-10pm PT). Null otherwise.
+export function liveAirPhase(weeks: BannerWeek[], now: Date = new Date()): LiveAirPhase | null {
+  for (const week of weeks) {
+    for (const episode of week.episodes) {
+      const airs = new Date(episode.airsAt);
+      const eastEnd = new Date(airs.getTime() + episode.durationMinutes * 60 * 1000);
+      const westStart = pacificClockOnSameDay(airs, WEST_FEED_START_HOUR);
+      const westEnd = pacificClockOnSameDay(airs, WEST_FEED_END_HOUR);
+      if (now >= airs && now < eastEnd) return { kind: "east", weekNumber: week.weekNumber };
+      if (now >= eastEnd && now < westStart) return { kind: "gap", weekNumber: week.weekNumber };
+      if (now >= westStart && now < westEnd) return { kind: "west", weekNumber: week.weekNumber };
+    }
+  }
+  return null;
+}
+
+// True once every one of the week's episodes has finished its East broadcast.
+export function eastBroadcastEnded(weeks: BannerWeek[], weekNumber: number, now: Date = new Date()): boolean {
+  const week = weeks.find((w) => w.weekNumber === weekNumber);
+  if (!week || week.episodes.length === 0) return false;
+  return week.episodes.every(
+    (episode) => now.getTime() >= new Date(episode.airsAt).getTime() + episode.durationMinutes * 60 * 1000
+  );
+}
+
+// Shapes a season's grouped weeks for the banner and live-air helpers.
+export function toBannerWeeks(
+  weeks: {
+    week_number: number;
+    episodes: { airs_at: string; duration_minutes?: number | null; status: string; results_published_at?: string | null }[];
+  }[]
+): BannerWeek[] {
+  return weeks.map((week) => ({
+    weekNumber: week.week_number,
+    episodes: week.episodes.map((episode) => ({
+      airsAt: episode.airs_at,
+      durationMinutes: episode.duration_minutes ?? DEFAULT_EPISODE_DURATION_MINUTES,
+      completed: episode.status === "completed",
+      publishedAt: episode.results_published_at ?? null,
+    })),
+  }));
+}
+
 function isComplete(week: BannerWeek): boolean {
   return week.episodes.length > 0 && week.episodes.every((episode) => episode.completed);
 }
