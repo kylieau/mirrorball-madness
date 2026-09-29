@@ -25,6 +25,7 @@ export function buildSpoilerFreeStripState({
   draftNightActive,
   draftWeekEastEnded,
   latestReleasedCouple,
+  eastLiveWeekNumber,
 }: {
   spoilerFreeMode: boolean;
   lastWatchedWeek: number;
@@ -47,6 +48,8 @@ export function buildSpoilerFreeStripState({
   draftWeekEastEnded: boolean;
   // draftContext.latestReleasedCouple
   latestReleasedCouple: string | null;
+  // The week whose East broadcast is on air right now, else null.
+  eastLiveWeekNumber: number | null;
 }): SpoilerFreeStripState | null {
   // After the East broadcast, drafts may be ahead of a viewer who hasn't
   // chosen Stay Updated or Mark Watched; Follow along unlocks them.
@@ -73,6 +76,7 @@ export function buildSpoilerFreeStripState({
     return {
       ...stripWeek,
       spoilerFree: spoilerFreeMode,
+      eastLive: stripWeek.kind === "posting" && eastLiveWeekNumber === stripWeek.weekNumber,
       earlierWeeks: unmarkedWeeks.filter((week) => week < stripWeek.weekNumber),
     };
   }
@@ -157,6 +161,7 @@ export function buildLiveAirChrome({
       draftWeekEastEnded:
         draftReleaseWeekNumber != null && eastBroadcastEnded(bannerWeeks, draftReleaseWeekNumber, now),
       latestReleasedCouple: draftContext.latestReleasedCouple,
+      eastLiveWeekNumber: phase?.kind === "east" ? phase.weekNumber : null,
     }),
     prompt: buildLivePromptState({
       phase,

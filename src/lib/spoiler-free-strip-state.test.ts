@@ -12,6 +12,7 @@ const base = {
   draftUnlockedWeek: 0,
   draftWeekEastEnded: false,
   latestReleasedCouple: null as string | null,
+  eastLiveWeekNumber: null as number | null,
 };
 
 describe("buildSpoilerFreeStripState", () => {
@@ -22,7 +23,7 @@ describe("buildSpoilerFreeStripState", () => {
   it("still offers a posting week with Spoiler-Free off, without the Spoiler-Free label or earlier weeks", () => {
     expect(
       buildSpoilerFreeStripState({ ...base, spoilerFreeMode: false, lastWatchedWeek: 0, revealingWeekNumber: 3 })
-    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: false });
+    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: false, eastLive: false });
   });
 
   it("has no watching strip with Spoiler-Free off", () => {
@@ -46,8 +47,12 @@ describe("buildSpoilerFreeStripState", () => {
     }
   );
 
-  it("keeps the posting strip during the East broadcast", () => {
-    expect(buildSpoilerFreeStripState({ ...base, draftReleaseWeekNumber: 3 })).toMatchObject({ kind: "posting" });
+  it("keeps the posting strip during the East broadcast, offering Stay Updated instead of Mark Watched", () => {
+    expect(buildSpoilerFreeStripState({ ...base, draftReleaseWeekNumber: 3, eastLiveWeekNumber: 3 })).toMatchObject({
+      kind: "posting",
+      eastLive: true,
+    });
+    expect(buildSpoilerFreeStripState({ ...base, draftReleaseWeekNumber: 3 })).toMatchObject({ eastLive: false });
   });
 
   it("drops Follow along once the viewer chose Stay Updated or unlocked drafts", () => {
@@ -66,13 +71,14 @@ describe("buildSpoilerFreeStripState", () => {
       weekNumber: 3,
       earlierWeeks: [],
       spoilerFree: true,
+      eastLive: false,
     });
   });
 
   it("is posting when a week is mid-reveal, taking priority over a merely-pending one", () => {
     expect(
       buildSpoilerFreeStripState({ ...base, revealingWeekNumber: 3, pendingRevealWeekNumber: 4 })
-    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: true });
+    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: true, eastLive: false });
   });
 
   it("is posting when a draft is released ahead of the last watched week", () => {
@@ -81,6 +87,7 @@ describe("buildSpoilerFreeStripState", () => {
       weekNumber: 3,
       earlierWeeks: [],
       spoilerFree: true,
+      eastLive: false,
     });
   });
 
@@ -92,7 +99,7 @@ describe("buildSpoilerFreeStripState", () => {
         completedWeekNumbers: [1, 2],
         pendingRevealWeekNumber: 3,
       })
-    ).toEqual({ kind: "ready", weekNumber: 3, earlierWeeks: [1, 2], spoilerFree: true });
+    ).toEqual({ kind: "ready", weekNumber: 3, earlierWeeks: [1, 2], spoilerFree: true, eastLive: false });
   });
 
   it("is watching when a revealing week is behind the viewer, even though revealing isn't visible to them yet", () => {

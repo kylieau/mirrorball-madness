@@ -22,11 +22,14 @@ import type { AccountSettingsData } from "@/lib/account-settings-data";
 
 // weekNumber is the latest week that can be unlocked; earlierWeeks are the
 // unmarked weeks before it, which marking a later week unlocks too.
+// eastLive: the week is posting while its East broadcast is on air, so the
+// pill offers Stay Updated (unlock drafts) instead of Mark Watched, matching
+// the live-air prompt's grayed Mark Watched.
 // Posting also shows with Spoiler-Free off (spoilerFree false), since a
 // live-posting week is gated for everyone until they opt in; draft_gap is
 // Spoiler-Free-agnostic for the same reason.
 export type SpoilerFreeStripState =
-  | { kind: "ready" | "posting"; weekNumber: number; earlierWeeks: number[]; spoilerFree: boolean }
+  | { kind: "ready" | "posting"; weekNumber: number; earlierWeeks: number[]; spoilerFree: boolean; eastLive: boolean }
   | { kind: "watching"; weekNumber: number }
   | { kind: "draft_gap"; weekNumber: number; latestCouple: string | null };
 
@@ -112,6 +115,18 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
     router.refresh();
   }
 
+  async function handleStayUpdated() {
+    setError(null);
+    setPending(true);
+    const result = await markWatchedAndUnlockDrafts(state.weekNumber);
+    setPending(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
+  }
+
   const message = state.kind === "ready" ? `${weekLabel} results are in` : `${weekLabel} posting live`;
 
   return (
@@ -126,10 +141,17 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
           ) : (
             message
           )}
+          {state.eastLive && error && <span className="text-destructive"> · {error}</span>}
         </p>
-        <Button size="xs" className={PILL_CLASSES} onClick={() => handleOpenChange(true)}>
-          Mark Watched
-        </Button>
+        {state.eastLive ? (
+          <Button size="xs" className={PILL_CLASSES} onClick={handleStayUpdated} disabled={pending}>
+            {pending ? "Updating..." : "Stay Updated"}
+          </Button>
+        ) : (
+          <Button size="xs" className={PILL_CLASSES} onClick={() => handleOpenChange(true)}>
+            Mark Watched
+          </Button>
+        )}
       </div>
 
       <Sheet open={open} onOpenChange={handleOpenChange}>
