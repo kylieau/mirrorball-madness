@@ -119,6 +119,21 @@ export async function unlockGrandFinaleLate(
   return { error: null };
 }
 
+// Only closes an open, not-yet-submitted late entry -- the RPC itself
+// refuses to touch one the manager already used.
+export async function closeGrandFinaleLate(leagueId: string, managerId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("close_grand_finale_late", {
+    p_league_id: leagueId,
+    p_manager_id: managerId,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/leagues/${leagueId}`);
+  revalidatePath(`/leagues/${leagueId}/settings`);
+  return { error: null };
+}
+
 export async function demoteMember(
   leagueId: string,
   userId: string

@@ -16,6 +16,7 @@ import {
   percentToLateFactor,
   resolvedCoupleCount,
   scaleGrandFinaleLateFactors,
+  updateLateButtonLabel,
 } from "./grand-finale-late";
 
 describe("parseLateFactor", () => {
@@ -93,6 +94,8 @@ describe("late entry copy", () => {
   it("names the confirm button and Score History helper from the percent", () => {
     expect(allowLateButtonLabel(100)).toBe("Allow late entry");
     expect(allowLateButtonLabel(50)).toBe("Allow late entry · 50%");
+    expect(updateLateButtonLabel(100)).toBe("Update to 100%");
+    expect(updateLateButtonLabel(50)).toBe("Update to 50%");
     expect(lateScoreHistoryHelper(100)).toEqual({
       percentLabel: "100% of Grand Finale",
       detail: "(full credit).",

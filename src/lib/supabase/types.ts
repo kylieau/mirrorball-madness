@@ -1734,6 +1734,10 @@ export type Database = {
         }
       }
       cancel_account_deletion: { Args: never; Returns: undefined }
+      close_grand_finale_late: {
+        Args: { p_league_id: string; p_manager_id: string }
+        Returns: undefined
+      }
       create_league: {
         Args: {
           p_curtain_call_enabled?: boolean

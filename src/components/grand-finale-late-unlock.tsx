@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TriangleAlertIcon } from "lucide-react";
-import { unlockGrandFinaleLate } from "@/app/leagues/[id]/settings/actions";
+import { closeGrandFinaleLate, unlockGrandFinaleLate } from "@/app/leagues/[id]/settings/actions";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -15,6 +15,7 @@ import {
   lateUnlockWarning,
   managerInitials,
   parseLatePercent,
+  updateLateButtonLabel,
 } from "@/lib/grand-finale-late";
 
 export type LateMisser = {
@@ -55,11 +56,14 @@ export function GrandFinaleLateUnlock({
   const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [closingUserId, setClosingUserId] = useState<string | null>(null);
+  const [closeError, setCloseError] = useState<{ userId: string; message: string } | null>(null);
 
   if (!grandFinaleLocked) return null;
 
   const showMissed = canUnlock && missers.length > 0;
   const warning = lateUnlockWarning(resolvedCount);
+  const isEditing = !!misser?.lateUnlock;
   const parsed = parseLatePercent(percentText);
   const helper = lateScoreHistoryHelper(parsed ?? percent);
   const canConfirm = parsed !== null && (!warning || acknowledged) && !submitting;
@@ -87,8 +91,11 @@ export function GrandFinaleLateUnlock({
 
   function openFor(next: LateMisser) {
     setMisser(next);
-    setPercent(100);
-    setPercentText("100");
+    // Pre-fill the current percent when editing an already-open entry;
+    // default to 100 for a fresh one.
+    const startingPercent = next.lateUnlock ? latePercent(next.lateUnlock.lateFactor) : 100;
+    setPercent(startingPercent);
+    setPercentText(String(startingPercent));
     setAcknowledged(false);
     setError(null);
     setOpen(true);
@@ -108,6 +115,18 @@ export function GrandFinaleLateUnlock({
     router.refresh();
   }
 
+  async function handleClose(row: LateMisser) {
+    setClosingUserId(row.userId);
+    setCloseError(null);
+    const result = await closeGrandFinaleLate(leagueId, row.userId);
+    setClosingUserId(null);
+    if (result.error) {
+      setCloseError({ userId: row.userId, message: result.error });
+      return;
+    }
+    router.refresh();
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 border-y border-border py-2.5 text-xs">
@@ -122,25 +141,46 @@ export function GrandFinaleLateUnlock({
         <div>
           <p className="mb-2 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Missed the lock</p>
           <div className="flex flex-col gap-2">
-            {missers.map((row) => (
-              <div
-                key={row.userId}
-                className="flex items-center gap-2.5 rounded-xl border border-border bg-background/60 px-2.5 py-2.5"
-              >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/25 text-xs font-bold">
-                  {managerInitials(row.displayName)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{row.displayName}</span>
-                  <span className="block text-[11px] text-muted-foreground">{misserStatus(row)}</span>
-                </span>
-                {!row.lateUnlock && (
-                  <Button size="sm" className="rounded-full px-3" onClick={() => openFor(row)}>
-                    Allow late…
-                  </Button>
-                )}
-              </div>
-            ))}
+            {missers.map((row) => {
+              const openUnsubmitted = row.lateUnlock && !row.lateUnlock.submitted;
+              return (
+                <div key={row.userId} className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2.5 rounded-xl border border-border bg-background/60 px-2.5 py-2.5">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/25 text-xs font-bold">
+                      {managerInitials(row.displayName)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">{row.displayName}</span>
+                      <span className="block text-[11px] text-muted-foreground">{misserStatus(row)}</span>
+                    </span>
+                    {!row.lateUnlock && (
+                      <Button size="sm" className="rounded-full px-3" onClick={() => openFor(row)}>
+                        Allow late…
+                      </Button>
+                    )}
+                    {openUnsubmitted && (
+                      <div className="flex shrink-0 gap-1.5">
+                        <Button size="sm" variant="outline" className="rounded-full px-3" onClick={() => openFor(row)}>
+                          Edit %
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="rounded-full px-3 text-destructive"
+                          disabled={closingUserId === row.userId}
+                          onClick={() => void handleClose(row)}
+                        >
+                          {closingUserId === row.userId ? "Closing…" : "Close"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {closeError?.userId === row.userId && (
+                    <p className="px-1 text-xs text-destructive">{closeError.message}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">Commissioner / super-admin only · one-shot late entry</p>
         </div>
@@ -152,7 +192,9 @@ export function GrandFinaleLateUnlock({
           className="max-h-[92vh] gap-3 overflow-y-auto rounded-t-3xl px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
         >
           <SheetHeader className="px-0">
-            <SheetTitle className="font-heading text-xl font-semibold">Allow late entry</SheetTitle>
+            <SheetTitle className="font-heading text-xl font-semibold">
+              {isEditing ? "Edit late entry" : "Allow late entry"}
+            </SheetTitle>
             <SheetDescription className="sr-only">
               Choose how much of a full Grand Finale score this one-shot late entry earns.
             </SheetDescription>
@@ -235,7 +277,13 @@ export function GrandFinaleLateUnlock({
           )}
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button className="h-11 w-full text-base font-semibold" onClick={handleUnlock} disabled={!canConfirm}>
-            {submitting ? "Allowing…" : parsed !== null ? allowLateButtonLabel(parsed) : "Allow late entry"}
+            {submitting
+              ? "Saving…"
+              : parsed !== null
+                ? isEditing
+                  ? updateLateButtonLabel(parsed)
+                  : allowLateButtonLabel(parsed)
+                : "Allow late entry"}
           </Button>
           <Button
             variant="ghost"

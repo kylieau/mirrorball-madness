@@ -84,6 +84,10 @@ export function allowLateButtonLabel(percent: number): string {
   return percent === 100 ? "Allow late entry" : `Allow late entry · ${percent}%`;
 }
 
+export function updateLateButtonLabel(percent: number): string {
+  return `Update to ${percent}%`;
+}
+
 export function lateScoreHistoryHelper(percent: number): {
   percentLabel: string;
   detail: string;

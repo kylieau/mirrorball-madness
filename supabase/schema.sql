@@ -2814,7 +2814,9 @@ using (
 );
 
 -- Commissioner of this league, or a super admin in any league. A manager
--- cannot open their own window; the button lives on League Settings.
+-- cannot open their own window; the button lives on League Settings. Upserts
+-- on an existing, unsubmitted row so a commissioner can edit the percent
+-- before the manager uses it; a submitted entry is permanent.
 create function public.unlock_grand_finale_late(
   p_league_id uuid,
   p_manager_id uuid,
@@ -2876,10 +2878,7 @@ begin
   from public.grand_finale_late_unlocks
   where league_id = p_league_id and manager_id = p_manager_id;
 
-  if found then
-    if v_submitted is null then
-      raise exception 'Late Grand Finale is already open for this manager';
-    end if;
+  if found and v_submitted is not null then
     raise exception 'This manager already used their late Grand Finale entry';
   end if;
 
@@ -2893,18 +2892,51 @@ begin
     raise exception 'Confirm that resolved couples will not be paid';
   end if;
 
-  begin
-    insert into public.grand_finale_late_unlocks (league_id, manager_id, late_factor, unlocked_by)
-    values (p_league_id, p_manager_id, v_factor, auth.uid());
-  exception
-    when unique_violation then
-      raise exception 'Late Grand Finale is already open for this manager';
-  end;
+  insert into public.grand_finale_late_unlocks (league_id, manager_id, late_factor, unlocked_by)
+  values (p_league_id, p_manager_id, v_factor, auth.uid())
+  on conflict (league_id, manager_id) do update
+    set late_factor = excluded.late_factor,
+        unlocked_by = excluded.unlocked_by,
+        unlocked_at = now()
+    where public.grand_finale_late_unlocks.submitted_at is null;
 end;
 $$;
 
 revoke execute on function public.unlock_grand_finale_late(uuid, uuid, numeric, boolean) from public;
 grant execute on function public.unlock_grand_finale_late(uuid, uuid, numeric, boolean) to authenticated;
+
+-- Commissioner/super-admin can close an open, not-yet-used late entry --
+-- e.g. opened it by mistake, or the manager no longer needs it. A used
+-- (submitted) entry is permanent and can't be closed.
+create function public.close_grand_finale_late(
+  p_league_id uuid,
+  p_manager_id uuid
+)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  if not (
+    public.is_league_commissioner(p_league_id)
+    or exists (select 1 from public.profiles where id = auth.uid() and is_super_admin)
+  ) then
+    raise exception 'Only a commissioner or a super admin can close a late entry';
+  end if;
+
+  delete from public.grand_finale_late_unlocks
+  where league_id = p_league_id
+    and manager_id = p_manager_id
+    and submitted_at is null;
+
+  if not found then
+    raise exception 'No open late entry to close for this manager';
+  end if;
+end;
+$$;
+
+revoke execute on function public.close_grand_finale_late(uuid, uuid) from public;
+grant execute on function public.close_grand_finale_late(uuid, uuid) to authenticated;
 
 create function public.submit_grand_finale_prediction(p_league_id uuid, p_couple_ids uuid[])
 returns setof public.grand_finale_predictions
