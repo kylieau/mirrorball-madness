@@ -913,6 +913,7 @@ export function ResultsForm({
                   : draftSavedAt
                     ? `Draft saved ${draftSavedAgo}`
                     : "Not saved yet"}
+              {!canPublish && !seedingCorrection && " · A site admin reviews and publishes it."}
             </CardDescription>
           )}
         </CardHeader>
@@ -1235,44 +1236,36 @@ export function ResultsForm({
             </Card>
           )}
 
-          <div className={`fixed inset-x-0 z-30 ${BOTTOM_NAV_STACK_ABOVE}`}>
-            <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="hidden text-xs text-muted-foreground sm:block">
-                {canPublish
-                  ? published
+          {canPublish && (
+            <div className={`fixed inset-x-0 z-30 ${BOTTOM_NAV_STACK_ABOVE}`}>
+              <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="hidden text-xs text-muted-foreground sm:block">
+                  {published
                     ? "Publishing updates Results & Standings across every league immediately."
                     : scoresDraftedAt
                       ? "Draft scores are visible to fans who marked this week watched. They can still change until you publish."
-                      : "Publish each couple as their scores are in. Finish Week posts safe and eliminated."
-                  : "Your draft is saved for a site admin to review and publish."}
-              </p>
-              <div className="flex gap-2 sm:w-auto">
-                <Button
-                  variant="outline"
-                  className="flex-1 sm:flex-none"
-                  onClick={() => void flushDraft()}
-                  disabled={savingDraft || publishing || releasing}
-                >
-                  {savingDraft ? "Saving..." : "Save Draft"}
-                </Button>
-                {canPublish && !published && (
-                  <Button
-                    variant="outline"
-                    className="flex-1 sm:flex-none"
-                    onClick={() => void handleReleaseDraft()}
-                    disabled={savingDraft || publishing || releasing || !hasDraft}
-                  >
-                    {releasing ? "Saving..." : scoresDraftedAt ? "Withdraw Draft" : "Draft Scores"}
-                  </Button>
-                )}
-                {canPublish && published && (
-                  <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing || releasing}>
-                    {publishing ? "Publishing..." : "Publish Results"}
-                  </Button>
-                )}
+                      : "Publish each couple as their scores are in. Finish Week posts safe and eliminated."}
+                </p>
+                <div className="flex gap-2 sm:w-auto">
+                  {!published && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 sm:flex-none"
+                      onClick={() => void handleReleaseDraft()}
+                      disabled={savingDraft || publishing || releasing || !hasDraft}
+                    >
+                      {releasing ? "Saving..." : scoresDraftedAt ? "Withdraw Draft" : "Draft Scores"}
+                    </Button>
+                  )}
+                  {published && (
+                    <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing || releasing}>
+                      {publishing ? "Publishing..." : "Publish Results"}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </>
       )}
     </div>
