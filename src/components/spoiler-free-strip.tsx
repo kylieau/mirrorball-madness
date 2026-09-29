@@ -223,7 +223,7 @@ function DraftGapStrip({ weekNumber, latestCouple }: { weekNumber: number; lates
       <span className={cn(DOT_CLASSES, "mt-1.5")} aria-hidden />
       <div className="min-w-0 flex-1 text-xs font-medium text-foreground/90">
         <p className="truncate">
-          <span className="font-semibold text-accent">Draft scores available</span> · may be ahead of you
+          <span className="font-semibold text-accent">Draft scores available</span>
         </p>
         {latestCouple && <p className="truncate text-muted-foreground">Latest: {latestCouple}</p>}
         {error && <p className="text-destructive">{error}</p>}
