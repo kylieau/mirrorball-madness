@@ -1,7 +1,6 @@
 import { formatSignedPoints } from "@/lib/format-points";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CoupleName } from "@/components/couple-name";
-import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
 import { cn } from "cn";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasual } from "@/lib/format-week";
@@ -75,6 +74,8 @@ export function WeeklyResultsView({
 }) {
   const inJeopardy = new Set(inJeopardyCoupleIds ?? []);
   const episode = episodes[0];
+  // No button here — the SpoilerFreeStrip at the top of the page is the one
+  // control for marking a week watched; this card is context only.
   const pendingCard = pendingReveal ? (
     <Card>
       <CardHeader>
@@ -82,13 +83,10 @@ export function WeeklyResultsView({
           {formatEpisodeCasual(pendingReveal.weekNumber)}&apos;s results are ready
         </CardTitle>
         <CardDescription>
-          {pendingReveal.theme ? `${pendingReveal.theme}. ` : ""}Mark it as watched once you&apos;ve caught up
-          to see dances, scores, and who went home.
+          {pendingReveal.theme ? `${pendingReveal.theme}. ` : ""}Mark it as watched from the banner above to see
+          dances, scores, and who went home.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <MarkWeekWatchedButton weekNumber={pendingReveal.weekNumber} />
-      </CardContent>
     </Card>
   ) : null;
 

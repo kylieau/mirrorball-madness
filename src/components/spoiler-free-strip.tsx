@@ -10,7 +10,7 @@
 // week so the newly revealed episode is the one on screen; a week still being
 // posted stays on the page.
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
@@ -37,17 +37,20 @@ const DOT_CLASSES = "size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_0_2px
 
 const PILL_CLASSES = "h-6 shrink-0 rounded-full px-2.5 text-[11px] font-bold";
 
-// Sticky wordmark + avatar, then the strip. The Home title stays in page flow
-// and scrolls away underneath. Rendered only while there is a week to unlock.
+// Sticky wordmark + avatar, then the strip. The page's own title stays in
+// page flow and scrolls away underneath. Rendered only while there is a
+// week to unlock. Shared by every page that mounts the strip (Home,
+// Results, the league hub), not Home-specific despite the name.
 export function HomeSpoilerChrome({
   state,
   email,
+  actionSlot,
   ...accountSettingsData
-}: AccountSettingsData & { email: string; state: SpoilerFreeStripState }) {
+}: AccountSettingsData & { email: string; state: SpoilerFreeStripState; actionSlot?: ReactNode }) {
   return (
     <div className="sticky top-0 z-30 -mx-4 bg-background pt-[env(safe-area-inset-top)]">
       <div className="px-4 py-2">
-        <TopBar {...accountSettingsData} email={email} />
+        <TopBar {...accountSettingsData} email={email} actionSlot={actionSlot} />
       </div>
       <SpoilerFreeStrip state={state} />
     </div>

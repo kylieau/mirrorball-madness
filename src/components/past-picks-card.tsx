@@ -1,6 +1,5 @@
 import { formatSignedPoints } from "@/lib/format-points";
 import { CoupleName } from "@/components/couple-name";
-import { MarkWeekWatchedButton } from "@/components/mark-week-watched-button";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import {
   collapsePickRows,
@@ -129,12 +128,10 @@ function ResultRows({
 }
 
 export function PastPicksRecap({
-  episodeWeekNumber,
   locked,
   comparison,
   coupleDisplayNames,
 }: {
-  episodeWeekNumber: number;
   locked: boolean;
   comparison: PastPicksComparison | null;
   coupleDisplayNames: Record<string, CoupleNameParts>;
@@ -142,8 +139,7 @@ export function PastPicksRecap({
   if (locked || !comparison) {
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">Mark as watched to see how you did</p>
-        <MarkWeekWatchedButton weekNumber={episodeWeekNumber} />
+        <p className="text-sm text-muted-foreground">Mark as watched from the banner above to see how you did</p>
       </div>
     );
   }

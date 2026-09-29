@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { LeagueSwitcher, type SwitcherLeague } from "@/components/league-switcher";
 import { ScrollRevealBar } from "@/components/scroll-reveal-bar";
 import { SlimTopBar, TopBar } from "@/components/top-bar";
+import { HomeSpoilerChrome, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
 import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
@@ -22,6 +23,7 @@ export function LeagueHeader({
   switcherLeagues,
   accountSettingsData,
   viewerEmail,
+  spoilerFreeStrip,
 }: {
   leagueId: string;
   danceCardOn: boolean;
@@ -33,6 +35,10 @@ export function LeagueHeader({
   switcherLeagues: SwitcherLeague[];
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
+  // Same strip as Home/Results; when present it takes over as the sticky
+  // chrome (wordmark + avatar + strip) and the scroll-triggered compact bar
+  // is skipped — one sticky mechanism at a time, matching Home exactly.
+  spoilerFreeStrip: SpoilerFreeStripState | null;
 }) {
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") ?? "yourpicks";
@@ -40,47 +46,62 @@ export function LeagueHeader({
   const currentPath = `/leagues/${leagueId}?tab=${activeTab}`;
   const leagueSettingsHref = `/leagues/${leagueId}/settings?from=${encodeURIComponent(currentPath)}`;
 
+  const recastAction =
+    danceCardOn &&
+    waiversOn && (
+      <Button
+        render={<Link href={`/leagues/${leagueId}/waivers`} />}
+        nativeButton={false}
+        variant="outline"
+        size="sm"
+      >
+        Recast
+      </Button>
+    );
+
+  const pageHeader = (
+    <PageHeader title={title}>
+      {switcherLeagues.length > 1 && (
+        <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
+      )}
+    </PageHeader>
+  );
+
   return (
     <>
-      <TopBar
-        {...accountSettingsData}
-        email={viewerEmail}
-        actionSlot={
-          danceCardOn &&
-          waiversOn && (
-            <Button
-              render={<Link href={`/leagues/${leagueId}/waivers`} />}
-              nativeButton={false}
-              variant="outline"
-              size="sm"
-            >
-              Recast
-            </Button>
-          )
-        }
-      />
-
-      <ScrollRevealBar
-        bar={
-          <SlimTopBar
+      {spoilerFreeStrip ? (
+        <>
+          <HomeSpoilerChrome
+            key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
             {...accountSettingsData}
             email={viewerEmail}
-            left={
-              switcherLeagues.length > 1 ? (
-                <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
-              ) : (
-                <span className="font-heading text-lg font-semibold">{title}</span>
-              )
-            }
+            state={spoilerFreeStrip}
+            actionSlot={recastAction}
           />
-        }
-      >
-        <PageHeader title={title}>
-          {switcherLeagues.length > 1 && (
-            <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
-          )}
-        </PageHeader>
-      </ScrollRevealBar>
+          {pageHeader}
+        </>
+      ) : (
+        <>
+          <TopBar {...accountSettingsData} email={viewerEmail} actionSlot={recastAction} />
+          <ScrollRevealBar
+            bar={
+              <SlimTopBar
+                {...accountSettingsData}
+                email={viewerEmail}
+                left={
+                  switcherLeagues.length > 1 ? (
+                    <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} activeTab={activeTab} />
+                  ) : (
+                    <span className="font-heading text-lg font-semibold">{title}</span>
+                  )
+                }
+              />
+            }
+          >
+            {pageHeader}
+          </ScrollRevealBar>
+        </>
+      )}
 
       {justCreated && canEdit && (
         <Card className="border-primary">

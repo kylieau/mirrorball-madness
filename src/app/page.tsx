@@ -11,10 +11,11 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { computeEpisodeBannerState, DEFAULT_EPISODE_DURATION_MINUTES, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
-import { HomeSpoilerChrome, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
+import { HomeSpoilerChrome } from "@/components/spoiler-free-strip";
+import { buildSpoilerFreeStripState } from "@/lib/spoiler-free-strip-state";
 import { HomeDraftChrome } from "@/components/draft-scores-strip";
 import type { LeagueTriage } from "@/components/league-triage-card";
-import { excludeReleasedCoupleRows, homeStripChoice, postingWeekNumber } from "@/lib/draft-scores";
+import { excludeReleasedCoupleRows, homeStripChoice } from "@/lib/draft-scores";
 import type { ModuleStackInput } from "@/lib/league-triage";
 import { loadModuleStackInputs } from "@/lib/league-module-stack-data";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
@@ -131,32 +132,15 @@ export default async function Home() {
     }
   }
 
-  const unmarkedWeeks = groupedWeeks
-    .filter((week) => week.status === "completed" && week.week_number > (cutoff.lastWatchedWeek ?? 0))
-    .map((week) => week.week_number)
-    .sort((a, b) => a - b);
-  const lastWatchedWeek = cutoff.lastWatchedWeek ?? 0;
-  const postingWeek = postingWeekNumber({
-    lastWatchedWeek,
+  const spoilerFreeStrip = buildSpoilerFreeStripState({
+    spoilerFreeMode: accountSettingsData.spoilerFreeMode,
+    lastWatchedWeek: cutoff.lastWatchedWeek ?? 0,
+    completedWeekNumbers: groupedWeeks.filter((week) => week.status === "completed").map((week) => week.week_number),
     revealingWeekNumber: revealing?.week.week_number ?? null,
+    pendingRevealWeekNumber: cutoff.pendingRevealEpisode?.week_number ?? null,
     draftReleaseWeekNumber: draftContext.release?.weekNumber ?? null,
+    draftNightActive: !!draftNight,
   });
-  const stripWeek = postingWeek
-    ? { kind: "posting" as const, weekNumber: postingWeek }
-    : cutoff.pendingRevealEpisode
-      ? { kind: "ready" as const, weekNumber: cutoff.pendingRevealEpisode.week_number }
-      : null;
-  const watchedDraft =
-    !!draftContext.release && lastWatchedWeek >= draftContext.release.weekNumber && !draftNight;
-  const spoilerFreeStrip: SpoilerFreeStripState | null = !accountSettingsData.spoilerFreeMode
-    ? null
-    : stripWeek
-      ? { ...stripWeek, earlierWeeks: unmarkedWeeks.filter((week) => week < stripWeek.weekNumber) }
-      : revealing
-        ? { kind: "watching", weekNumber: revealing.week.week_number }
-        : watchedDraft
-          ? { kind: "watching", weekNumber: draftContext.release!.weekNumber }
-          : null;
   const draftVisible = homeStripChoice(!!draftNight, !!spoilerFreeStrip) === "draft";
   const spoilerStrip = draftVisible ? null : spoilerFreeStrip;
 

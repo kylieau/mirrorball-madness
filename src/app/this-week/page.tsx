@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
+import { HomeSpoilerChrome } from "@/components/spoiler-free-strip";
+import { buildSpoilerFreeStripState } from "@/lib/spoiler-free-strip-state";
+import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
 import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
 import { PageHeader } from "@/components/page-header";
@@ -89,13 +92,10 @@ export default async function ThisWeekPage({
   // finale is what that means here, per Schedule's own theme naming.
   const finaleWeekNumber = groupedWeeks.find((week) => week.is_finale)?.week_number ?? null;
 
-  const cutoff = await resolveSpoilerCutoff(
-    supabase,
-    user.id,
-    activeSeasonId ?? null,
-    accountSettingsData.spoilerFreeMode,
-    completedWeeks
-  );
+  const [cutoff, draftContext] = await Promise.all([
+    resolveSpoilerCutoff(supabase, user.id, activeSeasonId ?? null, accountSettingsData.spoilerFreeMode, completedWeeks),
+    loadDraftScoreContext(supabase, user.id),
+  ]);
 
   // Carousel = spoiler-visible completed weeks + upcoming/locked for a
   // theme peek. ?week= honors that list; an unrecognized or unwatched
@@ -111,6 +111,16 @@ export default async function ThisWeekPage({
   const neighbors = selectedWeekId ? adjacentThisWeekWeeks(carouselWeeks, selectedWeekId) : { prev: null, next: null };
   const showResults = selectedMode === "results" || selectedMode === "scores";
   const selectedEpisodeIds = selectedWeek?.episodes.map((episode) => episode.id) ?? [];
+
+  const spoilerFreeStrip = buildSpoilerFreeStripState({
+    spoilerFreeMode: accountSettingsData.spoilerFreeMode,
+    lastWatchedWeek: cutoff.lastWatchedWeek ?? 0,
+    completedWeekNumbers: completedWeeks.map((week) => week.week_number),
+    revealingWeekNumber: revealing?.week.week_number ?? null,
+    pendingRevealWeekNumber: cutoff.pendingRevealEpisode?.week_number ?? null,
+    draftReleaseWeekNumber: draftContext.release?.weekNumber ?? null,
+    draftNightActive: !!draftContext.night,
+  });
 
   const pendingReveal = cutoff.pendingRevealEpisode
     ? { weekNumber: cutoff.pendingRevealEpisode.week_number, theme: cutoff.pendingRevealEpisode.theme }
@@ -266,88 +276,111 @@ export default async function ThisWeekPage({
     });
   }
 
-  return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
-      <TopBar {...accountSettingsData} email={user.email ?? ""} />
+  const pageHeader = (
+    <PageHeader title="Results">
+      {selectedWeek && (
+        <EpisodeCarousel
+          weekNumber={selectedWeek.week_number}
+          theme={selectedWeek.theme}
+          nightsLabel={selectedWeek.nightsLabel}
+          prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
+          nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
+        />
+      )}
+    </PageHeader>
+  );
 
-      <ScrollRevealBar
-        className="-mb-4"
-        bar={
-          <SlimTopBar
+  const resultsContent = (
+    <div className={BOTTOM_NAV_CLEARANCE}>
+      {selectedMode === "peek" && selectedWeek ? (
+        <div>
+          {pendingReveal && (
+            <div className="mb-4">
+              <WeeklyResultsView
+                episodes={[]}
+                episodeResults={[]}
+                danceScores={[]}
+                danceStyles={danceStyles ?? []}
+                couples={flatCouples}
+                coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
+                pendingReveal={pendingReveal}
+              />
+            </div>
+          )}
+          <ThisWeekThemePeek theme={selectedWeek.theme} />
+        </div>
+      ) : (
+        <WeeklyResultsView
+          episodes={
+            showResults && selectedWeek
+              ? selectedWeek.episodes.map((episode) => ({
+                  id: episode.id,
+                  week_number: selectedWeek.week_number,
+                  airs_at: episode.airs_at,
+                  theme: episode.theme,
+                  is_finale: selectedWeek.is_finale,
+                }))
+              : []
+          }
+          episodeResults={episodeResults ?? []}
+          inJeopardyCoupleIds={[...new Set((inJeopardyRows ?? []).map((row) => row.couple_id))]}
+          danceScores={danceScores ?? []}
+          danceStyles={danceStyles ?? []}
+          couples={flatCouples}
+          coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
+          leaguesByCouple={leaguesByCouple}
+          pendingReveal={pendingReveal}
+          scoresOnly={selectedMode === "scores"}
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col px-4">
+      {spoilerFreeStrip ? (
+        <>
+          <HomeSpoilerChrome
+            key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
             {...accountSettingsData}
             email={user.email ?? ""}
-            left={
-              selectedWeek ? (
-                <EpisodeCarousel
-                  weekNumber={selectedWeek.week_number}
-                  theme={selectedWeek.theme}
-                  prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
-                  nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
-                  compact
-                />
-              ) : (
-                <span className="font-heading text-lg font-semibold">Results</span>
-              )
-            }
+            state={spoilerFreeStrip}
           />
-        }
-      >
-        <PageHeader title="Results">
-          {selectedWeek && (
-            <EpisodeCarousel
-              weekNumber={selectedWeek.week_number}
-              theme={selectedWeek.theme}
-              nightsLabel={selectedWeek.nightsLabel}
-              prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
-              nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
-            />
-          )}
-        </PageHeader>
-      </ScrollRevealBar>
-
-      <div className={BOTTOM_NAV_CLEARANCE}>
-        {selectedMode === "peek" && selectedWeek ? (
-          <div>
-            {pendingReveal && (
-              <div className="mb-4">
-                <WeeklyResultsView
-                  episodes={[]}
-                  episodeResults={[]}
-                  danceScores={[]}
-                  danceStyles={danceStyles ?? []}
-                  couples={flatCouples}
-                  coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
-                  pendingReveal={pendingReveal}
-                />
-              </div>
-            )}
-            <ThisWeekThemePeek theme={selectedWeek.theme} />
+          <div className="flex flex-col gap-4 pt-4">
+            {pageHeader}
+            {resultsContent}
           </div>
-        ) : (
-          <WeeklyResultsView
-            episodes={
-              showResults && selectedWeek
-                ? selectedWeek.episodes.map((episode) => ({
-                    id: episode.id,
-                    week_number: selectedWeek.week_number,
-                    airs_at: episode.airs_at,
-                    theme: episode.theme,
-                    is_finale: selectedWeek.is_finale,
-                  }))
-                : []
+        </>
+      ) : (
+        <div className="flex flex-col gap-4 py-8">
+          <TopBar {...accountSettingsData} email={user.email ?? ""} />
+          <ScrollRevealBar
+            className="-mb-4"
+            bar={
+              <SlimTopBar
+                {...accountSettingsData}
+                email={user.email ?? ""}
+                left={
+                  selectedWeek ? (
+                    <EpisodeCarousel
+                      weekNumber={selectedWeek.week_number}
+                      theme={selectedWeek.theme}
+                      prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
+                      nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
+                      compact
+                    />
+                  ) : (
+                    <span className="font-heading text-lg font-semibold">Results</span>
+                  )
+                }
+              />
             }
-            episodeResults={episodeResults ?? []}
-            inJeopardyCoupleIds={[...new Set((inJeopardyRows ?? []).map((row) => row.couple_id))]}
-            danceScores={danceScores ?? []}
-            danceStyles={danceStyles ?? []}
-            couples={flatCouples}
-            coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
-            leaguesByCouple={leaguesByCouple}
-            pendingReveal={pendingReveal}
-            scoresOnly={selectedMode === "scores"}
-          />
-        )}
-      </div>
+          >
+            {pageHeader}
+          </ScrollRevealBar>
+          {resultsContent}
+        </div>
+      )}
 
       <RevealAutoRefresh active={revealingVisible} />
       <FanBottomNav active="results" leagueId={firstLeagueId} />

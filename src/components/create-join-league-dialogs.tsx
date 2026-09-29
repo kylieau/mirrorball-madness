@@ -33,17 +33,9 @@ export function CreateJoinLeagueDialogs({
   quiet?: boolean;
 }) {
   return (
-    <div className={quiet ? "flex items-center gap-4" : stacked ? "flex flex-col items-stretch gap-1.5" : "flex gap-2"}>
+    <div className={quiet ? "flex items-center gap-2" : stacked ? "flex flex-col items-stretch gap-1.5" : "flex gap-2"}>
       <Dialog>
-        <DialogTrigger
-          render={
-            <Button
-              size={quiet ? "sm" : "xs"}
-              variant={quiet ? "ghost" : "default"}
-              className={quiet ? "h-auto px-0 text-muted-foreground hover:bg-transparent hover:text-foreground" : undefined}
-            />
-          }
-        >
+        <DialogTrigger render={<Button size="xs" variant="default" />}>
           {quiet ? "Create a League" : "+ Create a League"}
         </DialogTrigger>
         <DialogContent>
@@ -86,15 +78,7 @@ export function CreateJoinLeagueDialogs({
       </Dialog>
 
       <Dialog>
-        <DialogTrigger
-          render={
-            <Button
-              variant={quiet ? "ghost" : "outline"}
-              size={quiet ? "sm" : "xs"}
-              className={quiet ? "h-auto px-0 text-muted-foreground hover:bg-transparent hover:text-foreground" : undefined}
-            />
-          }
-        >
+        <DialogTrigger render={<Button variant="outline" size="xs" />}>
           {quiet ? "Join a League" : "Join with Code"}
         </DialogTrigger>
         <DialogContent>

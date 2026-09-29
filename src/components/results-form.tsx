@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Dialog,
   DialogContent,
@@ -848,36 +849,64 @@ export function ResultsForm({
           ))}
         </fieldset>
 
-        {!published && !locked && (
+        {!published && (
           <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
             <div className="flex flex-wrap items-center gap-2">
-              {releasedCoupleIds.has(c.id) ? (
+              {locked ? (
                 <>
-                  <Badge>Drafted</Badge>
+                  <Badge>Posted</Badge>
                   <Button
                     size="xs"
                     variant="ghost"
                     className="text-destructive"
-                    disabled={releasing}
-                    onClick={() => void handleWithdrawDraftCouple(c.id)}
+                    disabled={revealBusy}
+                    onClick={() => void handleUndoReveal(c.id)}
                   >
-                    Withdraw
+                    {undoLeft > 0 ? `Undo · ${undoLeft}s` : "Un-Post"}
                   </Button>
                 </>
               ) : (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  disabled={releasing || !row.dances.some((d) => Object.values(d.scores).some((v) => v !== ""))}
-                  onClick={() => void handleReleaseDraftCouple(c.id)}
-                >
-                  {releasing ? "Saving..." : "Save as Draft Score"}
-                </Button>
+                <>
+                  {releasedCoupleIds.has(c.id) ? (
+                    <>
+                      <Badge>Drafted</Badge>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        className="text-destructive"
+                        disabled={releasing}
+                        onClick={() => void handleWithdrawDraftCouple(c.id)}
+                      >
+                        Withdraw
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={releasing || !row.dances.some((d) => Object.values(d.scores).some((v) => v !== ""))}
+                      onClick={() => void handleReleaseDraftCouple(c.id)}
+                    >
+                      {releasing ? "Saving..." : "Save as Draft Score"}
+                    </Button>
+                  )}
+                  {publishPerCouple && (
+                    <Button
+                      size="xs"
+                      disabled={!!publishBlocker || savingDraft || revealBusy}
+                      onClick={() => void handlePublishCouple(c.id)}
+                    >
+                      {revealBusy ? "Publishing..." : "Publish"}
+                    </Button>
+                  )}
+                </>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              Draft stays on this couple until you publish. In progress → Drafted → Published.
-            </p>
+            {!locked && (
+              <p className="text-[11px] text-muted-foreground">
+                Draft stays on this couple until you publish. In progress → Drafted → Published.
+              </p>
+            )}
           </div>
         )}
 
@@ -895,39 +924,6 @@ export function ResultsForm({
               <>
                 <Badge>Editing</Badge>
                 <p className="text-[11px] text-muted-foreground">Changes apply on the next Publish Results.</p>
-              </>
-            )}
-          </div>
-        )}
-
-        {publishPerCouple && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-            {locked ? (
-              <>
-                <Badge>Posted</Badge>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  className="text-destructive"
-                  disabled={revealBusy}
-                  onClick={() => void handleUndoReveal(c.id)}
-                >
-                  {undoLeft > 0 ? `Undo · ${undoLeft}s` : "Un-Post"}
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button size="sm" variant="outline" disabled={savingDraft || revealBusy} onClick={() => void flushDraft()}>
-                  {savingDraft ? "Saving..." : "Save"}
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={!!publishBlocker || savingDraft || revealBusy}
-                  onClick={() => void handlePublishCouple(c.id)}
-                >
-                  {revealBusy ? "Publishing..." : "Publish"}
-                </Button>
-                {publishBlocker && <p className="text-xs text-muted-foreground">{publishBlocker}</p>}
               </>
             )}
           </div>
@@ -1057,8 +1053,56 @@ export function ResultsForm({
               </SelectContent>
             </Select>
           )}
+          {selectedEpisode && !seedingCorrection && (
+            <div className="mt-2 flex items-baseline gap-2 text-sm">
+              <span className="text-xs text-muted-foreground">Air Date</span>
+              <span>
+                {new Date(selectedEpisode.airs_at).toLocaleDateString(undefined, {
+                  month: "numeric",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+                ,{" "}
+                {new Date(selectedEpisode.airs_at).toLocaleTimeString(undefined, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  timeZoneName: "short",
+                })}
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {eliminationOrder.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Season Elimination Order</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            {/* Displayed winner-first, same convention as Grand Finale's own
+                order list: "1." at the winner (the end of eliminationOrder,
+                which stays elimination-ascending), counting up toward the
+                first couple eliminated at the bottom (highest number). */}
+            {[...eliminationOrder].reverse().map((c, i) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between border-t border-border py-1.5 text-sm first:border-t-0"
+              >
+                <span>
+                  {i + 1}.{" "}
+                  <CoupleName {...(allCoupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name })} />
+                </span>
+                <span className="text-muted-foreground">
+                  {c.status === "winner" || c.status === "runner_up" || c.status === "third_place"
+                    ? STATUS_LABELS[c.status as StatusValue]
+                    : formatEpisodeCasual(c.elimination_week!)}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {selectedEpisode && seedingCorrection && (
         <p className="text-sm text-muted-foreground">Loading this week&apos;s published results…</p>
@@ -1087,29 +1131,6 @@ export function ResultsForm({
               </p>
             </div>
           )}
-          <Card>
-            <CardHeader>
-              <CardTitle>Episode Details</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-1">
-                <Label className="text-xs text-muted-foreground">Air Date</Label>
-                <p className="text-sm">{new Date(selectedEpisode.airs_at).toLocaleString()}</p>
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label className="text-xs text-muted-foreground">Theme</Label>
-                <p className="text-sm">{selectedEpisode.theme ?? "—"}</p>
-              </div>
-              <p className="text-xs text-muted-foreground sm:col-span-2">
-                Enter raw judges&apos; scores — each league&apos;s Judges&apos; Score Multiplier
-                applies automatically once results are published. To add a score box
-                (including a one-off guest), use Settings. Archive them there when
-                they&apos;re done so they don&apos;t keep appearing as empty boxes. Leave a
-                box blank on weeks they didn&apos;t judge.
-              </p>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
@@ -1193,50 +1214,62 @@ export function ResultsForm({
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>{published ? "Outcomes" : "Finish Week"}</CardTitle>
-              <CardDescription className="text-xs">
-                Mark eliminations and anything else that happened, then{" "}
-                {published ? "publish the correction" : "finish the week"}. Tick In Jeopardy for couples the show
-                called down who stayed. That list is what Curtain Call uses — it is not taken from the scores.
-                {publishPerCouple && revealedCoupleIds.size > 0 && unpostedCount > 0
-                  ? ` ${unpostedCount} ${unpostedCount === 1 ? "couple is" : "couples are"} still to publish.`
-                  : ""}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-left text-muted-foreground">
-                      <th className="sticky left-0 z-10 bg-card py-1 pr-2 font-medium">Couple</th>
-                      <th className="px-1 font-medium">Status</th>
-                      <th className="px-2 text-center font-medium">In Jeopardy</th>
-                      {judgesSaveAvailable && <th className="px-2 text-center font-medium">Judges&apos; Save</th>}
-                      <th className="px-2 text-center font-medium">Immunity</th>
-                      <th className="px-1 font-medium">Bonus</th>
-                    </tr>
-                  </thead>
-                  <tbody>{episodeCouples.map((c) => renderOutcomeRow(c))}</tbody>
-                </table>
-              </div>
-              {episodeCouples.some((c) => (rows[c.id] ?? emptyRow()).outcome === "bye") && (
-                <p className="text-xs text-muted-foreground">
-                  Did Not Dance is for a couple still in the cast tonight who didn&apos;t perform (an odd-couple bye, a
-                  mid-competition injury): they stay active and earn no survival bonus this week. For a couple not
-                  appearing this broadcast at all, use &quot;Who&apos;s Performing?&quot; under Edit Scheduled Episode.
-                </p>
-              )}
-              {publishPerCouple && (
-                <Button
-                  className="self-start"
-                  onClick={handleFinishWeek}
-                  disabled={savingDraft || publishing || unpostedCount > 0}
-                >
-                  {publishing ? "Finishing..." : "Finish Week"}
-                </Button>
-              )}
-            </CardContent>
+            <Accordion defaultValue={[]}>
+              <AccordionItem value="finish-week">
+                <AccordionTrigger className="px-(--card-spacing) pt-(--card-spacing) hover:no-underline">
+                  <CardHeader className="flex-1 p-0">
+                    <CardTitle>{published ? "Outcomes" : "Finish Week"}</CardTitle>
+                    <CardDescription className="text-xs">
+                      Mark eliminations and anything else that happened, then{" "}
+                      {published ? "publish the correction" : "finish the week"}. Tick In Jeopardy for couples the
+                      show called down who stayed. That list is what Curtain Call uses — it is not taken from the
+                      scores.
+                      {publishPerCouple && revealedCoupleIds.size > 0 && unpostedCount > 0
+                        ? ` ${unpostedCount} ${unpostedCount === 1 ? "couple is" : "couples are"} still to publish.`
+                        : ""}
+                    </CardDescription>
+                  </CardHeader>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <CardContent className="flex flex-col gap-3">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-muted-foreground">
+                            <th className="sticky left-0 z-10 bg-card py-1 pr-2 font-medium">Couple</th>
+                            <th className="px-1 font-medium">Status</th>
+                            <th className="px-2 text-center font-medium">In Jeopardy</th>
+                            {judgesSaveAvailable && (
+                              <th className="px-2 text-center font-medium">Judges&apos; Save</th>
+                            )}
+                            <th className="px-2 text-center font-medium">Immunity</th>
+                            <th className="px-1 font-medium">Bonus</th>
+                          </tr>
+                        </thead>
+                        <tbody>{episodeCouples.map((c) => renderOutcomeRow(c))}</tbody>
+                      </table>
+                    </div>
+                    {episodeCouples.some((c) => (rows[c.id] ?? emptyRow()).outcome === "bye") && (
+                      <p className="text-xs text-muted-foreground">
+                        Did Not Dance is for a couple still in the cast tonight who didn&apos;t perform (an
+                        odd-couple bye, a mid-competition injury): they stay active and earn no survival bonus this
+                        week. For a couple not appearing this broadcast at all, use &quot;Who&apos;s
+                        Performing?&quot; under Edit Scheduled Episode.
+                      </p>
+                    )}
+                    {publishPerCouple && (
+                      <Button
+                        className="self-start"
+                        onClick={handleFinishWeek}
+                        disabled={savingDraft || publishing || unpostedCount > 0}
+                      >
+                        {publishing ? "Finishing..." : "Finish Week"}
+                      </Button>
+                    )}
+                  </CardContent>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </Card>
 
           <Dialog open={confirmNoElimination} onOpenChange={setConfirmNoElimination}>
@@ -1268,117 +1301,108 @@ export function ResultsForm({
           </Dialog>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Special Moments</CardTitle>
-              <CardDescription>Perfect scores and Judges&apos; Save are detected automatically.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                {perfectScorePills.map((p, i) => {
-                  const couple = namedCouple(p.coupleId);
-                  return (
-                    <Badge key={i} variant="secondary">
-                      ⭐ Perfect Score — {couple ? <CoupleName {...coupleParts(couple)} /> : null}
-                    </Badge>
-                  );
-                })}
-                {judgesSavePills.map((coupleId) => {
-                  const couple = namedCouple(coupleId);
-                  return (
-                    <Badge key={coupleId} variant="secondary">
-                      🛡️ Judges&apos; Save — {couple ? <CoupleName {...coupleParts(couple)} /> : null}
-                    </Badge>
-                  );
-                })}
-                {customMoments.map((m) => (
-                  <Badge key={m.id} variant="outline" className="gap-1.5">
-                    {m.label}
-                    {m.coupleId && (
-                      <>
-                        {" — "}
-                        {(() => {
-                          const c = namedCouple(m.coupleId);
-                          return c ? <CoupleName {...coupleParts(c)} /> : null;
-                        })()}
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      aria-label="Remove"
-                      className="ml-1 text-muted-foreground hover:text-foreground"
-                      onClick={() => handleRemoveCustomMoment(m.id)}
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ))}
-                {perfectScorePills.length === 0 && judgesSavePills.length === 0 && customMoments.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Nothing yet this week.</p>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">Custom Event</Label>
-                  <Input
-                    className="w-48"
-                    placeholder="e.g. Dance-off win"
-                    value={customMomentLabel}
-                    onChange={(e) => setCustomMomentLabel(e.target.value)}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">Couple (Optional)</Label>
-                  <Select
-                    items={{ "": "—", ...Object.fromEntries(episodeCouples.map((c) => [c.id, coupleNameNode(coupleParts(c))])) }}
-                    value={customMomentCoupleId}
-                    onValueChange={(v) => setCustomMomentCoupleId(v ?? "")}
-                  >
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">—</SelectItem>
-                      {episodeCouples.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {coupleNameNode(coupleParts(c))}
-                        </SelectItem>
+            <Accordion defaultValue={[]}>
+              <AccordionItem value="special-moments">
+                <AccordionTrigger className="px-(--card-spacing) pt-(--card-spacing) hover:no-underline">
+                  <CardHeader className="flex-1 p-0">
+                    <CardTitle>Special Moments</CardTitle>
+                    <CardDescription>Perfect scores and Judges&apos; Save are detected automatically.</CardDescription>
+                  </CardHeader>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <CardContent className="flex flex-col gap-3">
+                    <div className="flex flex-wrap gap-2">
+                      {perfectScorePills.map((p, i) => {
+                        const couple = namedCouple(p.coupleId);
+                        return (
+                          <Badge key={i} variant="secondary">
+                            ⭐ Perfect Score — {couple ? <CoupleName {...coupleParts(couple)} /> : null}
+                          </Badge>
+                        );
+                      })}
+                      {judgesSavePills.map((coupleId) => {
+                        const couple = namedCouple(coupleId);
+                        return (
+                          <Badge key={coupleId} variant="secondary">
+                            🛡️ Judges&apos; Save — {couple ? <CoupleName {...coupleParts(couple)} /> : null}
+                          </Badge>
+                        );
+                      })}
+                      {customMoments.map((m) => (
+                        <Badge key={m.id} variant="outline" className="gap-1.5">
+                          {m.label}
+                          {m.coupleId && (
+                            <>
+                              {" — "}
+                              {(() => {
+                                const c = namedCouple(m.coupleId);
+                                return c ? <CoupleName {...coupleParts(c)} /> : null;
+                              })()}
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            aria-label="Remove"
+                            className="ml-1 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleRemoveCustomMoment(m.id)}
+                          >
+                            ×
+                          </button>
+                        </Badge>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={handleAddCustomMoment}
-                  disabled={!customMomentLabel.trim() || addingCustomMoment}
-                >
-                  + Add Custom Event
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                      {perfectScorePills.length === 0 &&
+                        judgesSavePills.length === 0 &&
+                        customMoments.length === 0 && (
+                          <p className="text-sm text-muted-foreground">Nothing yet this week.</p>
+                        )}
+                    </div>
 
-          {eliminationOrder.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Season Elimination Order</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-1">
-                {eliminationOrder.map((c, i) => (
-                  <div key={c.id} className="flex items-center justify-between border-t border-border py-1.5 text-sm first:border-t-0">
-                    <span>
-                      {i + 1}. <CoupleName {...(allCoupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name })} />
-                    </span>
-                    <span className="text-muted-foreground">
-                      {c.status === "winner" || c.status === "runner_up" || c.status === "third_place"
-                        ? STATUS_LABELS[c.status as StatusValue]
-                        : formatEpisodeCasual(c.elimination_week!)}
-                    </span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+                    <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+                      <div className="flex flex-col gap-1">
+                        <Label className="text-xs text-muted-foreground">Custom Event</Label>
+                        <Input
+                          className="w-48"
+                          placeholder="e.g. Dance-off win"
+                          value={customMomentLabel}
+                          onChange={(e) => setCustomMomentLabel(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <Label className="text-xs text-muted-foreground">Couple (Optional)</Label>
+                        <Select
+                          items={{
+                            "": "—",
+                            ...Object.fromEntries(episodeCouples.map((c) => [c.id, coupleNameNode(coupleParts(c))])),
+                          }}
+                          value={customMomentCoupleId}
+                          onValueChange={(v) => setCustomMomentCoupleId(v ?? "")}
+                        >
+                          <SelectTrigger className="w-40">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">—</SelectItem>
+                            {episodeCouples.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {coupleNameNode(coupleParts(c))}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={handleAddCustomMoment}
+                        disabled={!customMomentLabel.trim() || addingCustomMoment}
+                      >
+                        + Add Custom Event
+                      </Button>
+                    </div>
+                  </CardContent>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </Card>
 
           {published && canPublish && (
             <div className={`fixed inset-x-0 z-30 ${BOTTOM_NAV_STACK_ABOVE}`}>

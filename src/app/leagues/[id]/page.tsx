@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { cn } from "cn";
 import { createClient } from "@/lib/supabase/server";
 import {
   Card,
@@ -28,6 +29,7 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
+import { buildSpoilerFreeStripState } from "@/lib/spoiler-free-strip-state";
 import { draftManagerScoresForLeague, loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { excludeReleasedCoupleRows, replaceWeekDanceScores, scoresReplacingDraftWeek } from "@/lib/draft-scores";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
@@ -210,6 +212,15 @@ export default async function LeaguePage({
     loadDraftScoreContext(supabase, user.id),
   ]);
   const draftNight = draftContext.night;
+  const spoilerFreeStrip = buildSpoilerFreeStripState({
+    spoilerFreeMode: accountSettingsData.spoilerFreeMode,
+    lastWatchedWeek: cutoff.lastWatchedWeek ?? 0,
+    completedWeekNumbers: groupedWeeks.filter((week) => week.status === "completed").map((week) => week.week_number),
+    revealingWeekNumber: revealing?.week.week_number ?? null,
+    pendingRevealWeekNumber: cutoff.pendingRevealEpisode?.week_number ?? null,
+    draftReleaseWeekNumber: draftContext.release?.weekNumber ?? null,
+    draftNightActive: !!draftNight,
+  });
   const draftManagers =
     draftNight && scoringSettings ? await draftManagerScoresForLeague(supabase, id, draftNight) : [];
   const scoreRows =
@@ -996,7 +1007,8 @@ export default async function LeaguePage({
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
+    <div className="mx-auto flex max-w-2xl flex-col px-4">
+    <div className={cn("flex flex-col gap-4", spoilerFreeStrip ? "pt-4" : "py-8")}>
       <LeagueHeader
         leagueId={id}
         inviteCode={league.invite_code}
@@ -1008,6 +1020,7 @@ export default async function LeaguePage({
         switcherLeagues={switcherLeagues}
         accountSettingsData={accountSettingsData}
         viewerEmail={user.email ?? ""}
+        spoilerFreeStrip={spoilerFreeStrip}
       />
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -1064,7 +1077,6 @@ export default async function LeaguePage({
                     />
                   ) : curtainCallMode === "recap" && curtainCallEpisode ? (
                     <PastPicksRecap
-                      episodeWeekNumber={curtainCallEpisode.week_number}
                       locked={pastPicksLocked}
                       comparison={pastPicksComparison}
                       coupleDisplayNames={Object.fromEntries(allDisplayNames)}
@@ -1208,6 +1220,7 @@ export default async function LeaguePage({
           </div>
         }
       />
+    </div>
     </div>
   );
 }
