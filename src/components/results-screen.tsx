@@ -48,7 +48,6 @@ type Episode = {
   status: string;
   results_published_at: string | null;
   results_published_by: string | null;
-  scores_drafted_at: string | null;
 };
 type CompetitionWeek = {
   id: string;
@@ -96,6 +95,7 @@ export function ResultsScreen({
   episodeResults,
   draftsByEpisode,
   revealedByEpisode,
+  releasedCoupleIdsByEpisode,
   publishedByNames,
   season,
   participantsByEpisode,
@@ -122,6 +122,7 @@ export function ResultsScreen({
   episodeResults: EpisodeResult[];
   draftsByEpisode: Record<string, DraftState>;
   revealedByEpisode: Record<string, Record<string, string>>;
+  releasedCoupleIdsByEpisode: Record<string, string[]>;
   publishedByNames: Record<string, string>;
   season: Season;
   participantsByEpisode: Record<string, string[]>;
@@ -190,6 +191,7 @@ export function ResultsScreen({
           weeks={weeks}
           draftsByEpisode={draftsByEpisode}
           revealedByEpisode={revealedByEpisode}
+          releasedCoupleIdsByEpisode={releasedCoupleIdsByEpisode}
           forceSelectEpisodeId={forceSelectEpisodeId}
           participantsByEpisode={participantsByEpisode}
         />

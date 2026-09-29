@@ -26,7 +26,6 @@ export type ResultsPageData = {
     status: string;
     results_published_at: string | null;
     results_published_by: string | null;
-    scores_drafted_at: string | null;
   }[];
   weeks: {
     id: string;
@@ -58,6 +57,9 @@ export type ResultsPageData = {
   // Couples whose scores are live while the episode is still unpublished, with
   // their latest post time (drives Posted rows and the undo window).
   revealedByEpisode: Record<string, Record<string, string>>;
+  // Couples released from the draft to Spoiler-Free fans (draft_couple_releases),
+  // per episode -- per couple, not a whole-episode flag.
+  releasedCoupleIdsByEpisode: Record<string, string[]>;
   publishedByNames: Record<string, string>;
   season: {
     id: string;
@@ -103,6 +105,7 @@ export async function loadResultsPageData(
     { data: episodeParticipants },
     { data: episodeRoundTypes },
     { data: inJeopardyRows },
+    { data: draftReleases },
   ] = await Promise.all([
     supabase
       .from("couples")
@@ -117,7 +120,7 @@ export async function loadResultsPageData(
     supabase
       .from("episodes")
       .select(
-        "id, episode_number, week_id, airs_at, theme, expected_dance_count, judges_save_available, duration_minutes, status, results_published_at, results_published_by, scores_drafted_at, scores_drafted_by"
+        "id, episode_number, week_id, airs_at, theme, expected_dance_count, judges_save_available, duration_minutes, status, results_published_at, results_published_by"
       )
       .eq("season_id", activeSeasonId ?? "")
       .order("episode_number"),
@@ -138,6 +141,11 @@ export async function loadResultsPageData(
     supabase.from("episode_participants").select("episode_id, couple_id"),
     supabase.from("episode_round_types").select("episode_id, round_types(name)"),
     supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id"),
+    // Not season-scoped at the query level (draft_couple_releases has no
+    // season_id column) -- the table only ever holds rows for currently-
+    // unpublished episodes anyway (deleteAllDraftRows clears it on publish),
+    // so it stays small; filtered to this season's episode ids below.
+    admin.from("draft_couple_releases").select("episode_id, couple_id"),
   ]);
 
   const flatten = (rows: typeof activeCouplesRaw) =>
@@ -210,6 +218,13 @@ export async function loadResultsPageData(
     (inJeopardyByEpisode[row.episode_id] ??= []).push(row.couple_id);
   }
 
+  const seasonEpisodeIds = new Set((episodes ?? []).map((e) => e.id));
+  const releasedCoupleIdsByEpisode: Record<string, string[]> = {};
+  for (const row of draftReleases ?? []) {
+    if (!seasonEpisodeIds.has(row.episode_id)) continue;
+    (releasedCoupleIdsByEpisode[row.episode_id] ??= []).push(row.couple_id);
+  }
+
   return {
     activeCouples,
     allCouples,
@@ -224,6 +239,7 @@ export async function loadResultsPageData(
     episodeResults: episodeResults ?? [],
     draftsByEpisode,
     revealedByEpisode,
+    releasedCoupleIdsByEpisode,
     publishedByNames,
     season,
     participantsByEpisode,

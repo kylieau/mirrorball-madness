@@ -1,12 +1,16 @@
 import { computeWeeklyScores } from "./scoring";
 
-// A night whose Enter Results draft someone with propose access (a
-// commissioner or a site admin) has released (episodes.scores_drafted_at)
-// and not yet officially published.
+// A night with at least one couple's drafted dance released (per couple, via
+// draft_couple_releases -- someone with propose access, a commissioner or a
+// site admin) and not yet officially published. Couples not listed in
+// releasedCoupleIdsByEpisode may still be independently live-revealed via
+// per-couple Publish -- that's a different, admin-only mechanism, and its
+// couples must never be excluded here.
 export type DraftRelease = {
   weekId: string;
   weekNumber: number;
   episodeIds: string[];
+  releasedCoupleIdsByEpisode: Record<string, string[]>;
 };
 
 export const DRAFT_SCORES_STRIP_LABEL = "Draft scores · Not yet official";
@@ -21,27 +25,63 @@ type DraftEpisode = {
   id: string;
   week_id: string | null;
   results_published_at: string | null;
-  scores_drafted_at: string | null;
 };
 
-// Earliest unpublished night with a released draft. Later nights wait, the
-// same way a revealing week is the earliest one with live dance scores.
+// Earliest unpublished night with at least one released couple. Later nights
+// wait, the same way a revealing week is the earliest one with live scores.
 export function findDraftRelease(
   episodes: DraftEpisode[],
-  weekNumberById: ReadonlyMap<string, number>
+  weekNumberById: ReadonlyMap<string, number>,
+  releasedCoupleIdsByEpisode: ReadonlyMap<string, string[]>
 ): DraftRelease | null {
-  const byWeek = new Map<string, { weekNumber: number; episodeIds: string[] }>();
+  const byWeek = new Map<
+    string,
+    { weekNumber: number; episodeIds: string[]; releasedCoupleIdsByEpisode: Record<string, string[]> }
+  >();
   for (const episode of episodes) {
-    if (!episode.week_id || !episode.scores_drafted_at || episode.results_published_at) continue;
+    if (!episode.week_id || episode.results_published_at) continue;
+    const released = releasedCoupleIdsByEpisode.get(episode.id);
+    if (!released || released.length === 0) continue;
     const weekNumber = weekNumberById.get(episode.week_id);
     if (weekNumber == null) continue;
     const existing = byWeek.get(episode.week_id);
-    if (existing) existing.episodeIds.push(episode.id);
-    else byWeek.set(episode.week_id, { weekNumber, episodeIds: [episode.id] });
+    if (existing) {
+      existing.episodeIds.push(episode.id);
+      existing.releasedCoupleIdsByEpisode[episode.id] = released;
+    } else {
+      byWeek.set(episode.week_id, {
+        weekNumber,
+        episodeIds: [episode.id],
+        releasedCoupleIdsByEpisode: { [episode.id]: released },
+      });
+    }
   }
   const earliest = [...byWeek.entries()].sort((a, b) => a[1].weekNumber - b[1].weekNumber)[0];
   if (!earliest) return null;
-  return { weekId: earliest[0], weekNumber: earliest[1].weekNumber, episodeIds: earliest[1].episodeIds };
+  return {
+    weekId: earliest[0],
+    weekNumber: earliest[1].weekNumber,
+    episodeIds: earliest[1].episodeIds,
+    releasedCoupleIdsByEpisode: earliest[1].releasedCoupleIdsByEpisode,
+  };
+}
+
+// Excludes only the couples actually released in the draft from a set of
+// live dance-score-shaped rows for the same episodes, then appends the
+// draft's own rows for exactly those couples. A couple independently
+// live-revealed via per-couple Publish (never in releasedCoupleIdsByEpisode)
+// keeps its live row untouched, even in an episode that also has other
+// couples still mid-draft.
+export function excludeReleasedCoupleRows<T extends { episode_id: string; couple_id: string }>(
+  rows: T[],
+  releasedCoupleIdsByEpisode: Record<string, string[]>
+): T[] {
+  const released = new Set(
+    Object.entries(releasedCoupleIdsByEpisode).flatMap(([episodeId, coupleIds]) =>
+      coupleIds.map((coupleId) => `${episodeId}:${coupleId}`)
+    )
+  );
+  return rows.filter((row) => !released.has(`${row.episode_id}:${row.couple_id}`));
 }
 
 // Mark Watched (finished the East broadcast) raises draft_unlocked_week.
@@ -153,10 +193,19 @@ export function scoresReplacingDraftWeek(
   ];
 }
 
+// Merges rather than replaces: draft.danceScores only ever contains released
+// couples (per-couple, not the whole night), so any other couple's entry for
+// this week -- e.g. one independently live-revealed via per-couple Publish --
+// must stay, not get wiped by a lone released couple's draft dance.
 export function replaceWeekDanceScores<T extends { weekNumber: number; danceScores: { coupleId: string; totalScore: number }[] }>(
   weeks: T[],
   draft: { weekNumber: number; danceScores: { coupleId: string; totalScore: number }[] } | null
 ): T[] {
   if (!draft) return weeks;
-  return weeks.map((week) => (week.weekNumber === draft.weekNumber ? { ...week, danceScores: draft.danceScores } : week));
+  const draftCoupleIds = new Set(draft.danceScores.map((d) => d.coupleId));
+  return weeks.map((week) =>
+    week.weekNumber === draft.weekNumber
+      ? { ...week, danceScores: [...week.danceScores.filter((d) => !draftCoupleIds.has(d.coupleId)), ...draft.danceScores] }
+      : week
+  );
 }

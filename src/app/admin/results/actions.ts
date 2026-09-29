@@ -13,8 +13,8 @@ import {
   addDraftCustomMoment,
   removeDraftCustomMoment,
   publishEpisodeDraft,
-  releaseEpisodeScoreDraft,
-  withdrawEpisodeScoreDraft,
+  releaseDraftCouple,
+  withdrawDraftCouple,
   startCorrection,
   applySeasonSettings,
   type SaveDraftResultsInput,
@@ -109,24 +109,25 @@ export async function removeEpisodeCustomMoment(momentId: string): Promise<{ err
   return result;
 }
 
-// Propose tier, not admin-only: any commissioner can release/withdraw, since
-// they're the ones live at the ET broadcast entering scores. scores_drafted_at
-// is season-wide (not scoped to their own league) -- a deliberate tradeoff so
-// no one has to wait on a site admin to unlock a night for Spoiler-Free fans.
-export async function releaseDraftScores(episodeId: string): Promise<{ error: string | null }> {
+// Propose tier, not admin-only: any commissioner can release/withdraw one
+// couple's draft at a time, since they're the ones live at the ET broadcast
+// entering scores. draft_couple_releases is season-wide (not scoped to their
+// own league) -- a deliberate tradeoff so no one has to wait on a site admin
+// to unlock a couple's dance for Spoiler-Free fans.
+export async function releaseDraftCoupleAction(episodeId: string, coupleId: string): Promise<{ error: string | null }> {
   const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
-  const result = await releaseEpisodeScoreDraft(createAdminClient(), episodeId, access.userId);
+  const result = await releaseDraftCouple(createAdminClient(), episodeId, coupleId, access.userId);
   if (!result.error) revalidatePath("/", "layout");
   return result;
 }
 
-export async function withdrawDraftScores(episodeId: string): Promise<{ error: string | null }> {
+export async function withdrawDraftCoupleAction(episodeId: string, coupleId: string): Promise<{ error: string | null }> {
   const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
-  const result = await withdrawEpisodeScoreDraft(createAdminClient(), episodeId);
+  const result = await withdrawDraftCouple(createAdminClient(), episodeId, coupleId);
   if (!result.error) revalidatePath("/", "layout");
   return result;
 }

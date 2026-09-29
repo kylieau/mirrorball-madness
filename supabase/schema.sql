@@ -488,11 +488,6 @@ create table episodes (
   judges_save_available boolean not null default false,
   results_published_at timestamptz,
   results_published_by uuid references profiles(id) on delete set null,
-  -- Site Admin released this night's Enter Results draft for fans who marked
-  -- the week watched. Not a live post: dance rows stay in draft_* until
-  -- official publish, which clears this.
-  scores_drafted_at timestamptz,
-  scores_drafted_by uuid references profiles(id) on delete set null,
   unique (season_id, episode_number)
 );
 
@@ -2425,6 +2420,24 @@ create table draft_judge_scores (
   unique (draft_dance_score_id, judge_id)
 );
 
+-- A commissioner or site admin released this couple's drafted dance for fans
+-- who marked the week watched. Per couple, not a whole-episode flag: a
+-- night's couples can be a mix of released, still-drafting and (separately,
+-- via the live reveal below) already live-posted. Cleared on withdraw or
+-- when the episode's draft is published/re-seeded (deleteAllDraftRows). No
+-- scores here, just which couples are released, so -- unlike the score-
+-- bearing draft_* tables above -- this is granted straight to authenticated,
+-- the same public-readability the old episodes.scores_drafted_at column had.
+create table draft_couple_releases (
+  episode_id uuid not null references episodes(id) on delete cascade,
+  couple_id uuid not null references couples(id) on delete cascade,
+  released_at timestamptz not null default now(),
+  released_by uuid not null references profiles(id) on delete set null,
+  primary key (episode_id, couple_id)
+);
+
+grant select on public.draft_couple_releases to authenticated;
+
 create table draft_episode_results (
   id uuid primary key default gen_random_uuid(),
   episode_id uuid not null references episodes(id) on delete cascade,
@@ -3381,8 +3394,9 @@ $$;
 revoke execute on function public.unlock_draft_scores_through(int) from public;
 grant execute on function public.unlock_draft_scores_through(int) to authenticated;
 
--- Dance rows from a released, unpublished draft, only for weeks this caller
--- unlocked with Mark Watched. Draft tables stay ungranted.
+-- Dance rows from released draft couples, only for weeks this caller
+-- unlocked with Mark Watched. Per couple (draft_couple_releases), not a
+-- whole-episode flag. Draft tables stay ungranted.
 create function public.visible_draft_dance_scores()
 returns table (
   episode_id uuid,
@@ -3410,11 +3424,11 @@ as $$
   join public.episodes e on e.id = d.episode_id
   join public.competition_weeks w on w.id = e.week_id
   join public.dance_styles s on s.id = d.dance_style_id
+  join public.draft_couple_releases r on r.episode_id = d.episode_id and r.couple_id = d.couple_id
   join public.spoiler_watch_progress p
     on p.user_id = auth.uid()
    and p.season_id = e.season_id
-  where e.scores_drafted_at is not null
-    and e.results_published_at is null
+  where e.results_published_at is null
     and p.draft_unlocked_week >= w.week_number;
 $$;
 

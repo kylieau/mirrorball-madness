@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
+import { excludeReleasedCoupleRows } from "@/lib/draft-scores";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { buildScoreHistory, weekResults, type HistoryWeekData, type ScoreHistoryLine } from "@/lib/score-history";
 import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
@@ -126,9 +127,11 @@ export async function loadScoreHistory(
   );
   const coupleNames = new Map([...nameParts].map(([id, parts]) => [id, parts.celebrity]));
 
-  const draftEpisodeIds = new Set(draftNight?.episodeIds ?? []);
+  // Excludes only released couples' live rows (not the whole episode), so a
+  // couple independently live-revealed via per-couple Publish keeps showing
+  // even in an episode that also has other couples still mid-draft.
   const historyDanceRows = [
-    ...(danceRows ?? []).filter((row) => !draftEpisodeIds.has(row.episode_id)),
+    ...excludeReleasedCoupleRows(danceRows ?? [], draftNight?.releasedCoupleIdsByEpisode ?? {}),
     ...(draftNight?.dances.map((dance) => ({
       episode_id: dance.episodeId,
       couple_id: dance.coupleId,
@@ -142,10 +145,6 @@ export async function loadScoreHistory(
       weekNumber: week.week_number,
       isDoubleElimination: draftNight?.weekId === week.id ? draftNight.isDoubleElimination : week.is_double_elimination_week,
       ...results,
-      danceScores:
-        draftNight && week.week_number === draftNight.weekNumber
-          ? draftNight.dances.map((dance) => ({ coupleId: dance.coupleId, totalScore: dance.total }))
-          : results.danceScores,
       inJeopardyCoupleIds: [
         ...new Set((jeopardyRows ?? []).filter((row) => inWeek.has(row.episode_id)).map((row) => row.couple_id)),
       ],

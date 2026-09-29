@@ -4,6 +4,7 @@ import {
   DRAFT_SCORES_STRIP_LABEL,
   draftScoresVisible,
   draftWeekManagerScores,
+  excludeReleasedCoupleRows,
   findDraftRelease,
   homeStripChoice,
   postingWeekNumber,
@@ -17,24 +18,64 @@ const weeks = new Map([
 ]);
 
 describe("findDraftRelease", () => {
-  it("picks the earliest unpublished night with a released draft", () => {
+  it("picks the earliest unpublished night with at least one released couple", () => {
     const release = findDraftRelease(
       [
-        { id: "e3", week_id: "w3", results_published_at: null, scores_drafted_at: "t" },
-        { id: "e2", week_id: "w2", results_published_at: null, scores_drafted_at: "t" },
-        { id: "e2b", week_id: "w2", results_published_at: null, scores_drafted_at: "t" },
-        { id: "published", week_id: "w2", results_published_at: "t", scores_drafted_at: "t" },
-        { id: "unreleased", week_id: "w3", results_published_at: null, scores_drafted_at: null },
+        { id: "e3", week_id: "w3", results_published_at: null },
+        { id: "e2", week_id: "w2", results_published_at: null },
+        { id: "e2b", week_id: "w2", results_published_at: null },
+        { id: "published", week_id: "w2", results_published_at: "t" },
+        { id: "unreleased", week_id: "w3", results_published_at: null },
       ],
-      weeks
+      weeks,
+      new Map([
+        ["e3", ["c9"]],
+        ["e2", ["c1", "c2"]],
+        ["e2b", ["c3"]],
+        ["published", ["c4"]],
+      ])
     );
-    expect(release).toEqual({ weekId: "w2", weekNumber: 2, episodeIds: ["e2", "e2b"] });
+    expect(release).toEqual({
+      weekId: "w2",
+      weekNumber: 2,
+      episodeIds: ["e2", "e2b"],
+      releasedCoupleIdsByEpisode: { e2: ["c1", "c2"], e2b: ["c3"] },
+    });
+  });
+
+  it("only counts an episode with at least one released couple -- partial release within a night is fine", () => {
+    const release = findDraftRelease(
+      [{ id: "e2", week_id: "w2", results_published_at: null }],
+      weeks,
+      new Map([["e2", ["c1"]]])
+    );
+    expect(release?.releasedCoupleIdsByEpisode).toEqual({ e2: ["c1"] });
   });
 
   it("ignores a night that is not a competition week", () => {
     expect(
-      findDraftRelease([{ id: "ex", week_id: null, results_published_at: null, scores_drafted_at: "t" }], weeks)
+      findDraftRelease([{ id: "ex", week_id: null, results_published_at: null }], weeks, new Map([["ex", ["c1"]]]))
     ).toBeNull();
+  });
+
+  it("ignores an episode with no released couples yet", () => {
+    expect(
+      findDraftRelease([{ id: "e2", week_id: "w2", results_published_at: null }], weeks, new Map())
+    ).toBeNull();
+  });
+});
+
+describe("excludeReleasedCoupleRows", () => {
+  it("excludes only the released (episode, couple) pairs, leaving other couples' rows in the same episode untouched", () => {
+    const rows = [
+      { episode_id: "e1", couple_id: "c1", note: "live-revealed" },
+      { episode_id: "e1", couple_id: "c2", note: "not released" },
+      { episode_id: "e2", couple_id: "c1", note: "different episode, same couple id" },
+    ];
+    expect(excludeReleasedCoupleRows(rows, { e1: ["c1"] })).toEqual([
+      { episode_id: "e1", couple_id: "c2", note: "not released" },
+      { episode_id: "e2", couple_id: "c1", note: "different episode, same couple id" },
+    ]);
   });
 });
 
@@ -133,6 +174,17 @@ describe("replaceWeekDanceScores", () => {
     expect(weeks[1].danceScores).toEqual([
       { coupleId: "c1", totalScore: 27 },
       { coupleId: "c2", totalScore: 24 },
+    ]);
+  });
+
+  it("merges rather than replaces -- a couple not in the draft (e.g. independently live-revealed) keeps its existing entry", () => {
+    const weeks = replaceWeekDanceScores(
+      [{ weekNumber: 3, danceScores: [{ coupleId: "c1", totalScore: 8 }, { coupleId: "c2", totalScore: 22 }] }],
+      { weekNumber: 3, danceScores: [{ coupleId: "c1", totalScore: 27 }] }
+    );
+    expect(weeks[0].danceScores).toEqual([
+      { coupleId: "c2", totalScore: 22 },
+      { coupleId: "c1", totalScore: 27 },
     ]);
   });
 });

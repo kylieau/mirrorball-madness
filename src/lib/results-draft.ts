@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { resultsEntryCoupleIds, selectableCast } from "@/lib/episode-cast";
 import { inJeopardyIdsToPersist, type Outcome } from "@/lib/scoring";
 import { applyEpisodeResults, replaceInJeopardyCouples, type EntrySubmission } from "@/lib/results";
 import { loadRevealedCouples, loadRevealedDances } from "@/lib/results-reveal";
@@ -263,6 +262,7 @@ async function deleteAllDraftRows(admin: SupabaseClient<Database>, episodeId: st
   await admin.from("draft_episode_results").delete().eq("episode_id", episodeId);
   await admin.from("draft_episode_custom_moments").delete().eq("episode_id", episodeId);
   await admin.from("draft_episode_in_jeopardy_couples").delete().eq("episode_id", episodeId);
+  await admin.from("draft_couple_releases").delete().eq("episode_id", episodeId);
 }
 
 // Builds an EpisodeResultsInput from the draft tables and calls
@@ -328,8 +328,6 @@ export async function publishEpisodeDraft(
       judges_save_available: draft.judgesSaveAvailable,
       results_published_at: new Date().toISOString(),
       results_published_by: publishedBy,
-      scores_drafted_at: null,
-      scores_drafted_by: null,
     })
     .eq("id", episodeId);
   if (publishErr) return { error: publishErr.message };
@@ -351,70 +349,49 @@ export async function publishEpisodeDraft(
   return { error: null };
 }
 
-// Releases the night's draft for fans who marked the week watched. Does not
-// copy dances into the live tables or recompute weekly_manager_scores —
-// those stay official-publish / per-couple reveal. Every couple on the card
-// needs a scored dance first.
-export async function releaseEpisodeScoreDraft(
+// Releases one couple's drafted dance for fans who marked the week watched.
+// Does not copy dances into the live tables or recompute weekly_manager_scores
+// — those stay official-publish / per-couple reveal. Per couple, not the
+// whole night: this couple just needs its own scored dance first.
+export async function releaseDraftCouple(
   admin: SupabaseClient<Database>,
   episodeId: string,
+  coupleId: string,
   releasedBy: string
 ): Promise<{ error: string | null }> {
   const { data: episode, error: episodeErr } = await admin
     .from("episodes")
-    .select("id, season_id, week_id, results_published_at")
+    .select("id, results_published_at")
     .eq("id", episodeId)
     .single();
   if (episodeErr || !episode) return { error: episodeErr?.message ?? "Episode not found" };
   if (episode.results_published_at) return { error: "This night is already published" };
-  if (!episode.week_id) return { error: "This episode is not a scoring night" };
 
-  const draft = await loadDraftForEpisode(admin, episodeId);
-  const scoredCoupleIds = [
-    ...new Set(draft.dances.filter((dance) => dance.judgeScores.length > 0).map((dance) => dance.coupleId)),
-  ];
-  if (!draft.hasDraft || scoredCoupleIds.length === 0) {
-    return { error: "Draft the night's scores before releasing them" };
-  }
-
-  const [{ data: week, error: weekErr }, { data: couples, error: couplesErr }, { data: participants, error: participantsErr }] =
-    await Promise.all([
-      admin.from("competition_weeks").select("week_number").eq("id", episode.week_id).single(),
-      admin.from("couples").select("id, status, elimination_week").eq("season_id", episode.season_id),
-      admin.from("episode_participants").select("couple_id").eq("episode_id", episodeId),
-    ]);
-  if (weekErr || !week) return { error: weekErr?.message ?? "Competition week not found" };
-  if (couplesErr) return { error: couplesErr.message };
-  if (participantsErr) return { error: participantsErr.message };
-
-  const selectableIds = selectableCast(couples ?? [], week.week_number, { published: false }).map((couple) => couple.id);
-  const required = resultsEntryCoupleIds({
-    selectableIds,
-    participantIds: (participants ?? []).map((row) => row.couple_id),
-    draftCoupleIds: scoredCoupleIds,
-    published: false,
-  });
-  const scored = new Set(scoredCoupleIds);
-  const missing = required.filter((coupleId) => !scored.has(coupleId));
-  if (missing.length > 0) {
-    return { error: `Draft a scored dance for every couple before releasing (${missing.length} still to score).` };
-  }
+  const { data: dances, error: dancesErr } = await admin
+    .from("draft_dance_scores")
+    .select("id, draft_judge_scores(judge_id)")
+    .eq("episode_id", episodeId)
+    .eq("couple_id", coupleId);
+  if (dancesErr) return { error: dancesErr.message };
+  const hasScoredDance = (dances ?? []).some((d) => (d.draft_judge_scores ?? []).length > 0);
+  if (!hasScoredDance) return { error: "Draft a scored dance for this couple before releasing it" };
 
   const { error } = await admin
-    .from("episodes")
-    .update({ scores_drafted_at: new Date().toISOString(), scores_drafted_by: releasedBy })
-    .eq("id", episodeId);
+    .from("draft_couple_releases")
+    .upsert({ episode_id: episodeId, couple_id: coupleId, released_at: new Date().toISOString(), released_by: releasedBy });
   return { error: error?.message ?? null };
 }
 
-export async function withdrawEpisodeScoreDraft(
+export async function withdrawDraftCouple(
   admin: SupabaseClient<Database>,
-  episodeId: string
+  episodeId: string,
+  coupleId: string
 ): Promise<{ error: string | null }> {
   const { error } = await admin
-    .from("episodes")
-    .update({ scores_drafted_at: null, scores_drafted_by: null })
-    .eq("id", episodeId);
+    .from("draft_couple_releases")
+    .delete()
+    .eq("episode_id", episodeId)
+    .eq("couple_id", coupleId);
   return { error: error?.message ?? null };
 }
 

@@ -29,7 +29,7 @@ import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { draftManagerScoresForLeague, loadDraftScoreContext } from "@/lib/draft-scores-data";
-import { replaceWeekDanceScores, scoresReplacingDraftWeek } from "@/lib/draft-scores";
+import { excludeReleasedCoupleRows, replaceWeekDanceScores, scoresReplacingDraftWeek } from "@/lib/draft-scores";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { partitionRecastSlots } from "@/lib/recast-framing";
@@ -596,8 +596,7 @@ export default async function LeaguePage({
       : { data: [] as { couple_id: string; episode_id: string; total_score: number }[] };
   const judgePointsInputs = {
     scores: [
-      ...(leagueDanceScores ?? [])
-        .filter((row) => !draftNight || episodeWeekNumber.get(row.episode_id) !== draftNight.weekNumber)
+      ...excludeReleasedCoupleRows(leagueDanceScores ?? [], draftNight?.releasedCoupleIdsByEpisode ?? {})
         .map((row) => ({
           coupleId: row.couple_id,
           weekNumber: episodeWeekNumber.get(row.episode_id) ?? 0,

@@ -288,6 +288,49 @@ export type Database = {
         }
         Relationships: []
       }
+      draft_couple_releases: {
+        Row: {
+          episode_id: string
+          couple_id: string
+          released_at: string
+          released_by: string | null
+        }
+        Insert: {
+          episode_id: string
+          couple_id: string
+          released_at?: string
+          released_by?: string | null
+        }
+        Update: {
+          episode_id?: string
+          couple_id?: string
+          released_at?: string
+          released_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_couple_releases_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_couple_releases_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_couple_releases_released_by_fkey"
+            columns: ["released_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       draft_dance_scores: {
         Row: {
           couple_id: string
@@ -855,8 +898,6 @@ export type Database = {
           judges_save_available: boolean
           results_published_at: string | null
           results_published_by: string | null
-          scores_drafted_at: string | null
-          scores_drafted_by: string | null
           season_id: string
           status: string
           theme: string | null
@@ -872,8 +913,6 @@ export type Database = {
           judges_save_available?: boolean
           results_published_at?: string | null
           results_published_by?: string | null
-          scores_drafted_at?: string | null
-          scores_drafted_by?: string | null
           season_id: string
           status?: string
           theme?: string | null
@@ -889,8 +928,6 @@ export type Database = {
           judges_save_available?: boolean
           results_published_at?: string | null
           results_published_by?: string | null
-          scores_drafted_at?: string | null
-          scores_drafted_by?: string | null
           season_id?: string
           status?: string
           theme?: string | null
@@ -900,13 +937,6 @@ export type Database = {
           {
             foreignKeyName: "episodes_results_published_by_fkey"
             columns: ["results_published_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "episodes_scores_drafted_by_fkey"
-            columns: ["scores_drafted_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

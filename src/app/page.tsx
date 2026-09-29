@@ -14,7 +14,7 @@ import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
 import { HomeSpoilerChrome, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
 import { HomeDraftChrome } from "@/components/draft-scores-strip";
 import type { LeagueTriage } from "@/components/league-triage-card";
-import { homeStripChoice, postingWeekNumber } from "@/lib/draft-scores";
+import { excludeReleasedCoupleRows, homeStripChoice, postingWeekNumber } from "@/lib/draft-scores";
 import type { ModuleStackInput } from "@/lib/league-triage";
 import { loadModuleStackInputs } from "@/lib/league-module-stack-data";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
@@ -105,8 +105,8 @@ export default async function Home() {
       const week = activityWeeks.get(weekNumberByEpisodeId.get(r.episode_id) ?? -1);
       if (r.outcome === "eliminated" && parts && week) week.eliminated.push(formatCoupleName(parts));
     }
-    for (const d of danceScores ?? []) {
-      if (draftEpisodeIds.has(d.episode_id)) continue;
+    const liveDanceScores = excludeReleasedCoupleRows(danceScores ?? [], draftNight?.releasedCoupleIdsByEpisode ?? {});
+    for (const d of liveDanceScores) {
       const parts = displayNames.get(d.couple_id);
       const week = activityWeeks.get(weekNumberByEpisodeId.get(d.episode_id) ?? -1);
       if (parts && week && d.dance_styles) {
