@@ -1080,23 +1080,34 @@ export function ResultsForm({
             <CardTitle>Season Elimination Order</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-1">
-            {/* Displayed winner-first, same convention as Grand Finale's own
-                order list: "1." at the winner (the end of eliminationOrder,
-                which stays elimination-ascending), counting up toward the
-                first couple eliminated at the bottom (highest number). */}
+            {/* Same row shape as Grand Finale's own order list minus the
+                points pill — this is the real result, not a prediction.
+                Displayed winner-first: "1." at the winner, counting up toward
+                the first couple eliminated at the bottom (highest number).
+                Numbers are season-wide positions (allCouplesWithStatus.length,
+                the full cast), not eliminationOrder.length — mid-season,
+                eliminationOrder only holds couples with a resolved fate so
+                far, so using its own length would understate every number
+                until the finale. Elimination wording is "Week N"
+                (formatEpisodeCasual), not Grand Finale's abbreviated
+                "W2 Elim". */}
             {[...eliminationOrder].reverse().map((c, i) => (
               <div
                 key={c.id}
-                className="flex items-center justify-between border-t border-border py-1.5 text-sm first:border-t-0"
+                className="flex items-center justify-between border-b border-border py-1 text-sm last:border-b-0"
               >
                 <span>
-                  {i + 1}.{" "}
+                  {allCouplesWithStatus.length - eliminationOrder.length + i + 1}.{" "}
                   <CoupleName {...(allCoupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name })} />
                 </span>
                 <span className="text-muted-foreground">
-                  {c.status === "winner" || c.status === "runner_up" || c.status === "third_place"
-                    ? STATUS_LABELS[c.status as StatusValue]
-                    : formatEpisodeCasual(c.elimination_week!)}
+                  {c.status === "winner"
+                    ? "Won the season"
+                    : c.status === "runner_up"
+                      ? "Runner-up"
+                      : c.status === "third_place"
+                        ? "Third Place"
+                        : formatEpisodeCasual(c.elimination_week!)}
                 </span>
               </div>
             ))}
