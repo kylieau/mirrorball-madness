@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SF × Live-air alignment matrix — Mirrorball Madness</title>
+<link rel="stylesheet" href="shared.css"/>
+<style>
+  :root {
+    --bg: #08050a;
+    --panel: #141018;
+    --line: rgba(243,234,242,0.12);
+    --muted: #9A8798;
+    --ink: #F3EAF2;
+    --gold: #D4AF37;
+    --gold-bright: #F0D78C;
+    --ok: #7BC47F;
+    --no: #C47B8A;
+    --warn: #E0A85C;
+    --mauve: #C9A0C0;
+  }
+  * { box-sizing: border-box; }
+  body.board-page {
+    margin: 0;
+    padding: 24px;
+    background: #050308;
+    font-family: Inter, system-ui, sans-serif;
+    color: var(--ink);
+  }
+  .board {
+    width: 1680px;
+    background: var(--bg);
+    border-radius: 18px;
+    padding: 28px 28px 24px;
+    border: 1px solid rgba(212,175,55,0.18);
+  }
+  h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    color: #fff;
+  }
+  .sub {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.45;
+    max-width: 1580px;
+    margin: 0 0 16px;
+  }
+  .sub strong { color: #E8D5E4; font-weight: 600; }
+  .sub .gold { color: var(--gold-bright); }
+  .when-strip {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin: 0 0 18px;
+  }
+  .when-strip .tag {
+    font-size: 11px; font-weight: 600;
+    padding: 5px 10px; border-radius: 999px;
+    border: 1px solid rgba(243,234,242,0.12);
+    color: var(--muted); background: rgba(34,26,36,0.8);
+  }
+  .when-strip .tag.on {
+    color: var(--gold-bright);
+    border-color: rgba(212,175,55,0.4);
+    background: rgba(212,175,55,0.1);
+  }
+  .when-strip .tag.off {
+    color: #8A7488;
+    text-decoration: line-through;
+    text-decoration-color: rgba(138,116,136,0.55);
+  }
+  .section {
+    margin: 0 0 22px;
+  }
+  .section-h {
+    display: flex; align-items: baseline; gap: 10px;
+    margin: 0 0 10px;
+  }
+  .section-h h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 18px; font-weight: 600; margin: 0; color: var(--gold-bright);
+  }
+  .section-h .hint {
+    font-size: 12px; color: var(--muted);
+  }
+  .grid4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .cell {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .cell-head {
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--line);
+    min-height: 78px;
+  }
+  .cell-id {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 15px; color: var(--gold); font-weight: 600;
+  }
+  .cell-title {
+    font-size: 13px; font-weight: 600; color: #F3EAF2; margin-top: 2px;
+  }
+  .cell-desc {
+    font-size: 11px; color: var(--muted); line-height: 1.35; margin-top: 3px;
+  }
+  .chips {
+    display: flex; flex-wrap: wrap; gap: 5px;
+    padding: 8px 10px 0;
+  }
+  .chip {
+    font-size: 10px; font-weight: 700;
+    padding: 3px 7px; border-radius: 999px;
+    letter-spacing: 0.01em;
+  }
+  .chip.yes { background: rgba(123,196,127,0.15); color: var(--ok); border: 1px solid rgba(123,196,127,0.35); }
+  .chip.no  { background: rgba(196,123,138,0.12); color: var(--no); border: 1px solid rgba(196,123,138,0.3); }
+  .chip.warn{ background: rgba(224,168,92,0.14); color: var(--warn); border: 1px solid rgba(224,168,92,0.35); }
+  .chip.mauve{ background: rgba(201,160,192,0.14); color: var(--mauve); border: 1px solid rgba(201,160,192,0.35); }
+  .chip.muted{ background: rgba(154,135,152,0.12); color: var(--muted); border: 1px solid rgba(154,135,152,0.28); }
+  .still-wrap {
+    position: relative;
+    margin: 8px 10px 10px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0c090e;
+    border: 1px solid rgba(243,234,242,0.08);
+    height: 420px;
+  }
+  .still-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+  }
+  .still-wrap.curtain {
+    height: 220px;
+  }
+  .still-wrap.curtain img {
+    object-fit: contain;
+    object-position: center;
+    background: #0a070c;
+  }
+  .still-wrap.short {
+    height: 300px;
+  }
+  .cap {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.4;
+    padding: 0 12px 12px;
+  }
+  .cap strong { color: #E8D5E4; font-weight: 600; }
+  .cap .gold { color: var(--gold-bright); }
+  .note-bar {
+    margin-top: 4px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(212,175,55,0.07);
+    border: 1px solid rgba(212,175,55,0.22);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .note-bar strong { color: var(--gold-bright); }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin: 0 0 14px;
+  }
+  .legend span {
+    font-size: 10.5px; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+</style>
+</head>
+<body class="board-page">
+<div class="board" id="shot">
+  <h1>SF × Live-air · what shows</h1>
+  <p class="sub">
+    One place to read: <strong>if we’re in this mode / if we do this → what shows</strong>.
+    Collage of locked stills (live-air prompt + Soft inset Pattern B SF + draft amber + Settings/Results SF).
+    Visuals only — Push Pilot owns product/code truth notes.
+    <span class="gold">Kylie locks:</span> title <strong>Scores Are Going Live</strong> · curtain <strong>Live Now (ET)</strong> | <strong>Live Now (PT)</strong> · prompt <strong>Live Now · East Coast</strong> | <strong>Live Now · West Coast</strong> <em>no clock</em> · Follow-along soft subtext (no Site Admin on CTAs).
+    Reused phones may still show older strings — gold lock strip + captions are SoT.
+  </p>
+
+  <div class="when-strip">
+    <span class="tag on">Prompt · East air</span>
+    <span class="tag on">Prompt · West air</span>
+    <span class="tag off">Before curtain</span>
+    <span class="tag off">ET→PT gap ~7–8pm PT</span>
+    <span class="tag off">After night</span>
+  </div>
+
+
+  <div class="lock-strip" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 16px">
+    <div style="background:rgba(212,175,55,0.07);border:1px solid rgba(212,175,55,0.28);border-radius:12px;padding:10px 12px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#D4AF37;margin-bottom:4px">Title</div>
+      <div style="font-family:Playfair Display,Georgia,serif;font-size:15px;color:#fff">Scores Are Going Live</div>
+    </div>
+    <div style="background:rgba(212,175,55,0.07);border:1px solid rgba(212,175,55,0.28);border-radius:12px;padding:10px 12px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#D4AF37;margin-bottom:4px">Curtain + prompt copy</div>
+      <div style="font-size:11px;color:#F0D78C;font-weight:600">Curtain: Live Now (ET) &nbsp;|&nbsp; Live Now (PT)</div>
+      <div style="font-size:11px;color:#F0D78C;font-weight:600;margin-top:2px">Prompt: Live Now · East Coast &nbsp;|&nbsp; Live Now · West Coast</div>
+      <div style="font-size:10px;color:#9A8798;margin-top:3px">No clock · replaces old On Air labels</div>
+    </div>
+    <div style="background:rgba(212,175,55,0.07);border:1px solid rgba(212,175,55,0.28);border-radius:12px;padding:10px 12px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#D4AF37;margin-bottom:4px">Stay soft · Follow-along · muted</div>
+      <div style="font-size:11px;color:#9A8798;line-height:1.35"><strong style="color:#9A8798">ET:</strong> Follow along as scores are entered<br/><strong style="color:#9A8798">PT:</strong> Follow along as official scores post</div>
+    </div>
+    <div style="background:rgba(212,175,55,0.07);border:1px solid rgba(212,175,55,0.28);border-radius:12px;padding:10px 12px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#D4AF37;margin-bottom:4px">Mark soft</div>
+      <div style="font-size:13px;color:#fff;font-family:Playfair Display,Georgia,serif">You’re caught up · scores unlock</div>
+      <div style="font-size:11px;color:#9A8798;margin-top:3px">No Site Admin on CTA lines</div>
+    </div>
+  </div>
+
+    <div class="legend">
+    <span><span class="chip yes">PROMPT</span> sheet over Home</span>
+    <span><span class="chip warn">DRAFTS</span> after unlock (ET Stay / Mark)</span>
+    <span><span class="chip mauve">PUBLISHED</span> PT Stay path</span>
+    <span><span class="chip muted">SF STRIP</span> Soft inset posting</span>
+    <span><span class="chip warn">DRAFT STRIP</span> amber after unlock</span>
+    <span><span class="chip no">GATED</span> no scores yet</span>
+  </div>
+
+  <!-- Scenarios 1–3 -->
+  <div class="section">
+    <div class="section-h">
+      <h2>1–3 · Mid-air (prompt ON)</h2>
+      <span class="hint">Anyone SF on/off must choose before scores — no auto-show published for SF-off mid-air</span>
+    </div>
+    <div class="grid4">
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">1</div>
+          <div class="cell-title">Mid East air · SF on</div>
+          <div class="cell-desc">Prompt up · toggle on · drafts path</div>
+        </div>
+        <div class="chips">
+          <span class="chip yes">PROMPT</span>
+          <span class="chip warn">→ DRAFTS</span>
+          <span class="chip no">NO PUBLISHED</span>
+          <span class="chip muted">SF STRIP</span>
+        </div>
+        <div class="still-wrap"><img src="stills/02-et-air-prompt.png" alt="ET air prompt SF on"/></div>
+        <p class="cap"><strong>Shows:</strong> sheet <span class="gold">Scores Are Going Live</span> · Live Now · East Coast (no clock) · SF toggle on · Stay soft <em>Follow along as scores are entered</em> · Mark soft <em>You’re caught up · scores unlock</em> · Dismiss stays gated. Behind: Soft inset <em>Week N posting live</em>.</p>
+      </div>
+
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">2</div>
+          <div class="cell-title">Mid East air · SF off</div>
+          <div class="cell-desc">Same gate — no auto drafts/published</div>
+        </div>
+        <div class="chips">
+          <span class="chip yes">PROMPT</span>
+          <span class="chip no">NO AUTO SCORES</span>
+          <span class="chip warn">→ DRAFTS after choice</span>
+          <span class="chip no">NO SF STRIP</span>
+        </div>
+        <div class="still-wrap"><img src="stills/03-pt-air-prompt.png" alt="SF-off mid-air gate (representative)"/></div>
+        <p class="cap"><strong>Shows:</strong> same prompt requirement as SF on. <span class="gold">SF-off does not auto-reveal</span> mid-air. Still: reuse PT sheet for SF-off chrome; East Stay soft = <em>Follow along as scores are entered</em>. No Soft inset SF strip when off.</p>
+      </div>
+
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">3a</div>
+          <div class="cell-title">Mid West air · SF on</div>
+          <div class="cell-desc">Prompt · Stay → published</div>
+        </div>
+        <div class="chips">
+          <span class="chip yes">PROMPT</span>
+          <span class="chip mauve">→ PUBLISHED</span>
+          <span class="chip warn">Mark → DRAFTS/caught up</span>
+          <span class="chip muted">SF STRIP</span>
+        </div>
+        <div class="still-wrap"><img src="stills/02-et-air-prompt.png" alt="West SF on uses same sheet family"/></div>
+        <p class="cap"><strong>Shows:</strong> sheet <span class="gold">Scores Are Going Live</span> · Live Now · West Coast (no clock) · SF on. Stay soft <em>Follow along as official scores post</em> → published (no drafts). Mark soft <em>You’re caught up · scores unlock</em>. Soft inset posting strip behind until unlock.</p>
+      </div>
+
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">3b</div>
+          <div class="cell-title">Mid West air · SF off</div>
+          <div class="cell-desc">Still gated · published after Stay</div>
+        </div>
+        <div class="chips">
+          <span class="chip yes">PROMPT</span>
+          <span class="chip no">NO AUTO</span>
+          <span class="chip mauve">→ PUBLISHED after Stay</span>
+          <span class="chip no">NO SF STRIP</span>
+        </div>
+        <div class="still-wrap"><img src="stills/03-pt-air-prompt.png" alt="PT air prompt SF off"/></div>
+        <p class="cap"><strong>Shows:</strong> PT sheet · SF toggle off · still must choose. Stay soft <em>Follow along as official scores post</em> · Mark soft <em>You’re caught up · scores unlock</em> · Dismiss → gated. Caption on still: “SF-off also gated.”</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scenario 4 -->
+  <div class="section">
+    <div class="section-h">
+      <h2>4 · No prompt windows</h2>
+      <span class="hint">Before curtain · ET→PT gap · after night — prompt OFF; SF chrome can still show</span>
+    </div>
+    <div class="grid3">
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">4a</div>
+          <div class="cell-title">Before curtain</div>
+          <div class="cell-desc">No live-air sheet</div>
+        </div>
+        <div class="chips">
+          <span class="chip no">NO PROMPT</span>
+          <span class="chip muted">SF STRIP if behind</span>
+          <span class="chip mauve">CURTAIN · picks / lockdown</span>
+        </div>
+        <div class="still-wrap short"><img src="stills/02-soft-inset-pattern-b.png" alt="Soft inset before curtain"/></div>
+        <p class="cap"><strong>Shows:</strong> Soft inset Pattern B (e.g. Week N results are in / Mark Watched) if SF on &amp; not caught up. Curtain etiquette as usual. <strong>No</strong> live-air prompt.</p>
+      </div>
+
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">4b</div>
+          <div class="cell-title">ET→PT gap ~7–8pm PT</div>
+          <div class="cell-desc">Spoiler lockdown · no prompt</div>
+        </div>
+        <div class="chips">
+          <span class="chip no">NO PROMPT</span>
+          <span class="chip mauve">CURTAIN · Spoiler Lockdown</span>
+          <span class="chip muted">SF UI still</span>
+        </div>
+        <div class="still-wrap curtain"><img src="stills/curtain-pacific-before.png" alt="Pacific before curtain"/></div>
+        <p class="cap"><strong>Shows:</strong> Hold the Curtain / Spoiler Lockdown. Scores stay gated for SF-on until Mark. Settings SF toggle still available. <strong>No</strong> live-air prompt in the gap.</p>
+      </div>
+
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">4c</div>
+          <div class="cell-title">After night</div>
+          <div class="cell-desc">Prompt gone · Results / caught-up path</div>
+        </div>
+        <div class="chips">
+          <span class="chip no">NO PROMPT</span>
+          <span class="chip mauve">RESULTS SF GATE</span>
+          <span class="chip muted">SF STRIP / Mark</span>
+        </div>
+        <div class="still-wrap short"><img src="stills/03-results-sf-week2.png" alt="Results SF gate"/></div>
+        <p class="cap"><strong>Shows:</strong> Results SF card / Soft inset Mark Watched if still behind. Curtain → Results soon / Scores Are In. Live-air sheet does <strong>not</strong> return after night.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note-bar">
+    <strong>Locked product (don’t invent opposite):</strong>
+    Prompt only East or West air · anyone SF on/off chooses before scores · Title <strong>Scores Are Going Live</strong> · curtain <strong>Live Now (ET)</strong> | <strong>Live Now (PT)</strong> · prompt <strong>Live Now · East Coast</strong> | <strong>Live Now · West Coast</strong> · no clock ·
+    ET Stay soft → drafts (Follow along as scores are entered) · PT Stay soft → published (Follow along as official scores post) · Mark soft → You’re caught up · scores unlock · Dismiss → stay gated ·
+    Prompt SF toggle ↔ Settings Spoiler-Free Mode · SF strip “Spoiler-Free · Week N posting live” + Mark Watched · after unlock amber “Draft scores · may change” · no Site Admin on CTA lines.
+  </div>
+</div>
+</body>
+</html>

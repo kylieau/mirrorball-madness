@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Copy compare · OLD | NEW pairs — Mirrorball Madness</title>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="phone-common.css"/>
+<style>
+  body.board-page { padding: 28px 24px 36px; }
+  .board {
+    width: 920px;
+    background: #08050a;
+    border-radius: 18px;
+    padding: 28px 28px 24px;
+  }
+  .board > h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .board .sub {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.45;
+    max-width: 860px;
+    margin-bottom: 16px;
+  }
+  .board .sub strong { color: #E8D5E4; font-weight: 600; }
+  .board .sub .gold { color: var(--gold-bright); }
+
+  .pair {
+    margin-bottom: 22px;
+    padding: 16px 16px 14px;
+    background: rgba(34, 26, 36, 0.55);
+    border: 1px solid rgba(243, 234, 242, 0.1);
+    border-radius: 16px;
+  }
+  .pair:last-of-type { margin-bottom: 12px; }
+  .pair-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 0 4px;
+  }
+  .pair-head .pair-title {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .pair-head .pair-desc {
+    font-size: 11.5px;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.35;
+  }
+  .pair-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  .side-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 0 2px;
+  }
+  .side-label .badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+  .side-label .badge.old {
+    color: #E8D5E4;
+    background: rgba(243,234,242,0.08);
+    border: 1px solid rgba(243,234,242,0.2);
+  }
+  .side-label .badge.new {
+    color: #1A121E;
+    background: linear-gradient(180deg, #E8C547, #D4AF37);
+  }
+  .side-label .name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #F3EAF2;
+  }
+  .side-label .hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  .prod-frame {
+    width: 100%;
+    max-width: 390px;
+    margin: 0 auto;
+    border-radius: 28px;
+    border: 2px solid rgba(243,234,242,0.18);
+    overflow: hidden;
+    background: #120c14;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+  }
+  .prod-frame img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .phone.mini {
+    width: 100%;
+    max-width: 390px;
+    height: 700px;
+    margin: 0 auto;
+    border-radius: 28px;
+    border: 2px solid rgba(212,175,55,0.35);
+  }
+  .phone.mini .status-bar { height: 36px; font-size: 13px; padding: 0 22px 6px; }
+  .phone.mini .bottom-nav { height: 58px; padding: 5px 2px 10px; }
+  .phone.mini .nav-item { font-size: 9px; }
+  .phone.mini .nav-item svg { width: 17px; height: 17px; }
+  .phone.mini .nav-logo { width: 20px; height: 20px; }
+  .phone.mini .page-title { font-size: 20px; padding-top: 2px; }
+  .phone.mini .curtain { min-height: 90px; }
+  .phone.mini .curtain-inner { padding: 10px 44px 8px; }
+  .phone.mini .curtain-title { font-size: 17px !important; }
+  .phone.mini .curtain-sub { font-size: 10.5px; }
+  .phone.mini .sticky-chip { font-size: 9.5px; padding: 2px 8px; }
+  .phone.mini .league-row { padding: 8px 10px; }
+  .phone.mini .league-row .name { font-size: 12px; }
+  .phone.mini .league-row .meta { font-size: 10px; }
+  .phone.mini .pill { font-size: 9.5px; padding: 3px 7px; }
+  .phone.mini .sheet-title { font-size: 15px; }
+  .phone.mini .sheet-body { font-size: 11px; margin-bottom: 8px; }
+  .phone.mini .btn-sheet-primary.wrap,
+  .phone.mini .btn-sheet-secondary.wrap { font-size: 11px; padding: 9px 10px; }
+  .phone.mini .info-card {
+    left: 14px; right: 14px;
+    top: 40%;
+    padding: 14px 12px 12px;
+  }
+  .phone.mini .info-card .info-title { font-size: 15px; }
+  .phone.mini .info-card .info-body { font-size: 11px; margin-bottom: 10px; }
+
+  .footer-note {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.4;
+    padding: 4px 4px 0;
+  }
+  .footer-note strong { color: var(--gold-bright); }
+</style>
+</head>
+<body class="board-page">
+<div class="board" id="shot">
+  <h1>Copy compare · OLD | NEW</h1>
+  <p class="sub">
+    Each pair is horizontal: <strong>prod still left</strong> · <strong>revised mock right</strong>.
+    Prod = Push Pilot 390 stills. Revised phones unchanged this pass.
+  </p>
+
+  <!-- PAIR 1: sheet | ET -->
+  <section class="pair">
+    <div class="pair-head">
+      <div class="pair-title">1 · Prompt sheet · East air</div>
+      <div class="pair-desc">Prod coded sheet vs revised ET (Live Now · drafts)</div>
+    </div>
+    <div class="pair-grid">
+      <div>
+        <div class="side-label">
+          <span class="badge old">Old · Prod</span>
+          <span class="name">Live Scores Prompt sheet</span>
+        </div>
+        <div class="prod-frame">
+          <img src="refs/prod-live-scores-prompt-sheet-390.png" alt="Prod Live Scores Prompt sheet"/>
+        </div>
+      </div>
+      <div>
+        <div class="side-label">
+          <span class="badge new">New · Revised</span>
+          <span class="name">ET air</span>
+          <span class="hint">Stay Updated → draft scores as Site Admin enters them</span>
+        </div>
+        <div class="phone mini">
+          <div class="status-bar"><span>5:14</span><span class="right">LTE</span></div>
+          <div class="sticky-chrome style-soft" style="opacity:0.55">
+            <div class="logo-row">
+              <div class="wordmark"><span class="orb"></span>Mirrorball Madness</div>
+              <div class="avatar">K</div>
+            </div>
+            <div class="sf-line">
+              <span class="dot"></span>
+              <div class="copy"><b>Spoiler-Free</b> · Week 3 posting live</div>
+              <span class="cta">Mark Watched</span>
+            </div>
+          </div>
+          <div class="scroll under-sticky" style="opacity:0.36;pointer-events:none;gap:7px">
+            <div class="page-title">Home</div>
+            <div class="curtain">
+              <div class="curtain-panel left"></div>
+              <div class="curtain-panel right"></div>
+              <div class="curtain-inner">
+                <div class="sticky-chip">Week 3 · East air</div>
+                <div class="curtain-title">East Coast is on air</div>
+                <div class="curtain-sub">Drafts entering</div>
+              </div>
+            </div>
+            <div class="league-list-card">
+              <div class="league-row">
+                <div><div class="name">#supportSWEKylie</div><div class="meta">scores gated</div></div>
+                <span class="pill caught">SF</span>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-nav" style="opacity:0.35">
+            <div class="nav-item"><div class="nav-logo"></div></div>
+            <div class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2 3.5 10.2V21a.8.8 0 0 0 .8.8h5.2V15.5h5V21.8h5.2a.8.8 0 0 0 .8-.8V10.2L12 3.2z"/></svg>Home</div>
+            <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 6h11M8 12h11M8 18h11"/></svg>Results</div>
+            <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 19.5 14.8 4.8l4.4 2.9L9.4 22.4H5v-2.9z"/></svg>Picks</div>
+            <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 20h10M8.5 20V9.5h7V20"/></svg>Standings</div>
+          </div>
+          <div class="sheet-backdrop"></div>
+          <div class="sheet live-air-sheet">
+            <div class="sheet-handle"></div>
+            <div class="air-chip"><span class="live-dot"></span>Live Now · East · 8pm ET</div>
+            <div class="sheet-title-with-i">
+              <div class="sheet-title">Scores are going live</div>
+              <span class="info-i" aria-label="About live">i</span>
+            </div>
+            <div class="sheet-body broken">
+              <span class="helper-line">Week 3 judges&apos; scores are going up.</span>
+              <span class="helper-line">Follow live, catch up fully, or stay blind.</span>
+            </div>
+            <div class="sf-toggle-row">
+              <div>
+                <div class="fl-label">Spoiler-Free Mode</div>
+                <div class="fl-sub">Hide results until you mark a week as watched</div>
+              </div>
+              <div class="toggle on"></div>
+            </div>
+            <div class="sheet-actions">
+              <div class="btn-sheet-primary wrap">Stay Updated — I&apos;m Watching Live</div>
+              <div class="unlock-hint amber">Unlocks draft scores as Site Admin enters them</div>
+              <div class="btn-sheet-secondary wrap">Mark Watched — I&apos;ve Finished It</div>
+              <div class="unlock-hint">Unlocks drafts · you&apos;re caught up</div>
+              <div class="btn-sheet-ghost">Dismiss</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAIR 2: sheet | PT -->
+  <section class="pair">
+    <div class="pair-head">
+      <div class="pair-title">2 · Prompt sheet · West air</div>
+      <div class="pair-desc">Same prod sheet vs revised PT (Live Now · published scores as they post)</div>
+    </div>
+    <div class="pair-grid">
+      <div>
+        <div class="side-label">
+          <span class="badge old">Old · Prod</span>
+          <span class="name">Live Scores Prompt sheet</span>
+        </div>
+        <div class="prod-frame">
+          <img src="refs/prod-live-scores-prompt-sheet-390.png" alt="Prod Live Scores Prompt sheet"/>
+        </div>
+      </div>
+      <div>
+        <div class="side-label">
+          <span class="badge new">New · Revised</span>
+          <span class="name">PT air</span>
+          <span class="hint">Stay Updated → published scores as they post</span>
+        </div>
+        <div class="phone mini">
+          <div class="status-bar"><span>8:14</span><span class="right">LTE</span></div>
+          <div class="sticky-chrome style-soft" style="opacity:0.55">
+            <div class="logo-row">
+              <div class="wordmark"><span class="orb"></span>Mirrorball Madness</div>
+              <div class="avatar">K</div>
+            </div>
+            <div class="sf-line">
+              <span class="dot"></span>
+              <div class="copy"><b>Spoiler-Free</b> · Week 3 posting live</div>
+              <span class="cta">Mark Watched</span>
+            </div>
+          </div>
+          <div class="scroll under-sticky" style="opacity:0.36;pointer-events:none;gap:7px">
+            <div class="page-title">Home</div>
+            <div class="curtain">
+              <div class="curtain-panel left"></div>
+              <div class="curtain-panel right"></div>
+              <div class="curtain-inner">
+                <div class="sticky-chip">Week 3 · Pacific feed</div>
+                <div class="curtain-title">West Coast is watching</div>
+                <div class="curtain-sub">Spoilers can wait</div>
+              </div>
+            </div>
+            <div class="league-list-card">
+              <div class="league-row">
+                <div><div class="name">#supportSWEKylie</div><div class="meta">scores gated</div></div>
+                <span class="pill caught">Choose</span>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-nav" style="opacity:0.35">
+            <div class="nav-item"><div class="nav-logo"></div></div>
+            <div class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2 3.5 10.2V21a.8.8 0 0 0 .8.8h5.2V15.5h5V21.8h5.2a.8.8 0 0 0 .8-.8V10.2L12 3.2z"/></svg>Home</div>
+            <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 6h11M8 12h11M8 18h11"/></svg>Results</div>
+            <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 19.5 14.8 4.8l4.4 2.9L9.4 22.4H5v-2.9z"/></svg>Picks</div>
+            <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 20h10M8.5 20V9.5h7V20"/></svg>Standings</div>
+          </div>
+          <div class="sheet-backdrop"></div>
+          <div class="sheet live-air-sheet">
+            <div class="sheet-handle"></div>
+            <div class="air-chip"><span class="live-dot"></span>Live Now · West · 8pm PT</div>
+            <div class="sheet-title-with-i">
+              <div class="sheet-title">Scores are going live</div>
+              <span class="info-i" aria-label="About live">i</span>
+            </div>
+            <div class="sheet-body broken">
+              <span class="helper-line">Week 3 judges&apos; scores are going up.</span>
+              <span class="helper-line">Follow live, catch up fully, or stay blind.</span>
+            </div>
+            <div class="sf-toggle-row">
+              <div>
+                <div class="fl-label">Spoiler-Free Mode</div>
+                <div class="fl-sub">Hide results until you mark a week as watched</div>
+              </div>
+              <div class="toggle"></div>
+            </div>
+            <div class="sheet-actions">
+              <div class="btn-sheet-primary wrap">Stay Updated — I&apos;m Watching Live</div>
+              <div class="unlock-hint">Shows published scores as they post</div>
+              <div class="btn-sheet-secondary wrap">Mark Watched — I&apos;ve Finished It</div>
+              <div class="unlock-hint amber">Unlocks drafts · you&apos;re caught up</div>
+              <div class="btn-sheet-ghost">Dismiss</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAIR 3: (i) -->
+  <section class="pair">
+    <div class="pair-head">
+      <div class="pair-title">3 · (i) About live</div>
+      <div class="pair-desc">Prod coded note vs revised About “live”</div>
+    </div>
+    <div class="pair-grid">
+      <div>
+        <div class="side-label">
+          <span class="badge old">Old · Prod</span>
+          <span class="name">(i) info open</span>
+        </div>
+        <div class="prod-frame">
+          <img src="refs/prod-live-scores-info-open-390.png" alt="Prod Live Scores (i) open"/>
+        </div>
+      </div>
+      <div>
+        <div class="side-label">
+          <span class="badge new">New · Revised</span>
+          <span class="name">About “live”</span>
+          <span class="hint">Kylie shorter definition</span>
+        </div>
+        <div class="phone mini">
+          <div class="status-bar"><span>8:14</span><span class="right">LTE</span></div>
+          <div class="sticky-chrome style-soft" style="opacity:0.4">
+            <div class="logo-row">
+              <div class="wordmark"><span class="orb"></span>Mirrorball Madness</div>
+              <div class="avatar">K</div>
+            </div>
+            <div class="sf-line">
+              <span class="dot"></span>
+              <div class="copy"><b>Spoiler-Free</b> · Week 3 posting live</div>
+              <span class="cta">Mark Watched</span>
+            </div>
+          </div>
+          <div class="scroll under-sticky" style="opacity:0.28;pointer-events:none;gap:7px">
+            <div class="page-title">Home</div>
+            <div class="curtain">
+              <div class="curtain-panel left"></div>
+              <div class="curtain-panel right"></div>
+              <div class="curtain-inner">
+                <div class="sticky-chip">Week 3 · Pacific feed</div>
+                <div class="curtain-title">West Coast is watching</div>
+                <div class="curtain-sub">Spoilers can wait</div>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-nav" style="opacity:0.3">
+            <div class="nav-item"><div class="nav-logo"></div></div>
+            <div class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2 3.5 10.2V21a.8.8 0 0 0 .8.8h5.2V15.5h5V21.8h5.2a.8.8 0 0 0 .8-.8V10.2L12 3.2z"/></svg>Home</div>
+            <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 6h11M8 12h11M8 18h11"/></svg>Results</div>
+            <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 19.5 14.8 4.8l4.4 2.9L9.4 22.4H5v-2.9z"/></svg>Picks</div>
+            <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 20h10M8.5 20V9.5h7V20"/></svg>Standings</div>
+          </div>
+          <div class="sheet-backdrop" style="background:rgba(8,4,10,0.72)"></div>
+          <div class="sheet live-air-sheet" style="opacity:0.32;pointer-events:none">
+            <div class="sheet-handle"></div>
+            <div class="air-chip"><span class="live-dot"></span>Live Now · West · 8pm PT</div>
+            <div class="sheet-title-with-i">
+              <div class="sheet-title">Scores are going live</div>
+              <span class="info-i" aria-label="About live">i</span>
+            </div>
+            <div class="sheet-body broken">
+              <span class="helper-line">Week 3 judges&apos; scores are going up.</span>
+              <span class="helper-line">Follow live, catch up fully, or stay blind.</span>
+            </div>
+            <div class="sf-toggle-row">
+              <div>
+                <div class="fl-label">Spoiler-Free Mode</div>
+                <div class="fl-sub">Hide results until you mark a week as watched</div>
+              </div>
+              <div class="toggle"></div>
+            </div>
+            <div class="sheet-actions">
+              <div class="btn-sheet-primary wrap">Stay Updated — I&apos;m Watching Live</div>
+              <div class="btn-sheet-secondary wrap">Mark Watched — I&apos;ve Finished It</div>
+              <div class="btn-sheet-ghost">Dismiss</div>
+            </div>
+          </div>
+          <div class="info-card">
+            <div class="info-title">About “live”</div>
+            <div class="info-body">
+              “Live” means Site Admin is posting: drafts during East air, published scores on the Pacific feed (live West or delayed).
+              <br/><br/>
+              Scores stay gated until you tap Stay Updated or Mark Watched — either one also marks earlier weeks watched.
+            </div>
+            <div class="btn-sheet-primary">Got it</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="footer-note">
+    <strong>Refs:</strong> prod-live-scores-prompt-sheet-390.png · prod-live-scores-info-open-390.png ·
+    Revised: Super early unlock subtext · helper line-broken · (i) trailing title (placement A).
+  </p>
+</div>
+</body>
+</html>

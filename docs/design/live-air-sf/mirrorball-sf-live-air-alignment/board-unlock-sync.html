@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Unlock outcomes + strip sync — SF × Live-air</title>
+<link rel="stylesheet" href="shared.css"/>
+<style>
+  :root {
+    --bg: #08050a; --panel: #141018; --line: rgba(243,234,242,0.12);
+    --muted: #9A8798; --ink: #F3EAF2; --gold: #D4AF37; --gold-bright: #F0D78C;
+    --ok: #7BC47F; --no: #C47B8A; --warn: #E0A85C; --mauve: #C9A0C0;
+  }
+  * { box-sizing: border-box; }
+  body.board-page { margin: 0; padding: 24px; background: #050308; font-family: Inter, system-ui, sans-serif; color: var(--ink); }
+  .board {
+    width: 1680px; background: var(--bg); border-radius: 18px;
+    padding: 28px 28px 24px; border: 1px solid rgba(212,175,55,0.18);
+  }
+  h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 28px; font-weight: 600; margin: 0 0 6px; color: #fff; }
+  .sub { font-size: 13.5px; color: var(--muted); line-height: 1.45; max-width: 1580px; margin: 0 0 16px; }
+  .sub strong { color: #E8D5E4; font-weight: 600; }
+  .sub .gold { color: var(--gold-bright); }
+  .section { margin: 0 0 22px; }
+  .section-h { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; }
+  .section-h h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 18px; font-weight: 600; margin: 0; color: var(--gold-bright); }
+  .section-h .hint { font-size: 12px; color: var(--muted); }
+  .lock-strip {
+    display: grid; grid-template-columns: 1.1fr 1fr 1fr 1fr; gap: 10px;
+    margin: 0 0 18px;
+  }
+  .lock-card {
+    background: rgba(212,175,55,0.07);
+    border: 1px solid rgba(212,175,55,0.28);
+    border-radius: 12px; padding: 12px 14px;
+  }
+  .lock-card .k { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
+  .lock-card .v { font-family: 'Playfair Display', Georgia, serif; font-size: 16px; color: #fff; line-height: 1.25; }
+  .lock-card .s { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+  .lock-card .chip-demo {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 6px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid rgba(212,175,55,0.45); color: var(--gold-bright);
+    font-size: 11px; font-weight: 600; background: rgba(212,175,55,0.1);
+  }
+  .lock-card .chip-demo .dot { width: 6px; height: 6px; border-radius: 50%; background: #E24A4A; box-shadow: 0 0 0 2px rgba(226,74,74,0.25); }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .cell { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .cell-head { padding: 10px 12px 8px; border-bottom: 1px solid var(--line); min-height: 72px; }
+  .cell-id { font-family: 'Playfair Display', Georgia, serif; font-size: 15px; color: var(--gold); font-weight: 600; }
+  .cell-title { font-size: 13px; font-weight: 600; color: #F3EAF2; margin-top: 2px; }
+  .cell-desc { font-size: 11px; color: var(--muted); line-height: 1.35; margin-top: 3px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 10px 0; }
+  .chip { font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 999px; }
+  .chip.yes { background: rgba(123,196,127,0.15); color: var(--ok); border: 1px solid rgba(123,196,127,0.35); }
+  .chip.no  { background: rgba(196,123,138,0.12); color: var(--no); border: 1px solid rgba(196,123,138,0.3); }
+  .chip.warn{ background: rgba(224,168,92,0.14); color: var(--warn); border: 1px solid rgba(224,168,92,0.35); }
+  .chip.mauve{ background: rgba(201,160,192,0.14); color: var(--mauve); border: 1px solid rgba(201,160,192,0.35); }
+  .chip.muted{ background: rgba(154,135,152,0.12); color: var(--muted); border: 1px solid rgba(154,135,152,0.28); }
+  .still-wrap {
+    position: relative; margin: 8px 10px 10px; border-radius: 10px; overflow: hidden;
+    background: #0c090e; border: 1px solid rgba(243,234,242,0.08); height: 380px;
+  }
+  .still-wrap img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+  .still-wrap.short { height: 300px; }
+  .still-wrap.tall { height: 440px; }
+  .cap { font-size: 11px; color: var(--muted); line-height: 1.4; padding: 0 12px 12px; }
+  .cap strong { color: #E8D5E4; font-weight: 600; }
+  .cap .gold { color: var(--gold-bright); }
+  .cta-lock {
+    margin: 8px 10px 0; padding: 10px 12px; border-radius: 10px;
+    background: #0c090e; border: 1px dashed rgba(212,175,55,0.35);
+  }
+  .cta-lock .label { font-size: 10px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: 0.03em; }
+  .cta-lock .btn { margin-top: 6px; font-size: 12px; font-weight: 700; color: #1a1208; background: var(--gold); padding: 8px 10px; border-radius: 8px; text-align: center; }
+  .cta-lock .btn.sec { background: transparent; color: var(--gold-bright); border: 1px solid rgba(212,175,55,0.5); }
+  .cta-lock .soft { margin-top: 5px; font-size: 11px; color: var(--muted); text-align: center; line-height: 1.3; }
+  .note-bar {
+    padding: 10px 14px; border-radius: 10px;
+    background: rgba(212,175,55,0.07); border: 1px solid rgba(212,175,55,0.22);
+    font-size: 12px; color: var(--muted); line-height: 1.4;
+  }
+  .note-bar strong { color: var(--gold-bright); }
+</style>
+</head>
+<body class="board-page">
+<div class="board" id="shot">
+  <h1>5–6 · Unlock outcomes + strip sync</h1>
+  <p class="sub">
+    Kylie-locked copy folded in. Reused phones may still show older sentence-case / clock / “Site Admin” lines —
+    treat the <span class="gold">gold lock cards</span> + soft subtext below as source of truth for finals.
+  </p>
+
+  <div class="lock-strip">
+    <div class="lock-card">
+      <div class="k">Title · locked</div>
+      <div class="v">Scores Are Going Live</div>
+      <div class="s">Title case · (i) About “live” body stays locked</div>
+    </div>
+    <div class="lock-card">
+      <div class="k">Curtain + live-air copy · locked</div>
+      <div class="v">Curtain: Live Now (ET) | Live Now (PT)</div>
+      <div class="chip-demo"><span class="dot"></span> Live Now · East Coast</div>
+      <div class="chip-demo" style="margin-left:6px"><span class="dot"></span> Live Now · West Coast</div>
+      <div class="s">Prompt chip · no clock · replaces old On Air labels</div>
+    </div>
+    <div class="lock-card">
+      <div class="k">Stay Updated soft · Follow-along</div>
+      <div class="s" style="margin-top:0"><strong style="color:#E8D5E4">ET:</strong> Follow along as scores are entered</div>
+      <div class="s"><strong style="color:#E8D5E4">PT:</strong> Follow along as official scores post</div>
+      <div class="s">Subtext muted like Mark Watched · no “Site Admin” on CTA lines</div>
+    </div>
+    <div class="lock-card">
+      <div class="k">Mark Watched soft · locked</div>
+      <div class="v" style="font-size:15px">You’re caught up · scores unlock</div>
+      <div class="s">Aligns with SF strip Mark + amber draft strip after unlock</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">
+      <h2>5 · After choice — what unlocks</h2>
+      <span class="hint">Stay Updated (ET vs PT) · Mark Watched · Dismiss</span>
+    </div>
+    <div class="grid4">
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">5a</div>
+          <div class="cell-title">ET · Stay Updated</div>
+          <div class="cell-desc">Follow-along → draft scores</div>
+        </div>
+        <div class="chips">
+          <span class="chip warn">DRAFTS</span>
+          <span class="chip warn">AMBER STRIP</span>
+          <span class="chip no">NO SF STRIP</span>
+        </div>
+        <div class="cta-lock">
+          <div class="label">Locked soft</div>
+          <div class="btn">Stay Updated — I'm Watching Live</div>
+          <div class="soft">Follow along as scores are entered</div>
+        </div>
+        <div class="still-wrap short"><img src="stills/02-draft-may-change.png" alt="Draft amber strip"/></div>
+        <p class="cap"><strong>Unlocks:</strong> draft scores as they enter. Home gains amber Soft inset <span class="gold">Draft scores · may change</span> (+i). SF posting strip replaced (one sticky max).</p>
+      </div>
+
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">5b</div>
+          <div class="cell-title">PT · Stay Updated</div>
+          <div class="cell-desc">Follow-along → published</div>
+        </div>
+        <div class="chips">
+          <span class="chip mauve">PUBLISHED</span>
+          <span class="chip no">NO DRAFTS</span>
+          <span class="chip no">NO AMBER</span>
+        </div>
+        <div class="cta-lock">
+          <div class="label">Locked soft</div>
+          <div class="btn">Stay Updated — I'm Watching Live</div>
+          <div class="soft">Follow along as official scores post</div>
+        </div>
+        <div class="still-wrap short"><img src="stills/03-pt-air-prompt.png" alt="PT Stay path"/></div>
+        <p class="cap"><strong>Unlocks:</strong> published scores as they post — <span class="gold">no drafts</span>. No amber draft strip on this path. SF strip clears once caught-up / following.</p>
+      </div>
+
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">5c</div>
+          <div class="cell-title">Mark Watched</div>
+          <div class="cell-desc">Either coast · caught up</div>
+        </div>
+        <div class="chips">
+          <span class="chip yes">CAUGHT UP</span>
+          <span class="chip warn">SCORES UNLOCK</span>
+          <span class="chip warn">AMBER if drafts</span>
+        </div>
+        <div class="cta-lock">
+          <div class="label">Locked soft</div>
+          <div class="btn sec">Mark Watched — I've Finished It</div>
+          <div class="soft">You’re caught up · scores unlock</div>
+        </div>
+        <div class="still-wrap short"><img src="stills/02-mark-watched-current.png" alt="Mark watched"/></div>
+        <p class="cap"><strong>Unlocks:</strong> scores (drafts during East / whatever is posted) · earlier weeks marked watched. Aligns with SF strip Mark Watched CTA. Soft — no Site Admin language.</p>
+      </div>
+
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">5d</div>
+          <div class="cell-title">Dismiss</div>
+          <div class="cell-desc">Stay gated · prompt may return</div>
+        </div>
+        <div class="chips">
+          <span class="chip no">GATED</span>
+          <span class="chip muted">SF STRIP stays</span>
+          <span class="chip no">NO SCORES</span>
+        </div>
+        <div class="cta-lock">
+          <div class="label">Ghost</div>
+          <div class="btn sec" style="border-style:none;color:#9A8798">Dismiss</div>
+          <div class="soft" style="color:#9A8798">Stay blind · no unlock</div>
+        </div>
+        <div class="still-wrap short"><img src="stills/05-home-sf-on-hidden.png" alt="Still gated SF on"/></div>
+        <p class="cap"><strong>Unlocks:</strong> nothing. Scores stay gated. Soft inset posting strip / Results SF gate remain until Stay Updated or Mark Watched.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">
+      <h2>6 · Where strips + Settings sync with prompt SF toggle</h2>
+      <span class="hint">One preference · three surfaces</span>
+    </div>
+    <div class="grid3">
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">6a</div>
+          <div class="cell-title">Prompt SF toggle</div>
+          <div class="cell-desc">Spoiler-Free Mode · same wording as Settings</div>
+        </div>
+        <div class="chips">
+          <span class="chip mauve">↔ SETTINGS</span>
+          <span class="chip muted">ON → SF STRIP</span>
+          <span class="chip no">OFF → NO STRIP</span>
+        </div>
+        <div class="still-wrap tall"><img src="stills/02-et-air-prompt.png" alt="Prompt SF toggle"/></div>
+        <p class="cap"><strong>Sync:</strong> toggle on sheet = Settings <em>Spoiler-Free Mode</em> (“Hide results until you mark a week as watched”). Flip here flips Settings and Soft inset visibility.</p>
+      </div>
+
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">6b</div>
+          <div class="cell-title">Settings + SF strip</div>
+          <div class="cell-desc">Source of truth · Soft inset Pattern B</div>
+        </div>
+        <div class="chips">
+          <span class="chip mauve">SETTINGS SoT</span>
+          <span class="chip muted">POSTING LIVE</span>
+        </div>
+        <div class="still-wrap short"><img src="stills/04-settings-sf-on.png" alt="Settings SF on"/></div>
+        <div class="still-wrap short" style="margin-top:0"><img src="stills/02-soft-inset-pattern-b.png" alt="Soft inset SF strip"/></div>
+        <p class="cap"><strong>Sync:</strong> Settings on → Soft inset <span class="gold">Spoiler-Free · Week N posting live</span> + Mark Watched during air. Off → strip gone. Results SF gate still respects caught-up.</p>
+      </div>
+
+      <div class="cell">
+        <div class="cell-head">
+          <div class="cell-id">6c</div>
+          <div class="cell-title">Draft amber after unlock</div>
+          <div class="cell-desc">Replaces SF strip · one sticky max</div>
+        </div>
+        <div class="chips">
+          <span class="chip warn">DRAFT · MAY CHANGE</span>
+          <span class="chip no">DON’T STACK</span>
+        </div>
+        <div class="still-wrap short"><img src="stills/02-draft-may-change.png" alt="Draft strip"/></div>
+        <div class="still-wrap short" style="margin-top:0"><img src="stills/08-draft-coexist-note.png" alt="Coexist note"/></div>
+        <p class="cap"><strong>Sync:</strong> after ET Stay / Mark unlocks drafts → amber Soft inset rhyme. <span class="gold">Draft replaces SF Soft inset</span> — never stack two stickies.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="note-bar">
+    <strong>Follow-along lean (locked):</strong>
+    ET Stay soft = “Follow along as scores are entered” ·
+    PT Stay soft = “Follow along as official scores post” ·
+    Mark soft = “You’re caught up · scores unlock” ·
+    CTA lines never say Site Admin. Title = <strong>Scores Are Going Live</strong> · curtain = <strong>Live Now (ET)</strong> | <strong>Live Now (PT)</strong> · prompt chip = <strong>Live Now · East Coast</strong> | <strong>Live Now · West Coast</strong> · no clock.
+  </div>
+</div>
+</body>
+</html>

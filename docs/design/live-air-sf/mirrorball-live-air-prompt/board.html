@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Live-air prompt · ET vs PT — Mirrorball Madness</title>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="phone-common.css"/>
+<style>
+  body.board-page { padding: 28px 24px 36px; }
+  .board {
+    width: 1280px;
+    background: #08050a;
+    border-radius: 18px;
+    padding: 28px 28px 24px;
+  }
+  .board > h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .board .sub {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.45;
+    max-width: 1180px;
+    margin-bottom: 14px;
+  }
+  .board .sub strong { color: #E8D5E4; font-weight: 600; }
+  .board .sub .gold { color: var(--gold-bright); }
+  .board .phones {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  .board .col { display: flex; flex-direction: column; gap: 8px; }
+  .board .col-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 4px 2px;
+    min-height: 72px;
+  }
+  .col-top { display: flex; align-items: baseline; gap: 7px; }
+  .board .col-letter {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 18px;
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .board .col-name { font-size: 13px; font-weight: 600; color: #F3EAF2; }
+  .board .col-desc { font-size: 11px; color: var(--muted); line-height: 1.35; }
+  .phone.mini {
+    width: 100%;
+    height: 720px;
+    border-radius: 28px;
+  }
+  .phone.mini .status-bar { height: 36px; font-size: 13px; padding: 0 22px 6px; }
+  .phone.mini .bottom-nav { height: 58px; padding: 5px 2px 10px; }
+  .phone.mini .nav-item { font-size: 9px; }
+  .phone.mini .nav-item svg { width: 17px; height: 17px; }
+  .phone.mini .nav-logo { width: 20px; height: 20px; }
+  .phone.mini .page-title { font-size: 20px; padding-top: 2px; }
+  .phone.mini .curtain { min-height: 96px; }
+  .phone.mini .curtain-inner { padding: 10px 44px 8px; }
+  .phone.mini .curtain-title { font-size: 17px !important; }
+  .phone.mini .curtain-sub { font-size: 10.5px; }
+  .phone.mini .sticky-chip { font-size: 9.5px; padding: 2px 8px; }
+  .phone.mini .league-row { padding: 8px 10px; }
+  .phone.mini .league-row .name { font-size: 12px; }
+  .phone.mini .league-row .meta { font-size: 10px; }
+  .phone.mini .pill { font-size: 9.5px; padding: 3px 7px; }
+  .phone.mini .info-card {
+    left: 14px; right: 14px;
+    top: 42%;
+    padding: 14px 12px 12px;
+  }
+  .phone.mini .sheet-title { font-size: 15px; }
+  .phone.mini .sheet-body { font-size: 11px; margin-bottom: 8px; }
+  .phone.mini .btn-sheet-primary.wrap,
+  .phone.mini .btn-sheet-secondary.wrap { font-size: 11px; padding: 9px 10px; }
+  .when-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 16px;
+  }
+  .when-strip .tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(243,234,242,0.12);
+    color: var(--muted);
+    background: rgba(34,26,36,0.8);
+  }
+  .when-strip .tag.on {
+    color: var(--gold-bright);
+    border-color: rgba(212,175,55,0.4);
+    background: rgba(212,175,55,0.1);
+  }
+  .when-strip .tag.off {
+    color: #8A7488;
+    text-decoration: line-through;
+    text-decoration-color: rgba(138,116,136,0.55);
+  }
+</style>
+</head>
+<body class="board-page">
+<div class="board" id="shot">
+  <h1>Live-air prompt · ET vs PT unlock</h1>
+  <p class="sub">
+    Title + (i) = <strong>Kylie lock</strong> (“Scores are going live” / About “live”). Helper, buttons, SF strip &amp; Settings toggle stay coded.
+    Anyone during an <strong>active live-air window</strong> (East <em>or</em> West) must choose before scores show —
+    <span class="gold">SF on or off</span>. Centered Live Now chip w/ time (East · 8pm ET / West · 8pm PT) · Soft inset Pattern B.
+  </p>
+
+  <div class="when-strip">
+    <span class="tag on">Shows · East Coast air</span>
+    <span class="tag on">Shows · West Coast air</span>
+    <span class="tag off">Not before curtain</span>
+    <span class="tag off">Not ET→PT gap (~7–8pm PT)</span>
+    <span class="tag off">Not after night done</span>
+  </div>
+
+  <div class="phones">
+    <!-- A ET -->
+    <div class="col">
+      <div class="col-label">
+        <div class="col-top">
+          <span class="col-letter">A</span>
+          <span class="col-name">ET air · prompt</span>
+        </div>
+        <span class="col-desc">Stay Updated → draft scores as Site Admin enters them · Mark Watched → you&apos;re caught up</span>
+      </div>
+      <div class="phone mini">
+        <div class="status-bar"><span>5:14</span><span class="right">LTE</span></div>
+        <div class="sticky-chrome style-soft" style="opacity:0.55">
+          <div class="logo-row">
+            <div class="wordmark"><span class="orb"></span>Mirrorball Madness</div>
+            <div class="avatar">K</div>
+          </div>
+          <div class="sf-line">
+            <span class="dot"></span>
+            <div class="copy"><b>Spoiler-Free</b> · Week 3 posting live</div>
+            <span class="cta">Mark Watched</span>
+          </div>
+        </div>
+        <div class="scroll under-sticky" style="opacity:0.36;pointer-events:none;gap:7px">
+          <div class="page-title">Home</div>
+          <div class="curtain">
+            <div class="curtain-panel left"></div>
+            <div class="curtain-panel right"></div>
+            <div class="curtain-inner">
+              <div class="sticky-chip">Week 3 · East air</div>
+              <div class="curtain-title">East Coast is on air</div>
+              <div class="curtain-sub">Drafts entering</div>
+            </div>
+          </div>
+          <div class="league-list-card">
+            <div class="league-row">
+              <div><div class="name">#supportSWEKylie</div><div class="meta">scores gated</div></div>
+              <span class="pill caught">SF</span>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-nav" style="opacity:0.35">
+          <div class="nav-item"><div class="nav-logo"></div></div>
+          <div class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2 3.5 10.2V21a.8.8 0 0 0 .8.8h5.2V15.5h5V21.8h5.2a.8.8 0 0 0 .8-.8V10.2L12 3.2z"/></svg>Home</div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 6h11M8 12h11M8 18h11"/></svg>Results</div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 19.5 14.8 4.8l4.4 2.9L9.4 22.4H5v-2.9z"/></svg>Picks</div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 20h10M8.5 20V9.5h7V20"/></svg>Standings</div>
+        </div>
+        <div class="sheet-backdrop"></div>
+        <div class="sheet live-air-sheet">
+          <div class="sheet-handle"></div>
+          <div class="air-chip"><span class="live-dot"></span>Live Now · East · 8pm ET</div>
+          <div class="sheet-title-with-i">
+            <div class="sheet-title">Scores are going live</div>
+            <span class="info-i" aria-label="About live">i</span>
+          </div>
+          <div class="sheet-body broken">
+            <span class="helper-line">Week 3 judges&apos; scores are going up.</span>
+            <span class="helper-line">Follow live, catch up fully, or stay blind.</span>
+          </div>
+          <div class="sf-toggle-row">
+            <div>
+              <div class="fl-label">Spoiler-Free Mode</div>
+              <div class="fl-sub">Hide results until you mark a week as watched</div>
+            </div>
+            <div class="toggle on"></div>
+          </div>
+          <div class="sheet-actions">
+            <div class="btn-sheet-primary wrap">Stay Updated — I&apos;m Watching Live</div>
+            <div class="unlock-hint amber">Unlocks draft scores as Site Admin enters them</div>
+            <div class="btn-sheet-secondary wrap">Mark Watched — I&apos;ve Finished It</div>
+            <div class="unlock-hint">Unlocks drafts · you&apos;re caught up</div>
+            <div class="btn-sheet-ghost">Dismiss</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B PT -->
+    <div class="col">
+      <div class="col-label">
+        <div class="col-top">
+          <span class="col-letter">B</span>
+          <span class="col-name">PT air · prompt</span>
+        </div>
+        <span class="col-desc">Stay Updated → published scores as they post · Mark Watched → you&apos;re caught up · SF-off gated</span>
+      </div>
+      <div class="phone mini">
+        <div class="status-bar"><span>8:14</span><span class="right">LTE</span></div>
+        <div class="sticky-chrome style-soft" style="opacity:0.55">
+          <div class="logo-row">
+            <div class="wordmark"><span class="orb"></span>Mirrorball Madness</div>
+            <div class="avatar">K</div>
+          </div>
+          <div class="sf-line">
+            <span class="dot"></span>
+            <div class="copy"><b>Spoiler-Free</b> · Week 3 posting live</div>
+            <span class="cta">Mark Watched</span>
+          </div>
+        </div>
+        <div class="scroll under-sticky" style="opacity:0.36;pointer-events:none;gap:7px">
+          <div class="page-title">Home</div>
+          <div class="curtain">
+            <div class="curtain-panel left"></div>
+            <div class="curtain-panel right"></div>
+            <div class="curtain-inner">
+              <div class="sticky-chip">Week 3 · Pacific feed</div>
+              <div class="curtain-title">West Coast is watching</div>
+              <div class="curtain-sub">Spoilers can wait</div>
+            </div>
+          </div>
+          <div class="league-list-card">
+            <div class="league-row">
+              <div><div class="name">#supportSWEKylie</div><div class="meta">scores gated</div></div>
+              <span class="pill caught">Choose</span>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-nav" style="opacity:0.35">
+          <div class="nav-item"><div class="nav-logo"></div></div>
+          <div class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2 3.5 10.2V21a.8.8 0 0 0 .8.8h5.2V15.5h5V21.8h5.2a.8.8 0 0 0 .8-.8V10.2L12 3.2z"/></svg>Home</div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 6h11M8 12h11M8 18h11"/></svg>Results</div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 19.5 14.8 4.8l4.4 2.9L9.4 22.4H5v-2.9z"/></svg>Picks</div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 20h10M8.5 20V9.5h7V20"/></svg>Standings</div>
+        </div>
+        <div class="sheet-backdrop"></div>
+        <div class="sheet live-air-sheet">
+          <div class="sheet-handle"></div>
+          <div class="air-chip"><span class="live-dot"></span>Live Now · West · 8pm PT</div>
+          <div class="sheet-title-with-i">
+            <div class="sheet-title">Scores are going live</div>
+            <span class="info-i" aria-label="About live">i</span>
+          </div>
+          <div class="sheet-body broken">
+            <span class="helper-line">Week 3 judges&apos; scores are going up.</span>
+            <span class="helper-line">Follow live, catch up fully, or stay blind.</span>
+          </div>
+          <div class="sf-toggle-row">
+            <div>
+              <div class="fl-label">Spoiler-Free Mode</div>
+              <div class="fl-sub">Hide results until you mark a week as watched</div>
+            </div>
+            <div class="toggle"></div>
+          </div>
+          <div class="sheet-actions">
+            <div class="btn-sheet-primary wrap">Stay Updated — I&apos;m Watching Live</div>
+            <div class="unlock-hint">Shows published scores as they post</div>
+            <div class="btn-sheet-secondary wrap">Mark Watched — I&apos;ve Finished It</div>
+            <div class="unlock-hint amber">Unlocks drafts · you&apos;re caught up</div>
+            <div class="btn-sheet-ghost">Dismiss</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- C Info -->
+    <div class="col">
+      <div class="col-label">
+        <div class="col-top">
+          <span class="col-letter">C</span>
+          <span class="col-name">(i) About “live”</span>
+        </div>
+        <span class="col-desc">Kylie lock · shorter “live” definition · title About “live”</span>
+      </div>
+      <div class="phone mini">
+        <div class="status-bar"><span>8:14</span><span class="right">LTE</span></div>
+        <div class="sticky-chrome style-soft" style="opacity:0.4">
+          <div class="logo-row">
+            <div class="wordmark"><span class="orb"></span>Mirrorball Madness</div>
+            <div class="avatar">K</div>
+          </div>
+          <div class="sf-line">
+            <span class="dot"></span>
+            <div class="copy"><b>Spoiler-Free</b> · Week 3 posting live</div>
+            <span class="cta">Mark Watched</span>
+          </div>
+        </div>
+        <div class="scroll under-sticky" style="opacity:0.28;pointer-events:none;gap:7px">
+          <div class="page-title">Home</div>
+          <div class="curtain">
+            <div class="curtain-panel left"></div>
+            <div class="curtain-panel right"></div>
+            <div class="curtain-inner">
+              <div class="sticky-chip">Week 3 · Pacific feed</div>
+              <div class="curtain-title">West Coast is watching</div>
+              <div class="curtain-sub">Spoilers can wait</div>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-nav" style="opacity:0.3">
+          <div class="nav-item"><div class="nav-logo"></div></div>
+          <div class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2 3.5 10.2V21a.8.8 0 0 0 .8.8h5.2V15.5h5V21.8h5.2a.8.8 0 0 0 .8-.8V10.2L12 3.2z"/></svg>Home</div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 6h11M8 12h11M8 18h11"/></svg>Results</div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 19.5 14.8 4.8l4.4 2.9L9.4 22.4H5v-2.9z"/></svg>Picks</div>
+          <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 20h10M8.5 20V9.5h7V20"/></svg>Standings</div>
+        </div>
+        <div class="sheet-backdrop" style="background:rgba(8,4,10,0.72)"></div>
+        <div class="sheet live-air-sheet" style="opacity:0.32;pointer-events:none">
+          <div class="sheet-handle"></div>
+          <div class="air-chip"><span class="live-dot"></span>Live Now · West · 8pm PT</div>
+          <div class="sheet-title-with-i">
+            <div class="sheet-title">Scores are going live</div>
+            <span class="info-i" aria-label="About live">i</span>
+          </div>
+          <div class="sheet-body broken">
+            <span class="helper-line">Week 3 judges&apos; scores are going up.</span>
+            <span class="helper-line">Follow live, catch up fully, or stay blind.</span>
+          </div>
+          <div class="sf-toggle-row">
+            <div>
+              <div class="fl-label">Spoiler-Free Mode</div>
+              <div class="fl-sub">Hide results until you mark a week as watched</div>
+            </div>
+            <div class="toggle"></div>
+          </div>
+          <div class="sheet-actions">
+            <div class="btn-sheet-primary wrap">Stay Updated — I&apos;m Watching Live</div>
+            <div class="btn-sheet-secondary wrap">Mark Watched — I&apos;ve Finished It</div>
+            <div class="btn-sheet-ghost">Dismiss</div>
+          </div>
+        </div>
+        <div class="info-card">
+          <div class="info-title">About “live”</div>
+          <div class="info-body">
+            “Live” means Site Admin is posting: drafts during East air, published scores on the Pacific feed (live West or delayed).
+      <br/><br/>
+      Scores stay gated until you tap Stay Updated or Mark Watched — either one also marks earlier weeks watched.
+          </div>
+          <div class="btn-sheet-primary">Got it</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="unlock-matrix">
+    <div class="cell">
+      <div class="who">ET · Stay Updated (Watching live)</div>
+      <div class="what">Unlocks <b>draft</b> scores as Site Admin enters them.</div>
+    </div>
+    <div class="cell">
+      <div class="who">PT · Stay Updated (Watching live)</div>
+      <div class="what">Shows <b>published</b> scores as they post (per SF after choice).</div>
+    </div>
+    <div class="cell">
+      <div class="who">Mark Watched — Finished (either)</div>
+      <div class="what">Unlocks <b>drafts</b> · you&apos;re caught up. Drafts never by default / never SF-off alone.</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Coded buttons:</strong> Stay Updated — I&apos;m Watching Live · Mark Watched — I&apos;ve Finished It · Dismiss ·
+    <strong>SF toggle</strong> = Settings: Spoiler-Free Mode / Hide results until you mark a week as watched ·
+    <strong>(i)</strong> About “live” (Kylie lock — shorter definition).
+    Unlock subtext under buttons is the new ET/PT product lock only.
+  </div>
+</div>
+</body>
+</html>

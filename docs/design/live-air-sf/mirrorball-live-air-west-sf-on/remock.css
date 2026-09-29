@@ -1,0 +1,824 @@
+/* Mid West · SF-on remocks — prod still base + locked overlays only */
+
+:root {
+  --bg: #08050a;
+  --panel: #141018;
+  --line: rgba(243,234,242,0.12);
+  --muted: #9A8798;
+  --ink: #F3EAF2;
+  --gold: #D4AF37;
+  --gold-bright: #F0D78C;
+  --gold-dim: #C4A04A;
+  --ok: #7BC47F;
+  --no: #C47B8A;
+  --warn: #E0A85C;
+  --proposal: #B8A0B4;
+}
+
+* { box-sizing: border-box; }
+
+body.board-page {
+  margin: 0;
+  padding: 24px;
+  background: #050308;
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--ink);
+}
+
+.board.west-sf-board {
+  width: 900px;
+  min-width: 900px;
+  max-width: 900px;
+  background: var(--bg);
+  border-radius: 18px;
+  padding: 24px 28px 20px;
+  border: 1px solid rgba(212,175,55,0.18);
+}
+
+.board.west-sf-board h1 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: #fff;
+}
+
+.board.west-sf-board .sub {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0 0 14px;
+  max-width: 920px;
+}
+.board.west-sf-board .sub strong { color: #E8D5E4; font-weight: 600; }
+.board.west-sf-board .sub .gold { color: var(--gold-bright); }
+
+.lock-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+.lock-row .pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(212,175,55,0.28);
+  color: var(--gold-bright);
+  background: rgba(212,175,55,0.08);
+}
+.lock-row .pill.warn {
+  border-color: rgba(224,168,92,0.4);
+  color: var(--warn);
+  background: rgba(224,168,92,0.1);
+}
+.lock-row .pill.muted {
+  border-color: rgba(154,135,152,0.3);
+  color: var(--muted);
+  background: rgba(154,135,152,0.08);
+}
+.lock-row .pill.proposal {
+  border-color: rgba(184,160,180,0.45);
+  color: var(--proposal);
+  background: rgba(184,160,180,0.1);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 390px 390px;
+  gap: 22px;
+  align-items: start;
+  justify-content: center;
+}
+
+.col-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin: 0 0 8px;
+}
+.col-label span {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  margin-left: 6px;
+}
+
+/* ——— Prod-faithful phone frame ——— */
+.phone {
+  position: relative;
+  width: 390px;
+  height: 844px;
+  border-radius: 28px;
+  overflow: hidden;
+  background: #1A121E;
+  box-shadow:
+    0 0 0 2px rgba(243,234,242,0.08),
+    0 18px 48px rgba(0,0,0,0.55);
+  flex-shrink: 0;
+}
+.phone .base {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  z-index: 1;
+}
+.phone .dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(8,5,10,0.55);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Soft inset strip patch — covers prod strip band (~y 48–76) */
+.strip-patch {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 48px;
+  height: 30px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 0 16px;
+  background: linear-gradient(180deg, rgba(52, 34, 50, 0.98), rgba(36, 24, 40, 0.96));
+  border-bottom: 1px solid rgba(243, 234, 242, 0.14);
+}
+.strip-patch .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #E8C547;
+  box-shadow: 0 0 0 2px rgba(232, 197, 71, 0.28);
+  flex-shrink: 0;
+}
+.strip-patch .copy {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(243,234,242,0.88);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.strip-patch .copy b {
+  color: #F0D78C;
+  font-weight: 600;
+}
+.strip-patch .cta {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1A121E;
+  background: linear-gradient(180deg, #E8C547, #D4AF37);
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Amber draft Soft inset — replaces SF strip (don't stack) */
+.strip-patch.draft {
+  background: linear-gradient(180deg, rgba(62, 44, 26, 0.98), rgba(42, 30, 20, 0.96));
+  border-bottom: 1px solid rgba(232, 180, 80, 0.28);
+}
+.strip-patch.draft .dot {
+  background: #E8B84A;
+  box-shadow: 0 0 0 2px rgba(232, 184, 74, 0.28);
+}
+.strip-patch.draft .copy {
+  color: rgba(255, 240, 220, 0.92);
+}
+.strip-patch.draft .copy b {
+  color: #F0D070;
+}
+.strip-patch.draft .info-i {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(232, 197, 71, 0.55);
+  background: rgba(212, 175, 55, 0.10);
+  color: #E8C547;
+  font-family: Georgia, 'Playfair Display', serif;
+  font-size: 11px;
+  font-weight: 700;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+
+/* Soft inset GONE — cover prod strip band so base still doesn’t leak through */
+.strip-patch.gone {
+  background: #1A121E;
+  border-bottom: none;
+  pointer-events: none;
+}
+.strip-patch.gone .dot,
+.strip-patch.gone .copy,
+.strip-patch.gone .cta,
+.strip-patch.gone .info-i {
+  display: none;
+}
+
+/* Published / live Soft inset — replaces SF strip on West Stay/Mark (NO drafts) */
+.strip-patch.published {
+  background: linear-gradient(180deg, rgba(34, 48, 40, 0.98), rgba(24, 36, 30, 0.96));
+  border-bottom: 1px solid rgba(123, 196, 127, 0.28);
+}
+.strip-patch.published .dot {
+  background: #7BC47F;
+  box-shadow: 0 0 0 2px rgba(123, 196, 127, 0.28);
+}
+.strip-patch.published .copy {
+  color: rgba(232, 245, 232, 0.92);
+}
+.strip-patch.published .copy b {
+  color: #B5E0B8;
+}
+.strip-patch.published .info-i {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(123, 196, 127, 0.55);
+  background: rgba(123, 196, 127, 0.10);
+  color: #9DCEA0;
+  font-family: Georgia, 'Playfair Display', serif;
+  font-size: 11px;
+  font-weight: 700;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.league-card-patch .pill.live {
+  background: rgba(40, 52, 40, 0.95);
+  color: #B5E0B8;
+  border: 1px solid rgba(123,196,127,0.4);
+}
+
+.btn-secondary.selected {
+  box-shadow: 0 0 0 2px rgba(240,215,140,0.45), 0 0 0 5px rgba(212,175,55,0.14);
+  border-color: rgba(240,215,140,0.55);
+  color: #fff;
+}
+
+
+/* Curtain patch — covers prod curtain card (~y 138–385) */
+.curtain-patch {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 138px;
+  height: 248px;
+  z-index: 5;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(90,18,28,0.92) 0%, transparent 18%, transparent 82%, rgba(90,18,28,0.92) 100%),
+    linear-gradient(180deg, #3A1820 0%, #1E1016 55%, #1A0E14 100%);
+  border: 1px solid rgba(212,175,55,0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 16px 12px;
+  text-align: center;
+}
+.curtain-patch::before,
+.curtain-patch::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 28px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(120, 24, 40, 0.85) 0px,
+    rgba(70, 12, 24, 0.9) 6px,
+    rgba(140, 30, 48, 0.75) 12px
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+.curtain-patch::before { left: 0; border-radius: 14px 0 0 14px; }
+.curtain-patch::after { right: 0; border-radius: 0 14px 14px 0; }
+
+.curtain-patch .chip {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--gold-bright);
+  border: 1px solid rgba(212,175,55,0.4);
+  background: rgba(20,10,14,0.55);
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+.curtain-patch .chip .live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #E24A4A;
+  box-shadow: 0 0 0 2px rgba(226,74,74,0.28);
+}
+.curtain-patch .title {
+  position: relative;
+  z-index: 1;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 26px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.15;
+  margin: 0 0 4px;
+}
+.curtain-patch .sub {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(232,197,71,0.88);
+  margin: 0 0 10px;
+}
+.curtain-patch .rail {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  width: 70%;
+  max-width: 220px;
+}
+.curtain-patch .rail .node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+}
+.curtain-patch .rail .node::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 100%;
+  height: 1.5px;
+  background: rgba(212,175,55,0.35);
+  z-index: 0;
+}
+.curtain-patch .rail .node:last-child::before { display: none; }
+.curtain-patch .rail .dot {
+  position: relative;
+  z-index: 1;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(212,175,55,0.45);
+  background: #1A0E14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: #1A0E14;
+}
+.curtain-patch .rail .node.done .dot {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.curtain-patch .rail .node.done .dot::after {
+  content: '✓';
+  font-size: 9px;
+  color: #1A0E14;
+}
+.curtain-patch .rail .node.now .dot {
+  width: 18px; height: 18px;
+  border-width: 2px;
+  border-color: var(--gold-bright);
+  background: var(--gold);
+  color: #1A0E14;
+  font-size: 9px;
+}
+.curtain-patch .rail .lbl {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--gold-bright);
+  margin-top: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  min-height: 10px;
+}
+
+/* Full hybrid league card patch — covers Your Leagues block on prod home */
+.league-card-patch {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 398px;
+  height: 300px;
+  z-index: 5;
+  background: #1A121E;
+  border-radius: 4px;
+  padding: 0;
+}
+.league-card-patch .sec-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 4px 2px 8px;
+}
+.league-card-patch .sec-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-bright);
+  letter-spacing: 0.01em;
+}
+.league-card-patch .card {
+  background: linear-gradient(160deg, #26201E 0%, #221A22 100%);
+  border: 1px solid rgba(212,175,55,0.22);
+  border-radius: 12px;
+  padding: 10px 12px 10px;
+  position: relative;
+}
+.league-card-patch .card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 10px; bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+}
+.league-card-patch .row-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.league-card-patch .name {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.2;
+}
+.league-card-patch .name .crown {
+  color: var(--gold);
+  font-size: 12px;
+  margin-right: 4px;
+}
+.league-card-patch .meta {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 450;
+}
+.league-card-patch .pill {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.league-card-patch .pill.draft {
+  background: rgba(62, 44, 26, 0.95);
+  color: #F0D070;
+  border: 1px solid rgba(232, 184, 74, 0.4);
+}
+.league-card-patch .pill.caught {
+  background: rgba(40, 52, 40, 0.95);
+  color: #9DCEA0;
+  border: 1px solid rgba(123,196,127,0.35);
+}
+.league-card-patch .pill.gated {
+  background: rgba(40, 28, 42, 0.95);
+  color: #C9B8C6;
+  border: 1px solid rgba(243,234,242,0.15);
+}
+.league-card-patch .mods {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(243,234,242,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.league-card-patch .mod {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+.league-card-patch .mod .k {
+  width: 88px;
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+.league-card-patch .mod .v { color: #E8DCE6; font-weight: 500; flex: 1; min-width: 0; }
+.league-card-patch .mod .v.live { color: var(--gold-bright); font-weight: 600; }
+.league-card-patch .mod .v.ok { color: #D9CBD7; }
+.league-card-patch .mod .v.muted { color: var(--muted); }
+.league-card-patch .mod .side {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.league-card-patch .ctas {
+  display: grid;
+  grid-template-columns: 1fr 1fr 36px;
+  gap: 7px;
+  margin-top: 10px;
+}
+.league-card-patch .ctas .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.league-card-patch .ctas .btn.primary {
+  background: linear-gradient(180deg, #E8C547, #D4AF37);
+  color: #1A121E;
+}
+.league-card-patch .ctas .btn.sec {
+  border: 1px solid rgba(212,175,55,0.45);
+  color: var(--gold-bright);
+  background: transparent;
+}
+.league-card-patch .ctas .btn.gear {
+  border: 1px solid rgba(212,175,55,0.45);
+  color: var(--gold-bright);
+  background: transparent;
+  font-size: 14px;
+}
+.league-card-patch .links {
+  display: flex;
+  gap: 18px;
+  padding: 10px 4px 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ——— Live-air sheet overlay (locked copy) ——— */
+.sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8,5,10,0.52);
+  z-index: 10;
+}
+.live-sheet {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 12;
+  background: linear-gradient(180deg, #2A1E2C 0%, #1A121E 40%, #140E18 100%);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid rgba(243,234,242,0.12);
+  padding: 10px 16px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-height: 78%;
+  box-shadow: 0 -12px 40px rgba(0,0,0,0.45);
+}
+.live-sheet .handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(243,234,242,0.22);
+  margin: 2px auto 10px;
+}
+.live-sheet .air-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  align-self: center;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.32);
+  color: var(--gold-bright);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin: 0 auto 8px;
+}
+.live-sheet .air-chip .live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #E24A4A;
+  box-shadow: 0 0 0 2px rgba(226,74,74,0.25);
+}
+.live-sheet .title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  position: relative;
+}
+.live-sheet .title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  line-height: 1.2;
+  margin: 0;
+}
+.live-sheet .info-i {
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(212, 175, 55, 0.55);
+  color: var(--gold-bright);
+  font-size: 11px;
+  font-weight: 700;
+  font-style: italic;
+  font-family: Georgia, serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+  background: rgba(212, 175, 55, 0.08);
+}
+.live-sheet .x {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 28px; height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(243,234,242,0.55);
+  font-size: 18px;
+  font-weight: 300;
+}
+.live-sheet .helper {
+  text-align: center;
+  font-size: 13px;
+  color: #E8D5E4;
+  line-height: 1.4;
+  margin: 0 4px 12px;
+  font-weight: 450;
+}
+.live-sheet .helper .line { display: block; }
+
+.sf-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: rgba(52, 34, 50, 0.55);
+  border: 1px solid rgba(243, 234, 242, 0.12);
+  border-radius: 12px;
+}
+.sf-toggle-row .fl-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+.sf-toggle-row .fl-sub {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 1px;
+  font-weight: 450;
+  line-height: 1.3;
+}
+.toggle {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(243,234,242,0.18);
+  position: relative;
+  flex-shrink: 0;
+  border: 1px solid rgba(243,234,242,0.12);
+}
+.toggle.on {
+  background: linear-gradient(180deg, #E8C547, #D4AF37);
+  border-color: transparent;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  top: 2px; left: 3px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  transition: transform 0.15s;
+}
+.toggle.on::after { transform: translateX(18px); }
+
+.sheet-actions { display: flex; flex-direction: column; gap: 0; }
+.btn-primary {
+  background: linear-gradient(180deg, #E8C547, #D4AF37);
+  color: #1A121E;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  padding: 13px 14px;
+  border-radius: 12px;
+  line-height: 1.25;
+}
+.btn-primary.selected {
+  box-shadow: 0 0 0 2px rgba(240,215,140,0.55), 0 0 0 5px rgba(212,175,55,0.18);
+}
+.btn-secondary {
+  margin-top: 8px;
+  background: transparent;
+  color: #F3EAF2;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(243,234,242,0.35);
+  line-height: 1.25;
+}
+.btn-secondary.grayed {
+  color: #8A7888;
+  border-color: rgba(154,135,152,0.28);
+  background: rgba(40, 32, 42, 0.55);
+  opacity: 0.72;
+}
+.btn-ghost {
+  margin-top: 10px;
+  text-align: center;
+  color: #C9B8C6;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px;
+}
+.btn-ghost.selected {
+  color: #fff;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Soft Follow-along — BOTH muted, never gold */
+.soft-hint {
+  font-size: 11.5px;
+  color: var(--muted); /* SAME muted for Stay Updated + Mark Watched */
+  text-align: center;
+  line-height: 1.35;
+  margin: 5px 4px 2px;
+  font-weight: 450;
+}
+.soft-hint.under-primary { margin-top: 6px; margin-bottom: 2px; }
+.soft-hint.under-secondary { margin-top: 6px; margin-bottom: 2px; }
+
+.proposal-tag {
+  align-self: center;
+  margin: 6px 0 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--proposal);
+  border: 1px dashed rgba(184,160,180,0.45);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(184,160,180,0.08);
+}
+
+.foot-cap {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(212,175,55,0.07);
+  border: 1px solid rgba(212,175,55,0.22);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.foot-cap strong { color: var(--gold-bright); }
+.foot-cap .proposal { color: var(--proposal); font-weight: 600; }

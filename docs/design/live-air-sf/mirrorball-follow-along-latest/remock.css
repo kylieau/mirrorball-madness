@@ -1,0 +1,690 @@
+/* Post–East draft gap · Option A — Soft inset Follow-along strip */
+
+:root {
+  --bg: #08050a;
+  --panel: #141018;
+  --line: rgba(243,234,242,0.12);
+  --muted: #9A8798;
+  --ink: #F3EAF2;
+  --gold: #D4AF37;
+  --gold-bright: #F0D78C;
+  --warn: #E0A85C;
+}
+
+* { box-sizing: border-box; }
+
+body.board-page {
+  margin: 0;
+  padding: 24px;
+  background: #050308;
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--ink);
+}
+
+.board.gap-board {
+  width: 900px;
+  min-width: 900px;
+  max-width: 900px;
+  background: var(--bg);
+  border-radius: 18px;
+  padding: 24px 28px 20px;
+  border: 1px solid rgba(212,175,55,0.18);
+}
+
+.board.gap-board h1 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: #fff;
+}
+
+.board.gap-board .sub {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0 0 12px;
+  max-width: 860px;
+}
+.board.gap-board .sub strong { color: #E8D5E4; font-weight: 600; }
+.board.gap-board .sub .gold { color: var(--gold-bright); }
+
+.lock-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+.lock-row .pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(212,175,55,0.28);
+  color: var(--gold-bright);
+  background: rgba(212,175,55,0.08);
+}
+.lock-row .pill.warn {
+  border-color: rgba(224,168,92,0.4);
+  color: var(--warn);
+  background: rgba(224,168,92,0.1);
+}
+.lock-row .pill.muted {
+  border-color: rgba(154,135,152,0.3);
+  color: var(--muted);
+  background: rgba(154,135,152,0.08);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 390px 390px;
+  gap: 22px;
+  align-items: start;
+  justify-content: center;
+}
+
+.col-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin: 0 0 8px;
+}
+.col-label span {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  margin-left: 6px;
+}
+
+/* ——— Phone frame ——— */
+.phone {
+  position: relative;
+  width: 390px;
+  height: 844px;
+  border-radius: 28px;
+  overflow: hidden;
+  background: #1A121E;
+  box-shadow:
+    0 0 0 2px rgba(243,234,242,0.08),
+    0 18px 48px rgba(0,0,0,0.55);
+  flex-shrink: 0;
+}
+.phone .base {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  z-index: 1;
+}
+
+/* Soft inset Follow-along strip — Pattern B slot (~y 48–78) */
+.strip-patch {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 48px;
+  height: 30px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 0 16px;
+  background: linear-gradient(180deg, rgba(52, 34, 50, 0.98), rgba(36, 24, 40, 0.96));
+  border-bottom: 1px solid rgba(243, 234, 242, 0.14);
+}
+.strip-patch .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #E8C547;
+  box-shadow: 0 0 0 2px rgba(232, 197, 71, 0.28);
+  flex-shrink: 0;
+}
+.strip-patch .copy {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(243,234,242,0.88);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.strip-patch .copy b {
+  color: #F0D78C;
+  font-weight: 600;
+}
+.strip-patch .cta {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1A121E;
+  background: linear-gradient(180deg, #E8C547, #D4AF37);
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Cover any baked SF strip band cleanly on SF-off (same slot) */
+.strip-cover {
+  position: absolute;
+  left: 0; right: 0;
+  top: 48px;
+  height: 30px;
+  z-index: 4;
+  background: #1A121E;
+}
+
+/* Curtain — post–East ended (not Live Now) */
+.curtain-patch {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 138px;
+  height: 248px;
+  z-index: 5;
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(90,18,28,0.92) 0%, transparent 18%, transparent 82%, rgba(90,18,28,0.92) 100%),
+    linear-gradient(180deg, #3A1820 0%, #1E1016 55%, #1A0E14 100%);
+  border: 1px solid rgba(212,175,55,0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 16px 12px;
+  text-align: center;
+}
+.curtain-patch::before,
+.curtain-patch::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 28px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(120, 24, 40, 0.85) 0px,
+    rgba(70, 12, 24, 0.9) 6px,
+    rgba(140, 30, 48, 0.75) 12px
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+.curtain-patch::before { left: 0; border-radius: 14px 0 0 14px; }
+.curtain-patch::after { right: 0; border-radius: 0 14px 14px 0; }
+
+.curtain-patch .chip {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--gold-bright);
+  border: 1px solid rgba(212,175,55,0.4);
+  background: rgba(20,10,14,0.55);
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+.curtain-patch .chip .amber-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #E8B84A;
+  box-shadow: 0 0 0 2px rgba(232,184,74,0.28);
+}
+.curtain-patch .title {
+  position: relative;
+  z-index: 1;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.15;
+  margin: 0 0 4px;
+}
+.curtain-patch .sub {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(232,197,71,0.88);
+  margin: 0 0 10px;
+}
+.curtain-patch .rail {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  width: 70%;
+  max-width: 220px;
+}
+.curtain-patch .rail .node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+}
+.curtain-patch .rail .node::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 100%;
+  height: 1.5px;
+  background: rgba(212,175,55,0.35);
+  z-index: 0;
+}
+.curtain-patch .rail .node:last-child::before { display: none; }
+.curtain-patch .rail .dot {
+  position: relative;
+  z-index: 1;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(212,175,55,0.45);
+  background: #1A0E14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: #1A0E14;
+}
+.curtain-patch .rail .node.done .dot {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.curtain-patch .rail .node.done .dot::after {
+  content: '✓';
+  font-size: 9px;
+  color: #1A0E14;
+}
+.curtain-patch .rail .node.now .dot {
+  width: 18px; height: 18px;
+  border-width: 2px;
+  border-color: var(--gold-bright);
+  background: var(--gold);
+  color: #1A0E14;
+  font-size: 9px;
+}
+.curtain-patch .rail .lbl {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--gold-bright);
+  margin-top: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  min-height: 10px;
+}
+
+/* League gated card (scores still locked until Follow along) */
+.league-card-patch {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 398px;
+  height: 300px;
+  z-index: 5;
+  background: #1A121E;
+  border-radius: 4px;
+  padding: 0;
+}
+.league-card-patch .sec-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 4px 2px 8px;
+}
+.league-card-patch .sec-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-bright);
+  letter-spacing: 0.01em;
+}
+.league-card-patch .card {
+  background: linear-gradient(160deg, #26201E 0%, #221A22 100%);
+  border: 1px solid rgba(212,175,55,0.22);
+  border-radius: 12px;
+  padding: 10px 12px 10px;
+  position: relative;
+}
+.league-card-patch .card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 10px; bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+}
+.league-card-patch .row-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.league-card-patch .name {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.2;
+}
+.league-card-patch .name .crown {
+  color: var(--gold);
+  font-size: 12px;
+  margin-right: 4px;
+}
+.league-card-patch .meta {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 450;
+}
+.league-card-patch .pill {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(40, 28, 42, 0.95);
+  color: #C9B8C6;
+  border: 1px solid rgba(243,234,242,0.15);
+}
+.league-card-patch .mods {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(243,234,242,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.league-card-patch .mod {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+.league-card-patch .mod .k {
+  width: 88px;
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+.league-card-patch .mod .v { color: #E8DCE6; font-weight: 500; flex: 1; min-width: 0; }
+.league-card-patch .mod .v.muted { color: var(--muted); }
+.league-card-patch .mod .v.warn { color: var(--warn); font-weight: 600; }
+.league-card-patch .ctas {
+  display: grid;
+  grid-template-columns: 1fr 1fr 36px;
+  gap: 7px;
+  margin-top: 10px;
+}
+.league-card-patch .ctas .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.league-card-patch .ctas .btn.primary {
+  background: linear-gradient(180deg, #E8C547, #D4AF37);
+  color: #1A121E;
+}
+.league-card-patch .ctas .btn.sec {
+  border: 1px solid rgba(212,175,55,0.45);
+  color: var(--gold-bright);
+  background: transparent;
+}
+.league-card-patch .ctas .btn.gear {
+  border: 1px solid rgba(212,175,55,0.45);
+  color: var(--gold-bright);
+  background: transparent;
+  font-size: 14px;
+}
+.league-card-patch .links {
+  display: flex;
+  gap: 18px;
+  padding: 10px 4px 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.foot-cap {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(212,175,55,0.07);
+  border: 1px solid rgba(212,175,55,0.22);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.foot-cap strong { color: var(--gold-bright); }
+
+/* ——— Follow-along Latest placements board (3 phones) ——— */
+
+.board.gap-board.latest-board {
+  width: 1320px;
+  min-width: 1320px;
+  max-width: 1320px;
+}
+
+.trio {
+  display: grid;
+  grid-template-columns: 390px 390px 390px;
+  gap: 22px;
+  align-items: start;
+  justify-content: center;
+}
+
+/* Shared Soft inset Follow-along — Pattern B slot, soft mauve + gold hairline */
+.strip-patch.follow-soft {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  height: auto;
+  min-height: 30px;
+  padding: 6px 14px 7px 16px;
+  background: linear-gradient(180deg, rgba(52, 34, 50, 0.98), rgba(36, 24, 40, 0.96));
+  border-top: 1px solid rgba(212, 175, 55, 0.22);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.22);
+}
+
+.strip-patch.follow-soft .row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.strip-patch.follow-soft .copy-stack {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.2;
+}
+
+.strip-patch.follow-soft .copy-stack .primary {
+  font-size: 12px;
+  font-weight: 600;
+  color: #F0D78C;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.strip-patch.follow-soft .copy-stack .primary .muted-part {
+  font-weight: 500;
+  color: rgba(243,234,242,0.88);
+}
+
+.strip-patch.follow-soft .copy-stack .secondary {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(243,234,242,0.78);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.strip-patch.follow-soft .copy-stack .secondary .honesty {
+  color: var(--muted);
+  font-weight: 450;
+}
+
+.strip-patch.follow-soft .copy {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(243,234,242,0.88);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.strip-patch.follow-soft .copy b {
+  color: #F0D78C;
+  font-weight: 600;
+}
+
+.strip-patch.follow-soft .cta {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1A121E;
+  background: linear-gradient(180deg, #E8C547, #D4AF37);
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Soft line under strip / under CTA */
+.strip-patch.follow-soft .soft-under {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(243,234,242,0.08);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(243,234,242,0.72);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.strip-patch.follow-soft .soft-under .honesty {
+  color: var(--muted);
+  font-weight: 450;
+}
+
+.strip-patch.follow-soft .soft-under.under-cta {
+  text-align: right;
+  padding-right: 2px;
+}
+
+/* A: two-line strip (primary + latest/honesty) */
+.strip-patch.variant-a {
+  padding: 7px 14px 8px 16px;
+}
+
+/* B: locked single line + soft under button */
+.strip-patch.variant-b {
+  padding: 6px 14px 7px 16px;
+}
+
+/* C: latest on strip + short soft honesty */
+.strip-patch.variant-c {
+  padding: 6px 14px 7px 16px;
+}
+
+.col-label .opt {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #1A121E;
+  background: linear-gradient(180deg, #E8C547, #D4AF37);
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.strip-patch.follow-soft .copy-stack .secondary.honesty-only {
+  font-size: 10px;
+  margin-top: 0;
+}
+.strip-patch.follow-soft .copy-stack .muted-part {
+  font-weight: 500;
+  color: rgba(243,234,242,0.78);
+}
+.strip-patch.variant-a .row-main {
+  align-items: flex-start;
+}
+.strip-patch.variant-a .cta {
+  margin-top: 2px;
+}
+.strip-patch.variant-c .row-main {
+  align-items: flex-start;
+}
+.strip-patch.variant-c .cta {
+  margin-top: 2px;
+}
+
+/* Locked A highlight vs faded B/C */
+.col-locked .phone {
+  box-shadow:
+    0 0 0 2px rgba(232, 197, 71, 0.55),
+    0 0 0 5px rgba(212, 175, 55, 0.18),
+    0 18px 48px rgba(0,0,0,0.55);
+}
+.col-locked .col-label {
+  color: var(--gold-bright);
+}
+.col-locked .col-label .opt {
+  box-shadow: 0 0 0 2px rgba(232, 197, 71, 0.35);
+}
+
+.col-faded {
+  opacity: 0.38;
+  filter: grayscale(0.35);
+  pointer-events: none;
+}
+.col-faded .col-label {
+  color: var(--muted);
+}
+.col-faded .col-label .opt.muted-opt {
+  background: rgba(154, 135, 152, 0.45);
+  color: rgba(20, 14, 22, 0.85);
+}
+
+.strip-patch.follow-soft .copy-stack .primary .honesty {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 11px;
+}
+.board.gap-board h1 .gold { color: var(--gold-bright); }

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Post–East draft opt-in · Option A (recommended)</title>
+<link rel="stylesheet" href="../shared.css"/>
+<link rel="stylesheet" href="../remock.css"/>
+</head>
+<body class="board-page">
+<div class="board gap-board" id="shot">
+  <h1>Post–East draft opt-in · Option A (recommended)</h1>
+  <p class="sub">
+    Soft inset <strong class="gold">Follow along</strong> strip after East air ends —
+    SF-agnostic · same Pattern B slot · unlocks drafts like mid-East Stay Updated.
+    No live-air prompt sheet in the gap window.
+  </p>
+  <div class="lock-row">
+    <span class="pill">East air ended</span>
+    <span class="pill warn">Drafts still entering</span>
+    <span class="pill">SF-agnostic strip</span>
+    <span class="pill">CTA · Follow along</span>
+    <span class="pill muted">No live-air prompt</span>
+    <span class="pill muted">Mark Watched mid-East lock unchanged</span>
+  </div>
+
+  <div class="pair">
+    <!-- LEFT: SF on · gap -->
+    <div>
+      <div class="col-label">SF on · gap window<span>replaces SF posting strip</span></div>
+      <div class="phone">
+        <img class="base" src="../stills/prod-home.png" alt="Home base"/>
+        <!-- Follow-along Soft inset REPLACES SF strip (don't stack) -->
+        <div class="strip-patch">
+          <span class="dot"></span>
+          <div class="copy"><b>Draft scores available</b> · Follow along</div>
+          <span class="cta">Follow along</span>
+        </div>
+        <div class="curtain-patch">
+          <div class="chip"><span class="amber-dot"></span>Week 3 · East Coast ended</div>
+          <div class="title">East Coast ended</div>
+          <div class="sub">Drafts still entering · may change</div>
+          <div class="rail" aria-hidden="true">
+            <div class="node done"><div class="dot"></div><div class="lbl"></div></div>
+            <div class="node done"><div class="dot"></div><div class="lbl"></div></div>
+            <div class="node now"><div class="dot">3</div><div class="lbl">Now</div></div>
+            <div class="node"><div class="dot"></div><div class="lbl"></div></div>
+            <div class="node"><div class="dot"></div><div class="lbl"></div></div>
+            <div class="node"><div class="dot"></div><div class="lbl"></div></div>
+          </div>
+        </div>
+        <div class="league-card-patch">
+          <div class="sec-head"><h2>Your Leagues</h2></div>
+          <div class="card">
+            <div class="row-top">
+              <div>
+                <div class="name"><span class="crown">♛</span>Kylie&apos;s Test League</div>
+                <div class="meta">Rank 1 of 1 · 0.00 pts</div>
+              </div>
+              <span class="pill">Gated</span>
+            </div>
+            <div class="mods">
+              <div class="mod"><span class="k">Curtain Call</span><span class="v muted">Picks locked</span></div>
+              <div class="mod"><span class="k">Dance Card</span><span class="v warn">Drafts available</span></div>
+              <div class="mod"><span class="k">Grand Finale</span><span class="v muted">Waiting on results</span></div>
+            </div>
+            <div class="ctas">
+              <div class="btn primary">Open League</div>
+              <div class="btn sec">Standings</div>
+              <div class="btn gear">⚙</div>
+            </div>
+          </div>
+          <div class="links"><span>Create a League</span><span>Join a League</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: SF off · gap (THE FIX) -->
+    <div>
+      <div class="col-label">SF off · gap window<span>same strip · no SF chrome</span></div>
+      <div class="phone">
+        <img class="base" src="../stills/prod-home.png" alt="Home base"/>
+        <div class="strip-cover" aria-hidden="true"></div>
+        <!-- SAME Follow-along Soft inset — closes the SF-off gap -->
+        <div class="strip-patch">
+          <span class="dot"></span>
+          <div class="copy"><b>Draft scores available</b> · Follow along</div>
+          <span class="cta">Follow along</span>
+        </div>
+        <div class="curtain-patch">
+          <div class="chip"><span class="amber-dot"></span>Week 3 · East Coast ended</div>
+          <div class="title">East Coast ended</div>
+          <div class="sub">Drafts still entering · may change</div>
+          <div class="rail" aria-hidden="true">
+            <div class="node done"><div class="dot"></div><div class="lbl"></div></div>
+            <div class="node done"><div class="dot"></div><div class="lbl"></div></div>
+            <div class="node now"><div class="dot">3</div><div class="lbl">Now</div></div>
+            <div class="node"><div class="dot"></div><div class="lbl"></div></div>
+            <div class="node"><div class="dot"></div><div class="lbl"></div></div>
+            <div class="node"><div class="dot"></div><div class="lbl"></div></div>
+          </div>
+        </div>
+        <div class="league-card-patch">
+          <div class="sec-head"><h2>Your Leagues</h2></div>
+          <div class="card">
+            <div class="row-top">
+              <div>
+                <div class="name"><span class="crown">♛</span>Kylie&apos;s Test League</div>
+                <div class="meta">Rank 1 of 1 · 0.00 pts</div>
+              </div>
+              <span class="pill">Gated</span>
+            </div>
+            <div class="mods">
+              <div class="mod"><span class="k">Curtain Call</span><span class="v muted">Picks locked</span></div>
+              <div class="mod"><span class="k">Dance Card</span><span class="v warn">Drafts available</span></div>
+              <div class="mod"><span class="k">Grand Finale</span><span class="v muted">Waiting on results</span></div>
+            </div>
+            <div class="ctas">
+              <div class="btn primary">Open League</div>
+              <div class="btn sec">Standings</div>
+              <div class="btn gear">⚙</div>
+            </div>
+          </div>
+          <div class="links"><span>Create a League</span><span>Join a League</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot-cap">
+    <strong>Note:</strong> Mid-East Mark Watched stays gray during East air (unchanged).
+    This strip only after East air ends · until West air starts or published scores replace drafts.
+    After <strong>Follow along</strong> → amber <strong>Draft scores · may change</strong> strip (same as Stay Updated).
+  </div>
+</div>
+</body>
+</html>
