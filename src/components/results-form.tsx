@@ -304,9 +304,16 @@ export function ResultsForm({
   const [error, setError] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState(false);
   const [seedingCorrection, setSeedingCorrection] = useState(false);
-  const [coupleViewMode, setCoupleViewMode] = useState<"unpublished" | "published" | "leaderboard">("unpublished");
+  const [coupleViewMode, setCoupleViewMode] = useState<"inProgress" | "drafted" | "published">("inProgress");
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [byCoupleSelectedId, setByCoupleSelectedId] = useState("");
+  const [draftedSelectedId, setDraftedSelectedId] = useState("");
   const [publishedSelectedId, setPublishedSelectedId] = useState("");
+  // Published couples default to locked/read-only in a correction (every
+  // couple in a published episode is already fully editable in the draft
+  // underneath -- this just narrows which one the UI lets you touch at a
+  // time, instead of throwing the whole night open at once).
+  const [unlockedForCorrectionCoupleIds, setUnlockedForCorrectionCoupleIds] = useState<Set<string>>(new Set());
 
   const [revealBusy, setRevealBusy] = useState(false);
   // Null until mounted so the undo countdown never renders a server clock.
@@ -370,6 +377,10 @@ export function ResultsForm({
       previousEpisodeId.current = selectedEpisode.id;
       setJustPublished(false);
       setByCoupleSelectedId("");
+      setDraftedSelectedId("");
+      setShowLeaderboard(false);
+      setUnlockedForCorrectionCoupleIds(new Set());
+      setCoupleViewMode(selectedEpisode.results_published_at != null ? "published" : "inProgress");
       dirtyCoupleIds.current.clear();
     }
     const wasSelfTriggered = justSavedEpisodeId.current === selectedEpisode.id;
@@ -431,8 +442,13 @@ export function ResultsForm({
   const scoredCouples = episodeCouples.filter((c) =>
     (rows[c.id] ?? emptyRow()).dances.some((d) => Object.values(d.scores).some((v) => v !== ""))
   );
-  const publishedCouples = episodeCouples.filter((c) => revealedCoupleIds.has(c.id));
-  const unpublishedCouples = episodeCouples.filter((c) => !revealedCoupleIds.has(c.id));
+  // Once the whole episode is officially published, every couple in it is
+  // published -- there's no "still drafting" distinction left to make.
+  const publishedCouples = published ? episodeCouples : episodeCouples.filter((c) => revealedCoupleIds.has(c.id));
+  const draftedCouples = published ? [] : episodeCouples.filter((c) => releasedCoupleIds.has(c.id) && !revealedCoupleIds.has(c.id));
+  const inProgressCouples = published
+    ? []
+    : episodeCouples.filter((c) => !releasedCoupleIds.has(c.id) && !revealedCoupleIds.has(c.id));
   const eliminatedCount = episodeCouples.filter((c) => (rows[c.id] ?? emptyRow()).outcome === "eliminated").length;
   const requiredEliminations = selectedWeek?.is_double_elimination_week ? 2 : 1;
 
@@ -757,7 +773,11 @@ export function ResultsForm({
   function renderDanceEntry(c: Couple, rank?: number) {
     const row = rows[c.id] ?? emptyRow();
     const revealState = publishPerCouple ? revealStates.get(c.id) : undefined;
-    const locked = revealState === "posted";
+    // Once officially published, every couple's draft is already fully
+    // editable underneath (see the correction-seed effect) -- this just
+    // narrows which one the UI lets you touch, read-only by default.
+    const correctionLocked = published && !unlockedForCorrectionCoupleIds.has(c.id);
+    const locked = published ? correctionLocked : revealState === "posted";
     const postedAtIso = revealedAtByCouple[c.id];
     const undoLeft = nowMs !== null && postedAtIso ? undoSecondsLeft(postedAtIso, nowMs) : 0;
     const publishBlocker = row.dances.filter((d) => d.danceStyleId).length === 0
@@ -829,29 +849,53 @@ export function ResultsForm({
         </fieldset>
 
         {!published && !locked && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-            {releasedCoupleIds.has(c.id) ? (
-              <>
-                <Badge>Drafted</Badge>
+          <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {releasedCoupleIds.has(c.id) ? (
+                <>
+                  <Badge>Drafted</Badge>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    className="text-destructive"
+                    disabled={releasing}
+                    onClick={() => void handleWithdrawDraftCouple(c.id)}
+                  >
+                    Withdraw
+                  </Button>
+                </>
+              ) : (
                 <Button
                   size="xs"
-                  variant="ghost"
-                  className="text-destructive"
-                  disabled={releasing}
-                  onClick={() => void handleWithdrawDraftCouple(c.id)}
+                  variant="outline"
+                  disabled={releasing || !row.dances.some((d) => Object.values(d.scores).some((v) => v !== ""))}
+                  onClick={() => void handleReleaseDraftCouple(c.id)}
                 >
-                  Withdraw
+                  {releasing ? "Saving..." : "Save as Draft Score"}
                 </Button>
-              </>
-            ) : (
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Draft stays on this couple until you publish. In progress → Drafted → Published.
+            </p>
+          </div>
+        )}
+
+        {published && (
+          <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
+            {correctionLocked ? (
               <Button
                 size="xs"
                 variant="outline"
-                disabled={releasing || !row.dances.some((d) => Object.values(d.scores).some((v) => v !== ""))}
-                onClick={() => void handleReleaseDraftCouple(c.id)}
+                onClick={() => setUnlockedForCorrectionCoupleIds((prev) => new Set(prev).add(c.id))}
               >
-                {releasing ? "Saving..." : "Save as Draft Score"}
+                Edit
               </Button>
+            ) : (
+              <>
+                <Badge>Editing</Badge>
+                <p className="text-[11px] text-muted-foreground">Changes apply on the next Publish Results.</p>
+              </>
             )}
           </div>
         )}
@@ -1068,33 +1112,51 @@ export function ResultsForm({
 
           <Card>
             <CardHeader>
-              <CardTitle>Couples &amp; Scores</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle>Couples &amp; Scores</CardTitle>
+                <button
+                  type="button"
+                  className="shrink-0 text-sm font-semibold text-accent"
+                  onClick={() => setShowLeaderboard(true)}
+                >
+                  Leaderboard →
+                </button>
+              </div>
               <div className="flex gap-2 pt-1">
                 <Button
                   size="sm"
-                  variant={coupleViewMode === "unpublished" ? "default" : "outline"}
-                  onClick={() => setCoupleViewMode("unpublished")}
+                  variant={!showLeaderboard && coupleViewMode === "inProgress" ? "default" : "outline"}
+                  onClick={() => {
+                    setShowLeaderboard(false);
+                    setCoupleViewMode("inProgress");
+                  }}
                 >
-                  Unpublished
+                  In progress
                 </Button>
                 <Button
                   size="sm"
-                  variant={coupleViewMode === "published" ? "default" : "outline"}
-                  onClick={() => setCoupleViewMode("published")}
+                  variant={!showLeaderboard && coupleViewMode === "drafted" ? "default" : "outline"}
+                  onClick={() => {
+                    setShowLeaderboard(false);
+                    setCoupleViewMode("drafted");
+                  }}
+                >
+                  Drafted
+                </Button>
+                <Button
+                  size="sm"
+                  variant={!showLeaderboard && coupleViewMode === "published" ? "default" : "outline"}
+                  onClick={() => {
+                    setShowLeaderboard(false);
+                    setCoupleViewMode("published");
+                  }}
                 >
                   Published
-                </Button>
-                <Button
-                  size="sm"
-                  variant={coupleViewMode === "leaderboard" ? "default" : "outline"}
-                  onClick={() => setCoupleViewMode("leaderboard")}
-                >
-                  Leaderboard
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              {coupleViewMode === "leaderboard" ? (
+              {showLeaderboard ? (
                 scoredCouples.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No scores entered yet.</p>
                 ) : (
@@ -1102,20 +1164,30 @@ export function ResultsForm({
                     .sort((a, b) => coupleTotal(rows[b.id] ?? emptyRow()) - coupleTotal(rows[a.id] ?? emptyRow()))
                     .map((c, i) => renderDanceEntry(c, i + 1))
                 )
+              ) : coupleViewMode === "drafted" ? (
+                draftedCouples.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {published ? "This episode is published — see Published." : "No couples drafted yet."}
+                  </p>
+                ) : (
+                  renderCouplePicker(draftedCouples, draftedSelectedId, setDraftedSelectedId)
+                )
               ) : coupleViewMode === "published" ? (
                 publishedCouples.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No couples published yet.</p>
                 ) : (
                   renderCouplePicker(publishedCouples, publishedSelectedId, setPublishedSelectedId)
                 )
-              ) : unpublishedCouples.length === 0 ? (
+              ) : inProgressCouples.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   {episodeCouples.length === 0
                     ? "No couples to check for this episode."
-                    : "Every couple's scores are published."}
+                    : published
+                      ? "This episode is published — see Published."
+                      : "Every couple's scores are drafted or published."}
                 </p>
               ) : (
-                renderCouplePicker(unpublishedCouples, byCoupleSelectedId, setByCoupleSelectedId)
+                renderCouplePicker(inProgressCouples, byCoupleSelectedId, setByCoupleSelectedId)
               )}
             </CardContent>
           </Card>
