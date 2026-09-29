@@ -647,9 +647,15 @@ export function ResultsForm({
     });
   }
 
-  function removeDance(coupleId: string, danceKey: string) {
+  // Clears the slot rather than deleting it -- there's no "+ Dance" to add
+  // one back, so dropping a couple to zero rows would strand them with no
+  // way to re-enter a score short of reloading the page. A blank slot (no
+  // danceStyleId) is already excluded from what buildDraftInput sends.
+  function clearDance(coupleId: string, danceKey: string) {
     const row = rows[coupleId] ?? emptyRow();
-    updateRow(coupleId, { dances: row.dances.filter((d) => d.key !== danceKey) });
+    updateRow(coupleId, {
+      dances: row.dances.map((d) => (d.key === danceKey ? { ...d, danceStyleId: "", songTitle: "", scores: {} } : d)),
+    });
   }
 
   async function handleAddCustomMoment() {
@@ -813,9 +819,9 @@ export function ResultsForm({
                   size="xs"
                   variant="ghost"
                   className="text-destructive"
-                  onClick={() => removeDance(c.id, d.key)}
+                  onClick={() => clearDance(c.id, d.key)}
                 >
-                  Remove
+                  Clear
                 </Button>
               </div>
             </div>
