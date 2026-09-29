@@ -109,8 +109,12 @@ export async function removeEpisodeCustomMoment(momentId: string): Promise<{ err
   return result;
 }
 
+// Propose tier, not admin-only: any commissioner can release/withdraw, since
+// they're the ones live at the ET broadcast entering scores. scores_drafted_at
+// is season-wide (not scoped to their own league) -- a deliberate tradeoff so
+// no one has to wait on a site admin to unlock a night for Spoiler-Free fans.
 export async function releaseDraftScores(episodeId: string): Promise<{ error: string | null }> {
-  const access = await requireAdminAccess();
+  const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
   const result = await releaseEpisodeScoreDraft(createAdminClient(), episodeId, access.userId);
@@ -119,7 +123,7 @@ export async function releaseDraftScores(episodeId: string): Promise<{ error: st
 }
 
 export async function withdrawDraftScores(episodeId: string): Promise<{ error: string | null }> {
-  const access = await requireAdminAccess();
+  const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
   const result = await withdrawEpisodeScoreDraft(createAdminClient(), episodeId);

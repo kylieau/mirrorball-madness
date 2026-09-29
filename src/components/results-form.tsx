@@ -1236,7 +1236,7 @@ export function ResultsForm({
             </Card>
           )}
 
-          {canPublish && (
+          {(!published || canPublish) && (
             <div className={`fixed inset-x-0 z-30 ${BOTTOM_NAV_STACK_ABOVE}`}>
               <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="hidden text-xs text-muted-foreground sm:block">
@@ -1244,7 +1244,9 @@ export function ResultsForm({
                     ? "Publishing updates Results & Standings across every league immediately."
                     : scoresDraftedAt
                       ? "Draft scores are visible to fans who marked this week watched. They can still change until you publish."
-                      : "Publish each couple as their scores are in. Finish Week posts safe and eliminated."}
+                      : canPublish
+                        ? "Publish each couple as their scores are in. Finish Week posts safe and eliminated."
+                        : "Draft Scores makes tonight's entries visible to fans who marked this week watched, across every league."}
                 </p>
                 <div className="flex gap-2 sm:w-auto">
                   {!published && (
@@ -1257,7 +1259,7 @@ export function ResultsForm({
                       {releasing ? "Saving..." : scoresDraftedAt ? "Withdraw Draft" : "Draft Scores"}
                     </Button>
                   )}
-                  {published && (
+                  {published && canPublish && (
                     <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing || releasing}>
                       {publishing ? "Publishing..." : "Publish Results"}
                     </Button>

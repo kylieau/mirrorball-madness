@@ -1,18 +1,19 @@
 import { computeWeeklyScores } from "./scoring";
 
-// A night whose Enter Results draft a site admin has released
-// (episodes.scores_drafted_at) and not yet officially published.
+// A night whose Enter Results draft someone with propose access (a
+// commissioner or a site admin) has released (episodes.scores_drafted_at)
+// and not yet officially published.
 export type DraftRelease = {
   weekId: string;
   weekNumber: number;
   episodeIds: string[];
 };
 
-export const DRAFT_SCORES_STRIP_LABEL = "Draft scores · Site Admin to verify";
+export const DRAFT_SCORES_STRIP_LABEL = "Draft scores · Not yet official";
 
 export const DRAFT_SCORES_SHEET = {
   title: "Draft scores",
-  body: "Site Admin has drafted tonight's scores before official publish. Standings may update from these drafts and can change when scores are verified and published.",
+  body: "Tonight's scores are drafted before official publish. Standings may update from these drafts and can change when scores are verified and published.",
   primary: "Got it",
 } as const;
 

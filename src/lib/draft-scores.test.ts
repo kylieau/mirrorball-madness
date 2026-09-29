@@ -139,10 +139,10 @@ describe("replaceWeekDanceScores", () => {
 
 describe("locked strip copy", () => {
   it("uses the locked label and info sheet", () => {
-    expect(DRAFT_SCORES_STRIP_LABEL).toBe("Draft scores · Site Admin to verify");
+    expect(DRAFT_SCORES_STRIP_LABEL).toBe("Draft scores · Not yet official");
     expect(DRAFT_SCORES_SHEET).toEqual({
       title: "Draft scores",
-      body: "Site Admin has drafted tonight's scores before official publish. Standings may update from these drafts and can change when scores are verified and published.",
+      body: "Tonight's scores are drafted before official publish. Standings may update from these drafts and can change when scores are verified and published.",
       primary: "Got it",
     });
   });
