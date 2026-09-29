@@ -53,7 +53,7 @@ type CompetitionWeek = {
   is_finale: boolean;
   is_double_elimination_week: boolean;
 };
-type EpisodeResult = { episode_id: string; couple_id: string };
+type DanceScore = { episode_id: string; couple_id: string };
 type Couple = {
   id: string;
   celebrity_name: string;
@@ -180,7 +180,7 @@ export function ScheduleManager({
   readOnly,
   episodes,
   weeks,
-  episodeResults,
+  danceScores,
   draftsByEpisode,
   season,
   seasonCouples,
@@ -193,7 +193,7 @@ export function ScheduleManager({
   readOnly: boolean;
   episodes: Episode[];
   weeks: CompetitionWeek[];
-  episodeResults: EpisodeResult[];
+  danceScores: DanceScore[];
   draftsByEpisode: Record<string, DraftState>;
   season: Season;
   seasonCouples: Couple[];
@@ -401,18 +401,30 @@ export function ScheduleManager({
     setSubmitting(false);
   }
 
+  // Distinct couples with an actual scored dance for this episode -- not
+  // episode_results (outcome rows), which include every couple still in the
+  // cast that night whether or not they performed (e.g. the half of a
+  // split-cast premiere night that didn't dance still gets a "safe" row).
   function coupleCount(episodeId: string): number {
-    const publishedCount = episodeResults.filter((r) => r.episode_id === episodeId).length;
-    if (publishedCount > 0) return publishedCount;
-    return draftsByEpisode[episodeId]?.entries.length ?? 0;
+    const scoredCoupleIds = new Set(
+      danceScores.filter((d) => d.episode_id === episodeId).map((d) => d.couple_id)
+    );
+    if (scoredCoupleIds.size > 0) return scoredCoupleIds.size;
+    const draftCoupleIds = new Set((draftsByEpisode[episodeId]?.dances ?? []).map((d) => d.coupleId));
+    return draftCoupleIds.size;
   }
 
   function EpisodeRow({ episodeId }: { episodeId: string }) {
     const e = episodes.find((episode) => episode.id === episodeId);
     if (!e) return null;
+    // Matches AllResultsView: a published episode always reads as Published
+    // here too, regardless of a correction draft quietly in progress in
+    // Enter Results -- Schedule isn't the draft-workflow page, and showing
+    // "Correcting" here just contradicts what Scores says about the same
+    // episode.
     const status = deriveResultsStatus(
       { results_published_at: e.results_published_at },
-      !!draftsByEpisode[e.id]?.hasDraft
+      e.results_published_at ? false : !!draftsByEpisode[e.id]?.hasDraft
     );
     const count = coupleCount(e.id);
     const Row = readOnly ? "div" : "button";

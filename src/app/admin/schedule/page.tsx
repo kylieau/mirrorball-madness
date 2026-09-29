@@ -31,7 +31,7 @@ export default async function SchedulePage() {
         readOnly={!accountSettingsData.isSuperAdmin}
         episodes={data.episodes}
         weeks={data.weeks}
-        episodeResults={data.episodeResults}
+        danceScores={data.danceScores}
         draftsByEpisode={data.draftsByEpisode}
         season={data.season}
         seasonCouples={data.allCouplesWithStatus}
