@@ -625,15 +625,22 @@ export default async function LeaguePage({
   const yourRosterPoints = yourRosterWeek
     ? judgePointsThroughWeek({ ...judgePointsInputs, slots: yourSlotsForWeek, week: yourRosterWeek.week_number })
     : undefined;
+  const yourRosterWeekRosterPoints = yourRosterWeek
+    ? scoreRows
+        .filter(
+          (row) =>
+            row.manager_id === myTeamId &&
+            groupedWeeks.find((w) => w.id === row.week_id)?.week_number === yourRosterWeek.week_number
+        )
+        .reduce((sum, row) => sum + row.roster_points, 0)
+    : 0;
+  // Header total on Your Fantasy Roster: this paged week's Dance Card
+  // points, not the season-cumulative total — matches the carousel it sits
+  // above, same weighting as danceCardLeagueEntries' weekPoints below.
+  const yourRosterWeekTotalPoints = roundPoints(yourRosterWeekRosterPoints * judgePointsInputs.categoryWeight);
   const yourRosterWeekBonusPoints = yourRosterWeek
     ? weeklyBonusPoints(
-        scoreRows
-          .filter(
-            (row) =>
-              row.manager_id === myTeamId &&
-              groupedWeeks.find((w) => w.id === row.week_id)?.week_number === yourRosterWeek.week_number
-          )
-          .reduce((sum, row) => sum + row.roster_points, 0),
+        yourRosterWeekRosterPoints,
         judgePointsInputs.categoryWeight,
         yourSlotsForWeek.map((slot) => {
           const couple = flatCouplesById.get(slot.coupleId);
@@ -1030,7 +1037,7 @@ export default async function LeaguePage({
                   }
                   weeks={curtainCallWeeks}
                   invite={
-                    curtainCallMode === "picks" && !isLocked
+                    curtainCallMode === "picks" && !isLocked && !hasCurtainCallPicks(ownPrediction)
                       ? "Who's taking their final bow, and who's stealing the show? Make your call before the curtain rises."
                       : undefined
                   }
@@ -1105,9 +1112,7 @@ export default async function LeaguePage({
                 {rosterCouples.length > 0 && (
                   <RosterCard
                     couples={rosterCouples}
-                    totalPoints={roundPoints(
-                      (rosterPointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
-                    )}
+                    totalPoints={yourRosterWeekTotalPoints}
                     weekBonusPoints={yourRosterWeekBonusPoints}
                     carousel={
                       yourRosterWeek ? (

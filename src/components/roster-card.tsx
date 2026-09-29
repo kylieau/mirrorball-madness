@@ -41,7 +41,7 @@ export function RosterCard({
       <CardHeader>
         <CardTitle>Your Fantasy Roster</CardTitle>
         <CardDescription>
-          <span className="font-heading font-semibold">{formatPoints(totalPoints)}</span> pts this season
+          <span className="font-heading font-semibold">{formatPoints(totalPoints)}</span> pts this week
         </CardDescription>
         {carousel}
       </CardHeader>

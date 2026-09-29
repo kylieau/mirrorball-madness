@@ -291,11 +291,16 @@ export function PickEmBox({
             </>
           ) : (
             <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-sm text-emerald-text">
-                <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald/30 text-[10px]">
-                  ✓
-                </span>
-                Picks saved for this week
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm text-emerald-text">
+                  <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald/30 text-[10px]">
+                    ✓
+                  </span>
+                  Picks saved
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                  Edit Picks
+                </Button>
               </div>
               <div className="flex flex-col gap-1.5 text-sm">
                 <div className="flex items-center justify-between">
@@ -317,9 +322,6 @@ export function PickEmBox({
                   <span className="font-medium">{topScorerId ? nameFor(topScorerId) : "No Pick"}</span>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="self-start" onClick={() => setEditing(true)}>
-                Edit Picks
-              </Button>
             </div>
           )
         ) : (

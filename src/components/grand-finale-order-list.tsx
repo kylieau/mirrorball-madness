@@ -46,28 +46,18 @@ export function statusLabel(couple: GrandFinaleCouple): string {
 }
 
 // Gold "Next Predicted Elimination" bubble sitting on the top edge of the
-// framed row; the row's own text keeps its normal color.
-export function NextEliminationFrame({ children, onExpand }: { children: ReactNode; onExpand?: () => void }) {
+// framed row; the row's own text keeps its normal color. px-2 matches a
+// plain row's own px-2 so the two line up despite the border.
+export function NextEliminationFrame({ children }: { children: ReactNode }) {
   return (
     <div
       data-next-elim
-      className="relative mt-3 flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-2 py-1.5"
+      className="relative mt-4 rounded-lg border border-primary/40 bg-primary/10 px-2 py-1.5"
     >
-      <span className="absolute -top-2.5 left-2 rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary-foreground">
+      <span className="absolute -top-3 left-2 rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary-foreground">
         Next Predicted Elimination
       </span>
-      <div className="min-w-0 flex-1">{children}</div>
-      {onExpand && (
-        <button
-          type="button"
-          aria-expanded={false}
-          aria-label="View picks"
-          onClick={onExpand}
-          className="shrink-0 text-accent"
-        >
-          <ChevronDownIcon className="size-4" />
-        </button>
-      )}
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
@@ -170,6 +160,49 @@ export function GrandFinaleScoringExplainer({
   );
 }
 
+// One row's content (rank number, name, point-ceiling tag, status) shared by
+// the full order list below and the viewer's own collapsed "Next Predicted
+// Elimination" frame (GrandFinaleBox), so a surrounding pick there looks
+// identical to the same couple's row in the expanded list rather than a
+// second, plainer format.
+export function GrandFinaleOrderRow({
+  displayNumber,
+  nameNode,
+  couple,
+  predictedPosition,
+  scoring,
+  totalCouples,
+  context,
+  showStatus,
+}: {
+  displayNumber: number;
+  nameNode: ReactNode;
+  couple: GrandFinaleCouple | undefined;
+  predictedPosition: number;
+  scoring: GrandFinaleScoring;
+  totalCouples: number;
+  context: ReturnType<typeof grandFinaleRowContext>;
+  showStatus: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-sm">
+      <span>
+        {displayNumber}. {nameNode}
+      </span>
+      <span className="flex shrink-0 items-center gap-2">
+        <PointsTag
+          couple={couple}
+          predictedPosition={predictedPosition}
+          scoring={scoring}
+          totalCouples={totalCouples}
+          context={context}
+        />
+        {showStatus && <span className="text-muted-foreground">{couple ? statusLabel(couple) : "Unknown"}</span>}
+      </span>
+    </div>
+  );
+}
+
 // Shared row-rendering for both a manager's own bracket (select/edit's "Order
 // So Far" preview, and the saved/locked summary) and the League at a Glance
 // expanded view for another manager — one place for statusLabel, the
@@ -184,6 +217,7 @@ export function GrandFinaleOrderList({
   showStatus,
   showNextEliminationHighlight,
   windowed = false,
+  compact = false,
 }: {
   order: string[]; // elimination-ascending: index 0 = first predicted out, last = predicted winner
   couples: GrandFinaleCouple[];
@@ -195,6 +229,10 @@ export function GrandFinaleOrderList({
   // Caps the list's height and scrolls the next-elimination row to the middle,
   // so the couples around it show first and the rest are a scroll away.
   windowed?: boolean;
+  // Shorter cap for the default collapsed peek (still scrolls, still
+  // auto-centers) — same list, just less of it visible before the viewer
+  // expands.
+  compact?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const coupleById = new Map(couples.map((c) => [c.id, c]));
@@ -216,7 +254,14 @@ export function GrandFinaleOrderList({
   }, [windowed]);
 
   return (
-    <div ref={scrollRef} className={cn("flex flex-col gap-1", windowed && "relative max-h-52 overflow-y-auto pr-1")}>
+    <div
+      ref={scrollRef}
+      className={cn(
+        "flex flex-col gap-1",
+        windowed && "relative overflow-y-auto pr-1",
+        windowed && (compact ? "max-h-40" : "max-h-52")
+      )}
+    >
       {/* Displayed winner-first (reverse of storage order, which stays
           elimination-ascending), so "1." lines up with the predicted winner. */}
       {[...order].reverse().map((coupleId, i) => {
@@ -225,29 +270,24 @@ export function GrandFinaleOrderList({
         const predictedPosition = order.length - i;
 
         const row = (
-          <div className="flex items-center justify-between gap-2 text-sm">
-            <span>
-              {i + 1}. {nameFor(coupleId)}
-            </span>
-            <span className="flex shrink-0 items-center gap-2">
-              <PointsTag
-                couple={couple}
-                predictedPosition={predictedPosition}
-                scoring={scoring}
-                totalCouples={totalCouples}
-                context={rowContext}
-              />
-              {showStatus && (
-                <span className="text-muted-foreground">{couple ? statusLabel(couple) : "Unknown"}</span>
-              )}
-            </span>
-          </div>
+          <GrandFinaleOrderRow
+            displayNumber={i + 1}
+            nameNode={nameFor(coupleId)}
+            couple={couple}
+            predictedPosition={predictedPosition}
+            scoring={scoring}
+            totalCouples={totalCouples}
+            context={rowContext}
+            showStatus={showStatus}
+          />
         );
 
         return isHighlighted ? (
           <NextEliminationFrame key={coupleId}>{row}</NextEliminationFrame>
         ) : (
-          <div key={coupleId} className="border-b border-border py-1 last:border-b-0">
+          // px-2 matches NextEliminationFrame's own padding so a row's number/
+          // name/points line up whether or not it's the highlighted one.
+          <div key={coupleId} className="border-b border-border px-2 py-1 last:border-b-0">
             {row}
           </div>
         );

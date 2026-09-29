@@ -26,7 +26,6 @@ import {
 import {
   GrandFinaleOrderList,
   GrandFinaleScoringExplainer,
-  NextEliminationFrame,
   PointsTag,
   grandFinaleRowContext,
   type GrandFinaleCouple,
@@ -199,46 +198,38 @@ export function GrandFinaleBox({
         <CardContent className="flex flex-col gap-1 text-sm">
           {lateEntry && <LateEntryBanner factor={lateEntry.factor} />}
           <OtherLeagueSaveSummary results={otherResults} destinations={otherLeagues} />
-          {isCollapsed ? (
-            <div className="flex flex-col gap-2">
-              {highlightId ? (
-                <NextEliminationFrame onExpand={() => setCollapsed(false)}>
-                  {nameFor(highlightId)}
-                </NextEliminationFrame>
+          {isCollapsed && !highlightId ? (
+            <p className="text-muted-foreground">Nothing left to predict — your bracket&apos;s fully resolved.</p>
+          ) : (
+            // Collapsed: short compact peek (still scrolls, still centers on
+            // the highlight). Expanded: unwindowed, no cap — every couple,
+            // matching the pre-lock "Saved" state's rendering below.
+            <GrandFinaleOrderList
+              order={order}
+              couples={couples}
+              coupleDisplayNames={coupleDisplayNames}
+              scoring={scoring}
+              totalCouples={totalCouples}
+              showStatus
+              showNextEliminationHighlight
+              windowed={isCollapsed}
+              compact={isCollapsed}
+            />
+          )}
+          {summaryLocked && (
+            <Button variant="ghost" size="sm" className="mt-1 self-end" onClick={() => setCollapsed(!isCollapsed)}>
+              {isCollapsed ? (
+                <>
+                  Display Full Bracket
+                  <ChevronDownIcon className="size-3.5" />
+                </>
               ) : (
                 <>
-                  <p className="text-muted-foreground">Nothing left to predict — your bracket&apos;s fully resolved.</p>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="self-end"
-                    aria-label="View picks"
-                    onClick={() => setCollapsed(false)}
-                  >
-                    <ChevronDownIcon className="size-4" />
-                  </Button>
+                  Collapse Bracket
+                  <ChevronUpIcon className="size-3.5" />
                 </>
               )}
-            </div>
-          ) : (
-            <>
-              <GrandFinaleOrderList
-                order={order}
-                couples={couples}
-                coupleDisplayNames={coupleDisplayNames}
-                scoring={scoring}
-                totalCouples={totalCouples}
-                showStatus
-                showNextEliminationHighlight
-                windowed={summaryLocked}
-              />
-              {summaryLocked && (
-                <Button variant="ghost" size="sm" className="mt-1 self-end" onClick={() => setCollapsed(true)}>
-                  Collapse Surrounding Picks
-                  <ChevronUpIcon className="size-3.5" />
-                </Button>
-              )}
-            </>
+            </Button>
           )}
 
           {!summaryLocked && (
