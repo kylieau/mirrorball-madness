@@ -20,8 +20,9 @@ import { setSpoilerFreeMode } from "@/app/settings/actions";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
+// Two paragraphs, split on the blank line (whitespace-pre-line below).
 const LIVE_SCORES_NOTE =
-  "Live means Site Admin posting scores as the show airs: drafts during the East Coast broadcast, published scores during the Pacific one. They stay hidden until you choose Stay Updated or Mark Watched. Either choice also marks earlier weeks watched.";
+  "\u201cLive\u201d means Site Admin is posting: drafts during East air, published scores on the Pacific feed (live West or delayed).\n\nScores stay gated until you tap Stay Updated or Mark Watched \u2014 either one also marks earlier weeks watched.";
 
 const COAST = {
   east: { chip: "Live Now · East Coast", stayNote: "Follow along as scores are entered" },
@@ -94,7 +95,7 @@ export function LiveScoresPrompt({
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle className="sr-only">About live scores</DialogTitle>
-                  <DialogDescription className="text-left text-pretty text-popover-foreground">
+                  <DialogDescription className="whitespace-pre-line text-left text-pretty text-popover-foreground">
                     {LIVE_SCORES_NOTE}
                   </DialogDescription>
                 </DialogHeader>
