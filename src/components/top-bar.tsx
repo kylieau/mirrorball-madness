@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { AccountSettingsSheet } from "@/components/account-settings-sheet";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
@@ -21,7 +22,7 @@ export function TopBar({
   return (
     <div className="flex items-center justify-between gap-4">
       <Link href="/" className="flex h-7 items-center gap-1.5 text-sm font-semibold text-muted-foreground">
-        <span className="text-lg leading-none">🪩</span>
+        <Image src="/mark-glyph.png" alt="" width={20} height={20} />
         Mirrorball Madness
       </Link>
       <div className="flex gap-2">
