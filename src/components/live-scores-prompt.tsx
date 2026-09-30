@@ -89,6 +89,7 @@ export function LiveScoresPrompt({
       <SheetContent side="bottom" className="items-center gap-3 rounded-t-3xl px-5 pb-8 text-center">
         {confirming ? (
           <StayUpdatedConfirmBody
+            unlockDrafts={coast === "east"}
             onConfirm={() => handleChoice(() => stayUpdated(weekNumber, coast === "east"))}
             onCancel={() => {
               setError(null);

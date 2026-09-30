@@ -19,11 +19,14 @@ export async function stayUpdated(weekNumber: number, unlockDrafts: boolean) {
 // The sheet's contents, also rendered in place inside the live-air prompt so
 // the confirm never stacks a second sheet on top of it.
 export function StayUpdatedConfirmBody({
+  unlockDrafts,
   onConfirm,
   onCancel,
   pending,
   error,
 }: {
+  // False for West Stay Updated (published only), which isn't a draft unlock.
+  unlockDrafts: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   pending: boolean;
@@ -32,10 +35,14 @@ export function StayUpdatedConfirmBody({
   return (
     <>
       <SheetHeader className="items-center">
-        <SheetTitle className="font-heading text-xl font-semibold">Unlock draft scores?</SheetTitle>
+        <SheetTitle className="font-heading text-xl font-semibold">
+          {unlockDrafts ? "Unlock draft scores?" : "Unlock live scores?"}
+        </SheetTitle>
         <SheetDescription className="text-pretty">
-          You&apos;ll see scores as they&apos;re entered this week. To hide them again: turn Spoiler-Free on and
-          rewind to this week.
+          {unlockDrafts
+            ? "You\u2019ll see scores as they\u2019re entered this week."
+            : "You\u2019ll see official scores as they post this week."}{" "}
+          To hide them again: turn Spoiler-Free on and rewind to this week.
         </SheetDescription>
       </SheetHeader>
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -89,6 +96,7 @@ export function StayUpdatedPill({
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="bottom" className="items-center rounded-t-3xl px-5 pb-8 text-center">
           <StayUpdatedConfirmBody
+            unlockDrafts={unlockDrafts}
             onConfirm={handleConfirm}
             onCancel={() => setOpen(false)}
             pending={pending}
