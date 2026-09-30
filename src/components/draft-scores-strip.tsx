@@ -4,9 +4,10 @@
 // one hairline under the sticky stack, gold (i) and no second Mark Watched
 // button. Stickiness belongs to HomeDraftChrome so the wordmark, avatar, and
 // this line move together (Pattern B). Shown only while this viewer can see
-// a released draft, and it replaces the Spoiler-Free strip.
+// a released draft, and it replaces the Spoiler-Free strip on every page
+// that mounts it (Home, Results, Picks, Standings).
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TopBar } from "@/components/top-bar";
@@ -18,12 +19,13 @@ const STRIP_CLASSES =
 
 export function HomeDraftChrome({
   email,
+  actionSlot,
   ...accountSettingsData
-}: AccountSettingsData & { email: string }) {
+}: AccountSettingsData & { email: string; actionSlot?: ReactNode }) {
   return (
     <div className="sticky top-0 z-30 -mx-4 bg-background pt-[env(safe-area-inset-top)]">
       <div className="px-4 py-2">
-        <TopBar {...accountSettingsData} email={email} />
+        <TopBar {...accountSettingsData} email={email} actionSlot={actionSlot} />
       </div>
       <DraftScoresStrip />
     </div>

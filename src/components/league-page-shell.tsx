@@ -24,7 +24,7 @@ export function LeaguePageShell({
   const { league, scoringSettings, spoilerFreeStrip } = base;
   return (
     <div className="mx-auto flex max-w-2xl flex-col px-4">
-      <div className={cn("flex flex-col gap-4", spoilerFreeStrip ? "pt-4" : "py-8")}>
+      <div className={cn("flex flex-col gap-4", spoilerFreeStrip || base.draftScoresStrip ? "pt-4" : "py-8")}>
         <LeagueHeader
           tab={tab}
           leagueId={league.id}
@@ -38,6 +38,7 @@ export function LeaguePageShell({
           accountSettingsData={base.accountSettingsData}
           viewerEmail={base.user.email ?? ""}
           spoilerFreeStrip={spoilerFreeStrip}
+          draftScoresStrip={base.draftScoresStrip}
         />
 
         {error && <p className="text-sm text-destructive">{error}</p>}

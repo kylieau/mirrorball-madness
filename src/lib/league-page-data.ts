@@ -6,7 +6,7 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { draftManagerScoresForLeague, loadDraftScoreContext } from "@/lib/draft-scores-data";
-import { scoresReplacingDraftWeek } from "@/lib/draft-scores";
+import { homeStripChoice, scoresReplacingDraftWeek } from "@/lib/draft-scores";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { formatManagerName } from "@/lib/manager-display";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
@@ -349,6 +349,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     draftNight,
     draftManagers,
     spoilerFreeStrip,
+    draftScoresStrip: homeStripChoice(!!draftNight, !!spoilerFreeStrip) === "draft",
     livePrompt,
     liveWindow,
     scoreRows,

@@ -8,6 +8,7 @@ import { LeagueSwitcher, type SwitcherLeague } from "@/components/league-switche
 import { ScrollRevealBar } from "@/components/scroll-reveal-bar";
 import { SlimTopBar, TopBar } from "@/components/top-bar";
 import { HomeSpoilerChrome, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
+import { HomeDraftChrome } from "@/components/draft-scores-strip";
 import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
@@ -26,6 +27,7 @@ export function LeagueHeader({
   accountSettingsData,
   viewerEmail,
   spoilerFreeStrip,
+  draftScoresStrip,
 }: {
   tab: LeagueTab;
   leagueId: string;
@@ -42,6 +44,8 @@ export function LeagueHeader({
   // chrome (wordmark + avatar + strip) and the scroll-triggered compact bar
   // is skipped — one sticky mechanism at a time, matching Home exactly.
   spoilerFreeStrip: SpoilerFreeStripState | null;
+  // Unlocked drafts: the amber strip replaces the Spoiler-Free one, as on Home.
+  draftScoresStrip: boolean;
 }) {
   const title = tab === "standings" ? "Standings" : "Picks";
   const currentPath = `/leagues/${leagueId}/${tab}`;
@@ -70,7 +74,12 @@ export function LeagueHeader({
 
   return (
     <>
-      {spoilerFreeStrip ? (
+      {draftScoresStrip ? (
+        <>
+          <HomeDraftChrome {...accountSettingsData} email={viewerEmail} actionSlot={recastAction} />
+          {pageHeader}
+        </>
+      ) : spoilerFreeStrip ? (
         <>
           <HomeSpoilerChrome
             key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}

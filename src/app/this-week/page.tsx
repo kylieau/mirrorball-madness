@@ -4,6 +4,8 @@ import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { HomeSpoilerChrome } from "@/components/spoiler-free-strip";
+import { HomeDraftChrome } from "@/components/draft-scores-strip";
+import { homeStripChoice } from "@/lib/draft-scores";
 import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
 import { toBannerWeeks } from "@/lib/episode-banner";
 import { LiveScoresPrompt } from "@/components/live-scores-prompt";
@@ -338,9 +340,19 @@ export default async function ThisWeekPage({
     </div>
   );
 
+  const draftVisible = homeStripChoice(!!draftContext.night, !!spoilerFreeStrip) === "draft";
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col px-4">
-      {spoilerFreeStrip ? (
+      {draftVisible ? (
+        <>
+          <HomeDraftChrome {...accountSettingsData} email={user.email ?? ""} />
+          <div className="flex flex-col gap-4 pt-4">
+            {pageHeader}
+            {resultsContent}
+          </div>
+        </>
+      ) : spoilerFreeStrip ? (
         <>
           <HomeSpoilerChrome
             key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
