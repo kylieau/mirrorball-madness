@@ -12,9 +12,9 @@
 - `e919aab` (the user/Cursor, not us): an RLS policy so fans can read `draft_couple_releases`. Before it, fans never saw a release, so the prompt and strips were dead for them.
 - `f37c207`: the (i) copy is now two locked paragraphs.
 - `e08ed93`: **Stay Updated is the only opt-in label.**
-  - The posting strip pill is Stay Updated. It unlocks drafts during East or whenever drafts are out, and follows published scores only otherwise.
-  - "Draft scores available" shows whenever released drafts are ahead of a viewer who hasn't opted in, East included.
-  - A viewer who chose West Stay while drafts are out gets the posting strip.
+  - The posting strip pill is Stay Updated. It unlocks drafts during East, and follows published scores only otherwise, West included.
+  - "Draft scores available" shows whenever released drafts are ahead of a viewer who hasn't opted in, East included. Its Stay Updated unlocks drafts in the gap and during East; during the West window it is published-only.
+  - A viewer who chose West Stay while drafts are out sees Watching live · Week N and does not get the amber strip.
   - `eastBroadcastEnded` was removed.
 - `88480b7`: the draft strip's second line reads "Latest: {First} & {First} · N/M" (`draftReleaseLabel`: released couples over couples dancing that week).
 - `592e94e`: every Stay Updated confirms first in one bottom sheet (`stay-updated-confirm.tsx`). On the prompt the sheet swaps in place, and Not now returns to the choices.
