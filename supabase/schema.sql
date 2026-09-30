@@ -2426,8 +2426,10 @@ create table draft_judge_scores (
 -- via the live reveal below) already live-posted. Cleared on withdraw or
 -- when the episode's draft is published/re-seeded (deleteAllDraftRows). No
 -- scores here, just which couples are released, so -- unlike the score-
--- bearing draft_* tables above -- this is granted straight to authenticated,
--- the same public-readability the old episodes.scores_drafted_at column had.
+-- bearing draft_* tables above -- fans can read it. A grant is not enough:
+-- RLS with no SELECT policy returns zero rows to authenticated (PostgREST
+-- 200, content-range */0) while the service role still sees them, so Home
+-- never learns a draft was released. The policy is the actual read path.
 create table draft_couple_releases (
   episode_id uuid not null references episodes(id) on delete cascade,
   couple_id uuid not null references couples(id) on delete cascade,
@@ -2437,6 +2439,11 @@ create table draft_couple_releases (
 );
 
 grant select on public.draft_couple_releases to authenticated;
+alter table public.draft_couple_releases enable row level security;
+create policy "draft couple releases are viewable by all authenticated users"
+on public.draft_couple_releases for select
+to authenticated
+using (true);
 
 create table draft_episode_results (
   id uuid primary key default gen_random_uuid(),
