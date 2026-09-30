@@ -49,19 +49,22 @@ export function buildSpoilerFreeStripState({
   // sheet for the right coast (no chip outside both windows).
   livePhase: LiveAirPhase | null;
 }): SpoilerFreeStripState | null {
-  // Released drafts the viewer hasn't unlocked. Someone who chose nothing
-  // yet gets "Draft scores available"; someone who chose West Stay Updated
-  // (published only) gets the posting strip. Either pill unlocks drafts.
+  // Released drafts the viewer hasn't unlocked, and they haven't opted in.
+  // "Draft scores available" unlocks drafts in the gap and during East. During
+  // the West window that same pill is published-only, matching the prompt's
+  // West Stay — it must not raise draft_unlocked_week.
   const liveCoast = (week: number) =>
     livePhase && livePhase.kind !== "gap" && livePhase.weekNumber === week ? livePhase.kind : null;
   const draftsAhead = draftReleaseWeekNumber != null && draftUnlockedWeek < draftReleaseWeekNumber;
   if (draftsAhead && lastWatchedWeek < draftReleaseWeekNumber) {
+    const coast = liveCoast(draftReleaseWeekNumber);
     return {
       kind: "draft_gap",
       weekNumber: draftReleaseWeekNumber,
       latest: latestRelease,
       spoilerFree: spoilerFreeMode,
-      liveCoast: liveCoast(draftReleaseWeekNumber),
+      liveCoast: coast,
+      stayUnlocksDrafts: coast !== "west",
     };
   }
 
@@ -69,24 +72,29 @@ export function buildSpoilerFreeStripState({
     ? completedWeekNumbers.filter((week) => week > lastWatchedWeek).sort((a, b) => a - b)
     : [];
 
-  const postingWeek = draftsAhead
-    ? draftReleaseWeekNumber
-    : postingWeekNumber({ lastWatchedWeek, revealingWeekNumber, draftReleaseWeekNumber });
+  // A published-only Stay (West) raises last_watched_week and leaves drafts
+  // locked. Do not force a posting strip in that case: its Stay Updated would
+  // call unlock_draft_scores_through and the amber strip would replace
+  // Watching live. postingWeekNumber already returns null once the mark
+  // covers the week, and the watching states below take it from there.
+  const postingWeek = postingWeekNumber({ lastWatchedWeek, revealingWeekNumber, draftReleaseWeekNumber });
   const stripWeek = postingWeek
     ? { kind: "posting" as const, weekNumber: postingWeek }
     : spoilerFreeMode && pendingRevealWeekNumber
       ? { kind: "ready" as const, weekNumber: pendingRevealWeekNumber }
       : null;
   if (stripWeek) {
+    const coast = stripWeek.kind === "posting" ? liveCoast(stripWeek.weekNumber) : null;
     return {
       ...stripWeek,
       spoilerFree: spoilerFreeMode,
-      // Stay Updated on the strip follows the prompt: drafts during East or
-      // whenever drafts are out, published only otherwise.
+      // East Stay unlocks drafts. West Stay follows published scores only,
+      // even when a draft for this week is already out.
       stayUnlocksDrafts:
         stripWeek.kind === "posting" &&
-        (liveCoast(stripWeek.weekNumber) === "east" || draftReleaseWeekNumber === stripWeek.weekNumber),
-      liveCoast: stripWeek.kind === "posting" ? liveCoast(stripWeek.weekNumber) : null,
+        coast !== "west" &&
+        (coast === "east" || draftReleaseWeekNumber === stripWeek.weekNumber),
+      liveCoast: coast,
       earlierWeeks: unmarkedWeeks.filter((week) => week < stripWeek.weekNumber),
     };
   }

@@ -25,7 +25,7 @@ import type { AccountSettingsData } from "@/lib/account-settings-data";
 // unmarked weeks before it, which marking a later week unlocks too.
 // A posting week's pill is Stay Updated (the live opt-in, same as the
 // prompt); stayUnlocksDrafts says whether it unlocks drafts or follows
-// published scores only. Ready keeps Mark Watched.
+// published scores only. West is published-only. Ready keeps Mark Watched.
 // Posting also shows with Spoiler-Free off (spoilerFree false), since a
 // live-posting week is gated for everyone until they opt in; draft_gap is
 // Spoiler-Free-agnostic for the same reason.
@@ -45,6 +45,7 @@ export type SpoilerFreeStripState =
       latest: string | null;
       spoilerFree: boolean;
       liveCoast: "east" | "west" | null;
+      stayUnlocksDrafts: boolean;
     };
 
 type MarkableState = Extract<SpoilerFreeStripState, { earlierWeeks: number[] }>;
@@ -224,8 +225,9 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
 }
 
 // Released drafts exist and the viewer hasn't opted in at all. Stay Updated
-// opens the live-air sheet; its draft unlock swaps in the amber draft strip.
-// The pill stays vertically centered on this two-line strip like the others.
+// opens the live-air sheet. It unlocks drafts in the gap and during East;
+// during the West window it follows published scores only, same as the
+// prompt's West Stay. The pill stays vertically centered on this two-line strip.
 
 function DraftGapStrip({ state }: { state: Extract<SpoilerFreeStripState, { kind: "draft_gap" }> }) {
   return (
@@ -241,7 +243,7 @@ function DraftGapStrip({ state }: { state: Extract<SpoilerFreeStripState, { kind
         coast={state.liveCoast}
         weekNumber={state.weekNumber}
         spoilerFreeMode={state.spoilerFree}
-        stayUnlocksDrafts
+        stayUnlocksDrafts={state.stayUnlocksDrafts}
         className={PILL_CLASSES}
       />
     </div>
