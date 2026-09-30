@@ -29,37 +29,26 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     redirect("/login");
   }
 
-  const { data: league } = await supabase.from("leagues").select("*").eq("id", id).single();
-
-  if (!league) {
-    notFound();
-  }
-
-  const { data: scoringSettings } = await supabase
-    .from("scoring_settings")
-    .select("*")
-    .eq("league_id", id)
-    .single();
-
-  const danceCardOn = scoringSettings?.judges_score_category_enabled ?? true;
-  const waiversOn = league.waiver_mode === "waivers";
-  const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
-  const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
-
-  const { data: members } = await supabase
-    .from("league_members")
-    .select(
-      "user_id, role, joined_at, draft_position, draft_autopilot, co_manager_id, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
-    )
-    .eq("league_id", id)
-    .order("joined_at");
-
-  // A co-manager's auth uid never appears as a team-scoped manager_id (those
-  // stay keyed to the primary's user_id) — every "my team's row" lookup
-  // below resolves through myTeamId instead of the raw viewer id.
-  const myTeamId = findOwnMembership(members ?? [], user.id)?.user_id ?? user.id;
-
-  const [{ data: allScores }, { data: allCouples }] = await Promise.all([
+  const [
+    { data: league },
+    { data: scoringSettings },
+    { data: members },
+    { data: allScores },
+    { data: allCouples },
+    accountSettingsData,
+    { data: activeSeasonId },
+    { data: myMemberships },
+    draftContext,
+  ] = await Promise.all([
+    supabase.from("leagues").select("*").eq("id", id).single(),
+    supabase.from("scoring_settings").select("*").eq("league_id", id).single(),
+    supabase
+      .from("league_members")
+      .select(
+        "user_id, role, joined_at, draft_position, draft_autopilot, co_manager_id, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
+      )
+      .eq("league_id", id)
+      .order("joined_at"),
     supabase
       .from("weekly_manager_scores")
       .select("week_id, manager_id, roster_points, prediction_points, grand_finale_points, total_points")
@@ -69,13 +58,34 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
       .select(
         "id, status, season_id, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
       ),
+    getAccountSettingsData(supabase, user.id),
+    supabase.rpc("active_season_id"),
+    supabase
+      .from("league_members")
+      .select("leagues(id, name)")
+      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`),
+    loadDraftScoreContext(supabase, user.id),
   ]);
 
-  const isCommissioner = (members ?? []).some((m) => isOwnMembership(m, user.id) && m.role === "commissioner");
-  const accountSettingsData = await getAccountSettingsData(supabase, user.id);
+  if (!league) {
+    notFound();
+  }
 
-  const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
+  const danceCardOn = scoringSettings?.judges_score_category_enabled ?? true;
+  const waiversOn = league.waiver_mode === "waivers";
+  const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
+  const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
+
+  // A co-manager's auth uid never appears as a team-scoped manager_id (those
+  // stay keyed to the primary's user_id) — every "my team's row" lookup
+  // below resolves through myTeamId instead of the raw viewer id.
+  const myTeamId = findOwnMembership(members ?? [], user.id)?.user_id ?? user.id;
+  const isCommissioner = (members ?? []).some((m) => isOwnMembership(m, user.id) && m.role === "commissioner");
+
+  // Everyone's current roster is public once the draft is done — the standings
+  // are read through who holds which couples.
+  const showLeagueRosters = danceCardOn && league.draft_status === "completed";
+  const [{ data: weekRows }, { data: episodeRows }, { data: allLeagueSlots }] = await Promise.all([
     supabase
       .from("competition_weeks")
       .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
@@ -85,6 +95,15 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
       .from("episodes")
       .select("id, episode_number, week_id, airs_at, duration_minutes, theme, status, results_published_at")
       .eq("season_id", activeSeasonId ?? ""),
+    showLeagueRosters
+      ? supabase
+          .from("roster_slots")
+          .select("manager_id, couple_id, start_week, end_week")
+          .eq("league_id", id)
+          .order("slot_number")
+      : Promise.resolve({
+          data: [] as { manager_id: string; couple_id: string | null; start_week: number; end_week: number | null }[],
+        }),
   ]);
   const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
   const liveWeek = liveCompetitionWeek(groupedWeeks);
@@ -125,10 +144,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     completedEpisodes ?? []
   );
 
-  const [{ revealing, scoredIds, visible: revealingVisible }, draftContext] = await Promise.all([
-    loadRevealingWeek(supabase, groupedWeeks, cutoff),
-    loadDraftScoreContext(supabase, user.id),
-  ]);
+  const { revealing, scoredIds, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
   const draftNight = draftContext.night;
   const { strip: spoilerFreeStrip, prompt: livePrompt, refreshWindows } = buildLiveAirChrome({
     spoilerFreeMode: accountSettingsData.spoilerFreeMode,
@@ -236,16 +252,6 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
   const allDisplayNames = buildCoupleDisplayNames(flatCouples);
   const activeDisplayNames = buildCoupleDisplayNames(activeCouples);
 
-  // Everyone's current roster is public once the draft is done — the standings
-  // are read through who holds which couples.
-  const showLeagueRosters = danceCardOn && league.draft_status === "completed";
-  const { data: allLeagueSlots } = showLeagueRosters
-    ? await supabase
-        .from("roster_slots")
-        .select("manager_id, couple_id, start_week, end_week")
-        .eq("league_id", id)
-        .order("slot_number")
-    : { data: [] as { manager_id: string; couple_id: string | null; start_week: number; end_week: number | null }[] };
   const leagueSlotPeriods = (allLeagueSlots ?? [])
     .filter((r): r is typeof r & { couple_id: string } => !!r.couple_id)
     .map((r) => ({ managerId: r.manager_id, coupleId: r.couple_id, startWeek: r.start_week, endWeek: r.end_week }));
@@ -286,11 +292,6 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     ...revealingDanceWeek,
     ...draftDanceWeek,
   ].sort((a, b) => a.week_number - b.week_number);
-
-  const { data: myMemberships } = await supabase
-    .from("league_members")
-    .select("leagues(id, name)")
-    .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`);
 
   const RECENT_JOIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
   const joinCutoffMs = Date.now() - RECENT_JOIN_WINDOW_MS;

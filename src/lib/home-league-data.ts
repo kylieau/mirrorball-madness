@@ -16,7 +16,10 @@ export async function loadHomeLeagueData(
   spoilerFreeMode: boolean,
   leagueRefs: { id: string; name: string }[]
 ) {
-  const { data: activeSeasonId } = await supabase.rpc("active_season_id");
+  const [{ data: activeSeasonId }, draftContext] = await Promise.all([
+    supabase.rpc("active_season_id"),
+    loadDraftScoreContext(supabase, userId),
+  ]);
   const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
     supabase
       .from("competition_weeks")
@@ -47,10 +50,7 @@ export async function loadHomeLeagueData(
 
   const cutoff = await resolveSpoilerCutoff(supabase, userId, activeSeasonId ?? null, spoilerFreeMode, completedWeeks);
 
-  const [{ revealing, scoredIds, visible: revealingVisible }, draftContext] = await Promise.all([
-    loadRevealingWeek(supabase, groupedWeeks, cutoff),
-    loadDraftScoreContext(supabase, userId),
-  ]);
+  const { revealing, scoredIds, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
   const revealingWeek = revealing && revealingVisible ? revealing.week : null;
   const draftNight = draftContext.night
     ? {
