@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DRAFT_SCORES_SHEET,
   DRAFT_SCORES_STRIP_LABEL,
+  draftReleaseLabel,
   draftScoresVisible,
   draftWeekManagerScores,
   excludeReleasedCoupleRows,
@@ -197,5 +198,35 @@ describe("locked strip copy", () => {
       body: "Tonight's scores are drafted before official publish. Standings may update from these drafts and can change when scores are verified and published.",
       primary: "Got it",
     });
+  });
+});
+
+describe("draftReleaseLabel", () => {
+  const couple = (id: string, celebrity: string, pro: string, status = "active", eliminationWeek: number | null = null) => ({
+    id,
+    celebrity_name: celebrity,
+    pro_name: pro,
+    status,
+    elimination_week: eliminationWeek,
+  });
+  const seasonCouples = [
+    couple("c1", "Ciara Miller", "Brandon Armstrong"),
+    couple("c2", "Jordan Chiles", "Ezra Sosa"),
+    couple("c3", "Andy Richter", "Emma Slater", "eliminated", 2),
+    couple("c4", "Robert Irwin", "Witney Carson", "eliminated", 3),
+  ];
+
+  it("names the latest couple by first names and counts released over couples dancing that week", () => {
+    // c3 went out before week 3; c4 went out in week 3 itself, so still danced.
+    expect(
+      draftReleaseLabel({ latestCoupleId: "c1", releasedCoupleIds: ["c2", "c1", "c1"], weekNumber: 3, seasonCouples })
+    ).toBe("Ciara & Brandon · 2/3");
+  });
+
+  it("adds a last initial when two first names clash", () => {
+    const clash = [...seasonCouples, couple("c5", "Ciara Wilson", "Val Chmerkovskiy")];
+    expect(draftReleaseLabel({ latestCoupleId: "c1", releasedCoupleIds: ["c1"], weekNumber: 1, seasonCouples: clash })).toBe(
+      "Ciara M. & Brandon · 1/5"
+    );
   });
 });

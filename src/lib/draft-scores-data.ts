@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { formatCoupleName } from "@/lib/couple-display";
 import { slotActiveInWeek } from "@/lib/roster-couple-points";
 import {
+  draftReleaseLabel,
   draftScoresVisible,
   draftWeekManagerScores,
   findDraftRelease,
@@ -23,8 +23,8 @@ export type VisibleDraftNight = DraftRelease & {
 
 export type DraftScoreContext = {
   release: DraftRelease | null;
-  // Most recently released couple, shown on the "Draft scores available"
-  // strip before the viewer unlocks. Release rows carry no scores.
+  // "{First} & {First} · N/M" (draftReleaseLabel) under "Draft scores
+  // available", before the viewer unlocks. Release rows carry no scores.
   latestRelease: string | null;
   unlockedWeek: number;
   night: VisibleDraftNight | null;
@@ -69,7 +69,7 @@ export async function loadDraftScoreContext(
   const weekNumberById = new Map((weeks ?? []).map((week) => [week.id, week.week_number]));
   const release = findDraftRelease(episodes ?? [], weekNumberById, releasedCoupleIdsByEpisode);
   const unlockedWeek = progress?.draft_unlocked_week ?? 0;
-  const latestRelease = release ? await loadLatestRelease(supabase, releases ?? [], release) : null;
+  const latestRelease = release ? await loadLatestRelease(supabase, seasonId, releases ?? [], release) : null;
   if (!release || !draftScoresVisible(unlockedWeek, release.weekNumber)) {
     return { release, latestRelease, unlockedWeek, night: null };
   }
@@ -100,20 +100,29 @@ export async function loadDraftScoreContext(
 
 async function loadLatestRelease(
   supabase: SupabaseClient<Database>,
+  seasonId: string,
   releases: { episode_id: string; couple_id: string; released_at: string }[],
   release: DraftRelease
 ): Promise<string | null> {
-  const latest = releases
-    .filter((row) => release.episodeIds.includes(row.episode_id))
-    .sort((a, b) => b.released_at.localeCompare(a.released_at))[0];
+  const weekReleases = releases.filter((row) => release.episodeIds.includes(row.episode_id));
+  const latest = [...weekReleases].sort((a, b) => b.released_at.localeCompare(a.released_at))[0];
   if (!latest) return null;
-  const { data: couple } = await supabase
+  const { data: couples } = await supabase
     .from("couples")
-    .select("celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)")
-    .eq("id", latest.couple_id)
-    .maybeSingle();
-  if (!couple) return null;
-  return formatCoupleName({ celebrity: couple.celebrity?.name ?? "Unknown", pro: couple.pro?.name ?? "Unknown" });
+    .select("id, status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)")
+    .eq("season_id", seasonId);
+  return draftReleaseLabel({
+    latestCoupleId: latest.couple_id,
+    releasedCoupleIds: weekReleases.map((row) => row.couple_id),
+    weekNumber: release.weekNumber,
+    seasonCouples: (couples ?? []).map((c) => ({
+      id: c.id,
+      celebrity_name: c.celebrity?.name ?? "Unknown",
+      pro_name: c.pro?.name ?? "Unknown",
+      status: c.status,
+      elimination_week: c.elimination_week,
+    })),
+  });
 }
 
 export async function draftManagerScoresForLeague(

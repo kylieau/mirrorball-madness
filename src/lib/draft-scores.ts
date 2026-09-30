@@ -1,3 +1,4 @@
+import { buildCoupleDisplayNames, formatCoupleName } from "./couple-display";
 import { computeWeeklyScores } from "./scoring";
 
 // A night with at least one couple's drafted dance released (per couple, via
@@ -12,6 +13,30 @@ export type DraftRelease = {
   episodeIds: string[];
   releasedCoupleIdsByEpisode: Record<string, string[]>;
 };
+
+// "Ciara & Brandon · 3/8" under "Draft scores available": the latest released
+// couple by short first names, then released couples over the couples dancing
+// that week (everyone not already out before it).
+export function draftReleaseLabel(input: {
+  latestCoupleId: string;
+  releasedCoupleIds: readonly string[];
+  weekNumber: number;
+  seasonCouples: readonly {
+    id: string;
+    celebrity_name: string;
+    pro_name: string;
+    status: string;
+    elimination_week: number | null;
+  }[];
+}): string | null {
+  const parts = buildCoupleDisplayNames([...input.seasonCouples]).get(input.latestCoupleId);
+  if (!parts) return null;
+  const dancing = input.seasonCouples.filter(
+    (c) =>
+      !((c.status === "eliminated" || c.status === "withdrawn") && c.elimination_week != null && c.elimination_week < input.weekNumber)
+  ).length;
+  return `${formatCoupleName(parts)} · ${new Set(input.releasedCoupleIds).size}/${dancing}`;
+}
 
 export const DRAFT_SCORES_STRIP_LABEL = "Draft scores · Unverified";
 
