@@ -23,9 +23,17 @@ comment on table public.draft_couple_releases is
 
 -- No scores in this table, just which couples are released -- same
 -- public-readability as the old episodes.scores_drafted_at column it
--- replaces (episodes itself is granted to authenticated). The actual score
--- rows stay behind the security-definer visible_draft_dance_scores() RPC.
+-- replaces. The actual score rows stay behind the security-definer
+-- visible_draft_dance_scores() RPC. Grant alone is not enough once RLS is
+-- on: without a SELECT policy, authenticated reads return zero rows.
 grant select on public.draft_couple_releases to authenticated;
+alter table public.draft_couple_releases enable row level security;
+drop policy if exists "draft couple releases are viewable by all authenticated users"
+  on public.draft_couple_releases;
+create policy "draft couple releases are viewable by all authenticated users"
+on public.draft_couple_releases for select
+to authenticated
+using (true);
 
 -- Backfill: any night already released whole-episode under the old model
 -- becomes one release row per couple that already has a scored dance, so no
