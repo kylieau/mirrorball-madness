@@ -1,5 +1,5 @@
 import { postingWeekNumber } from "./draft-scores";
-import { eastBroadcastEnded, liveAirPhase, type BannerWeek, type LiveAirPhase } from "./episode-banner";
+import { liveAirPhase, type BannerWeek, type LiveAirPhase } from "./episode-banner";
 import type { DraftScoreContext } from "./draft-scores-data";
 import type { SpoilerFreeStripState } from "../components/spoiler-free-strip";
 
@@ -23,8 +23,7 @@ export function buildSpoilerFreeStripState({
   pendingRevealWeekNumber,
   draftReleaseWeekNumber,
   draftNightActive,
-  draftWeekEastEnded,
-  latestReleasedCouple,
+  latestRelease,
   eastLiveWeekNumber,
 }: {
   spoilerFreeMode: boolean;
@@ -44,29 +43,26 @@ export function buildSpoilerFreeStripState({
   draftReleaseWeekNumber: number | null;
   // !!draftContext.night
   draftNightActive: boolean;
-  // eastBroadcastEnded for the draft release's week
-  draftWeekEastEnded: boolean;
-  // draftContext.latestReleasedCouple
-  latestReleasedCouple: string | null;
+  // draftContext.latestRelease
+  latestRelease: string | null;
   // The week whose East broadcast is on air right now, else null.
   eastLiveWeekNumber: number | null;
 }): SpoilerFreeStripState | null {
-  // After the East broadcast, drafts may be ahead of a viewer who hasn't
-  // chosen Stay Updated or Mark Watched; Follow along unlocks them.
-  if (
-    draftReleaseWeekNumber != null &&
-    draftWeekEastEnded &&
-    lastWatchedWeek < draftReleaseWeekNumber &&
-    draftUnlockedWeek < draftReleaseWeekNumber
-  ) {
-    return { kind: "draft_gap", weekNumber: draftReleaseWeekNumber, latestCouple: latestReleasedCouple };
+  // Released drafts the viewer hasn't unlocked. Someone who chose nothing
+  // yet gets "Draft scores available"; someone who chose West Stay Updated
+  // (published only) gets the posting strip. Either pill unlocks drafts.
+  const draftsAhead = draftReleaseWeekNumber != null && draftUnlockedWeek < draftReleaseWeekNumber;
+  if (draftsAhead && lastWatchedWeek < draftReleaseWeekNumber) {
+    return { kind: "draft_gap", weekNumber: draftReleaseWeekNumber, latest: latestRelease };
   }
 
   const unmarkedWeeks = spoilerFreeMode
     ? completedWeekNumbers.filter((week) => week > lastWatchedWeek).sort((a, b) => a - b)
     : [];
 
-  const postingWeek = postingWeekNumber({ lastWatchedWeek, revealingWeekNumber, draftReleaseWeekNumber });
+  const postingWeek = draftsAhead
+    ? draftReleaseWeekNumber
+    : postingWeekNumber({ lastWatchedWeek, revealingWeekNumber, draftReleaseWeekNumber });
   const stripWeek = postingWeek
     ? { kind: "posting" as const, weekNumber: postingWeek }
     : spoilerFreeMode && pendingRevealWeekNumber
@@ -76,7 +72,11 @@ export function buildSpoilerFreeStripState({
     return {
       ...stripWeek,
       spoilerFree: spoilerFreeMode,
-      eastLive: stripWeek.kind === "posting" && eastLiveWeekNumber === stripWeek.weekNumber,
+      // Stay Updated on the strip follows the prompt: drafts during East or
+      // whenever drafts are out, published only otherwise.
+      stayUnlocksDrafts:
+        stripWeek.kind === "posting" &&
+        (eastLiveWeekNumber === stripWeek.weekNumber || draftReleaseWeekNumber === stripWeek.weekNumber),
       earlierWeeks: unmarkedWeeks.filter((week) => week < stripWeek.weekNumber),
     };
   }
@@ -158,9 +158,7 @@ export function buildLiveAirChrome({
       pendingRevealWeekNumber,
       draftReleaseWeekNumber,
       draftNightActive: !!draftContext.night,
-      draftWeekEastEnded:
-        draftReleaseWeekNumber != null && eastBroadcastEnded(bannerWeeks, draftReleaseWeekNumber, now),
-      latestReleasedCouple: draftContext.latestReleasedCouple,
+      latestRelease: draftContext.latestRelease,
       eastLiveWeekNumber: phase?.kind === "east" ? phase.weekNumber : null,
     }),
     prompt: buildLivePromptState({

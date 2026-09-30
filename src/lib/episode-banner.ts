@@ -100,15 +100,6 @@ export function liveAirPhase(weeks: BannerWeek[], now: Date = new Date()): LiveA
   return null;
 }
 
-// True once every one of the week's episodes has finished its East broadcast.
-export function eastBroadcastEnded(weeks: BannerWeek[], weekNumber: number, now: Date = new Date()): boolean {
-  const week = weeks.find((w) => w.weekNumber === weekNumber);
-  if (!week || week.episodes.length === 0) return false;
-  return week.episodes.every(
-    (episode) => now.getTime() >= new Date(episode.airsAt).getTime() + episode.durationMinutes * 60 * 1000
-  );
-}
-
 // Shapes a season's grouped weeks for the banner and live-air helpers.
 export function toBannerWeeks(
   weeks: {

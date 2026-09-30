@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   computeEpisodeBannerState,
-  eastBroadcastEnded,
   liveAirPhase,
   nextBannerRefreshMs,
   seasonTrack,
@@ -259,15 +258,5 @@ describe("liveAirPhase", () => {
     const phase = liveAirPhase([live()], at(now));
     expect(phase?.kind ?? null).toBe(kind);
     if (phase) expect(phase.weekNumber).toBe(2);
-  });
-});
-
-describe("eastBroadcastEnded", () => {
-  it("is true only once every episode of the week has finished its East broadcast", () => {
-    const week = live([episode(), episode({ airsAt: "2026-09-30T00:00:00Z" })]);
-    expect(eastBroadcastEnded([live()], 2, at("2026-09-23T01:59:00Z"))).toBe(false);
-    expect(eastBroadcastEnded([live()], 2, at("2026-09-23T02:00:00Z"))).toBe(true);
-    expect(eastBroadcastEnded([week], 2, at("2026-09-23T02:00:00Z"))).toBe(false);
-    expect(eastBroadcastEnded([live()], 3, at("2026-09-23T02:00:00Z"))).toBe(false);
   });
 });

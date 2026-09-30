@@ -16,22 +16,22 @@ import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TopBar } from "@/components/top-bar";
-import { markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
+import { markEpisodesWatchedThrough, markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
 // weekNumber is the latest week that can be unlocked; earlierWeeks are the
 // unmarked weeks before it, which marking a later week unlocks too.
-// eastLive: the week is posting while its East broadcast is on air, so the
-// pill offers Stay Updated (unlock drafts) instead of Mark Watched, matching
-// the live-air prompt's grayed Mark Watched.
+// A posting week's pill is Stay Updated (the live opt-in, same as the
+// prompt); stayUnlocksDrafts says whether it unlocks drafts or follows
+// published scores only. Ready keeps Mark Watched.
 // Posting also shows with Spoiler-Free off (spoilerFree false), since a
 // live-posting week is gated for everyone until they opt in; draft_gap is
 // Spoiler-Free-agnostic for the same reason.
 export type SpoilerFreeStripState =
-  | { kind: "ready" | "posting"; weekNumber: number; earlierWeeks: number[]; spoilerFree: boolean; eastLive: boolean }
+  | { kind: "ready" | "posting"; weekNumber: number; earlierWeeks: number[]; spoilerFree: boolean; stayUnlocksDrafts: boolean }
   | { kind: "watching"; weekNumber: number }
-  | { kind: "draft_gap"; weekNumber: number; latestCouple: string | null };
+  | { kind: "draft_gap"; weekNumber: number; latest: string | null };
 
 type MarkableState = Extract<SpoilerFreeStripState, { earlierWeeks: number[] }>;
 
@@ -76,7 +76,7 @@ export function SpoilerFreeStrip({ state }: { state: SpoilerFreeStripState }) {
     );
   }
   if (state.kind === "draft_gap") {
-    return <DraftGapStrip weekNumber={state.weekNumber} latestCouple={state.latestCouple} />;
+    return <DraftGapStrip weekNumber={state.weekNumber} latest={state.latest} />;
   }
   return <MarkWatchedStrip state={state} />;
 }
@@ -118,7 +118,9 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
   async function handleStayUpdated() {
     setError(null);
     setPending(true);
-    const result = await markWatchedAndUnlockDrafts(state.weekNumber);
+    const result = state.stayUnlocksDrafts
+      ? await markWatchedAndUnlockDrafts(state.weekNumber)
+      : await markEpisodesWatchedThrough(state.weekNumber);
     setPending(false);
     if (result.error) {
       setError(result.error);
@@ -141,9 +143,9 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
           ) : (
             message
           )}
-          {state.eastLive && error && <span className="text-destructive"> · {error}</span>}
+          {state.kind === "posting" && error && <span className="text-destructive"> · {error}</span>}
         </p>
-        {state.eastLive ? (
+        {state.kind === "posting" ? (
           <Button size="xs" className={PILL_CLASSES} onClick={handleStayUpdated} disabled={pending}>
             {pending ? "Updating..." : "Stay Updated"}
           </Button>
@@ -218,17 +220,16 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
   );
 }
 
-// After the East broadcast, while released drafts exist and the viewer hasn't
-// chosen Stay Updated or Mark Watched: drafts may be ahead of where they are.
-// Follow along is the same unlock as East Stay Updated, after which the amber
-// draft strip takes this one's place.
+// Released drafts exist and the viewer hasn't opted in at all. Stay Updated
+// is the same draft unlock as the prompt's East Stay Updated, after which the
+// amber draft strip takes this one's place.
 
-function DraftGapStrip({ weekNumber, latestCouple }: { weekNumber: number; latestCouple: string | null }) {
+function DraftGapStrip({ weekNumber, latest }: { weekNumber: number; latest: string | null }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleFollow() {
+  async function handleStayUpdated() {
     setError(null);
     setPending(true);
     const result = await markWatchedAndUnlockDrafts(weekNumber);
@@ -247,11 +248,11 @@ function DraftGapStrip({ weekNumber, latestCouple }: { weekNumber: number; lates
         <p className="truncate">
           <span className="font-semibold text-accent">Draft scores available</span>
         </p>
-        {latestCouple && <p className="truncate text-muted-foreground">Latest: {latestCouple}</p>}
+        {latest && <p className="truncate text-muted-foreground">Latest: {latest}</p>}
         {error && <p className="text-destructive">{error}</p>}
       </div>
-      <Button size="xs" className={PILL_CLASSES} onClick={handleFollow} disabled={pending}>
-        {pending ? "Unlocking..." : "Follow Along"}
+      <Button size="xs" className={PILL_CLASSES} onClick={handleStayUpdated} disabled={pending}>
+        {pending ? "Updating..." : "Stay Updated"}
       </Button>
     </div>
   );

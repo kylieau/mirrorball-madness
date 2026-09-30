@@ -10,8 +10,7 @@ const base = {
   draftReleaseWeekNumber: null as number | null,
   draftNightActive: false,
   draftUnlockedWeek: 0,
-  draftWeekEastEnded: false,
-  latestReleasedCouple: null as string | null,
+  latestRelease: null as string | null,
   eastLiveWeekNumber: null as number | null,
 };
 
@@ -23,7 +22,7 @@ describe("buildSpoilerFreeStripState", () => {
   it("still offers a posting week with Spoiler-Free off, without the Spoiler-Free label or earlier weeks", () => {
     expect(
       buildSpoilerFreeStripState({ ...base, spoilerFreeMode: false, lastWatchedWeek: 0, revealingWeekNumber: 3 })
-    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: false, eastLive: false });
+    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: false, stayUnlocksDrafts: false });
   });
 
   it("has no watching strip with Spoiler-Free off", () => {
@@ -33,32 +32,35 @@ describe("buildSpoilerFreeStripState", () => {
   });
 
   it.each([true, false])(
-    "offers Follow along after the East broadcast while drafts are ahead (Spoiler-Free %s)",
+    "offers Draft scores available whenever drafts are out and the viewer hasn't opted in (Spoiler-Free %s)",
     (spoilerFreeMode) => {
-      expect(
-        buildSpoilerFreeStripState({
-          ...base,
-          spoilerFreeMode,
-          draftReleaseWeekNumber: 3,
-          draftWeekEastEnded: true,
-          latestReleasedCouple: "Tatyana & Jan",
-        })
-      ).toEqual({ kind: "draft_gap", weekNumber: 3, latestCouple: "Tatyana & Jan" });
+      const drafts = { ...base, spoilerFreeMode, draftReleaseWeekNumber: 3, latestRelease: "Tatyana & Jan" };
+      const expected = { kind: "draft_gap", weekNumber: 3, latest: "Tatyana & Jan" };
+      expect(buildSpoilerFreeStripState(drafts)).toEqual(expected);
+      expect(buildSpoilerFreeStripState({ ...drafts, eastLiveWeekNumber: 3 })).toEqual(expected);
     }
   );
 
-  it("keeps the posting strip during the East broadcast, offering Stay Updated instead of Mark Watched", () => {
-    expect(buildSpoilerFreeStripState({ ...base, draftReleaseWeekNumber: 3, eastLiveWeekNumber: 3 })).toMatchObject({
+  it("gives a West Stay Updated viewer (published only) the posting strip, whose Stay Updated unlocks drafts", () => {
+    expect(buildSpoilerFreeStripState({ ...base, draftReleaseWeekNumber: 3, lastWatchedWeek: 3 })).toEqual({
       kind: "posting",
-      eastLive: true,
+      weekNumber: 3,
+      earlierWeeks: [],
+      spoilerFree: true,
+      stayUnlocksDrafts: true,
     });
-    expect(buildSpoilerFreeStripState({ ...base, draftReleaseWeekNumber: 3 })).toMatchObject({ eastLive: false });
   });
 
-  it("drops Follow along once the viewer chose Stay Updated or unlocked drafts", () => {
-    const gap = { ...base, draftReleaseWeekNumber: 3, draftWeekEastEnded: true };
-    expect(buildSpoilerFreeStripState({ ...gap, lastWatchedWeek: 3 })).toEqual({ kind: "watching", weekNumber: 3 });
-    expect(buildSpoilerFreeStripState({ ...gap, draftUnlockedWeek: 3 })).toMatchObject({ kind: "posting" });
+  it("drops the draft strips once drafts are unlocked", () => {
+    const unlocked = { ...base, draftReleaseWeekNumber: 3, lastWatchedWeek: 3, draftUnlockedWeek: 3 };
+    expect(buildSpoilerFreeStripState(unlocked)).toEqual({ kind: "watching", weekNumber: 3 });
+    expect(buildSpoilerFreeStripState({ ...unlocked, draftNightActive: true })).toBeNull();
+  });
+
+  it("follows published scores only from a live couple's posting strip outside East, drafts during East", () => {
+    const live = { ...base, revealingWeekNumber: 3 };
+    expect(buildSpoilerFreeStripState(live)).toMatchObject({ kind: "posting", stayUnlocksDrafts: false });
+    expect(buildSpoilerFreeStripState({ ...live, eastLiveWeekNumber: 3 })).toMatchObject({ stayUnlocksDrafts: true });
   });
 
   it("returns null when the viewer is fully caught up", () => {
@@ -71,24 +73,14 @@ describe("buildSpoilerFreeStripState", () => {
       weekNumber: 3,
       earlierWeeks: [],
       spoilerFree: true,
-      eastLive: false,
+      stayUnlocksDrafts: false,
     });
   });
 
   it("is posting when a week is mid-reveal, taking priority over a merely-pending one", () => {
     expect(
       buildSpoilerFreeStripState({ ...base, revealingWeekNumber: 3, pendingRevealWeekNumber: 4 })
-    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: true, eastLive: false });
-  });
-
-  it("is posting when a draft is released ahead of the last watched week", () => {
-    expect(buildSpoilerFreeStripState({ ...base, draftReleaseWeekNumber: 3 })).toEqual({
-      kind: "posting",
-      weekNumber: 3,
-      earlierWeeks: [],
-      spoilerFree: true,
-      eastLive: false,
-    });
+    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: true, stayUnlocksDrafts: false });
   });
 
   it("carries earlier unmarked completed weeks alongside the strip week", () => {
@@ -99,7 +91,7 @@ describe("buildSpoilerFreeStripState", () => {
         completedWeekNumbers: [1, 2],
         pendingRevealWeekNumber: 3,
       })
-    ).toEqual({ kind: "ready", weekNumber: 3, earlierWeeks: [1, 2], spoilerFree: true, eastLive: false });
+    ).toEqual({ kind: "ready", weekNumber: 3, earlierWeeks: [1, 2], spoilerFree: true, stayUnlocksDrafts: false });
   });
 
   it("is watching when a revealing week is behind the viewer, even though revealing isn't visible to them yet", () => {
@@ -109,17 +101,6 @@ describe("buildSpoilerFreeStripState", () => {
     });
   });
 
-  it("is watching when caught up to a released draft with no live draft night", () => {
-    expect(
-      buildSpoilerFreeStripState({ ...base, lastWatchedWeek: 3, draftReleaseWeekNumber: 3, draftNightActive: false })
-    ).toEqual({ kind: "watching", weekNumber: 3 });
-  });
-
-  it("stays null when caught up to a released draft that still has a live draft night", () => {
-    expect(
-      buildSpoilerFreeStripState({ ...base, lastWatchedWeek: 3, draftReleaseWeekNumber: 3, draftNightActive: true })
-    ).toBeNull();
-  });
 });
 
 describe("buildLivePromptState", () => {

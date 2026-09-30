@@ -23,15 +23,14 @@ export type VisibleDraftNight = DraftRelease & {
 
 export type DraftScoreContext = {
   release: DraftRelease | null;
-  // Most recently released couple, named for the post-East "Draft scores
-  // available" strip. Release rows carry no scores, so this is safe to show
-  // before the viewer unlocks.
-  latestReleasedCouple: string | null;
+  // Most recently released couple, shown on the "Draft scores available"
+  // strip before the viewer unlocks. Release rows carry no scores.
+  latestRelease: string | null;
   unlockedWeek: number;
   night: VisibleDraftNight | null;
 };
 
-const EMPTY_CONTEXT: DraftScoreContext = { release: null, latestReleasedCouple: null, unlockedWeek: 0, night: null };
+const EMPTY_CONTEXT: DraftScoreContext = { release: null, latestRelease: null, unlockedWeek: 0, night: null };
 
 // release is set whenever at least one couple's draft has been released for
 // an unpublished night. night is set only after this viewer chose Mark
@@ -70,18 +69,18 @@ export async function loadDraftScoreContext(
   const weekNumberById = new Map((weeks ?? []).map((week) => [week.id, week.week_number]));
   const release = findDraftRelease(episodes ?? [], weekNumberById, releasedCoupleIdsByEpisode);
   const unlockedWeek = progress?.draft_unlocked_week ?? 0;
-  const latestReleasedCouple = release ? await loadLatestReleasedCouple(supabase, releases ?? [], release) : null;
+  const latestRelease = release ? await loadLatestRelease(supabase, releases ?? [], release) : null;
   if (!release || !draftScoresVisible(unlockedWeek, release.weekNumber)) {
-    return { release, latestReleasedCouple, unlockedWeek, night: null };
+    return { release, latestRelease, unlockedWeek, night: null };
   }
 
   const { data: dances, error } = await supabase.rpc("visible_draft_dance_scores");
-  if (error || !dances) return { release, latestReleasedCouple, unlockedWeek, night: null };
+  if (error || !dances) return { release, latestRelease, unlockedWeek, night: null };
 
   const week = (weeks ?? []).find((row) => row.id === release.weekId);
   return {
     release,
-    latestReleasedCouple,
+    latestRelease,
     unlockedWeek,
     night: {
       ...release,
@@ -99,7 +98,7 @@ export async function loadDraftScoreContext(
   };
 }
 
-async function loadLatestReleasedCouple(
+async function loadLatestRelease(
   supabase: SupabaseClient<Database>,
   releases: { episode_id: string; couple_id: string; released_at: string }[],
   release: DraftRelease
