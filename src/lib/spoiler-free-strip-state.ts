@@ -1,5 +1,5 @@
 import { postingWeekNumber } from "./draft-scores";
-import { liveAirPhase, type BannerWeek, type LiveAirPhase } from "./episode-banner";
+import { liveAirPhase, liveRefreshWindows, type BannerWeek, type LiveAirPhase, type RefreshWindow } from "./episode-banner";
 import type { DraftScoreContext } from "./draft-scores-data";
 import type { SpoilerFreeStripState } from "../components/spoiler-free-strip";
 
@@ -155,7 +155,7 @@ export function buildLiveAirChrome({
   draftContext: DraftScoreContext;
   bannerWeeks: BannerWeek[];
   now?: Date;
-}): { strip: SpoilerFreeStripState | null; prompt: LivePromptState | null; liveWindow: boolean } {
+}): { strip: SpoilerFreeStripState | null; prompt: LivePromptState | null; refreshWindows: RefreshWindow[] } {
   const phase = liveAirPhase(bannerWeeks, now);
   const draftReleaseWeekNumber = draftContext.release?.weekNumber ?? null;
   return {
@@ -178,8 +178,8 @@ export function buildLiveAirChrome({
       revealingWeekNumber,
       draftReleaseWeekNumber,
     }),
-    // Pages auto-refresh through the live windows so the prompt appears when
-    // the first draft or couple posts, without a reload.
-    liveWindow: !!phase,
+    // Pages auto-refresh through each episode night so the prompt appears
+    // when the first draft or couple posts, without a reload.
+    refreshWindows: liveRefreshWindows(bannerWeeks, now),
   };
 }

@@ -83,6 +83,27 @@ function westFeedState(weeks: BannerWeek[], now: Date): EpisodeBannerState | nul
 
 export type LiveAirPhase = { kind: "east" | "gap" | "west"; weekNumber: number };
 
+export type RefreshWindow = { startMs: number; endMs: number };
+
+const REFRESH_LEAD_MS = 30 * 60 * 1000;
+
+// Each episode night from 30 minutes before the East curtain to the end of
+// the West feed, not yet over. Pages auto-refresh inside these (checked on the
+// client), so a page opened before the show still picks up the first posted
+// scores and the live-air prompt without a reload.
+export function liveRefreshWindows(weeks: BannerWeek[], now: Date = new Date()): RefreshWindow[] {
+  return weeks
+    .flatMap((week) => week.episodes)
+    .map((episode) => {
+      const airs = new Date(episode.airsAt);
+      return {
+        startMs: airs.getTime() - REFRESH_LEAD_MS,
+        endMs: pacificClockOnSameDay(airs, WEST_FEED_END_HOUR).getTime(),
+      };
+    })
+    .filter((window) => window.endMs > now.getTime());
+}
+
 // Where tonight's broadcast is for everyone: the East live window, the gap
 // before the West feed, or the West window (8-10pm PT). Null otherwise.
 export function liveAirPhase(weeks: BannerWeek[], now: Date = new Date()): LiveAirPhase | null {

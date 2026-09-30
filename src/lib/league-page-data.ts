@@ -130,7 +130,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     loadDraftScoreContext(supabase, user.id),
   ]);
   const draftNight = draftContext.night;
-  const { strip: spoilerFreeStrip, prompt: livePrompt, liveWindow } = buildLiveAirChrome({
+  const { strip: spoilerFreeStrip, prompt: livePrompt, refreshWindows } = buildLiveAirChrome({
     spoilerFreeMode: accountSettingsData.spoilerFreeMode,
     lastWatchedWeek: cutoff.lastWatchedWeek ?? 0,
     completedWeekNumbers: groupedWeeks.filter((week) => week.status === "completed").map((week) => week.week_number),
@@ -351,7 +351,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     spoilerFreeStrip,
     draftScoresStrip: homeStripChoice(!!draftNight, !!spoilerFreeStrip) === "draft",
     livePrompt,
-    liveWindow,
+    refreshWindows,
     scoreRows,
     pointsByManager,
     rosterPointsByManager,

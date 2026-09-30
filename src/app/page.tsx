@@ -134,7 +134,7 @@ export default async function Home() {
   }
 
   const bannerWeeks = toBannerWeeks(groupedWeeks);
-  const { strip: spoilerFreeStrip, prompt: livePrompt, liveWindow } = buildLiveAirChrome({
+  const { strip: spoilerFreeStrip, prompt: livePrompt, refreshWindows } = buildLiveAirChrome({
     spoilerFreeMode: accountSettingsData.spoilerFreeMode,
     lastWatchedWeek: cutoff.lastWatchedWeek ?? 0,
     completedWeekNumbers: groupedWeeks.filter((week) => week.status === "completed").map((week) => week.week_number),
@@ -178,7 +178,6 @@ export default async function Home() {
   const episodeBannerState = computeEpisodeBannerState(episodeBannerInput);
 
   const westWindow = episodeBannerState?.kind === "west_soon" || episodeBannerState?.kind === "west_watching";
-  const autoRefresh = !!revealing || westWindow || liveWindow;
 
   const recentActivity = buildRecentActivity({
     weeks: [...activityWeeks.values()],
@@ -252,7 +251,7 @@ export default async function Home() {
       {livePrompt && (
         <LiveScoresPrompt {...livePrompt} spoilerFreeMode={accountSettingsData.spoilerFreeMode} />
       )}
-      <RevealAutoRefresh active={autoRefresh} />
+      <RevealAutoRefresh active={!!revealing} windows={refreshWindows} />
       <FanBottomNav active="home" leagueId={firstLeagueId} />
     </div>
   );

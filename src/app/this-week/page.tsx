@@ -116,7 +116,7 @@ export default async function ThisWeekPage({
   const showResults = selectedMode === "results" || selectedMode === "scores";
   const selectedEpisodeIds = selectedWeek?.episodes.map((episode) => episode.id) ?? [];
 
-  const { strip: spoilerFreeStrip, prompt: livePrompt, liveWindow } = buildLiveAirChrome({
+  const { strip: spoilerFreeStrip, prompt: livePrompt, refreshWindows } = buildLiveAirChrome({
     spoilerFreeMode: accountSettingsData.spoilerFreeMode,
     lastWatchedWeek: cutoff.lastWatchedWeek ?? 0,
     completedWeekNumbers: completedWeeks.map((week) => week.week_number),
@@ -399,7 +399,7 @@ export default async function ThisWeekPage({
       {livePrompt && (
         <LiveScoresPrompt {...livePrompt} spoilerFreeMode={accountSettingsData.spoilerFreeMode} />
       )}
-      <RevealAutoRefresh active={revealingVisible || liveWindow} />
+      <RevealAutoRefresh active={revealingVisible} windows={refreshWindows} />
       <FanBottomNav active="results" leagueId={firstLeagueId} />
     </div>
   );

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeEpisodeBannerState,
   liveAirPhase,
+  liveRefreshWindows,
   nextBannerRefreshMs,
   seasonTrack,
   type BannerEpisode,
@@ -258,5 +259,15 @@ describe("liveAirPhase", () => {
     const phase = liveAirPhase([live()], at(now));
     expect(phase?.kind ?? null).toBe(kind);
     if (phase) expect(phase.weekNumber).toBe(2);
+  });
+});
+
+describe("liveRefreshWindows", () => {
+  it("runs from 30 minutes before the East curtain to the end of the West feed, dropping finished nights", () => {
+    // AIRS is 00:00Z (5pm PT); the West feed ends 10pm PT = 05:00Z.
+    const window = { startMs: at("2026-09-22T23:30:00Z").getTime(), endMs: at("2026-09-23T05:00:00Z").getTime() };
+    expect(liveRefreshWindows([live()], at("2026-09-22T12:00:00Z"))).toEqual([window]);
+    expect(liveRefreshWindows([live()], at("2026-09-23T04:59:00Z"))).toEqual([window]);
+    expect(liveRefreshWindows([live()], at("2026-09-23T05:00:00Z"))).toEqual([]);
   });
 });
