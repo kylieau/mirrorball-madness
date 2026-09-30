@@ -38,7 +38,6 @@ export async function loadModuleStackInputs(
       pro_name: c.pro?.name ?? "Unknown",
     }))
   );
-  const nameOf = (id: string | null) => (id ? (names.get(id)?.celebrity ?? null) : null);
   const fullNameOf = (id: string | null) => {
     const parts = id ? names.get(id) : null;
     return parts ? formatCoupleName(parts) : null;
@@ -70,8 +69,8 @@ export async function loadModuleStackInputs(
             state: s.curtainCall.state,
             afterWeek: context.spoilerCutoffWeek,
             lockAt: s.curtainCallLockAt,
-            eliminatedName: nameOf(s.curtainCall.eliminatedCoupleId),
-            topScorerName: nameOf(s.curtainCall.topScorerCoupleId),
+            eliminatedName: fullNameOf(s.curtainCall.eliminatedCoupleId),
+            topScorerName: fullNameOf(s.curtainCall.topScorerCoupleId),
           },
           danceCard: {
             on: s.danceCardOn,
