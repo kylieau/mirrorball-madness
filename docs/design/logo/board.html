@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mirrorball Madness — Logo Pack v0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #1e1420;
+    --card: #271a29;
+    --cream: #f2e8d8;
+    --muted: #9c8296;
+    --gold: #c9a24b;
+    --gold-hi: #e4c77a;
+    --gold-ink: #2a1c10;
+    --sec: #332338;
+    --curtain: #5c1a2e;
+    --border: rgba(201,162,75,0.28);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #120c14;
+    color: var(--cream);
+    font-family: Inter, system-ui, sans-serif;
+    padding: 40px;
+  }
+  .board {
+    max-width: 1180px;
+    margin: 0 auto;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 40px 48px;
+  }
+  h1 {
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 600;
+    font-size: 36px;
+    margin: 0 0 6px;
+  }
+  .rule {
+    width: 48px;
+    height: 3px;
+    background: var(--gold);
+    border-radius: 2px;
+    margin: 10px 0 14px;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.45;
+    max-width: 62ch;
+    margin: 0 0 28px;
+  }
+  h2 {
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--gold);
+    margin: 28px 0 14px;
+  }
+  .grid {
+    display: grid;
+    gap: 14px;
+  }
+  .icons { grid-template-columns: repeat(3, 1fr); }
+  .lockups { grid-template-columns: 1.2fr 0.8fr; }
+  .swatches { grid-template-columns: repeat(6, 1fr); }
+  .type-row { grid-template-columns: 1fr 1fr 1fr; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .card label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .card img {
+    width: 100%;
+    border-radius: 10px;
+    display: block;
+    background: #150d18;
+  }
+  .swatch {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .swatch .chip { height: 64px; }
+  .swatch .meta {
+    padding: 8px 10px 10px;
+    background: var(--card);
+    font-size: 11px;
+  }
+  .swatch .meta strong { display: block; font-weight: 600; color: var(--cream); }
+  .swatch .meta span { color: var(--muted); font-family: ui-monospace, monospace; }
+  .type-sample {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .type-sample .name { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+  .fraunces { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 28px; }
+  .inter { font-family: Inter, sans-serif; font-size: 15px; color: var(--cream); }
+  .gold-btn {
+    display: inline-block;
+    margin-top: 10px;
+    background: var(--gold);
+    color: var(--gold-ink);
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 8px;
+  }
+  .rails {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .rails ul { margin: 0; padding-left: 18px; color: var(--cream); font-size: 13px; line-height: 1.55; }
+  .rails li { margin-bottom: 4px; }
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+  .topbar-demo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .topbar-demo img { width: 22px; height: 22px; border-radius: 4px; }
+  footer {
+    margin-top: 28px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+  <div class="board">
+    <h1>Mirrorball Madness</h1>
+    <div class="rule"></div>
+    <p class="sub">Logo / design pack v0 — stays on the live app look (dark plum curtain + gold). Proposed only; pick icon + lockup before eng swaps assets.</p>
+
+    <h2>App icons</h2>
+    <div class="grid icons">
+      <div class="card">
+        <label>Current · shipping</label>
+        <img src="assets/current-icon-mm.png" alt="Current MM icon" />
+      </div>
+      <div class="card">
+        <label>A · MM on plum + gold rim</label>
+        <img src="assets/01-icon-mm-gold.jpg" alt="MM gold icon" />
+      </div>
+      <div class="card">
+        <label>B · Disco (recommended)</label>
+        <img src="assets/02-icon-disco.jpg" alt="Disco icon" />
+      </div>
+    </div>
+
+    <h2>Wordmark &amp; lockups</h2>
+    <div class="grid lockups">
+      <div class="card">
+        <label>Horizontal lockup</label>
+        <img src="assets/03-wordmark.jpg" alt="Wordmark" />
+      </div>
+      <div class="card">
+        <label>Stacked splash</label>
+        <img src="assets/04-lockup-stacked.jpg" alt="Stacked lockup" />
+      </div>
+    </div>
+
+    <h2>Top bar mark</h2>
+    <div class="grid" style="grid-template-columns: 160px 1fr; align-items: center;">
+      <div class="card">
+        <label>Glyph</label>
+        <img src="assets/05-mark-glyph.jpg" alt="Glyph" />
+      </div>
+      <div>
+        <div class="topbar-demo">
+          <img src="assets/05-mark-glyph.jpg" alt="" />
+          Mirrorball Madness
+        </div>
+        <p class="sub" style="margin:10px 0 0">Optional swap for the 🪩 emoji; same muted label weight as today.</p>
+      </div>
+    </div>
+
+    <h2>Palette (live tokens)</h2>
+    <div class="grid swatches">
+      <div class="swatch"><div class="chip" style="background:#1e1420"></div><div class="meta"><strong>Background</strong><span>#1e1420</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#271a29"></div><div class="meta"><strong>Card</strong><span>#271a29</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#c9a24b"></div><div class="meta"><strong>Primary gold</strong><span>#c9a24b</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#e4c77a"></div><div class="meta"><strong>Accent gold</strong><span>#e4c77a</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#f2e8d8"></div><div class="meta"><strong>Cream</strong><span>#f2e8d8</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#5c1a2e"></div><div class="meta"><strong>Curtain</strong><span>#5c1a2e</span></div></div>
+    </div>
+
+    <h2>Type</h2>
+    <div class="grid type-row">
+      <div class="type-sample">
+        <div class="name">Fraunces · headings</div>
+        <div class="fraunces">Home</div>
+        <div class="rule"></div>
+        <div class="fraunces" style="font-size:20px">Mirrorball Madness</div>
+      </div>
+      <div class="type-sample">
+        <div class="name">Inter · UI</div>
+        <div class="inter">1 league · 1 needs picks</div>
+        <div class="inter" style="color:var(--muted);margin-top:6px">Spoiler-Free · Week 2 results are in</div>
+        <span class="gold-btn">Make Picks</span>
+      </div>
+      <div class="type-sample">
+        <div class="name">Libre Caslon · ranks only</div>
+        <div style="font-family: Georgia, serif; font-size:42px; font-weight:700; color:var(--gold-hi)">1</div>
+        <div class="inter" style="color:var(--muted)">Managers Leaderboard</div>
+      </div>
+    </div>
+
+    <h2>Rails</h2>
+    <div class="rails">
+      <div class="card">
+        <span class="pill">Do</span>
+        <ul>
+          <li>Plum fields + gold accents only</li>
+          <li>Cream wordmark / Fraunces for titles</li>
+          <li>Keep gold CTA fill + dark ink</li>
+          <li>One dark theme forever</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="pill">Don’t</span>
+        <ul>
+          <li>Bright purple chrome (current icon only as legacy)</li>
+          <li>Cyan / neon / light-mode variants</li>
+          <li>Busy stage photos inside the mark</li>
+          <li>New hexes outside globals.css</li>
+        </ul>
+      </div>
+    </div>
+
+    <footer>v0 proposed · tokens from mirrorball-madness globals.css · /workspace/mirrorball-logo-pack/</footer>
+  </div>
+</body>
+</html>
