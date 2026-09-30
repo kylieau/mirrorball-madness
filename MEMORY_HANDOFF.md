@@ -1,48 +1,45 @@
 # Session Handoff
 
 ## 1. Current State
-**We spent the rest of the 2026-09-29 episode night tuning the live-air strips and prompt from the user's live testing.** Everything is committed and pushed; local `main` == `origin/main` at `43c99da`.
+**Scores and Enter Results are now separate pages, and everything is committed and pushed.** Local `main` == `origin/main` at `11a6488`. The same stretch finished the live-air strip/prompt work from the 2026-09-29 episode night.
 
-**Verified for every commit:** `tsc`, `eslint src`, and `npm test` (549 passing). There were no new full builds after `b2b3b2e`, since these were small UI/copy/logic changes and a `next dev` from another session was holding `.next`. The fan-read fix for `draft_couple_releases` was verified live: service role and a signed-in throwaway fan both saw 6 rows.
+**The split (`11a6488`):**
+- **Scores** stays at `/admin/results` (By Week / By Couple via `?tab=`).
+- **Enter Results** is `/admin/results/enter`, propose tier only. A viewer without propose access is redirected to Scores. `?episode=<id>` opens a week directly (that's how Scores' "Continue in Enter Results" links there). `/admin/results?tab=enter` redirects to the new page.
+- Results actions now `revalidatePath("/admin/results", "layout")`, so both pages refresh.
 
-**Not verified:** none of the prompt or strip states have been seen rendered from this container. The user has been checking on their phone; their punch-list results aren't in yet (BACKLOG item 10).
+**Verified:** `tsc`, `eslint src`, `npm test` (553 passing), and a full `npm run build` (both routes are separate bundles). Signed-in throwaway-account checks passed before a session restart and covered this same code: a plain viewer is redirected away from `/enter`, a commissioner gets the page, `?episode=` renders, and the old `?tab=enter` redirects.
 
-**Commits since the last sync:**
-- `4636d53`: Enter Results puts Season Elimination Order at the bottom of the page.
-- `e919aab` (the user/Cursor, not us): an RLS policy so fans can read `draft_couple_releases`. Before it, fans never saw a release, so the prompt and strips were dead for them.
-- `f37c207`: the (i) copy is now two locked paragraphs.
-- `e08ed93`: **Stay Updated is the only opt-in label.**
-  - The posting strip pill is Stay Updated. It unlocks drafts during East, and follows published scores only otherwise, West included.
-  - "Draft scores available" shows whenever released drafts are ahead of a viewer who hasn't opted in, East included. Its Stay Updated unlocks drafts in the gap and during East; during the West window it is published-only.
-  - A viewer who chose West Stay while drafts are out sees Watching live · Week N and does not get the amber strip.
-  - `eastBroadcastEnded` was removed.
-- `88480b7`: the draft strip's second line reads "Latest: {First} & {First} · N/M" (`draftReleaseLabel`: released couples over couples dancing that week).
-- `592e94e`: every Stay Updated confirms first in one bottom sheet (`stay-updated-confirm.tsx`). On the prompt the sheet swaps in place, and Not now returns to the choices.
-- `1442d0f`: the confirm reads "Unlock live scores?" / "…official scores as they post…" when Stay Updated is published-only.
-- `0ecf17c`: Home/Manage Leagues cards show Curtain Call Home/High as couple first names.
-- `43c99da`: league cards bold only the celebrity in every couple name (`StackRow` carries `CoupleNameParts`).
+**Not verified:** nothing from tonight has been seen in a browser (the container has none). Specifically unchecked: autosave and Publish after the split (they relied on the old single-page refresh behavior; BACKLOG item 5), the prompt/strip states, and the rest of the browser-check list in BACKLOG.
+
+**Live-air work in this stretch, all pushed:**
+- `4049a3c`: every strip Stay Updated pill opens the same **Scores Are Going Live** sheet as the automatic prompt (`LiveScoresSheet` / `LiveScoresPrompt` / `LiveScoresPill` in `live-scores-prompt.tsx`), for the week's current coast, with no chip in the gap or after the night. Stay Updated inside it unlocks directly. The separate "Unlock draft scores?" confirm sheet (`stay-updated-confirm.tsx`) was deleted. The draft strip's pill is also vertically centered.
+- `623e97a`: auto-refresh is time-aware. Each page gets `refreshWindows` (30 minutes before the East curtain to 10pm PT, `liveRefreshWindows`), and `RevealAutoRefresh` checks the clock every 20s, so a page opened before the show switches on by itself.
+- `8ec74a3` (the user, not us): West Stay Updated and the West-window "Draft scores available" pill are published-only. East, the gap and Mark Watched still unlock drafts. After West Stay the strip reads Watching live · Week N and the amber strip stays hidden.
+- `a9ebbe4`: docs only. CLAUDE.md documents the Results gold lines (`coupleLeagueNotes`), and the backlog was pruned.
+- Earlier in the night (already pushed before the last sync): the prompt/strip rebuild, Stay Updated as the only opt-in label, the "Latest: {First} & {First} · N/M" draft-strip line, and bold celebrity names on league cards.
 
 ## 2. Changes Made
-This stretch's files:
-- **Components:** `results-form.tsx`, `live-scores-prompt.tsx`, `spoiler-free-strip.tsx`, `stay-updated-confirm.tsx` (new), `league-triage-card.tsx`.
-- **Lib:** `spoiler-free-strip-state.ts` (+ test), `episode-banner.ts` (+ test), `draft-scores.ts` (+ test), `draft-scores-data.ts`, `league-triage.ts` (+ test), `league-module-stack-data.ts`.
-- **Docs:** CLAUDE.md throughout, BACKLOG items 10–11.
+This stretch's files, all committed:
+- **Split:** `src/app/admin/results/page.tsx`, `src/app/admin/results/enter/page.tsx` (new), `src/app/admin/results/actions.ts`, `src/components/results-screen.tsx` (now Scores-only), `results-form.tsx`, `results-nav.tsx`, `src/lib/results-page-data.ts`.
+- **Live-air:** `src/components/live-scores-prompt.tsx`, `spoiler-free-strip.tsx`, `reveal-auto-refresh.tsx`, `league-page-shell.tsx`; `src/lib/spoiler-free-strip-state.ts` (+ test), `episode-banner.ts` (+ test), `league-page-data.ts`; `src/app/page.tsx` and `src/app/this-week/page.tsx`.
+- **Docs:** CLAUDE.md throughout, BACKLOG.md.
 
-`e919aab` touched `schema.sql` and SQL files and isn't ours. **Not ours, leave unstaged:** `ios/App/App.xcodeproj/project.pbxproj`. **Untracked and unresolved:** `scratch/` (BACKLOG item 9).
+**Not ours, leave unstaged:** `ios/App/App.xcodeproj/project.pbxproj`. `scratch/` was deleted this session, so it is no longer a concern.
 
 ## 3. Key Decisions
-- **Stay Updated is the only opt-in CTA label** (prompt, posting pill, draft pill). "Follow along…" is only helper text under the prompt's Stay Updated, and never a button. Mark Watched stays on the prompt and the "results are in" strip. Mark Watched on the prompt stays gray during East.
-- **Every Stay Updated confirms in one light bottom sheet**, the user's locked copy. It never stacks on the prompt, which swaps in place instead.
-- **The draft strip:** "Draft scores available" with no "may be ahead of you", and "Latest: {First} & {First} · N/M". **No dance name**: the user dropped it, so no SQL is needed. **M uses real elimination data even for behind Spoiler-Free viewers**: the user said the numbers aren't a spoiler concern.
-- **The amber strip reads "Draft scores · Unverified"** on every tab.
-- **League cards: only the celebrity is bold**, not the "&" or the pro.
-- **Pasted specs from other tools can contradict earlier answers in the same session.** This happened twice tonight: "may be ahead of you" came back, and Mark Watched vs Stay Updated on the posting pill flipped. Ask before building; the user's latest direct answer wins.
-- **Never `npm run build` into the shared `.next` while any `next dev` is running.** Build in a scratchpad copy: tar excluding `node_modules`, `.next`, `ios`, `scratch`, `.git` and `tsconfig.tsbuildinfo`, then symlink `node_modules`.
-- **When rebasing onto upstream with the other session's dirty `project.pbxproj`, use `git rebase --autostash origin/main`.** A plain pull --rebase refuses.
-- **Signed-in checks without a browser:** create a throwaway user with the admin client, use `@supabase/ssr` `createServerClient` with an in-memory cookie jar, and fetch the dev server. The script goes in the project root and runs with `NODE_OPTIONS=--experimental-websocket`. Clean up `spoiler_watch_progress` too.
-- **`BACKLOG.md` edits: `Edit` or targeted scripts, never `Write`.**
+- **Stay Updated is the only opt-in label** on every surface, and it opens the Scores Are Going Live sheet with no extra confirm step. Mark Watched stays on the prompt and the "results are in" strip, and is gray on the prompt during East. "Follow along…" is only helper text.
+- **West Stay is published-only** (user's call in `8ec74a3`). Don't reintroduce draft unlocks into any West path.
+- **The draft strip:** "Draft scores available", "Latest: {First} & {First} · N/M" (no dance name, no "may be ahead of you"), amber strip "Draft scores · Unverified" on every tab. M uses real elimination data; the user said that's not a spoiler concern.
+- **League cards:** couple names use first names for both partners, with only the celebrity in bold.
+- **The Settings "I last watched" picker is not locked mid-East.** I recommended dropping that idea (Stay Updated already unlocks drafts in East, so it adds no new access). It stays in BACKLOG item 7 until the user says to remove it.
+- **Mockups and pasted specs:** only what the user's written spec asks for gets built, and a later direct answer beats an earlier pasted spec. Pasted specs from other tools contradicted earlier answers more than once tonight, so ask before building when they conflict.
+- **Builds:** never `npm run build` into the shared `.next` while a `next dev` is running. Build in a scratchpad copy (tar excluding `node_modules`, `.next`, `ios`, `.git`, `tsconfig.tsbuildinfo`, then symlink `node_modules`). If no dev server is running, building in place is fine. `pgrep -af "next dev"` matches its own command line, so read its output carefully. A background build dies if the session restarts and leaves `scratchpad/buildcopy` behind; delete it.
+- **Git with a dirty other-session `project.pbxproj`:** `git rebase --autostash origin/main`; stage files by name.
+- **Signed-in checks without a browser:** create a throwaway user with the admin client, sign in through `@supabase/ssr` `createServerClient` with an in-memory cookie jar, and fetch the dev server. The script goes in the project root, runs with `NODE_OPTIONS=--experimental-websocket`, and cleans up `spoiler_watch_progress` too.
+- **`BACKLOG.md` edits:** `Edit` or a targeted script, never `Write`.
 
 ## 4. Backlog & Next Steps
-Everything deferred is in `BACKLOG.md` "Up next". **First, get the user's live punch-list results (item 10)** and fix any failures. Then get their calls on item 11: locking the Settings picker mid-East, the unbuilt mockup extras, and the design packs. Item 7 (the route split click-through) and items 1–3 are still waiting on a real browser.
+Everything deferred is in `BACKLOG.md` "Up next": the Spoiler-Free strip mounts, Enter Results and Picks/Results checks, the "Built but not checked" list (all need a real browser or a real episode), the two route-split click-throughs (items 5 and 6), and the open live-air follow-up (item 7). There is no in-flight code work. The next thing to do is the user's phone or browser pass, then fix whatever they report.
 
 Next command: `git fetch && git status -sb`
