@@ -14,6 +14,7 @@ import {
   picksButtonLabel,
   showHybridStatusPill,
   type ModuleStackInput,
+  type StackRow,
 } from "@/lib/league-triage";
 
 export type LeagueTriage = {
@@ -100,19 +101,21 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
                   >
                     {line.lines.length === 1 ? (
                       <span className={cn(toneClass, "flex-1")}>
-                        {line.lines[0]}
+                        <StackRowText row={line.lines[0]} />
                         {need}
                       </span>
                     ) : (
                       line.lines.map((row, i) =>
                         i === 0 ? (
                           <span key={i} className="flex items-baseline justify-between gap-2">
-                            <span className={cn(toneClass, "flex-1")}>{row}</span>
+                            <span className={cn(toneClass, "flex-1")}>
+                              <StackRowText row={row} />
+                            </span>
                             {status}
                           </span>
                         ) : (
                           <span key={i} className={cn(toneClass, "block")}>
-                            {row}
+                            <StackRowText row={row} />
                             {i === line.lines.length - 1 && need}
                           </span>
                         )
@@ -172,5 +175,18 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function StackRowText({ row }: { row: StackRow }) {
+  return (
+    <>
+      {row.text}
+      {row.couple && (
+        <>
+          <span className="font-semibold">{row.couple.celebrity}</span> &amp; {row.couple.pro}
+        </>
+      )}
+    </>
   );
 }

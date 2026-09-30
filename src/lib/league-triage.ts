@@ -1,4 +1,4 @@
-import { buildCoupleDisplayNames, formatCoupleName } from "./couple-display";
+import { buildCoupleDisplayNames, type CoupleNameParts } from "./couple-display";
 import { SCORING_MODULES, type ScoringModuleKey } from "./scoring-modules";
 
 export function leagueTapHref(leagueId: string, picksDue: boolean): string {
@@ -15,26 +15,34 @@ export type ModuleStackInput = {
     state: CurtainCallState;
     afterWeek: number | null;
     lockAt: string | null;
-    eliminatedName: string | null;
-    topScorerName: string | null;
+    eliminatedName: CoupleNameParts | null;
+    topScorerName: CoupleNameParts | null;
   };
-  danceCard: { on: boolean; draftStatus: string; rosterNames: string[] };
+  danceCard: { on: boolean; draftStatus: string; rosterNames: CoupleNameParts[] };
   grandFinale: {
     on: boolean;
     open: boolean;
     locked: boolean;
     deadlineAt: string | null;
     hasPrediction: boolean;
-    nextElimName: string | null;
+    nextElimName: CoupleNameParts | null;
   };
 };
+
+// One visual row: plain text, then a couple the card renders as
+// "Tatyana & Jan" with the celebrity in bold ("Home: " + couple). Rows
+// without a couple have couple null.
+export type StackRow = { text: string; couple: CoupleNameParts | null };
+
+const plain = (text: string): StackRow => ({ text, couple: null });
+const named = (text: string, couple: CoupleNameParts): StackRow => ({ text, couple });
 
 export type ModuleLine = {
   key: ScoringModuleKey;
   name: string;
-  // One string per visual row under the module name. Curtain Call Home/High
+  // One row per visual line under the module name. Curtain Call Home/High
   // and Dance Card couples are never joined onto a single row.
-  lines: string[];
+  lines: StackRow[];
   tone: "needed" | "normal" | "dim";
   // A gold "Need …" tacked onto an otherwise normal line.
   needText: string | null;
@@ -49,13 +57,13 @@ type LineBody = Pick<ModuleLine, "lines" | "tone" | "locked" | "locksAt"> & { ne
 export function danceCardRosterNames(
   coupleIds: readonly string[],
   couples: readonly { id: string; celebrityName: string; proName: string }[]
-): string[] {
+): CoupleNameParts[] {
   const display = buildCoupleDisplayNames(
     couples.map((c) => ({ id: c.id, celebrity_name: c.celebrityName, pro_name: c.proName }))
   );
   return coupleIds.flatMap((id) => {
     const parts = display.get(id);
-    return parts ? [formatCoupleName(parts)] : [];
+    return parts ? [parts] : [];
   });
 }
 
@@ -64,15 +72,15 @@ export function buildModuleStack(input: ModuleStackInput): ModuleLine[] {
   const { curtainCall: cc, danceCard: dc, grandFinale: gf } = input;
 
   const curtainCall = ((): LineBody => {
-    const home = cc.eliminatedName && `Home: ${cc.eliminatedName}`;
-    const high = cc.topScorerName && `High: ${cc.topScorerName}`;
-    const picks = [home, high].filter((line): line is string => !!line);
+    const home = cc.eliminatedName ? named("Home: ", cc.eliminatedName) : null;
+    const high = cc.topScorerName ? named("High: ", cc.topScorerName) : null;
+    const picks = [home, high].filter((row): row is StackRow => !!row);
     switch (cc.state) {
       case "no_week":
-        return { lines: ["Not open yet"], tone: "dim", locked: false, locksAt: null };
+        return { lines: [plain("Not open yet")], tone: "dim", locked: false, locksAt: null };
       case "awaiting_results":
         return {
-          lines: [cc.afterWeek ? `Opens after Week ${cc.afterWeek} results` : "Opens after results"],
+          lines: [plain(cc.afterWeek ? `Opens after Week ${cc.afterWeek} results` : "Opens after results")],
           tone: "dim",
           locked: false,
           locksAt: null,
@@ -80,10 +88,10 @@ export function buildModuleStack(input: ModuleStackInput): ModuleLine[] {
       case "locked":
         return picks.length
           ? { lines: picks, tone: "normal", locked: true, locksAt: null }
-          : { lines: ["Missed your cue"], tone: "dim", locked: true, locksAt: null };
+          : { lines: [plain("Missed your cue")], tone: "dim", locked: true, locksAt: null };
       case "open":
         if (home && high) return { lines: picks, tone: "normal", locked: false, locksAt: cc.lockAt };
-        if (!home && !high) return { lines: ["Need Home & High picks"], tone: "needed", locked: false, locksAt: cc.lockAt };
+        if (!home && !high) return { lines: [plain("Need Home & High picks")], tone: "needed", locked: false, locksAt: cc.lockAt };
         return { lines: picks, needText: `Need ${home ? "High" : "Home"}`, tone: "normal", locked: false, locksAt: cc.lockAt };
     }
   })();
@@ -91,26 +99,26 @@ export function buildModuleStack(input: ModuleStackInput): ModuleLine[] {
   const danceCard = ((): LineBody => {
     const lines =
       dc.draftStatus === "not_started"
-        ? ["Draft not started"]
+        ? [plain("Draft not started")]
         : dc.draftStatus === "in_progress"
-          ? ["Draft in progress"]
+          ? [plain("Draft in progress")]
           : dc.rosterNames.length
-            ? dc.rosterNames
-            : ["No couples"];
+            ? dc.rosterNames.map((couple) => named("", couple))
+            : [plain("No couples")];
     return { lines, tone: "normal", locked: dc.draftStatus === "completed", locksAt: null };
   })();
 
   const grandFinale = ((): LineBody => {
     if (gf.hasPrediction) {
       return {
-        lines: [gf.nextElimName ? `Next elim: ${gf.nextElimName}` : "Prediction in"],
+        lines: [gf.nextElimName ? named("Next elim: ", gf.nextElimName) : plain("Prediction in")],
         tone: "normal",
         locked: gf.locked,
         locksAt: gf.open ? gf.deadlineAt : null,
       };
     }
-    if (gf.locked) return { lines: ["Missed your cue"], tone: "dim", locked: true, locksAt: null };
-    return { lines: ["Need predictions"], tone: "needed", locked: false, locksAt: gf.deadlineAt };
+    if (gf.locked) return { lines: [plain("Missed your cue")], tone: "dim", locked: true, locksAt: null };
+    return { lines: [plain("Need predictions")], tone: "needed", locked: false, locksAt: gf.deadlineAt };
   })();
 
   const bodies: Record<ScoringModuleKey, LineBody & { on: boolean }> = {

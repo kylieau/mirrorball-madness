@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
+import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { nextPredictedElimination } from "@/lib/grand-finale-pins";
 import type { LeagueHomeSummary } from "@/lib/league-home-summary";
 import { danceCardRosterNames, type ModuleStackInput } from "@/lib/league-triage";
@@ -38,10 +38,7 @@ export async function loadModuleStackInputs(
       pro_name: c.pro?.name ?? "Unknown",
     }))
   );
-  const fullNameOf = (id: string | null) => {
-    const parts = id ? names.get(id) : null;
-    return parts ? formatCoupleName(parts) : null;
-  };
+  const fullNameOf = (id: string | null) => (id ? (names.get(id) ?? null) : null);
   const draftStatusByLeague = new Map((leagues ?? []).map((l) => [l.id, l.draft_status]));
   const seasonCouples = (couples ?? [])
     .filter((c) => c.season_id === context.activeSeasonId)
