@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ResultsForm } from "@/components/results-form";
 import { AllResultsView } from "@/components/all-results-view";
 import { PageHeader } from "@/components/page-header";
 import { TopBar } from "@/components/top-bar";
@@ -11,13 +9,8 @@ import type { CoupleNameParts } from "@/lib/couple-display";
 import type { ScoringJudge } from "@/lib/scoring-judges";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 import type { DraftState } from "@/lib/results-draft";
-import { ArrowLeftIcon } from "lucide-react";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
-type CoupleWithStatus = Couple & {
-  status: string;
-  elimination_week: number | null;
-};
 type Named = { id: string; name: string };
 type DanceScore = {
   id: string;
@@ -65,13 +58,13 @@ type Season = {
   season_number: number | null;
 } | null;
 
-type TabValue = "week" | "couple" | "enter";
+type TabValue = "week" | "couple";
 
 // Settings' Episodes section shows By Week/By Couple as their own rows
 // nested under "Scores" (results-nav.tsx), each linking with its own ?tab= —
 // so this switcher is purely for flipping between the two once you're
-// already on the page, not a landing choice. Schedule lives on its own page
-// (/admin/schedule), not as a tab here.
+// already on the page, not a landing choice. Enter Results
+// (/admin/results/enter) and Schedule (/admin/schedule) are their own pages.
 const SWITCHER_TABS: { value: TabValue; label: string }[] = [
   { value: "week", label: "By Week" },
   { value: "couple", label: "By Couple" },
@@ -81,10 +74,7 @@ export function ResultsScreen({
   accountSettingsData,
   viewerEmail,
   canPropose,
-  activeCouples,
   allCouples,
-  allCouplesWithStatus,
-  activeCoupleDisplayNames,
   allCoupleDisplayNames,
   judges,
   danceStyles,
@@ -94,8 +84,6 @@ export function ResultsScreen({
   judgeScores,
   episodeResults,
   draftsByEpisode,
-  revealedByEpisode,
-  releasedCoupleIdsByEpisode,
   publishedByNames,
   season,
   participantsByEpisode,
@@ -108,10 +96,7 @@ export function ResultsScreen({
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
   canPropose: boolean;
-  activeCouples: Couple[];
   allCouples: Couple[];
-  allCouplesWithStatus: CoupleWithStatus[];
-  activeCoupleDisplayNames: Record<string, CoupleNameParts>;
   allCoupleDisplayNames: Record<string, CoupleNameParts>;
   judges: ScoringJudge[];
   danceStyles: Named[];
@@ -121,8 +106,6 @@ export function ResultsScreen({
   judgeScores: JudgeScore[];
   episodeResults: EpisodeResult[];
   draftsByEpisode: Record<string, DraftState>;
-  revealedByEpisode: Record<string, Record<string, string>>;
-  releasedCoupleIdsByEpisode: Record<string, string[]>;
   publishedByNames: Record<string, string>;
   season: Season;
   participantsByEpisode: Record<string, string[]>;
@@ -132,96 +115,56 @@ export function ResultsScreen({
   spoilerFreeMode: boolean;
   allowedWeekIds: string[];
 }) {
-  const { isSuperAdmin } = accountSettingsData;
-
+  const router = useRouter();
   // The URL is the source of truth so Account Settings links (?tab=week,
-  // ?tab=enter, …) work even when tapped while already on this page. "enter"
-  // is only reachable by a propose-tier viewer.
-  const requestedTab = useSearchParams().get("tab");
-  const tab: TabValue =
-    requestedTab === "enter" && canPropose ? "enter" : requestedTab === "couple" ? "couple" : "week";
+  // ?tab=couple) work even when tapped while already on this page.
+  const tab: TabValue = useSearchParams().get("tab") === "couple" ? "couple" : "week";
   // Next syncs native history.replaceState into useSearchParams, so switching
-  // tabs doesn't trigger a server refetch of the page's data.
+  // views doesn't trigger a server refetch of the page's data.
   const setTab = (next: TabValue) => window.history.replaceState(null, "", `?tab=${next}`);
-  // Lifted here so View Results' "Correct Results"/"Continue draft" can
-  // jump to Enter Results already pointed at the right episode.
-  const [forceSelectEpisodeId, setForceSelectEpisodeId] = useState<string | null>(null);
-
-  function navigateToEpisode(episodeId: string) {
-    setForceSelectEpisodeId(episodeId);
-    setTab("enter");
-  }
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-8 pb-8">
       <TopBar {...accountSettingsData} email={viewerEmail} />
 
-      <PageHeader title={tab === "enter" ? "Enter Results" : "Scores"}>
-        {tab === "enter" ? (
-          <Button size="sm" variant="ghost" className="-ml-2" onClick={() => setTab("week")}>
-            <ArrowLeftIcon className="size-4" />
-            Back to Scores
-          </Button>
-        ) : (
-          <div className="flex gap-2">
-            {SWITCHER_TABS.map(({ value, label }) => (
-              <Button
-                key={value}
-                size="sm"
-                variant={tab === value ? "default" : "outline"}
-                onClick={() => setTab(value)}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
-        )}
+      <PageHeader title="Scores">
+        <div className="flex gap-2">
+          {SWITCHER_TABS.map(({ value, label }) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={tab === value ? "default" : "outline"}
+              onClick={() => setTab(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
       </PageHeader>
 
-      {tab === "enter" && canPropose && (
-        <ResultsForm
-          canPublish={isSuperAdmin}
-          activeCouples={activeCouples}
-          allCouplesWithStatus={allCouplesWithStatus}
-          coupleDisplayNames={activeCoupleDisplayNames}
-          allCoupleDisplayNames={allCoupleDisplayNames}
-          judges={judges}
-          danceStyles={danceStyles}
-          episodes={episodes}
-          weeks={weeks}
-          draftsByEpisode={draftsByEpisode}
-          revealedByEpisode={revealedByEpisode}
-          releasedCoupleIdsByEpisode={releasedCoupleIdsByEpisode}
-          forceSelectEpisodeId={forceSelectEpisodeId}
-          participantsByEpisode={participantsByEpisode}
-        />
-      )}
-
-      {(tab === "week" || tab === "couple") && (
-        <AllResultsView
-          view={tab}
-          canPropose={canPropose}
-          episodes={episodes}
-          weeks={weeks}
-          danceScores={danceScores}
-          judgeScores={judgeScores}
-          episodeResults={episodeResults}
-          couples={allCouples}
-          coupleDisplayNames={allCoupleDisplayNames}
-          judges={judges}
-          danceStyles={danceStyles}
-          draftsByEpisode={draftsByEpisode}
-          publishedByNames={publishedByNames}
-          onNavigateToEpisode={navigateToEpisode}
-          seasonNumber={season?.season_number ?? null}
-          roundTypes={roundTypes}
-          roundTypesByEpisode={roundTypesByEpisode}
-          inJeopardyByEpisode={inJeopardyByEpisode}
-          participantsByEpisode={participantsByEpisode}
-          spoilerFreeMode={spoilerFreeMode}
-          allowedWeekIds={new Set(allowedWeekIds)}
-        />
-      )}
+      <AllResultsView
+        view={tab}
+        canPropose={canPropose}
+        episodes={episodes}
+        weeks={weeks}
+        danceScores={danceScores}
+        judgeScores={judgeScores}
+        episodeResults={episodeResults}
+        couples={allCouples}
+        coupleDisplayNames={allCoupleDisplayNames}
+        judges={judges}
+        danceStyles={danceStyles}
+        draftsByEpisode={draftsByEpisode}
+        publishedByNames={publishedByNames}
+        onNavigateToEpisode={(episodeId) => router.push(`/admin/results/enter?episode=${episodeId}`)}
+        seasonNumber={season?.season_number ?? null}
+        roundTypes={roundTypes}
+        roundTypesByEpisode={roundTypesByEpisode}
+        inJeopardyByEpisode={inJeopardyByEpisode}
+        participantsByEpisode={participantsByEpisode}
+        spoilerFreeMode={spoilerFreeMode}
+        allowedWeekIds={new Set(allowedWeekIds)}
+      />
     </div>
   );
 }

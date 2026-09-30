@@ -9,7 +9,16 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 
-export default async function AdminResultsPage() {
+// Scores (By Week / By Couple). Enter Results is its own page at
+// /admin/results/enter; old ?tab=enter links land there.
+export default async function AdminResultsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  if ((await searchParams).tab === "enter") {
+    redirect("/admin/results/enter");
+  }
   const supabase = await createClient();
   const {
     data: { user },
@@ -22,8 +31,8 @@ export default async function AdminResultsPage() {
   const accountSettingsData = await getAccountSettingsData(supabase, user.id);
 
   // No access gate beyond being signed in — the view tier is open to everyone
-  // so anyone can see how scores and outcomes get entered. What a viewer can
-  // *do* is decided per-tab below and re-checked server-side in actions.ts.
+  // so anyone can see how scores and outcomes get entered. canPropose only
+  // decides whether "Continue in Enter Results" shows; actions.ts re-checks.
   const canPropose =
     accountSettingsData.isSuperAdmin ||
     (await userIsAnyLeagueCommissioner(createAdminClient(), user.id));
@@ -33,8 +42,8 @@ export default async function AdminResultsPage() {
   // Scores' View tier being open to any signed-in user is about access, not
   // about overriding the viewer's own spoiler preference — apply the same
   // cutoff This Week uses, for every viewer regardless of role. Enter
-  // Results (a separate tab/component) stays unguarded, since correcting a
-  // week requires seeing it.
+  // Results (its own page) stays unguarded, since correcting a week requires
+  // seeing it.
   const groupedWeeks = groupEpisodesByWeek(data.weeks, data.episodes);
   const completedWeeksDesc = groupedWeeks
     .filter((week) => week.status === "completed")
@@ -52,10 +61,7 @@ export default async function AdminResultsPage() {
       accountSettingsData={accountSettingsData}
       viewerEmail={user.email ?? ""}
       canPropose={canPropose}
-      activeCouples={data.activeCouples}
       allCouples={data.allCouples}
-      allCouplesWithStatus={data.allCouplesWithStatus}
-      activeCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(data.activeCouples))}
       allCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(data.allCouples))}
       judges={data.judges}
       danceStyles={data.danceStyles}
@@ -65,8 +71,6 @@ export default async function AdminResultsPage() {
       judgeScores={data.judgeScores}
       episodeResults={data.episodeResults}
       draftsByEpisode={data.draftsByEpisode}
-      revealedByEpisode={data.revealedByEpisode}
-      releasedCoupleIdsByEpisode={data.releasedCoupleIdsByEpisode}
       publishedByNames={data.publishedByNames}
       season={data.season}
       participantsByEpisode={data.participantsByEpisode}

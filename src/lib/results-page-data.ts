@@ -73,8 +73,8 @@ export type ResultsPageData = {
   inJeopardyByEpisode: Record<string, string[]>;
 };
 
-// Shared by /admin/results (By Week / By Couple / Enter Results) and
-// /admin/schedule — both need the same season's episodes/weeks/drafts/roster,
+// Shared by /admin/results (Scores: By Week / By Couple), /admin/results/enter and
+// /admin/schedule — they all need the same season's episodes/weeks/drafts/roster,
 // just render different subsets of it, so the query shape can't drift
 // between the two pages. `admin` is the service-role client, needed only for
 // reading draft rows (draft_* tables grant nothing to authenticated).

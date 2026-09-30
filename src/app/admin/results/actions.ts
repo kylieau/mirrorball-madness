@@ -70,7 +70,7 @@ export async function scheduleEpisode(
 
   const result = await applyEpisodeSchedule(createAdminClient(), input);
   if (!result.error) {
-    revalidatePath("/admin/results");
+    revalidatePath("/admin/results", "layout");
     revalidatePath("/admin/schedule");
   }
   return result;
@@ -83,7 +83,7 @@ export async function saveEpisodeDraft(
   if (access.error) return { error: access.error };
 
   const result = await saveDraftResults(createAdminClient(), { ...input, updatedBy: access.userId });
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
@@ -96,7 +96,7 @@ export async function addEpisodeCustomMoment(input: {
   if (access.error) return { error: access.error };
 
   const result = await addDraftCustomMoment(createAdminClient(), { ...input, createdBy: access.userId });
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
@@ -105,7 +105,7 @@ export async function removeEpisodeCustomMoment(momentId: string): Promise<{ err
   if (access.error) return { error: access.error };
 
   const result = await removeDraftCustomMoment(createAdminClient(), momentId);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
@@ -138,7 +138,7 @@ export async function publishEpisodeResults(episodeId: string): Promise<{ error:
 
   const result = await publishEpisodeDraft(createAdminClient(), episodeId, access.userId);
   if (!result.error) {
-    revalidatePath("/admin/results");
+    revalidatePath("/admin/results", "layout");
     revalidatePath("/admin/schedule");
   }
   return result;
@@ -152,7 +152,7 @@ export async function revealCoupleScores(input: {
   if (access.error) return { error: access.error };
 
   const result = await revealCouple(createAdminClient(), input);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
@@ -164,7 +164,7 @@ export async function undoCoupleReveal(input: {
   if (access.error) return { error: access.error };
 
   const result = await undoReveal(createAdminClient(), input);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
@@ -173,7 +173,7 @@ export async function startEpisodeCorrection(episodeId: string): Promise<{ error
   if (access.error) return { error: access.error };
 
   const result = await startCorrection(createAdminClient(), episodeId, access.userId);
-  if (!result.error) revalidatePath("/admin/results");
+  if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
@@ -183,7 +183,7 @@ export async function updateSeasonSettings(input: SeasonSettingsInput): Promise<
 
   const result = await applySeasonSettings(createAdminClient(), input);
   if (!result.error) {
-    revalidatePath("/admin/results");
+    revalidatePath("/admin/results", "layout");
     revalidatePath("/admin/schedule");
   }
   return result;
@@ -195,7 +195,7 @@ export async function addJudge(name: string): Promise<{ error: string | null }> 
 
   const result = await insertScoringJudge(createAdminClient(), name);
   if (!result.error) {
-    revalidatePath("/admin/results");
+    revalidatePath("/admin/results", "layout");
     revalidatePath("/admin/show-settings");
   }
   return result;
@@ -207,7 +207,7 @@ export async function archiveJudge(personId: string): Promise<{ error: string | 
 
   const result = await setJudgeArchived(createAdminClient(), personId, true);
   if (!result.error) {
-    revalidatePath("/admin/results");
+    revalidatePath("/admin/results", "layout");
     revalidatePath("/admin/show-settings");
   }
   return result;
@@ -219,7 +219,7 @@ export async function restoreJudge(personId: string): Promise<{ error: string | 
 
   const result = await setJudgeArchived(createAdminClient(), personId, false);
   if (!result.error) {
-    revalidatePath("/admin/results");
+    revalidatePath("/admin/results", "layout");
     revalidatePath("/admin/show-settings");
   }
   return result;
@@ -231,7 +231,7 @@ export async function renameJudge(personId: string, name: string): Promise<{ err
 
   const result = await renameScoringJudge(createAdminClient(), personId, name);
   if (!result.error) {
-    revalidatePath("/admin/results");
+    revalidatePath("/admin/results", "layout");
     revalidatePath("/admin/show-settings");
   }
   return result;
@@ -247,7 +247,7 @@ export async function addDanceStyle(name: string): Promise<{ error: string | nul
   const { error } = await createAdminClient().from("dance_styles").insert({ name: trimmed });
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/results");
+  revalidatePath("/admin/results", "layout");
   revalidatePath("/admin/show-settings");
   return { error: null };
 }
@@ -265,7 +265,7 @@ export async function addRoundType(name: string): Promise<{ error: string | null
   const { error } = await createAdminClient().from("round_types").insert({ name: trimmed });
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/results");
+  revalidatePath("/admin/results", "layout");
   revalidatePath("/admin/show-settings");
   return { error: null };
 }
@@ -287,7 +287,7 @@ export async function setDanceStyleCategory(
     .eq("id", styleId);
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/results");
+  revalidatePath("/admin/results", "layout");
   revalidatePath("/admin/show-settings");
   return { error: null };
 }

@@ -229,9 +229,8 @@ export function ResultsForm({
   draftsByEpisode: Record<string, DraftState>;
   revealedByEpisode: Record<string, Record<string, string>>;
   releasedCoupleIdsByEpisode: Record<string, string[]>;
-  // Set by AllResultsView's "Correct Results" button (lifted up into
-  // ResultsScreen) to jump here already pointed at that episode, once
-  // startEpisodeCorrection has seeded a fresh draft for it.
+  // From /admin/results/enter?episode= (Scores' "Continue in Enter Results"),
+  // to open already pointed at that episode.
   forceSelectEpisodeId?: string | null;
   participantsByEpisode: Record<string, string[]>;
 }) {
@@ -329,7 +328,7 @@ export function ResultsForm({
   const flushDraftRef = useRef<() => Promise<{ error: string | null }>>(async () => ({ error: null }));
   const draftSavedAgo = useRelativeTimeAgo(draftSavedAt);
 
-  // saveEpisodeDraft's revalidatePath("/admin/results") makes Next
+  // saveEpisodeDraft's revalidatePath("/admin/results", "layout") makes Next
   // auto-refresh this route's server props for the client that called it —
   // including draftsByEpisode — which would otherwise re-trigger the
   // rehydrate effect below and stomp whatever the admin has typed since.

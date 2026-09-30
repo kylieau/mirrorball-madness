@@ -67,7 +67,7 @@ export function ResultsNav({ canPropose }: { canPropose: boolean }) {
     <SettingsSection title="Episodes">
       <Row href="/admin/schedule" label="Schedule" />
       <ScoresRow />
-      {canPropose && <Row href="/admin/results?tab=enter" label="Enter Results" />}
+      {canPropose && <Row href="/admin/results/enter" label="Enter Results" />}
     </SettingsSection>
   );
 }
