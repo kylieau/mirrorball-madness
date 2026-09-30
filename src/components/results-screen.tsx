@@ -124,7 +124,7 @@ export function ResultsScreen({
   const setTab = (next: TabValue) => window.history.replaceState(null, "", `?tab=${next}`);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-8 pb-8">
+    <div className="flex w-full flex-col gap-4 px-4 pt-8 pb-8">
       <TopBar {...accountSettingsData} email={viewerEmail} />
 
       <PageHeader title="Scores">

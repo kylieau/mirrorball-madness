@@ -62,7 +62,7 @@ export default async function LeaguesPage({
     .sort((a, b) => Number(b.picksDue) - Number(a.picksDue));
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
+    <div className="flex flex-col gap-4 px-4 py-8">
       <div className="flex flex-col gap-6">
         <TopBar {...accountSettingsData} email={user.email ?? ""} />
 

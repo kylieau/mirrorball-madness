@@ -24,7 +24,7 @@ export default async function ShowSettingsPage() {
   const { judges, danceStyles, roundTypes } = await loadResultsTaxonomy(supabase);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-8 pb-8">
+    <div className="flex w-full flex-col gap-4 px-4 pt-8 pb-8">
       <TopBar {...accountSettingsData} email={user.email ?? ""} />
       <PageHeader title="Show Settings" />
       <JudgesDanceStylesManager judges={judges} danceStyles={danceStyles} roundTypes={roundTypes} />

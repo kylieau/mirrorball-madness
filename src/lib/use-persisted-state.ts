@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { APP } from "@/config/app";
 
 // First use of localStorage in this repo — a per-viewer UI convenience
 // (collapse/expand state), never data anyone else needs to see. SSR-safe:
@@ -9,7 +10,10 @@ import { useEffect, useState } from "react";
 // convention as useFormattedDeadline for viewer-timezone formatting). The
 // third element flips once the stored value has been adopted, for callers that
 // must not act on the default (e.g. auto-opening a sheet).
-export function usePersistedState<T>(key: string, defaultValue: T): [T, (v: T) => void, boolean] {
+// Keys are prefixed with the app slug so they can't collide with anything else
+// stored on the same origin (e.g. a dev server or another app on localhost).
+export function usePersistedState<T>(name: string, defaultValue: T): [T, (v: T) => void, boolean] {
+  const key = `${APP.slug}:${name}`;
   const [value, setValue] = useState(defaultValue);
   const [hydrated, setHydrated] = useState(false);
 

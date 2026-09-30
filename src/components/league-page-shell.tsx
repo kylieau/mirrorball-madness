@@ -23,7 +23,7 @@ export function LeaguePageShell({
 }) {
   const { league, scoringSettings, spoilerFreeStrip } = base;
   return (
-    <div className="mx-auto flex max-w-2xl flex-col px-4">
+    <div className="flex flex-col px-4">
       <div className={cn("flex flex-col gap-4", spoilerFreeStrip || base.draftScoresStrip ? "pt-4" : "py-8")}>
         <LeagueHeader
           tab={tab}

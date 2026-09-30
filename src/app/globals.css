@@ -103,12 +103,18 @@
     --danger-text: #e7aba8;
     --rank-up: #5fd58a;
     --rank-down: #f26b66;
+
+    /* Phone-sized app column; the desk is the darker strip around it on wide screens. */
+    --frame-width: 30rem;
+    --desk: #150d18;
   }
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background: var(--desk);
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     @apply font-sans;

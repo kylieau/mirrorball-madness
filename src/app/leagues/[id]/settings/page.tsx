@@ -87,7 +87,7 @@ export default async function LeagueSettingsPage({
 
   return (
     <div
-      className={`mx-auto flex max-w-2xl flex-col gap-4 px-4 ${
+      className={`flex flex-col gap-4 px-4 ${
         // Room for the pinned Save bar so the last section isn't hidden behind it.
         isCommissioner ? "pb-36" : "pb-8"
       }`}
@@ -303,7 +303,7 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
   }));
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-8">
+    <div className="flex flex-col gap-4 px-4 pb-8">
       <div className="flex flex-col gap-6">
         <div className="sticky top-0 z-30 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
           <div className="min-w-0">

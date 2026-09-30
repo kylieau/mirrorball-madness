@@ -49,7 +49,7 @@ export default async function NotificationsPage() {
   const needingAttention = summaries.filter((s) => s.needsAttention);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
+    <div className="flex flex-col gap-4 px-4 py-8">
       <TopBar {...accountSettingsData} email={user.email ?? ""} />
 
       <div>

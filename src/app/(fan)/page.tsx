@@ -61,6 +61,15 @@ export default async function Home() {
     finaleWeekNumber,
   } = await loadHomeLeagueData(supabase, user.id, accountSettingsData.spoilerFreeMode, leagueRefs);
 
+  const moduleInputsPending =
+    summaries.length > 0
+      ? loadModuleStackInputs(supabase, summaries, {
+          activeSeasonId,
+          spoilerCutoffWeek: cutoff.effectiveLatestEpisode?.week_number ?? null,
+          finaleWeekNumber,
+        })
+      : Promise.resolve(new Map<string, ModuleStackInput>());
+
   // Results are season-global, so they're fetched once and shared by every league.
   const visibleWeeks = [
     ...cutoff.visibleEpisodes,
@@ -145,14 +154,7 @@ export default async function Home() {
   });
   const draftVisible = homeStripChoice(!!draftNight, !!spoilerFreeStrip) === "draft";
 
-  const moduleInputs =
-    summaries.length > 0
-      ? await loadModuleStackInputs(supabase, summaries, {
-          activeSeasonId,
-          spoilerCutoffWeek: cutoff.effectiveLatestEpisode?.week_number ?? null,
-          finaleWeekNumber,
-        })
-      : new Map<string, ModuleStackInput>();
+  const moduleInputs = await moduleInputsPending;
   const leagues: LeagueTriage[] = summaries.map((s, i) => ({
     id: s.id,
     name: s.name,
@@ -207,7 +209,7 @@ export default async function Home() {
   );
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col px-4">
+    <div className="flex flex-col px-4">
       {draftVisible ? (
         <>
           <HomeDraftChrome {...accountSettingsData} email={user.email ?? ""} />

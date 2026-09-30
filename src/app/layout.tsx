@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter, Libre_Caslon_Text } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { APP } from "@/config/app";
 import { SiteHeader } from "@/components/site-header";
 import { NativeAuthListener } from "@/components/native-auth-listener";
 import "./globals.css";
@@ -14,14 +15,15 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const caslon = Libre_Caslon_Text({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-rank" });
 
 export const metadata: Metadata = {
-  title: "Mirrorball Madness",
-  description: "Fantasy sports for Dancing with the Stars.",
+  title: APP.name,
+  description: APP.tagline,
+  icons: { apple: "/apple-touch-icon.png" },
   // Makes iOS "Add to Home Screen" open as a standalone web app (no Safari
   // chrome) — required later for web push, and what the install notice asks
   // people to do. Not a service worker / FCM setup.
   appleWebApp: {
     capable: true,
-    title: "Mirrorball Madness",
+    title: APP.name,
     statusBarStyle: "black-translucent",
   },
 };
@@ -44,9 +46,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn(fraunces.variable, inter.variable, caslon.variable)}>
       <body className="font-sans antialiased">
-        <NativeAuthListener />
-        <SiteHeader />
-        <main>{children}</main>
+        <div className="mx-auto min-h-dvh max-w-(--frame-width) bg-background min-[520px]:shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+          <NativeAuthListener />
+          <SiteHeader />
+          <main>{children}</main>
+        </div>
       </body>
     </html>
   );

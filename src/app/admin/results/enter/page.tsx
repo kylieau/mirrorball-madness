@@ -40,7 +40,7 @@ export default async function EnterResultsPage({
   const data = await loadResultsPageData(supabase, createAdminClient());
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-8 pb-8">
+    <div className="flex w-full flex-col gap-4 px-4 pt-8 pb-8">
       <TopBar {...accountSettingsData} email={user.email ?? ""} />
 
       <PageHeader title="Enter Results">

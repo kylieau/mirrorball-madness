@@ -13,12 +13,12 @@ export const BOTTOM_NAV_TABS_CLASS =
   "flex h-auto w-full justify-around bg-transparent p-1";
 
 const ITEM_CLASS =
-  "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-2 py-1.5 text-sm font-medium sm:flex-row sm:gap-1.5 sm:px-3";
+  "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-2 py-1.5 text-sm font-medium sm:flex-row sm:gap-1.5 sm:px-3";
 
 export function BottomNav({ children }: { children: ReactNode }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40">
-      <div className="mx-auto w-full max-w-2xl border-t border-border bg-background px-4 pb-[env(safe-area-inset-bottom)]">
+      <div className="mx-auto w-full max-w-(--frame-width) border-t border-border bg-background px-4 pb-[env(safe-area-inset-bottom)]">
         {children}
       </div>
     </nav>

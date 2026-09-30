@@ -29,7 +29,7 @@ export default async function AccountPage({
     .single();
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
+    <div className="flex flex-col gap-4 px-4 py-8">
       <Link href={settingsHref} className="text-sm text-muted-foreground hover:text-foreground">
         ‹ Settings
       </Link>

@@ -1375,7 +1375,7 @@ export function ResultsForm({
 
           {published && canPublish && (
             <div className={`fixed inset-x-0 z-30 ${BOTTOM_NAV_STACK_ABOVE}`}>
-              <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mx-auto flex w-full max-w-(--frame-width) flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="hidden text-xs text-muted-foreground sm:block">
                   Publishing updates Results & Standings across every league immediately.
                 </p>

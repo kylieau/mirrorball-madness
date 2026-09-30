@@ -44,14 +44,23 @@ export default async function ThisWeekPage({
     redirect("/login");
   }
 
-  const [{ data: memberships }, accountSettingsData] = await Promise.all([
-    supabase
-      .from("league_members")
-      .select("user_id, joined_at, leagues(id, name)")
-      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`)
-      .order("joined_at", { ascending: true }),
-    getAccountSettingsData(supabase, user.id),
-  ]);
+  const [{ data: memberships }, accountSettingsData, { data: activeSeasonId }, draftContext, { data: danceStyles }, { data: allCouples }] =
+    await Promise.all([
+      supabase
+        .from("league_members")
+        .select("user_id, joined_at, leagues(id, name)")
+        .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`)
+        .order("joined_at", { ascending: true }),
+      getAccountSettingsData(supabase, user.id),
+      supabase.rpc("active_season_id"),
+      loadDraftScoreContext(supabase, user.id),
+      supabase.from("dance_styles").select("id, name").order("name"),
+      supabase
+        .from("couples")
+        .select(
+          "id, status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
+        ),
+    ]);
 
   const leagueRefs = (memberships ?? []).map((m) => m.leagues!).filter(Boolean);
 
@@ -66,8 +75,7 @@ export default async function ThisWeekPage({
   // primary's user_id even when the viewer is a co-manager there.
   const myTeamIds = [...new Set((memberships ?? []).map((m) => m.user_id))];
 
-  const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
+  const [{ data: weekRows }, { data: episodeRows }, { data: rosterSlots }] = await Promise.all([
     supabase
       .from("competition_weeks")
       .select("id, week_number, theme, is_finale, is_elimination_week, is_double_elimination_week")
@@ -77,6 +85,12 @@ export default async function ThisWeekPage({
       .from("episodes")
       .select("id, episode_number, week_id, airs_at, duration_minutes, theme, status, results_published_at")
       .eq("season_id", activeSeasonId ?? ""),
+    supabase
+      .from("roster_slots")
+      .select("league_id, couple_id")
+      .in("manager_id", myTeamIds)
+      .in("league_id", leagueIds)
+      .is("end_week", null),
   ]);
 
   const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
@@ -96,10 +110,13 @@ export default async function ThisWeekPage({
   // finale is what that means here, per Schedule's own theme naming.
   const finaleWeekNumber = groupedWeeks.find((week) => week.is_finale)?.week_number ?? null;
 
-  const [cutoff, draftContext] = await Promise.all([
-    resolveSpoilerCutoff(supabase, user.id, activeSeasonId ?? null, accountSettingsData.spoilerFreeMode, completedWeeks),
-    loadDraftScoreContext(supabase, user.id),
-  ]);
+  const cutoff = await resolveSpoilerCutoff(
+    supabase,
+    user.id,
+    activeSeasonId ?? null,
+    accountSettingsData.spoilerFreeMode,
+    completedWeeks
+  );
 
   // Carousel = spoiler-visible completed weeks + upcoming/locked for a
   // theme peek. ?week= honors that list; an unrecognized or unwatched
@@ -130,7 +147,7 @@ export default async function ThisWeekPage({
     ? { weekNumber: cutoff.pendingRevealEpisode.week_number, theme: cutoff.pendingRevealEpisode.theme }
     : null;
 
-  const [{ data: danceScores }, { data: episodeResults }, { data: inJeopardyRows }, { data: danceStyles }, { data: allCouples }] =
+  const [{ data: danceScores }, { data: episodeResults }, { data: inJeopardyRows }] =
     await Promise.all([
       showResults && selectedEpisodeIds.length > 0
         ? supabase
@@ -150,12 +167,6 @@ export default async function ThisWeekPage({
             .select("couple_id")
             .in("episode_id", selectedEpisodeIds)
         : Promise.resolve({ data: [] as { couple_id: string }[] }),
-      supabase.from("dance_styles").select("id, name").order("name"),
-      supabase
-        .from("couples")
-        .select(
-          "id, status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
-        ),
     ]);
 
   const flatCouples = (allCouples ?? []).map((c) => ({
@@ -172,13 +183,7 @@ export default async function ThisWeekPage({
   // show news. Picks are looked up against the episode being shown here
   // (whichever week is selected), not the upcoming episode Your Picks deals
   // with — a past call, not a pending one.
-  const [{ data: rosterSlots }, { data: pastPredictions }, { data: grandFinaleRows }] = await Promise.all([
-    supabase
-      .from("roster_slots")
-      .select("league_id, couple_id")
-      .in("manager_id", myTeamIds)
-      .in("league_id", leagueIds)
-      .is("end_week", null),
+  const [{ data: pastPredictions }, { data: grandFinaleRows }] = await Promise.all([
     selectedMode === "results" && selectedWeekId
       ? supabase
           .from("predictions")
@@ -343,7 +348,7 @@ export default async function ThisWeekPage({
   const draftVisible = homeStripChoice(!!draftContext.night, !!spoilerFreeStrip) === "draft";
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col px-4">
+    <div className="flex flex-col px-4">
       {draftVisible ? (
         <>
           <HomeDraftChrome {...accountSettingsData} email={user.email ?? ""} />

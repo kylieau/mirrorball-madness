@@ -113,7 +113,7 @@ export function WaiversPanel({
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-12">
+    <div className="flex flex-col gap-6 px-4 py-12">
       <Link href={closeHref} aria-label="Close" className="text-muted-foreground hover:text-foreground">
         <XIcon className="size-5" />
       </Link>
