@@ -16,7 +16,8 @@ import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TopBar } from "@/components/top-bar";
-import { markEpisodesWatchedThrough, markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
+import { markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
+import { StayUpdatedPill } from "@/components/stay-updated-confirm";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
@@ -115,20 +116,6 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
     router.refresh();
   }
 
-  async function handleStayUpdated() {
-    setError(null);
-    setPending(true);
-    const result = state.stayUnlocksDrafts
-      ? await markWatchedAndUnlockDrafts(state.weekNumber)
-      : await markEpisodesWatchedThrough(state.weekNumber);
-    setPending(false);
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-    router.refresh();
-  }
-
   const message = state.kind === "ready" ? `${weekLabel} results are in` : `${weekLabel} posting live`;
 
   return (
@@ -143,12 +130,13 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
           ) : (
             message
           )}
-          {state.kind === "posting" && error && <span className="text-destructive"> · {error}</span>}
         </p>
         {state.kind === "posting" ? (
-          <Button size="xs" className={PILL_CLASSES} onClick={handleStayUpdated} disabled={pending}>
-            {pending ? "Updating..." : "Stay Updated"}
-          </Button>
+          <StayUpdatedPill
+            weekNumber={state.weekNumber}
+            unlockDrafts={state.stayUnlocksDrafts}
+            className={PILL_CLASSES}
+          />
         ) : (
           <Button size="xs" className={PILL_CLASSES} onClick={() => handleOpenChange(true)}>
             Mark Watched
@@ -225,22 +213,6 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
 // amber draft strip takes this one's place.
 
 function DraftGapStrip({ weekNumber, latest }: { weekNumber: number; latest: string | null }) {
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleStayUpdated() {
-    setError(null);
-    setPending(true);
-    const result = await markWatchedAndUnlockDrafts(weekNumber);
-    setPending(false);
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-    router.refresh();
-  }
-
   return (
     <div className={cn(STRIP_CLASSES, "items-start")}>
       <span className={cn(DOT_CLASSES, "mt-1.5")} aria-hidden />
@@ -249,11 +221,8 @@ function DraftGapStrip({ weekNumber, latest }: { weekNumber: number; latest: str
           <span className="font-semibold text-accent">Draft scores available</span>
         </p>
         {latest && <p className="truncate text-muted-foreground">Latest: {latest}</p>}
-        {error && <p className="text-destructive">{error}</p>}
       </div>
-      <Button size="xs" className={PILL_CLASSES} onClick={handleStayUpdated} disabled={pending}>
-        {pending ? "Updating..." : "Stay Updated"}
-      </Button>
+      <StayUpdatedPill weekNumber={weekNumber} unlockDrafts className={PILL_CLASSES} />
     </div>
   );
 }

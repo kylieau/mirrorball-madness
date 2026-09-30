@@ -15,7 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
-import { markEpisodesWatchedThrough, markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
+import { markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
+import { StayUpdatedConfirmBody, stayUpdated } from "@/components/stay-updated-confirm";
 import { setSpoilerFreeMode } from "@/app/settings/actions";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { usePersistedState } from "@/lib/use-persisted-state";
@@ -47,14 +48,15 @@ export function LiveScoresPrompt({
   const [error, setError] = useState<string | null>(null);
   const [spoilerFree, setSpoilerFree] = useState(spoilerFreeMode);
   const [togglePending, setTogglePending] = useState(false);
+  // Stay Updated confirms in place (same sheet); Not now or closing returns
+  // to the choices rather than dismissing the prompt.
+  const [confirming, setConfirming] = useState(false);
   const markEnabled = coast === "west";
 
-  async function handleChoice(unlockDrafts: boolean) {
+  async function handleChoice(action: () => Promise<{ error: string | null }>) {
     setError(null);
     setPending(true);
-    const result = unlockDrafts
-      ? await markWatchedAndUnlockDrafts(weekNumber)
-      : await markEpisodesWatchedThrough(weekNumber);
+    const result = await action();
     if (result.error) {
       setError(result.error);
       setPending(false);
@@ -76,73 +78,94 @@ export function LiveScoresPrompt({
   }
 
   return (
-    <Sheet open={hydrated && !dismissed} onOpenChange={(next) => !next && setDismissed(true)}>
+    <Sheet
+      open={hydrated && !dismissed}
+      onOpenChange={(next) => {
+        if (next) return;
+        if (confirming) setConfirming(false);
+        else setDismissed(true);
+      }}
+    >
       <SheetContent side="bottom" className="items-center gap-3 rounded-t-3xl px-5 pb-8 text-center">
-        <SheetHeader className="items-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-accent">
-            <span className="size-1.5 animate-pulse rounded-full bg-red-500" aria-hidden />
-            {COAST[coast].chip}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <SheetTitle className="font-heading text-xl font-semibold">Scores Are Going Live</SheetTitle>
-            <Dialog>
-              <DialogTrigger
-                aria-label="About live scores"
-                className="relative inline-flex size-4 text-accent before:absolute before:-inset-2.5 before:content-['']"
+        {confirming ? (
+          <StayUpdatedConfirmBody
+            onConfirm={() => handleChoice(() => stayUpdated(weekNumber, coast === "east"))}
+            onCancel={() => {
+              setError(null);
+              setConfirming(false);
+            }}
+            pending={pending}
+            error={error}
+          />
+        ) : (
+          <>
+            <SheetHeader className="items-center">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-accent">
+                <span className="size-1.5 animate-pulse rounded-full bg-red-500" aria-hidden />
+                {COAST[coast].chip}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <SheetTitle className="font-heading text-xl font-semibold">Scores Are Going Live</SheetTitle>
+                <Dialog>
+                  <DialogTrigger
+                    aria-label="About live scores"
+                    className="relative inline-flex size-4 text-accent before:absolute before:-inset-2.5 before:content-['']"
+                  >
+                    <InfoIcon className="size-4" />
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="sr-only">About live scores</DialogTitle>
+                      <DialogDescription className="whitespace-pre-line text-left text-pretty text-popover-foreground">
+                        {LIVE_SCORES_NOTE}
+                      </DialogDescription>
+                    </DialogHeader>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <SheetDescription className="text-pretty">
+                {formatEpisodeCasual(weekNumber)} judges&apos; scores are going up. Follow live, catch up fully, or stay
+                blind.
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-left text-sm">
+              <div>
+                <p>Spoiler-Free Mode</p>
+                <p className="text-xs text-muted-foreground">Hide results until you mark a week as watched</p>
+              </div>
+              <Switch checked={spoilerFree} onCheckedChange={handleSpoilerFree} disabled={togglePending} />
+            </div>
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <div className="flex w-full flex-col gap-1">
+              <Button size="lg" className="w-full" onClick={() => setConfirming(true)} disabled={pending}>
+                Stay Updated — I&apos;m Watching Live
+              </Button>
+              <p className="text-xs text-muted-foreground">{COAST[coast].stayNote}</p>
+            </div>
+            <div className="flex w-full flex-col gap-1">
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full"
+                onClick={() => handleChoice(() => markWatchedAndUnlockDrafts(weekNumber))}
+                disabled={pending || !markEnabled}
               >
-                <InfoIcon className="size-4" />
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="sr-only">About live scores</DialogTitle>
-                  <DialogDescription className="whitespace-pre-line text-left text-pretty text-popover-foreground">
-                    {LIVE_SCORES_NOTE}
-                  </DialogDescription>
-                </DialogHeader>
-              </DialogContent>
-            </Dialog>
-          </div>
-          <SheetDescription className="text-pretty">
-            {formatEpisodeCasual(weekNumber)} judges&apos; scores are going up. Follow live, catch up fully, or stay
-            blind.
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-left text-sm">
-          <div>
-            <p>Spoiler-Free Mode</p>
-            <p className="text-xs text-muted-foreground">Hide results until you mark a week as watched</p>
-          </div>
-          <Switch checked={spoilerFree} onCheckedChange={handleSpoilerFree} disabled={togglePending} />
-        </div>
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="flex w-full flex-col gap-1">
-          <Button size="lg" className="w-full" onClick={() => handleChoice(coast === "east")} disabled={pending}>
-            {pending ? "Updating..." : "Stay Updated — I'm Watching Live"}
-          </Button>
-          <p className="text-xs text-muted-foreground">{COAST[coast].stayNote}</p>
-        </div>
-        <div className="flex w-full flex-col gap-1">
-          <Button
-            size="lg"
-            variant="outline"
-            className="w-full"
-            onClick={() => handleChoice(true)}
-            disabled={pending || !markEnabled}
-          >
-            Mark Watched — I&apos;ve Finished It
-          </Button>
-          {markEnabled && <p className="text-xs text-muted-foreground">You&apos;re caught up · scores unlock</p>}
-        </div>
-        <Button
-          variant="ghost"
-          className="w-full hover:bg-transparent dark:hover:bg-transparent"
-          onClick={() => setDismissed(true)}
-          disabled={pending}
-        >
-          Dismiss
-        </Button>
+                Mark Watched — I&apos;ve Finished It
+              </Button>
+              {markEnabled && <p className="text-xs text-muted-foreground">You&apos;re caught up · scores unlock</p>}
+            </div>
+            <Button
+              variant="ghost"
+              className="w-full hover:bg-transparent dark:hover:bg-transparent"
+              onClick={() => setDismissed(true)}
+              disabled={pending}
+            >
+              Dismiss
+            </Button>
+          </>
+        )}
       </SheetContent>
     </Sheet>
   );
