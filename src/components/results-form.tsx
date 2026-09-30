@@ -1074,47 +1074,6 @@ export function ResultsForm({
         </CardContent>
       </Card>
 
-      {eliminationOrder.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Season Elimination Order</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-1">
-            {/* Same row shape as Grand Finale's own order list minus the
-                points pill — this is the real result, not a prediction.
-                Displayed winner-first: "1." at the winner, counting up toward
-                the first couple eliminated at the bottom (highest number).
-                Numbers are season-wide positions (allCouplesWithStatus.length,
-                the full cast), not eliminationOrder.length — mid-season,
-                eliminationOrder only holds couples with a resolved fate so
-                far, so using its own length would understate every number
-                until the finale. Elimination wording is "Week N"
-                (formatEpisodeCasual), not Grand Finale's abbreviated
-                "W2 Elim". */}
-            {[...eliminationOrder].reverse().map((c, i) => (
-              <div
-                key={c.id}
-                className="flex items-center justify-between border-b border-border py-1 text-sm last:border-b-0"
-              >
-                <span>
-                  {allCouplesWithStatus.length - eliminationOrder.length + i + 1}.{" "}
-                  <CoupleName {...(allCoupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name })} />
-                </span>
-                <span className="text-muted-foreground">
-                  {c.status === "winner"
-                    ? "Won the season"
-                    : c.status === "runner_up"
-                      ? "Runner-up"
-                      : c.status === "third_place"
-                        ? "Third Place"
-                        : formatEpisodeCasual(c.elimination_week!)}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
       {selectedEpisode && seedingCorrection && (
         <p className="text-sm text-muted-foreground">Loading this week&apos;s published results…</p>
       )}
@@ -1430,6 +1389,47 @@ export function ResultsForm({
             </div>
           )}
         </>
+      )}
+
+      {eliminationOrder.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Season Elimination Order</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            {/* Same row shape as Grand Finale's own order list minus the
+                points pill — this is the real result, not a prediction.
+                Displayed winner-first: "1." at the winner, counting up toward
+                the first couple eliminated at the bottom (highest number).
+                Numbers are season-wide positions (allCouplesWithStatus.length,
+                the full cast), not eliminationOrder.length — mid-season,
+                eliminationOrder only holds couples with a resolved fate so
+                far, so using its own length would understate every number
+                until the finale. Elimination wording is "Week N"
+                (formatEpisodeCasual), not Grand Finale's abbreviated
+                "W2 Elim". */}
+            {[...eliminationOrder].reverse().map((c, i) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between border-b border-border py-1 text-sm last:border-b-0"
+              >
+                <span>
+                  {allCouplesWithStatus.length - eliminationOrder.length + i + 1}.{" "}
+                  <CoupleName {...(allCoupleDisplayNames[c.id] ?? { celebrity: c.celebrity_name, pro: c.pro_name })} />
+                </span>
+                <span className="text-muted-foreground">
+                  {c.status === "winner"
+                    ? "Won the season"
+                    : c.status === "runner_up"
+                      ? "Runner-up"
+                      : c.status === "third_place"
+                        ? "Third Place"
+                        : formatEpisodeCasual(c.elimination_week!)}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       )}
     </div>
   );
