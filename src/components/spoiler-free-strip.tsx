@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TopBar } from "@/components/top-bar";
 import { markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
-import { StayUpdatedPill } from "@/components/stay-updated-confirm";
+import { LiveScoresPill } from "@/components/live-scores-prompt";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
@@ -30,9 +30,22 @@ import type { AccountSettingsData } from "@/lib/account-settings-data";
 // live-posting week is gated for everyone until they opt in; draft_gap is
 // Spoiler-Free-agnostic for the same reason.
 export type SpoilerFreeStripState =
-  | { kind: "ready" | "posting"; weekNumber: number; earlierWeeks: number[]; spoilerFree: boolean; stayUnlocksDrafts: boolean }
+  | {
+      kind: "ready" | "posting";
+      weekNumber: number;
+      earlierWeeks: number[];
+      spoilerFree: boolean;
+      stayUnlocksDrafts: boolean;
+      liveCoast: "east" | "west" | null;
+    }
   | { kind: "watching"; weekNumber: number }
-  | { kind: "draft_gap"; weekNumber: number; latest: string | null };
+  | {
+      kind: "draft_gap";
+      weekNumber: number;
+      latest: string | null;
+      spoilerFree: boolean;
+      liveCoast: "east" | "west" | null;
+    };
 
 type MarkableState = Extract<SpoilerFreeStripState, { earlierWeeks: number[] }>;
 
@@ -77,7 +90,7 @@ export function SpoilerFreeStrip({ state }: { state: SpoilerFreeStripState }) {
     );
   }
   if (state.kind === "draft_gap") {
-    return <DraftGapStrip weekNumber={state.weekNumber} latest={state.latest} />;
+    return <DraftGapStrip state={state} />;
   }
   return <MarkWatchedStrip state={state} />;
 }
@@ -132,9 +145,11 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
           )}
         </p>
         {state.kind === "posting" ? (
-          <StayUpdatedPill
+          <LiveScoresPill
+            coast={state.liveCoast}
             weekNumber={state.weekNumber}
-            unlockDrafts={state.stayUnlocksDrafts}
+            spoilerFreeMode={state.spoilerFree}
+            stayUnlocksDrafts={state.stayUnlocksDrafts}
             className={PILL_CLASSES}
           />
         ) : (
@@ -209,20 +224,26 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
 }
 
 // Released drafts exist and the viewer hasn't opted in at all. Stay Updated
-// is the same draft unlock as the prompt's East Stay Updated, after which the
-// amber draft strip takes this one's place.
+// opens the live-air sheet; its draft unlock swaps in the amber draft strip.
+// The pill stays vertically centered on this two-line strip like the others.
 
-function DraftGapStrip({ weekNumber, latest }: { weekNumber: number; latest: string | null }) {
+function DraftGapStrip({ state }: { state: Extract<SpoilerFreeStripState, { kind: "draft_gap" }> }) {
   return (
-    <div className={cn(STRIP_CLASSES, "items-start")}>
-      <span className={cn(DOT_CLASSES, "mt-1.5")} aria-hidden />
+    <div className={STRIP_CLASSES}>
+      <span className={cn(DOT_CLASSES, "mt-1.5 self-start")} aria-hidden />
       <div className="min-w-0 flex-1 text-xs font-medium text-foreground/90">
         <p className="truncate">
           <span className="font-semibold text-accent">Draft scores available</span>
         </p>
-        {latest && <p className="truncate text-muted-foreground">Latest: {latest}</p>}
+        {state.latest && <p className="truncate text-muted-foreground">Latest: {state.latest}</p>}
       </div>
-      <StayUpdatedPill weekNumber={weekNumber} unlockDrafts className={PILL_CLASSES} />
+      <LiveScoresPill
+        coast={state.liveCoast}
+        weekNumber={state.weekNumber}
+        spoilerFreeMode={state.spoilerFree}
+        stayUnlocksDrafts
+        className={PILL_CLASSES}
+      />
     </div>
   );
 }

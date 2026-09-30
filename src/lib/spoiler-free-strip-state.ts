@@ -24,7 +24,7 @@ export function buildSpoilerFreeStripState({
   draftReleaseWeekNumber,
   draftNightActive,
   latestRelease,
-  eastLiveWeekNumber,
+  livePhase,
 }: {
   spoilerFreeMode: boolean;
   lastWatchedWeek: number;
@@ -45,15 +45,24 @@ export function buildSpoilerFreeStripState({
   draftNightActive: boolean;
   // draftContext.latestRelease
   latestRelease: string | null;
-  // The week whose East broadcast is on air right now, else null.
-  eastLiveWeekNumber: number | null;
+  // liveAirPhase right now, so a strip's Stay Updated opens the live-air
+  // sheet for the right coast (no chip outside both windows).
+  livePhase: LiveAirPhase | null;
 }): SpoilerFreeStripState | null {
   // Released drafts the viewer hasn't unlocked. Someone who chose nothing
   // yet gets "Draft scores available"; someone who chose West Stay Updated
   // (published only) gets the posting strip. Either pill unlocks drafts.
+  const liveCoast = (week: number) =>
+    livePhase && livePhase.kind !== "gap" && livePhase.weekNumber === week ? livePhase.kind : null;
   const draftsAhead = draftReleaseWeekNumber != null && draftUnlockedWeek < draftReleaseWeekNumber;
   if (draftsAhead && lastWatchedWeek < draftReleaseWeekNumber) {
-    return { kind: "draft_gap", weekNumber: draftReleaseWeekNumber, latest: latestRelease };
+    return {
+      kind: "draft_gap",
+      weekNumber: draftReleaseWeekNumber,
+      latest: latestRelease,
+      spoilerFree: spoilerFreeMode,
+      liveCoast: liveCoast(draftReleaseWeekNumber),
+    };
   }
 
   const unmarkedWeeks = spoilerFreeMode
@@ -76,7 +85,8 @@ export function buildSpoilerFreeStripState({
       // whenever drafts are out, published only otherwise.
       stayUnlocksDrafts:
         stripWeek.kind === "posting" &&
-        (eastLiveWeekNumber === stripWeek.weekNumber || draftReleaseWeekNumber === stripWeek.weekNumber),
+        (liveCoast(stripWeek.weekNumber) === "east" || draftReleaseWeekNumber === stripWeek.weekNumber),
+      liveCoast: stripWeek.kind === "posting" ? liveCoast(stripWeek.weekNumber) : null,
       earlierWeeks: unmarkedWeeks.filter((week) => week < stripWeek.weekNumber),
     };
   }
@@ -159,7 +169,7 @@ export function buildLiveAirChrome({
       draftReleaseWeekNumber,
       draftNightActive: !!draftContext.night,
       latestRelease: draftContext.latestRelease,
-      eastLiveWeekNumber: phase?.kind === "east" ? phase.weekNumber : null,
+      livePhase: phase,
     }),
     prompt: buildLivePromptState({
       phase,

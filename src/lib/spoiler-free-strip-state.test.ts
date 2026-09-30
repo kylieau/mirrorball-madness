@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildLivePromptState, buildSpoilerFreeStripState } from "./spoiler-free-strip-state";
+import type { LiveAirPhase } from "./episode-banner";
 
 const base = {
   spoilerFreeMode: true,
@@ -11,7 +12,7 @@ const base = {
   draftNightActive: false,
   draftUnlockedWeek: 0,
   latestRelease: null as string | null,
-  eastLiveWeekNumber: null as number | null,
+  livePhase: null as LiveAirPhase | null,
 };
 
 describe("buildSpoilerFreeStripState", () => {
@@ -22,7 +23,7 @@ describe("buildSpoilerFreeStripState", () => {
   it("still offers a posting week with Spoiler-Free off, without the Spoiler-Free label or earlier weeks", () => {
     expect(
       buildSpoilerFreeStripState({ ...base, spoilerFreeMode: false, lastWatchedWeek: 0, revealingWeekNumber: 3 })
-    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: false, stayUnlocksDrafts: false });
+    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: false, stayUnlocksDrafts: false, liveCoast: null });
   });
 
   it("has no watching strip with Spoiler-Free off", () => {
@@ -35,9 +36,13 @@ describe("buildSpoilerFreeStripState", () => {
     "offers Draft scores available whenever drafts are out and the viewer hasn't opted in (Spoiler-Free %s)",
     (spoilerFreeMode) => {
       const drafts = { ...base, spoilerFreeMode, draftReleaseWeekNumber: 3, latestRelease: "Tatyana & Jan" };
-      const expected = { kind: "draft_gap", weekNumber: 3, latest: "Tatyana & Jan" };
+      const expected = { kind: "draft_gap", weekNumber: 3, latest: "Tatyana & Jan", spoilerFree: spoilerFreeMode, liveCoast: null };
       expect(buildSpoilerFreeStripState(drafts)).toEqual(expected);
-      expect(buildSpoilerFreeStripState({ ...drafts, eastLiveWeekNumber: 3 })).toEqual(expected);
+      expect(buildSpoilerFreeStripState({ ...drafts, livePhase: { kind: "east", weekNumber: 3 } })).toEqual({
+        ...expected,
+        liveCoast: "east",
+      });
+      expect(buildSpoilerFreeStripState({ ...drafts, livePhase: { kind: "gap", weekNumber: 3 } })).toEqual(expected);
     }
   );
 
@@ -48,6 +53,7 @@ describe("buildSpoilerFreeStripState", () => {
       earlierWeeks: [],
       spoilerFree: true,
       stayUnlocksDrafts: true,
+      liveCoast: null,
     });
   });
 
@@ -59,8 +65,8 @@ describe("buildSpoilerFreeStripState", () => {
 
   it("follows published scores only from a live couple's posting strip outside East, drafts during East", () => {
     const live = { ...base, revealingWeekNumber: 3 };
-    expect(buildSpoilerFreeStripState(live)).toMatchObject({ kind: "posting", stayUnlocksDrafts: false });
-    expect(buildSpoilerFreeStripState({ ...live, eastLiveWeekNumber: 3 })).toMatchObject({ stayUnlocksDrafts: true });
+    expect(buildSpoilerFreeStripState(live)).toMatchObject({ kind: "posting", stayUnlocksDrafts: false, liveCoast: null });
+    expect(buildSpoilerFreeStripState({ ...live, livePhase: { kind: "east", weekNumber: 3 } })).toMatchObject({ stayUnlocksDrafts: true });
   });
 
   it("returns null when the viewer is fully caught up", () => {
@@ -74,13 +80,14 @@ describe("buildSpoilerFreeStripState", () => {
       earlierWeeks: [],
       spoilerFree: true,
       stayUnlocksDrafts: false,
+      liveCoast: null,
     });
   });
 
   it("is posting when a week is mid-reveal, taking priority over a merely-pending one", () => {
     expect(
       buildSpoilerFreeStripState({ ...base, revealingWeekNumber: 3, pendingRevealWeekNumber: 4 })
-    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: true, stayUnlocksDrafts: false });
+    ).toEqual({ kind: "posting", weekNumber: 3, earlierWeeks: [], spoilerFree: true, stayUnlocksDrafts: false, liveCoast: null });
   });
 
   it("carries earlier unmarked completed weeks alongside the strip week", () => {
@@ -91,7 +98,7 @@ describe("buildSpoilerFreeStripState", () => {
         completedWeekNumbers: [1, 2],
         pendingRevealWeekNumber: 3,
       })
-    ).toEqual({ kind: "ready", weekNumber: 3, earlierWeeks: [1, 2], spoilerFree: true, stayUnlocksDrafts: false });
+    ).toEqual({ kind: "ready", weekNumber: 3, earlierWeeks: [1, 2], spoilerFree: true, stayUnlocksDrafts: false, liveCoast: null });
   });
 
   it("is watching when a revealing week is behind the viewer, even though revealing isn't visible to them yet", () => {
