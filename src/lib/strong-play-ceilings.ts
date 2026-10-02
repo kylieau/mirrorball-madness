@@ -1,3 +1,5 @@
+import { roundPoints } from "./format-points";
+
 // Strong-play season ceilings. Module weights are shares of these ceilings:
 // weight 1 on every module means a strong season is worth the same points
 // in Dance Card, Curtain Call, and Grand Finale. This is not a standings-
@@ -41,10 +43,6 @@ export const DISTANCE_ZERO_AT = 4;
 export const BAND_WIDTH = 3;
 export const GRADED_BAND_STEP = 0.25;
 export const GRADED_BAND_FLOOR = 0.25;
-
-export function roundPoints(n: number): number {
-  return Math.round(n * 100) / 100;
-}
 
 export function roundMultiplier(n: number): number {
   return Math.round(n * 10000) / 10000;
