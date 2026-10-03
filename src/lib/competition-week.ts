@@ -115,7 +115,3 @@ export function mergeCoupleOutcomes<T extends { couple_id: string; outcome: stri
   }
   return [...byCouple.values()];
 }
-
-export function episodeIdsForWeek(week: { episodes: { id: string }[] }): string[] {
-  return week.episodes.map((episode) => episode.id);
-}

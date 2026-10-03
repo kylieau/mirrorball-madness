@@ -12,7 +12,7 @@ export function formatEpisodeCasual(weekNumber: number): string {
 }
 
 export function formatEpisodeCasualShort(weekNumber: number): string {
-  return `Week ${weekNumber}`;
+  return formatEpisodeCasual(weekNumber);
 }
 
 // The only genuinely-abbreviated variant — for tight inline spots (e.g. a

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-export async function submitPrediction(
+async function submitPrediction(
   leagueId: string,
   weekId: string,
   predictedEliminatedCoupleId: string | null,
@@ -29,7 +29,7 @@ export async function submitPrediction(
   return { error: null };
 }
 
-export async function submitGrandFinalePrediction(
+async function submitGrandFinalePrediction(
   leagueId: string,
   coupleIdsInOrder: string[]
 ): Promise<{ error: string | null }> {
