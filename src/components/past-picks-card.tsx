@@ -54,7 +54,7 @@ function ResultRows({
                 <span className="text-emerald-text" aria-label="Correct">
                   ✓
                 </span>
-                <span className="font-heading font-semibold text-emerald-text">+{row.points}</span>
+                <span className="font-heading font-semibold text-emerald-text">{formatSignedPoints(row.points)}</span>
               </span>
             </div>
           );
@@ -74,7 +74,7 @@ function ResultRows({
                   fallback="—"
                   className="font-medium text-amber-800 dark:text-amber-300"
                 />
-                <span className="font-heading font-semibold text-amber-800 dark:text-amber-300">+{row.points}</span>
+                <span className="font-heading font-semibold text-amber-800 dark:text-amber-300">{formatSignedPoints(row.points)}</span>
                 {row.actualIds.length > 0 && (
                   <>
                     <span className="text-muted-foreground" aria-hidden>

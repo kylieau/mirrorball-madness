@@ -57,7 +57,7 @@ export function HomeDashboard({
                   key={line.key}
                   className="flex items-baseline justify-between gap-3 border-t border-border py-2.5 text-sm text-muted-foreground first:border-t-0"
                 >
-                  <span>
+                  <span className="min-w-0 break-words">
                     {line.segments.map((seg, i) => (
                       <span
                         key={i}

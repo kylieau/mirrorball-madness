@@ -51,8 +51,8 @@ export function LeagueSwitcher({
                 key={l.id}
                 className="flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0"
               >
-                <Link href={`/leagues/${l.id}/${tab}`} className="flex-1">
-                  <p className={cn("text-sm font-semibold", isCurrent && "text-accent")}>{l.name}</p>
+                <Link href={`/leagues/${l.id}/${tab}`} className="min-w-0 flex-1">
+                  <p className={cn("break-words text-sm font-semibold", isCurrent && "text-accent")}>{l.name}</p>
                   <p className="text-xs text-muted-foreground">
                     Rank {l.rank} of {l.totalMembers}
                     {isCurrent && ", currently viewing"}

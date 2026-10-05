@@ -185,7 +185,7 @@ export function WeeklyResultsView({
                 r.outcome === "eliminated" && "opacity-60"
               )}
             >
-              <div>
+              <div className="min-w-0 flex-1 break-words">
                 <p className="text-sm font-semibold">{r.parts ? <CoupleName {...r.parts} /> : "Unknown"}</p>
                 {r.danceLabels.map((label, i) => (
                   <p key={i} className="mt-0.5 text-xs text-muted-foreground">

@@ -74,8 +74,8 @@ export function StandingsLeaderboard({
                 {i + 1}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2 text-sm font-semibold">
-                  {row.displayName}
+                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+                  <span className="truncate">{row.displayName}</span>
                   {isYou && <YouPill />}
                 </span>
                 {row.weekPoints !== null && (
@@ -84,7 +84,7 @@ export function StandingsLeaderboard({
                   </span>
                 )}
               </span>
-              <span className="font-heading text-sm font-semibold">{formatPoints(row.totalPoints)}</span>
+              <span className="shrink-0 font-heading text-sm font-semibold tabular-nums">{formatPoints(row.totalPoints)}</span>
               {isOpen ? (
                 <ChevronDownIcon aria-hidden className="size-4 shrink-0 text-accent" />
               ) : (

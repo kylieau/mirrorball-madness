@@ -55,9 +55,9 @@ export function StandingsTable({
         </div>
       )}
 
-      <div className="mb-2.5 mt-6 flex items-baseline justify-between gap-3">
+      <div className="mb-2.5 mt-6 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <h2 className="font-heading text-lg font-semibold text-accent">Managers Leaderboard</h2>
-        <span className="text-xs text-muted-foreground">
+        <span className="shrink-0 text-xs text-muted-foreground">
           {latestCompletedWeek !== null
             ? `through ${formatEpisodeCasualShort(latestCompletedWeek)}`
             : "Results appear once you mark a week as watched"}

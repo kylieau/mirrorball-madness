@@ -70,12 +70,12 @@ export function CurtainCallLeagueList({
         {entries.map((e) => (
           <AccordionItem key={e.managerId} value={e.managerId}>
             <AccordionTrigger>
-              <span className="flex flex-1 items-center gap-2">
+              <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold">
                   {e.displayName.charAt(0).toUpperCase()}
                 </span>
-                <span>{e.displayName}</span>
-                <span className="ml-auto pr-2 text-xs font-normal text-muted-foreground">
+                <span className="min-w-0 truncate">{e.displayName}</span>
+                <span className="ml-auto shrink-0 whitespace-nowrap pr-2 text-xs font-normal text-muted-foreground">
                   {e.comparison ? (
                     <>
                       <span className="font-heading font-semibold">{formatSignedPoints(e.comparison.predictionPoints)}</span> pts
@@ -90,7 +90,7 @@ export function CurtainCallLeagueList({
               <div className="flex flex-col gap-1.5 text-sm">
                 {pickLines(e).map((line, i) => (
                   <div key={i} className="flex items-center justify-between gap-3">
-                    <span>
+                    <span className="min-w-0 break-words">
                       <span className="text-muted-foreground">{line.label}: </span>
                       {line.coupleId ? (
                         <CoupleName {...(coupleDisplayNames[line.coupleId] ?? { celebrity: "Unknown", pro: "Unknown" })} />
