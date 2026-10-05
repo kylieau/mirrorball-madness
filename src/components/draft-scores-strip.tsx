@@ -44,7 +44,7 @@ export function DraftScoresStrip() {
           type="button"
           aria-label="About draft scores"
           onClick={() => setOpen(true)}
-          className="grid size-6 shrink-0 place-items-center rounded-full border border-primary/80 font-heading text-[13px] font-semibold italic leading-none text-primary"
+          className="relative grid size-6 shrink-0 place-items-center rounded-full border border-primary/80 font-heading text-[13px] font-semibold italic leading-none text-primary before:absolute before:-inset-2 before:content-['']"
         >
           i
         </button>

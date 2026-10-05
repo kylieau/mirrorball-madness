@@ -32,7 +32,7 @@ import { SettingsSection } from "@/components/settings-section";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
 const ROW_CLASSES =
-  "flex w-full items-center justify-between border-t border-border px-4 py-3 text-left text-sm transition-colors first:border-t-0 hover:bg-muted";
+  "flex w-full items-center justify-between border-t border-border px-4 py-3 text-left text-sm transition-colors first:border-t-0 hover:bg-muted active:bg-muted";
 
 // The avatar trigger present on every top-level page (via TopBar). Replaces
 // /settings + /settings/profile + /settings/account as the primary path —

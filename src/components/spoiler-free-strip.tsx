@@ -57,7 +57,9 @@ const STRIP_CLASSES =
 
 const DOT_CLASSES = "size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_0_2px_rgba(201,162,75,0.22)]";
 
-const PILL_CLASSES = "h-6 shrink-0 rounded-full px-2.5 text-[11px] font-bold";
+// The pill draws at 24px; the ::before pseudo-element widens its tap target to about 40px.
+const PILL_CLASSES =
+  "relative h-6 shrink-0 rounded-full px-2.5 text-[11px] font-bold before:absolute before:-inset-2 before:content-['']";
 
 // Sticky wordmark + avatar, then the strip. The page's own title stays in
 // page flow and scrolls away underneath. Rendered only while there is a

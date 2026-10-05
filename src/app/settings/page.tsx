@@ -69,7 +69,7 @@ export default async function SettingsPage({
               <Link
                 key={row.href}
                 href={`${row.href}${fromParam}`}
-                className="flex items-center justify-between border-b border-border px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-muted"
+                className="flex items-center justify-between border-b border-border px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-muted active:bg-muted"
               >
                 <span>
                   <span className="block">{row.label}</span>

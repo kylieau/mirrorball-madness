@@ -22,7 +22,7 @@ export function LeagueSettingsLinks({
             <Link
               key={l.id}
               href={`/leagues/${l.id}/settings?from=${encodeURIComponent(fromHref)}`}
-              className="flex w-full items-center justify-between border-t border-border px-4 py-3 text-left text-sm transition-colors first:border-t-0 hover:bg-muted"
+              className="flex w-full items-center justify-between border-t border-border px-4 py-3 text-left text-sm transition-colors first:border-t-0 hover:bg-muted active:bg-muted"
             >
               <span>{l.name}</span>
               <ChevronRightIcon className="size-4 text-muted-foreground" />

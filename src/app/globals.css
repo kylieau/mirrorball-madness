@@ -118,5 +118,17 @@
   }
   html {
     @apply font-sans;
+    /* No rubber-band past the frame or pull-to-refresh; the app refreshes itself. */
+    overscroll-behavior-y: none;
+  }
+  /* Skip the double-tap-to-zoom wait on anything tappable. */
+  button,
+  a,
+  label,
+  input,
+  select,
+  textarea,
+  [role="button"] {
+    touch-action: manipulation;
   }
 }
