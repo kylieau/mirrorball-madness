@@ -189,7 +189,7 @@ export function GrandFinaleLateUnlock({
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="bottom"
-          className="max-h-[92vh] gap-3 overflow-y-auto rounded-t-3xl px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+          className="gap-3 rounded-t-3xl px-5"
         >
           <SheetHeader className="px-0">
             <SheetTitle className="font-heading text-xl font-semibold">

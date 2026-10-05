@@ -161,7 +161,7 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
       </div>
 
       <Sheet open={open} onOpenChange={handleOpenChange}>
-        <SheetContent side="bottom" className="items-center rounded-t-3xl px-5 pb-8 text-center">
+        <SheetContent side="bottom" className="items-center rounded-t-3xl px-5 text-center">
           <SheetHeader className="items-center">
             <SheetTitle className="font-heading text-xl font-semibold">Mark {throughLabel} Watched?</SheetTitle>
             <SheetDescription className="text-pretty">

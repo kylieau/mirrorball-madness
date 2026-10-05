@@ -3,7 +3,7 @@ import Link from "next/link";
 import { HomeIcon, ListChecksIcon, PencilLineIcon, TrophyIcon, type LucideIcon } from "lucide-react";
 
 /** Clears page content so it isn't hidden behind the always-sticky bar. */
-export const BOTTOM_NAV_CLEARANCE = "pb-20";
+export const BOTTOM_NAV_CLEARANCE = "pb-[calc(5rem+env(safe-area-inset-bottom))]";
 
 /** Sit a second sticky bar (e.g. admin Save/Publish) just above the tab bar. */
 export const BOTTOM_NAV_STACK_ABOVE =

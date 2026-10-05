@@ -79,7 +79,7 @@ export function LiveScoresSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="items-center gap-3 rounded-t-3xl px-5 pb-8 text-center">
+      <SheetContent side="bottom" className="items-center gap-3 rounded-t-3xl px-5 text-center">
         <SheetHeader className="items-center">
           {coast && (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-accent">

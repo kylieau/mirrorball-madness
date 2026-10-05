@@ -50,7 +50,7 @@ export function DraftScoresStrip() {
         </button>
       </div>
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="bottom" className="items-center rounded-t-3xl px-5 pb-8 text-center">
+        <SheetContent side="bottom" className="items-center rounded-t-3xl px-5 text-center">
           <SheetHeader className="items-center">
             <SheetTitle className="font-heading text-xl font-semibold">{DRAFT_SCORES_SHEET.title}</SheetTitle>
             <SheetDescription className="text-pretty">{DRAFT_SCORES_SHEET.body}</SheetDescription>
