@@ -23,7 +23,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+        "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
         active ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"
       )}
     >

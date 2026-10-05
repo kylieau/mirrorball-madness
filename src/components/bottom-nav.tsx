@@ -38,7 +38,7 @@ function FanTabItem({
   icon: LucideIcon;
   label: string;
 }) {
-  const className = `${ITEM_CLASS} ${active ? "text-accent" : "text-muted-foreground hover:text-foreground"}`;
+  const className = `${ITEM_CLASS} ${active ? "text-accent" : "text-muted-foreground hover:text-foreground active:text-foreground"}`;
   const body = (
     <>
       <Icon className="size-5 sm:size-4" />

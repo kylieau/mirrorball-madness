@@ -70,7 +70,7 @@ export default async function NotificationsPage() {
         <div className="flex flex-col gap-2">
           {needingAttention.map((s) => (
             <Link key={s.id} href={`/leagues/${s.id}/picks`}>
-              <Card className="transition-colors hover:bg-muted">
+              <Card className="transition-colors hover:bg-muted active:bg-muted">
                 <CardContent className="flex items-center justify-between gap-3 py-4">
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{s.name}</span>
