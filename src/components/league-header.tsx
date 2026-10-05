@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { LeagueSwitcher, type SwitcherLeague } from "@/components/league-switcher";
-import { ScrollRevealBar } from "@/components/scroll-reveal-bar";
-import { SlimTopBar, TopBar } from "@/components/top-bar";
+import { StickyTopBar } from "@/components/top-bar";
 import { HomeSpoilerChrome, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
 import { HomeDraftChrome } from "@/components/draft-scores-strip";
 import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
@@ -41,8 +40,7 @@ export function LeagueHeader({
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
   // Same strip as Home/Results; when present it takes over as the sticky
-  // chrome (wordmark + avatar + strip) and the scroll-triggered compact bar
-  // is skipped — one sticky mechanism at a time, matching Home exactly.
+  // chrome (wordmark + avatar + strip), matching Home exactly.
   spoilerFreeStrip: SpoilerFreeStripState | null;
   // Unlocked drafts: the amber strip replaces the Spoiler-Free one, as on Home.
   draftScoresStrip: boolean;
@@ -92,24 +90,8 @@ export function LeagueHeader({
         </>
       ) : (
         <>
-          <TopBar {...accountSettingsData} email={viewerEmail} actionSlot={recastAction} />
-          <ScrollRevealBar
-            bar={
-              <SlimTopBar
-                {...accountSettingsData}
-                email={viewerEmail}
-                left={
-                  switcherLeagues.length > 1 ? (
-                    <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} tab={tab} />
-                  ) : (
-                    <span className="font-heading text-lg font-semibold">{title}</span>
-                  )
-                }
-              />
-            }
-          >
-            {pageHeader}
-          </ScrollRevealBar>
+          <StickyTopBar {...accountSettingsData} email={viewerEmail} actionSlot={recastAction} />
+          {pageHeader}
         </>
       )}
 

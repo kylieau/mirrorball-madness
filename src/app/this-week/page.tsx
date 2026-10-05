@@ -13,8 +13,7 @@ import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
 import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
 import { PageHeader } from "@/components/page-header";
-import { ScrollRevealBar } from "@/components/scroll-reveal-bar";
-import { SlimTopBar, TopBar } from "@/components/top-bar";
+import { StickyTopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { coupleLeagueNotes } from "@/lib/couple-league-notes";
@@ -371,34 +370,13 @@ export default async function ThisWeekPage({
           </div>
         </>
       ) : (
-        <div className="flex flex-col gap-4 py-8">
-          <TopBar {...accountSettingsData} email={user.email ?? ""} />
-          <ScrollRevealBar
-            className="-mb-4"
-            bar={
-              <SlimTopBar
-                {...accountSettingsData}
-                email={user.email ?? ""}
-                left={
-                  selectedWeek ? (
-                    <EpisodeCarousel
-                      weekNumber={selectedWeek.week_number}
-                      theme={selectedWeek.theme}
-                      prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
-                      nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
-                      compact
-                    />
-                  ) : (
-                    <span className="font-heading text-lg font-semibold">Results</span>
-                  )
-                }
-              />
-            }
-          >
+        <>
+          <StickyTopBar {...accountSettingsData} email={user.email ?? ""} />
+          <div className="flex flex-col gap-4 pt-4">
             {pageHeader}
-          </ScrollRevealBar>
-          {resultsContent}
-        </div>
+            {resultsContent}
+          </div>
+        </>
       )}
 
       {livePrompt && (

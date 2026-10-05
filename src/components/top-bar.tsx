@@ -33,20 +33,13 @@ export function TopBar({
   );
 }
 
-// The pinned single-row version shown by ScrollRevealBar once the full header
-// has scrolled away: a page-specific control on the left, the avatar on the right.
-export function SlimTopBar({
-  left,
-  email,
-  ...accountSettingsData
-}: AccountSettingsData & {
-  left: ReactNode;
-  email: string;
-}) {
+// TopBar pinned to the top of the page, for fan tabs with no strip. The strip
+// chromes (HomeSpoilerChrome, HomeDraftChrome) stick the same bar with their
+// strip underneath, so the wordmark + avatar never change between tabs.
+export function StickyTopBar(props: Parameters<typeof TopBar>[0]) {
   return (
-    <div className="flex h-12 items-center justify-between gap-3 px-4">
-      <div className="min-w-0 flex-1">{left}</div>
-      <AccountSettingsSheet email={email} {...accountSettingsData} />
+    <div className="sticky top-0 z-30 -mx-4 bg-background px-4 py-2 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
+      <TopBar {...props} />
     </div>
   );
 }

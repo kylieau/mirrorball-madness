@@ -4,8 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { HomeDashboard } from "@/components/home-dashboard";
 import { PageHeader } from "@/components/page-header";
-import { ScrollRevealBar } from "@/components/scroll-reveal-bar";
-import { SlimTopBar, TopBar } from "@/components/top-bar";
+import { StickyTopBar } from "@/components/top-bar";
 import { loadHomeLeagueData } from "@/lib/home-league-data";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { computeEpisodeBannerState, toBannerWeeks, type EpisodeBannerInput } from "@/lib/episode-banner";
@@ -232,22 +231,13 @@ export default async function Home() {
           </div>
         </>
       ) : (
-        <div className="flex flex-col gap-4 py-8">
-          <TopBar {...accountSettingsData} email={user.email ?? ""} />
-          <ScrollRevealBar
-            className="-mb-4"
-            bar={
-              <SlimTopBar
-                {...accountSettingsData}
-                email={user.email ?? ""}
-                left={<span className="font-heading text-lg font-semibold">Home</span>}
-              />
-            }
-          >
+        <>
+          <StickyTopBar {...accountSettingsData} email={user.email ?? ""} />
+          <div className={cn("flex flex-col gap-4 pt-4", BOTTOM_NAV_CLEARANCE)}>
             <PageHeader title="Home" />
-          </ScrollRevealBar>
-          <div className={BOTTOM_NAV_CLEARANCE}>{dashboard}</div>
-        </div>
+            {dashboard}
+          </div>
+        </>
       )}
 
       {livePrompt && (
