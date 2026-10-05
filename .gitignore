@@ -60,3 +60,6 @@ ios/DerivedData/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# QA screenshot pass (scripts/qa-screenshots)
+scripts/qa-screenshots/.qa-state.json

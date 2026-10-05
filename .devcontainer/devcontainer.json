@@ -1,7 +1,7 @@
 {
   "name": "Claude Code Sandbox",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
-  "postCreateCommand": "npm install -g @anthropic-ai/claude-code",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends chromium fonts-noto-color-emoji && npm install -g @anthropic-ai/claude-code",
   "remoteUser": "node",
   "forwardPorts": [3000],
   "portsAttributes": {
