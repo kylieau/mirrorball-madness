@@ -28,8 +28,11 @@ async function snapshotScores(weekIds: string[]) {
 }
 
 async function main() {
-  const { data: seasonId, error: seasonErr } = await admin.rpc("active_season_id");
-  if (seasonErr || !seasonId) throw new Error(seasonErr?.message ?? "No active season");
+  // Same resolution as active_season_id(), done directly — the service role
+  // has no execute grant on that RPC.
+  const { data: season, error: seasonErr } = await admin.from("seasons").select("id").eq("is_active", true).single();
+  if (seasonErr || !season) throw new Error(seasonErr?.message ?? "No active season");
+  const seasonId = season.id;
 
   const [{ data: weeks, error: weeksErr }, { data: episodes, error: episodesErr }] = await Promise.all([
     admin
