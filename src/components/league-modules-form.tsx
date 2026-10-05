@@ -787,7 +787,7 @@ export function LeagueModulesForm({
                 <span>
                   <span className="font-medium">In Jeopardy</span>
                   <span className="mt-0.5 block text-xs text-muted-foreground">
-                    25% credit for a called-down elimination or a top scorer within 1 of the high.
+                    25% credit for a called-down elimination or a top scorer within 1 of the high; 10% within 2.
                   </span>
                 </span>
               </label>

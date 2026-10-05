@@ -7,6 +7,7 @@ import {
   isPastPicksLocked,
   matchEliminationPicks,
   matchTopScorerPick,
+  partialVerdictLabel,
   selectCurtainCallWeek,
   selectPastPicksEpisode,
   type PickMatch,
@@ -227,9 +228,10 @@ describe("matchTopScorerPick", () => {
     { coupleId: "a", totalScore: 30 },
     { coupleId: "b", totalScore: 30 },
     { coupleId: "c", totalScore: 29 },
+    { coupleId: "d", totalScore: 28 },
   ];
 
-  it("hits when the pick is in the tied top-scorer set, and near-misses within 1", () => {
+  it("hits when the pick is in the tied top-scorer set, and near-misses within 1 and 2", () => {
     expect(
       matchTopScorerPick({
         predictedTopScorerCoupleId: "a",
@@ -246,11 +248,26 @@ describe("matchTopScorerPick", () => {
     ).toEqual({ pickId: "c", verdict: "near_miss", points: 5 });
     expect(
       matchTopScorerPick({
+        predictedTopScorerCoupleId: "d",
+        danceScores: dances,
+        ...payout,
+      })
+    ).toEqual({ pickId: "d", verdict: "near_miss_2", points: 2 });
+    expect(
+      matchTopScorerPick({
         predictedTopScorerCoupleId: null,
         danceScores: dances,
         ...payout,
       })
     ).toEqual({ pickId: null, verdict: "miss", points: 0 });
+  });
+});
+
+describe("partialVerdictLabel", () => {
+  it("labels the elim pick's near miss In Jeopardy and the top scorer's by distance", () => {
+    expect(partialVerdictLabel("elimination", "near_miss")).toBe("In Jeopardy");
+    expect(partialVerdictLabel("top_scorer", "near_miss")).toBe("Within 1");
+    expect(partialVerdictLabel("top_scorer", "near_miss_2")).toBe("Within 2");
   });
 });
 
@@ -279,7 +296,7 @@ describe("collapsePickRows", () => {
       )
     ).toEqual([
       { kind: "nailed", coupleIds: ["a"], points: 20 },
-      { kind: "in_jeopardy", pickIds: ["c"], actualIds: ["b"], points: 5 },
+      { kind: "partial", verdict: "near_miss", pickIds: ["c"], actualIds: ["b"], points: 5 },
     ]);
 
     expect(
@@ -291,8 +308,8 @@ describe("collapsePickRows", () => {
         ["a", "b"]
       )
     ).toEqual([
-      { kind: "in_jeopardy", pickIds: ["c"], actualIds: ["a"], points: 5 },
-      { kind: "in_jeopardy", pickIds: ["d"], actualIds: ["b"], points: 5 },
+      { kind: "partial", verdict: "near_miss", pickIds: ["c"], actualIds: ["a"], points: 5 },
+      { kind: "partial", verdict: "near_miss", pickIds: ["d"], actualIds: ["b"], points: 5 },
     ]);
   });
 

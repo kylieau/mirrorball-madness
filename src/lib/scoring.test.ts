@@ -9,6 +9,7 @@ import {
   grandFinaleBestCasePoints,
   grandFinalePredictionPoints,
   computeWeeklyScores,
+  curtainCallNearMiss2Points,
   curtainCallNearMissPoints,
   curtainCallPayout,
   curtainCallPreviewCopy,
@@ -588,7 +589,7 @@ describe("Curtain Call In Jeopardy", () => {
     expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(5 + 5);
   });
 
-  it("pays a top scorer within 1 of the high, and not a top-3 finish farther out", () => {
+  it("pays a top scorer within 1 of the high, 10% within 2, nothing farther out", () => {
     const totals = sumDanceScoresByCouple([
       { coupleId: "high", totalScore: 30 },
       { coupleId: "within", totalScore: 29 },
@@ -597,7 +598,7 @@ describe("Curtain Call In Jeopardy", () => {
     ]);
     expect(classifyTopScorerGuess("high", totals)).toBe("exact");
     expect(classifyTopScorerGuess("within", totals)).toBe("near_miss");
-    expect(classifyTopScorerGuess("third", totals)).toBe("miss");
+    expect(classifyTopScorerGuess("third", totals)).toBe("near_miss_2");
     expect(classifyTopScorerGuess("fourth", totals)).toBe("miss");
 
     const result = computeWeeklyScores({
@@ -634,25 +635,35 @@ describe("Curtain Call In Jeopardy", () => {
     });
 
     expect(result.find((r) => r.managerId === "alice")!.predictionPoints).toBe(3.75);
-    expect(result.find((r) => r.managerId === "bob")!.predictionPoints).toBe(0);
+    expect(result.find((r) => r.managerId === "bob")!.predictionPoints).toBe(1.5);
     expect(result.find((r) => r.managerId === "carol")!.predictionPoints).toBe(15);
   });
 
-  it("treats a tie at the high as exact only, and the score one below as near-miss", () => {
+  it("treats a tie at the high as exact only, with one band per point below", () => {
     const totals = sumDanceScoresByCouple([
       { coupleId: "a", totalScore: 27 },
       { coupleId: "b", totalScore: 27 },
       { coupleId: "c", totalScore: 26 },
+      { coupleId: "d", totalScore: 25 },
+      { coupleId: "e", totalScore: 24 },
     ]);
     expect(classifyTopScorerGuess("a", totals)).toBe("exact");
     expect(classifyTopScorerGuess("b", totals)).toBe("exact");
     expect(classifyTopScorerGuess("c", totals)).toBe("near_miss");
+    expect(classifyTopScorerGuess("d", totals)).toBe("near_miss_2");
+    expect(classifyTopScorerGuess("e", totals)).toBe("miss");
   });
 
   it("does not near-miss a top scorer who has no score row", () => {
     const totals = sumDanceScoresByCouple([{ coupleId: "high", totalScore: 30 }]);
     expect(classifyTopScorerGuess("bye", totals)).toBe("miss");
     expect(resolveCurtainCallGuess("near_miss", 15, false)).toEqual({ verdict: "miss", points: 0 });
+    expect(resolveCurtainCallGuess("near_miss_2", 15, false)).toEqual({ verdict: "miss", points: 0 });
+  });
+
+  it("pays the within-2 band 10% of the exact payout, two-decimal rounded", () => {
+    expect(resolveCurtainCallGuess("near_miss_2", 15, true)).toEqual({ verdict: "near_miss_2", points: 1.5 });
+    expect(curtainCallNearMiss2Points(curtainCallPayout(31, 5, 10))).toBe(1.55);
   });
 
   it("pays nothing for a near-miss when the league has In Jeopardy off", () => {
@@ -694,9 +705,10 @@ describe("Curtain Call In Jeopardy", () => {
         kind: "top_scorer",
         exactDisplayPoints: 20,
         nearMissPoints: 5,
+        nearMiss2Points: 2,
         nearMissEnabled: true,
       })
-    ).toBe("Correct top scorer: 20.00 pts · 5.00 pts if within 1 of the high");
+    ).toBe("Correct top scorer: 20.00 pts · 5.00 pts within 1 of the high · 2.00 pts within 2");
     expect(
       curtainCallPreviewCopy({
         kind: "elimination",

@@ -25,8 +25,19 @@ export type PastPicksComparison = {
 
 export type PastPicksDisplayRow =
   | { kind: "nailed"; coupleIds: string[]; points: number }
-  | { kind: "in_jeopardy"; pickIds: string[]; actualIds: string[]; points: number }
+  | { kind: "partial"; verdict: "near_miss" | "near_miss_2"; pickIds: string[]; actualIds: string[]; points: number }
   | { kind: "miss"; pickIds: string[]; actualIds: string[] };
+
+// Label for a partial-credit verdict, by which pick it sits under: the elim
+// pick's near miss is the In Jeopardy tick (no distance, no second band); the
+// top scorer's near misses are judge-point distance from the week high.
+export function partialVerdictLabel(
+  pickKind: "elimination" | "top_scorer",
+  verdict: "near_miss" | "near_miss_2"
+): string {
+  if (pickKind === "elimination") return "In Jeopardy";
+  return verdict === "near_miss" ? "Within 1" : "Within 2";
+}
 
 // Layout A for hits: one "Nailed It" line so the couple isn't printed twice.
 // Layout 2 for misses: one strike→actual line per slot (no stacked Actual row).
@@ -66,8 +77,8 @@ export function collapsePickRows(picks: PickMatch[], actualIds: string[]): PastP
     if (!isLastMiss) actualCursor += assigned.length;
 
     const pickIds = pick.pickId ? [pick.pickId] : [];
-    if (pick.verdict === "near_miss") {
-      rows.push({ kind: "in_jeopardy", pickIds, actualIds: assigned, points: pick.points });
+    if (pick.verdict === "near_miss" || pick.verdict === "near_miss_2") {
+      rows.push({ kind: "partial", verdict: pick.verdict, pickIds, actualIds: assigned, points: pick.points });
       continue;
     }
     rows.push({ kind: "miss", pickIds, actualIds: assigned });

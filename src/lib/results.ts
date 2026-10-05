@@ -352,7 +352,9 @@ export async function replaceInJeopardyCouples(
   return error?.message ?? null;
 }
 
-async function recomputeWeekScores(
+// Exported for retroactive recomputes from a script (a scoring-logic change
+// applied to already-published weeks); in-app callers are below.
+export async function recomputeWeekScores(
   admin: SupabaseClient<Database>,
   seasonId: string,
   week: {

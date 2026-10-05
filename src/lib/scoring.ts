@@ -12,8 +12,8 @@ export type ScoringSettings = {
   thirdPlacePoints: number;
   fourthPlacePoints: number;
   fifthPlacePoints: number;
-  // On by default. Partial credit is a hardcoded 25% (curtainCallNearMissPoints),
-  // not a commissioner-editable fraction.
+  // On by default. Partial credit is hardcoded (curtainCallNearMissPoints /
+  // curtainCallNearMiss2Points), not a commissioner-editable fraction.
   curtainCallNearMissEnabled: boolean;
 };
 
@@ -138,15 +138,22 @@ export function curtainCallPayout(basePoints: number, couplesRemaining: number, 
   return basePoints * (couplesRemaining / totalCouples);
 }
 
-// Hardcoded. Commissioners can turn In Jeopardy off; they cannot change this.
+// Hardcoded. Commissioners can turn In Jeopardy off; they cannot change these.
+// near_miss covers an In Jeopardy elim pick and a top scorer within 1 of the
+// high; near_miss_2 is top scorer only, within 2 — two bands, no further.
 export const CURTAIN_CALL_NEAR_MISS_FRACTION = 0.25;
+export const CURTAIN_CALL_NEAR_MISS_2_FRACTION = 0.1;
 
-export type CurtainCallVerdict = "exact" | "near_miss" | "miss";
+export type CurtainCallVerdict = "exact" | "near_miss" | "near_miss_2" | "miss";
 
 // Two-decimal points, taken from the unrounded exact payout (curtainCallPayout)
 // so the near-miss figure never compounds a rounding step.
 export function curtainCallNearMissPoints(exactPayout: number): number {
   return roundPoints(exactPayout * CURTAIN_CALL_NEAR_MISS_FRACTION);
+}
+
+export function curtainCallNearMiss2Points(exactPayout: number): number {
+  return roundPoints(exactPayout * CURTAIN_CALL_NEAR_MISS_2_FRACTION);
 }
 
 export function couplesRemainingAtWeek(
@@ -179,9 +186,10 @@ export function classifyEliminationGuess(
   return "miss";
 }
 
-// Exact = tied for the week high M (and M > 0). Near-miss = total in [M−1, M).
-// A couple with no dance_scores row is absent from `totals` and cannot near-miss,
-// including a bye. Ties at M are exact only.
+// Exact = tied for the week high M (and M > 0). Near-miss = total in [M−1, M);
+// near-miss 2 = total in [M−2, M−1). A couple with no dance_scores row is
+// absent from `totals` and cannot near-miss, including a bye. Ties at M are
+// exact only.
 export function classifyTopScorerGuess(
   guessId: string | null,
   totals: Map<string, number>
@@ -193,6 +201,7 @@ export function classifyTopScorerGuess(
   const high = Math.max(0, ...totals.values());
   const score = totals.get(guessId)!;
   if (high > 0 && score >= high - 1 && score < high) return "near_miss";
+  if (high > 0 && score >= high - 2 && score < high - 1) return "near_miss_2";
   return "miss";
 }
 
@@ -205,6 +214,9 @@ export function resolveCurtainCallGuess(
   if (verdict === "near_miss" && nearMissEnabled) {
     return { verdict: "near_miss", points: curtainCallNearMissPoints(exactPayout) };
   }
+  if (verdict === "near_miss_2" && nearMissEnabled) {
+    return { verdict: "near_miss_2", points: curtainCallNearMiss2Points(exactPayout) };
+  }
   return { verdict: "miss", points: 0 };
 }
 
@@ -212,16 +224,24 @@ export function curtainCallPreviewCopy({
   kind,
   exactDisplayPoints,
   nearMissPoints,
+  nearMiss2Points,
   nearMissEnabled,
 }: {
   kind: "elimination" | "top_scorer";
   exactDisplayPoints: number;
   nearMissPoints: number;
+  // Top scorer only; the elim pick has no second band.
+  nearMiss2Points?: number;
   nearMissEnabled: boolean;
 }): string {
   const exactLabel = kind === "elimination" ? "Correct elimination" : "Correct top scorer";
-  const nearClause = kind === "elimination" ? "if In Jeopardy" : "if within 1 of the high";
-  const near = nearMissEnabled ? ` · ${formatPoints(nearMissPoints)} pts ${nearClause}` : "";
+  let near = "";
+  if (nearMissEnabled) {
+    near =
+      kind === "elimination"
+        ? ` · ${formatPoints(nearMissPoints)} pts if In Jeopardy`
+        : ` · ${formatPoints(nearMissPoints)} pts within 1 of the high · ${formatPoints(nearMiss2Points ?? 0)} pts within 2`;
+  }
   return `${exactLabel}: ${formatPoints(exactDisplayPoints)} pts${near}`;
 }
 

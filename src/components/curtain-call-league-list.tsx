@@ -5,7 +5,7 @@ import { formatPoints, formatSignedPoints } from "@/lib/format-points";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CoupleName } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
-import type { PastPicksComparison, PickMatch } from "@/lib/past-picks";
+import { partialVerdictLabel, type PastPicksComparison, type PickMatch } from "@/lib/past-picks";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
 export type CurtainCallLeagueEntry = {
@@ -18,14 +18,14 @@ export type CurtainCallLeagueEntry = {
   comparison: PastPicksComparison | null;
 };
 
-function PickPoints({ pick }: { pick: PickMatch }) {
+function PickPoints({ pick, pickKind }: { pick: PickMatch; pickKind: "elimination" | "top_scorer" }) {
   if (pick.verdict === "exact") {
     return <span className="font-heading font-semibold text-emerald-text">✓ +{formatPoints(pick.points)}</span>;
   }
-  if (pick.verdict === "near_miss") {
+  if (pick.verdict === "near_miss" || pick.verdict === "near_miss_2") {
     return (
       <span className="font-heading font-semibold text-amber-800 dark:text-amber-300">
-        In Jeopardy +{formatPoints(pick.points)}
+        {partialVerdictLabel(pickKind, pick.verdict)} +{formatPoints(pick.points)}
       </span>
     );
   }
@@ -98,7 +98,9 @@ export function CurtainCallLeagueList({
                         <span className="text-muted-foreground">No Pick</span>
                       )}
                     </span>
-                    {line.pick && <PickPoints pick={line.pick} />}
+                    {line.pick && (
+                      <PickPoints pick={line.pick} pickKind={line.label === "High" ? "top_scorer" : "elimination"} />
+                    )}
                   </div>
                 ))}
                 {!e.comparison && (

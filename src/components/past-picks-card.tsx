@@ -3,6 +3,7 @@ import { CoupleName } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import {
   collapsePickRows,
+  partialVerdictLabel,
   type PastPicksComparison,
   type PastPicksDisplayRow,
 } from "@/lib/past-picks";
@@ -37,10 +38,12 @@ function ResultRows({
   rows,
   names,
   actualFallback,
+  pickKind,
 }: {
   rows: PastPicksDisplayRow[];
   names: Record<string, CoupleNameParts>;
   actualFallback: string;
+  pickKind: "elimination" | "top_scorer";
 }) {
   return (
     <>
@@ -60,13 +63,13 @@ function ResultRows({
           );
         }
 
-        if (row.kind === "in_jeopardy") {
+        if (row.kind === "partial") {
           return (
             <div
-              key={`jeopardy-${row.pickIds.join("-")}-${row.actualIds.join("-") || i}`}
+              key={`partial-${row.pickIds.join("-")}-${row.actualIds.join("-") || i}`}
               className="flex items-start justify-between gap-3"
             >
-              <span className="text-amber-800 dark:text-amber-300">In Jeopardy</span>
+              <span className="text-amber-800 dark:text-amber-300">{partialVerdictLabel(pickKind, row.verdict)}</span>
               <span className="inline-flex max-w-[75%] flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-right">
                 <CoupleNames
                   ids={row.pickIds}
@@ -152,6 +155,7 @@ export function PastPicksRecap({
           rows={collapsePickRows(comparison.eliminationPicks, comparison.actualEliminatedIds)}
           names={coupleDisplayNames}
           actualFallback="Nobody"
+          pickKind="elimination"
         />
       </div>
       <div className="flex flex-col gap-1.5">
@@ -160,6 +164,7 @@ export function PastPicksRecap({
           rows={collapsePickRows([comparison.topScorer], comparison.actualTopScorerIds)}
           names={coupleDisplayNames}
           actualFallback="—"
+          pickKind="top_scorer"
         />
       </div>
       <div className="flex items-baseline justify-between border-t border-border pt-1">

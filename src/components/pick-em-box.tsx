@@ -18,7 +18,12 @@ import {
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { coupleNameNode } from "@/components/couple-name";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
-import { curtainCallNearMissPoints, curtainCallPayout, curtainCallPreviewCopy } from "@/lib/scoring";
+import {
+  curtainCallNearMiss2Points,
+  curtainCallNearMissPoints,
+  curtainCallPayout,
+  curtainCallPreviewCopy,
+} from "@/lib/scoring";
 import { adaptCurtainCallPick, defaultSelection, type CurtainCallDestination } from "@/lib/copy-picks";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -207,6 +212,7 @@ export function PickEmBox({
     kind: "top_scorer",
     exactDisplayPoints: topScorerExact,
     nearMissPoints: curtainCallNearMissPoints(topScorerExact),
+    nearMiss2Points: curtainCallNearMiss2Points(topScorerExact),
     nearMissEnabled,
   });
   const pickSources = otherLeagues.filter((l) => l.pick);
