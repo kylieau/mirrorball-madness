@@ -6,6 +6,7 @@ import {
   computeEpisodeBannerState,
   nextBannerRefreshMs,
   seasonTrack,
+  trackDots,
   type EpisodeBannerInput,
   type EpisodeBannerState,
   type SeasonTrackModel,
@@ -13,13 +14,7 @@ import {
 import { formatAirsAt } from "@/lib/format-airs";
 import { formatEpisodeCasual } from "@/lib/format-week";
 
-// Total season length isn't known, so the track shows what's done, the
-// current week, and hollow dots that fade out instead of a real "N of M". It
-// holds seven nodes early in the season, then grows with the checked weeks.
-const TRACK_NODES = 7;
-const MIN_FUTURE_DOTS = 3;
-
-// Titles longer than this drop a size step so the fixed-height curtain still fits.
+// Titles longer than this drop a size step so the curtain keeps its usual height.
 const SHORT_TITLE_MAX = 12;
 
 const CURTAIN_FOLDS =
@@ -61,18 +56,16 @@ function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
   }
 }
 
-function SeasonTrack({ weeksDone, currentWeek, marker }: SeasonTrackModel) {
-  const dots = [
-    ...Array.from({ length: weeksDone }, () => ({ kind: "done" as const, label: "✓" })),
-    ...(currentWeek === null ? [] : [{ kind: "current" as const, label: String(currentWeek) }]),
-    ...Array.from({ length: Math.max(MIN_FUTURE_DOTS, TRACK_NODES - 1 - weeksDone) }, () => ({ kind: "future" as const, label: "" })),
-  ];
+function SeasonTrack(track: SeasonTrackModel) {
+  const { dots, hiddenDone } = trackDots(track);
+  const { weeksDone, marker } = track;
 
   return (
     <div
       className="flex w-full items-center overflow-hidden px-1.5 pb-4 opacity-60"
       aria-hidden
     >
+      {hiddenDone > 0 && <span className="h-0.5 min-w-[3px] flex-1 bg-linear-to-r from-transparent to-primary" />}
       {dots.map((dot, i) => (
         <Fragment key={i}>
           <span className="relative flex-none">
@@ -96,7 +89,7 @@ function SeasonTrack({ weeksDone, currentWeek, marker }: SeasonTrackModel) {
           <span
             className={cn(
               "h-0.5 min-w-[3px] flex-1",
-              i < weeksDone ? "bg-primary" : "bg-primary/30",
+              i < weeksDone - hiddenDone ? "bg-primary" : "bg-primary/30",
               i === dots.length - 1 && "bg-linear-to-r from-primary/30 to-transparent"
             )}
           />
@@ -145,7 +138,7 @@ export function EpisodeBanner({
   const weekLabel = formatEpisodeCasual(state.weekNumber);
 
   return (
-    <div className="relative mb-4 h-48 overflow-hidden rounded-2xl bg-[radial-gradient(ellipse_at_50%_62%,rgba(255,232,170,0.4),rgba(255,232,170,0.07)_58%,#14060f_88%)] shadow-[0_6px_22px_rgba(0,0,0,0.45)]">
+    <div className="relative mb-4 min-h-48 overflow-hidden rounded-2xl bg-[radial-gradient(ellipse_at_50%_62%,rgba(255,232,170,0.4),rgba(255,232,170,0.07)_58%,#14060f_88%)] shadow-[0_6px_22px_rgba(0,0,0,0.45)]">
       <div className="absolute inset-x-0 top-0 z-10 h-1.5 border-b-2 border-primary bg-linear-to-b from-[#3b0a17] to-[#5c1022]" />
       <div
         className={cn(

@@ -174,6 +174,29 @@ export function seasonTrack(weeks: BannerWeek[], state: EpisodeBannerState): Sea
   };
 }
 
+// Total season length isn't known, so the track shows what's done, the
+// current week, and hollow dots that fade out instead of a real "N of M". It
+// never grows past seven nodes: once more than three weeks are checked the
+// earliest fall off the left (hiddenDone), or the row would clip at 360px.
+export const TRACK_NODES = 7;
+const MIN_FUTURE_DOTS = 3;
+const MAX_DONE_DOTS = TRACK_NODES - 1 - MIN_FUTURE_DOTS;
+
+export type TrackDot = { kind: "done"; label: "✓" } | { kind: "current"; label: string } | { kind: "future"; label: "" };
+
+export function trackDots({ weeksDone, currentWeek }: SeasonTrackModel): { dots: TrackDot[]; hiddenDone: number } {
+  const visibleDone = Math.min(weeksDone, MAX_DONE_DOTS);
+  const dots: TrackDot[] = [
+    ...Array.from({ length: visibleDone }, () => ({ kind: "done" as const, label: "✓" as const })),
+    ...(currentWeek === null ? [] : [{ kind: "current" as const, label: String(currentWeek) }]),
+    ...Array.from({ length: Math.max(MIN_FUTURE_DOTS, TRACK_NODES - 1 - visibleDone) }, () => ({
+      kind: "future" as const,
+      label: "" as const,
+    })),
+  ];
+  return { dots, hiddenDone: weeksDone - visibleDone };
+}
+
 function latestPublishedAt(week: BannerWeek): Date | null {
   const times = week.episodes.flatMap((episode) => (episode.publishedAt ? [new Date(episode.publishedAt)] : []));
   return times.length > 0 ? new Date(Math.max(...times.map((t) => t.getTime()))) : null;

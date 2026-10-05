@@ -5,9 +5,11 @@ import {
   liveRefreshWindows,
   nextBannerRefreshMs,
   seasonTrack,
+  trackDots,
   type BannerEpisode,
   type BannerWeek,
   type EpisodeBannerInput,
+  type SeasonTrackModel,
 } from "./episode-banner";
 
 // 8pm ET Tuesday Sept 22, 2026 = 00:00Z Sept 23 = 5pm PT; a 2h show ends 7pm PT.
@@ -197,6 +199,41 @@ describe("nextBannerRefreshMs", () => {
     expect(nextBannerRefreshMs(weeks, new Date(at(AIRS).getTime() - 5 * 24 * HOUR))).toBe(24 * HOUR);
     expect(nextBannerRefreshMs(weeks, new Date(at(AIRS).getTime() - 10 * HOUR))).toBe(4 * HOUR);
     expect(nextBannerRefreshMs(weeks, new Date(at(AIRS).getTime() + 30 * HOUR))).toBe(24 * HOUR);
+  });
+});
+
+describe("trackDots", () => {
+  const kinds = (model: SeasonTrackModel) => trackDots(model).dots.map((dot) => dot.kind);
+
+  it("holds seven nodes early in the season", () => {
+    expect(kinds({ weeksDone: 1, currentWeek: 2, marker: "next" })).toEqual([
+      "done",
+      "current",
+      "future",
+      "future",
+      "future",
+      "future",
+      "future",
+    ]);
+    expect(trackDots({ weeksDone: 1, currentWeek: 2, marker: "next" }).hiddenDone).toBe(0);
+  });
+
+  it("drops the earliest checked weeks instead of growing past seven", () => {
+    const late = trackDots({ weeksDone: 9, currentWeek: 10, marker: "now" });
+    expect(late.dots.map((dot) => dot.kind)).toEqual(["done", "done", "done", "current", "future", "future", "future"]);
+    expect(late.hiddenDone).toBe(6);
+    expect(late.dots[3]).toEqual({ kind: "current", label: "10" });
+  });
+
+  it("keeps the fading future dots once the season is over", () => {
+    expect(kinds({ weeksDone: 11, currentWeek: null, marker: "next" })).toEqual([
+      "done",
+      "done",
+      "done",
+      "future",
+      "future",
+      "future",
+    ]);
   });
 });
 
