@@ -15,7 +15,9 @@ export type CoupleLeaderboardRow = {
   totalPoints: number;
 };
 
-const COLUMNS = "grid grid-cols-[1.25rem_minmax(0,1fr)_3.25rem_3.25rem_4rem] items-center gap-x-2";
+// Number columns are sized for two-digit points so the name column keeps
+// enough room at 360px for a couple's first names on one line.
+const COLUMNS = "grid grid-cols-[1rem_minmax(0,1fr)_2.5rem_3rem_3.5rem] items-center gap-x-1.5";
 
 export function CouplesLeaderboard({ rows }: { rows: CoupleLeaderboardRow[] }) {
   return (
@@ -29,7 +31,7 @@ export function CouplesLeaderboard({ rows }: { rows: CoupleLeaderboardRow[] }) {
         <div
           className={cn(
             COLUMNS,
-            "sticky top-0 z-10 bg-muted px-3.5 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            "sticky top-0 z-10 bg-muted px-3.5 py-2 text-[10px] font-semibold uppercase text-muted-foreground"
           )}
         >
           <span className="col-span-2" />
@@ -60,8 +62,8 @@ export function CouplesLeaderboard({ rows }: { rows: CoupleLeaderboardRow[] }) {
                     <strong className="font-semibold text-foreground">{row.celebrity}</strong>{" "}
                     <span className="text-muted-foreground">&amp; {row.pro}</span>
                   </span>
-                  <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                    {undrafted ? "Undrafted" : row.ownerName}
+                  <span className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                    <span className="truncate">{undrafted ? "Undrafted" : row.ownerName}</span>
                     {row.isViewer && <YouPill />}
                   </span>
                 </span>
