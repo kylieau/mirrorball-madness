@@ -61,7 +61,21 @@ describe("computeEpisodeBannerState", () => {
       kind: "on_air",
       weekNumber: 2,
       picksModuleOn: true,
+      picksOpen: false,
     });
+  });
+
+  it("keeps picks open on air while a league's lock is still after the curtain", () => {
+    const westLock = input([live()], { curtainCallLockAtIso: "2026-09-23T03:00:00Z" });
+    expect(computeEpisodeBannerState(westLock, at("2026-09-23T01:00:00Z"))).toMatchObject({
+      kind: "on_air",
+      picksOpen: true,
+    });
+  });
+
+  it("stays picks_open before air while any league is still open", () => {
+    const westLock = input([live()], { curtainCallLockAtIso: "2026-09-23T03:00:00Z" });
+    expect(computeEpisodeBannerState(westLock, at("2026-09-22T22:00:00Z"))).toMatchObject({ kind: "picks_open" });
   });
 
   it("honors a custom duration", () => {
@@ -209,7 +223,7 @@ describe("seasonTrack", () => {
 
   it("checks earlier weeks and glows the banner's own week", () => {
     const weeks = [done(1), upcoming(2), upcoming(3)];
-    expect(seasonTrack(weeks, { kind: "on_air", weekNumber: 2, picksModuleOn: true })).toEqual({
+    expect(seasonTrack(weeks, { kind: "on_air", weekNumber: 2, picksModuleOn: true, picksOpen: false })).toEqual({
       weeksDone: 1,
       currentWeek: 2,
       marker: "now",

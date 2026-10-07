@@ -1,6 +1,7 @@
 "use client";
 
 import { formatPoints } from "@/lib/format-points";
+import { curtainCallLockAt, describePickLockOffset, type PickLockCoast } from "@/lib/curtain-call-lock";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -106,6 +107,7 @@ type League = {
   waiver_claim_method: string | null;
   pick_time_limit_seconds: number;
   prediction_lock_hours_before_air: number;
+  prediction_lock_coast: string;
   draft_status: string;
   draft_type: string;
   draft_scheduled_at: string | null;
@@ -113,6 +115,10 @@ type League = {
 };
 
 type SeasonEpisode = { week_number: number; theme: string | null; airs_at: string };
+
+type CurtainCallNight = { weekNumber: number; airsAt: string; durationMinutes: number };
+
+type LockDirection = "before" | "after";
 
 const CURTAIN_CALL_PAYOUT_NOTE =
   "Each week's payout scales with how many couples are still in the running: full value at the start of the season, shrinking as couples are eliminated.";
@@ -126,6 +132,16 @@ const METHOD_ITEMS: Record<ScoringMethod, string> = {
 const TIER_PAY_STYLE_ITEMS: Record<TierPayStyle, string> = {
   equal: "Equal Pay for Every Band",
   graded: "Graded (Lower Bands Pay Less)",
+};
+
+const PICK_LOCK_COAST_ITEMS: Record<PickLockCoast, string> = {
+  east: "East Coast (8pm ET)",
+  west: "West Coast (8pm PT)",
+};
+
+const LOCK_DIRECTION_ITEMS: Record<LockDirection, string> = {
+  before: "Before the Curtain",
+  after: "After the Curtain",
 };
 
 const WAIVER_MODE_ITEMS: Record<WaiverMode, string> = {
@@ -151,6 +167,7 @@ export function LeagueModulesForm({
   scoringSettings,
   canEdit,
   seasonEpisodes,
+  nextCurtainCallNight,
   seasonNumber,
   effectiveHardDeadlineWeek,
   scoringLocked,
@@ -163,6 +180,8 @@ export function LeagueModulesForm({
   scoringSettings: ScoringSettings | null;
   canEdit: boolean;
   seasonEpisodes: SeasonEpisode[];
+  // First night of the next unscored week, for the Pick 'Em lock preview.
+  nextCurtainCallNight: CurtainCallNight | null;
   seasonNumber: number | null;
   // effective_hard_deadline_week — the episode Grand Finale actually locks
   // at. May have auto-advanced past the commissioner's Anchor week while a
@@ -264,9 +283,32 @@ export function LeagueModulesForm({
   const [nearMissEnabled, setNearMissEnabled] = useState(
     scoringSettings?.curtain_call_near_miss_enabled ?? true
   );
-  const [predictionLockHoursBeforeAir, setPredictionLockHoursBeforeAir] = useState(
-    league.prediction_lock_hours_before_air
+  const [predictionLockCoast, setPredictionLockCoast] = useState<PickLockCoast>(
+    (league.prediction_lock_coast as PickLockCoast) ?? "east"
   );
+  // Stored signed (negative = after the curtain); edited as an amount plus a
+  // direction so "after" survives an amount of 0 mid-edit.
+  const [predictionLockHours, setPredictionLockHours] = useState(Math.abs(league.prediction_lock_hours_before_air));
+  const [predictionLockDirection, setPredictionLockDirection] = useState<LockDirection>(
+    league.prediction_lock_hours_before_air < 0 ? "after" : "before"
+  );
+  const predictionLockHoursBeforeAir =
+    predictionLockDirection === "after" ? -predictionLockHours : predictionLockHours;
+  const nextLockAt = nextCurtainCallNight
+    ? curtainCallLockAt({
+        firstAirsAt: nextCurtainCallNight.airsAt,
+        durationMinutes: nextCurtainCallNight.durationMinutes,
+        coast: predictionLockCoast,
+        hoursBeforeAir: predictionLockHoursBeforeAir,
+      }).toISOString()
+    : null;
+  const formattedNextLockAt = useFormattedDeadline(nextLockAt);
+  // Only non-null after mount (formattedNextLockAt), so reading the clock here
+  // can't cause a hydration mismatch.
+  const pickLockPreview =
+    nextCurtainCallNight && nextLockAt && formattedNextLockAt
+      ? `Week ${nextCurtainCallNight.weekNumber} ${new Date(nextLockAt).getTime() > Date.now() ? "locks" : "locked"} ${formattedNextLockAt}.`
+      : null;
 
   const [bonusMethod, setBonusMethod] = useState<ScoringMethod>(
     (scoringSettings?.bonus_picks_scoring_method as ScoringMethod) ?? GRAND_FINALE_DEFAULT_METHOD
@@ -419,7 +461,7 @@ export function LeagueModulesForm({
       return;
     }
 
-    if (eliminationsEnabled && predictionLockHoursBeforeAir < 0) {
+    if (eliminationsEnabled && predictionLockHours < 0) {
       setError("Pick 'Em Lock can't be negative.");
       return;
     }
@@ -456,6 +498,7 @@ export function LeagueModulesForm({
       waiverClaimMethod,
       pickTimeLimitSeconds,
       predictionLockHoursBeforeAir,
+      predictionLockCoast,
       draftType,
       draftScheduledAt: draftScheduledAt ? airsAtToUtcIso(draftScheduledAt) : null,
     };
@@ -546,7 +589,8 @@ export function LeagueModulesForm({
               <SettingRow label="Elimination Prediction Points" value={formatPoints(eliminationPredictionPoints)} />
               <SettingRow label="Top Scorer Prediction Points" value={formatPoints(topScorerPredictionPoints)} />
               <SettingRow label="In Jeopardy" value={nearMissEnabled ? "On" : "Off"} />
-              <SettingRow label="Pick 'Em Lock" value={`${predictionLockHoursBeforeAir}h before air`} />
+              <SettingRow label="Air Time" value={PICK_LOCK_COAST_ITEMS[predictionLockCoast]} />
+              <SettingRow label="Pick 'Em Lock" value={describePickLockOffset(predictionLockHoursBeforeAir)} />
               <p className="pt-2 text-sm text-muted-foreground">{CURTAIN_CALL_PAYOUT_NOTE}</p>
             </div>
           </ScoringModulePanel>
@@ -754,16 +798,59 @@ export function LeagueModulesForm({
         >
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="predictionLockHoursBeforeAir">Pick &apos;Em Lock (Hours Before Air)</Label>
-                <Input
-                  id="predictionLockHoursBeforeAir"
-                  type="number"
-                  step="0.5"
-                  min={0}
-                  value={predictionLockHoursBeforeAir}
-                  onChange={(e) => setPredictionLockHoursBeforeAir(Number(e.target.value))}
-                />
+              <div className="flex flex-col gap-2 sm:col-span-2">
+                <Label htmlFor="predictionLockCoast">Air Time</Label>
+                <Select
+                  items={PICK_LOCK_COAST_ITEMS}
+                  value={predictionLockCoast}
+                  onValueChange={(v) => setPredictionLockCoast((v as PickLockCoast) ?? "east")}
+                >
+                  <SelectTrigger id="predictionLockCoast" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="east">{PICK_LOCK_COAST_ITEMS.east}</SelectItem>
+                    <SelectItem value="west">{PICK_LOCK_COAST_ITEMS.west}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Which broadcast Curtain Call locks against. West Coast leagues lock against the 8pm PT feed, after
+                  the East broadcast has aired.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:col-span-2">
+                <Label htmlFor="predictionLockHours">Pick &apos;Em Lock (Hours)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="predictionLockHours"
+                    type="number"
+                    step="0.5"
+                    min={0}
+                    className="w-24 shrink-0"
+                    value={predictionLockHours}
+                    onChange={(e) => setPredictionLockHours(Number(e.target.value))}
+                  />
+                  <Select
+                    items={LOCK_DIRECTION_ITEMS}
+                    value={predictionLockDirection}
+                    onValueChange={(v) => setPredictionLockDirection((v as LockDirection) ?? "before")}
+                  >
+                    <SelectTrigger aria-label="Before or after the curtain" className="min-w-0 flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="before">{LOCK_DIRECTION_ITEMS.before}</SelectItem>
+                      <SelectItem value="after">{LOCK_DIRECTION_ITEMS.after}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {pickLockPreview && <p className="text-xs text-muted-foreground">{pickLockPreview}</p>}
+                {predictionLockHoursBeforeAir < 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Locking after the curtain lets picks come in during the show, after some judges&apos; scores are
+                    out. It never locks later than the end of the broadcast.
+                  </p>
+                )}
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="eliminationPredictionPoints">Elimination Prediction Points</Label>

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncSeasonClockAnchor as writeSeasonClockAnchor } from "@/lib/season-clock-sync";
 import { parseLatePercent, percentToLateFactor } from "@/lib/grand-finale-late";
+import type { PickLockCoast } from "@/lib/curtain-call-lock";
 import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
 
 export async function renameLeague(
@@ -152,6 +153,7 @@ export type LeagueSettingsInput = {
   waiverClaimMethod: "reverse_standings" | "fcfs" | "manual";
   pickTimeLimitSeconds: number;
   predictionLockHoursBeforeAir: number;
+  predictionLockCoast: PickLockCoast;
   draftType: "snake" | "linear" | "custom";
   draftScheduledAt: string | null;
 };
@@ -170,6 +172,7 @@ export async function updateLeagueSettings(
     p_waiver_claim_method: (input.waiverMode === "waivers" ? input.waiverClaimMethod : null) as string,
     p_pick_time_limit_seconds: input.pickTimeLimitSeconds,
     p_prediction_lock_hours_before_air: input.predictionLockHoursBeforeAir,
+    p_prediction_lock_coast: input.predictionLockCoast,
     p_draft_type: input.draftType,
     // Same generated-type gap as p_waiver_claim_method above: draft_scheduled_at
     // is nullable in Postgres, but the RPC arg type doesn't model that.

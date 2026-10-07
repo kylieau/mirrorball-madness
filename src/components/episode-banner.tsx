@@ -47,7 +47,11 @@ function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
       return {
         chip: "Live Now (ET)",
         title: LETS_DANCE,
-        sub: state.picksModuleOn ? "Picks Locked · Time to Vote" : "Time to Vote",
+        sub: !state.picksModuleOn
+          ? "Time to Vote"
+          : state.picksOpen
+            ? "Picks Still Open · Time to Vote"
+            : "Picks Locked · Time to Vote",
         live: true,
       };
     case "west_soon":

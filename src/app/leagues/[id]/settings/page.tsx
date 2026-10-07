@@ -146,6 +146,7 @@ export default async function LeagueSettingsPage({
           scoringSettings={scoringSettings}
           canEdit={isCommissioner}
           seasonEpisodes={season.seasonEpisodes}
+          nextCurtainCallNight={season.nextCurtainCallNight}
           seasonNumber={season.seasonNumber}
           effectiveHardDeadlineWeek={season.effectiveHardDeadlineWeek}
           scoringLocked={scoringLocked}
@@ -210,7 +211,7 @@ async function loadSeasonContext(supabase: SupabaseClient<Database>, leagueId: s
       .order("week_number"),
     supabase
       .from("episodes")
-      .select("id, episode_number, week_id, airs_at, theme, status")
+      .select("id, episode_number, week_id, airs_at, theme, status, duration_minutes")
       .eq("season_id", activeSeasonId ?? ""),
     supabase.from("seasons").select("season_number").eq("id", activeSeasonId ?? "").maybeSingle(),
     supabase.rpc("effective_hard_deadline_week", { p_league_id: leagueId }),
@@ -220,13 +221,26 @@ async function loadSeasonContext(supabase: SupabaseClient<Database>, leagueId: s
       .select("id", { count: "exact", head: true })
       .eq("season_id", activeSeasonId ?? ""),
   ]);
+  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const nextWeek = groupedWeeks.find((week) => week.status !== "completed");
+  const nextFirstNight = (episodeRows ?? [])
+    .filter((episode) => nextWeek && episode.week_id === nextWeek.id)
+    .sort((a, b) => a.airs_at.localeCompare(b.airs_at))[0];
   return {
     activeSeasonId,
     seasonNumber: activeSeason?.season_number ?? null,
+    nextCurtainCallNight:
+      nextWeek && nextFirstNight
+        ? {
+            weekNumber: nextWeek.week_number,
+            airsAt: nextFirstNight.airs_at,
+            durationMinutes: nextFirstNight.duration_minutes,
+          }
+        : null,
     effectiveHardDeadlineWeek: effectiveHardDeadlineWeek ?? null,
     effectiveGrandFinaleDeadline,
     totalCouples: totalCouples ?? 12,
-    seasonEpisodes: groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []).map((week) => ({
+    seasonEpisodes: groupedWeeks.map((week) => ({
       week_number: week.week_number,
       theme: week.theme,
       airs_at: week.earliestAirsAt ?? "",
@@ -333,6 +347,7 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
           scoringSettings={settings}
           canEdit={false}
           seasonEpisodes={season.seasonEpisodes}
+          nextCurtainCallNight={season.nextCurtainCallNight}
           seasonNumber={season.seasonNumber}
           effectiveHardDeadlineWeek={season.effectiveHardDeadlineWeek}
           scoringLocked={scoringIsLocked(settings?.locking_exempt ?? false, season.effectiveGrandFinaleDeadline)}

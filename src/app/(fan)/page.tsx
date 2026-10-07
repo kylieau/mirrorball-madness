@@ -174,7 +174,7 @@ export default async function Home() {
       summaries
         .flatMap((s) => (s.curtainCallLockAt ? [s.curtainCallLockAt] : []))
         .sort()
-        .at(0) ?? null,
+        .at(-1) ?? null,
   };
   const episodeBannerState = computeEpisodeBannerState(episodeBannerInput);
 

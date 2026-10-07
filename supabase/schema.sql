@@ -110,11 +110,15 @@ create table leagues (
   -- reset after every pick (manual or auto). make_auto_draft_pick times out
   -- against this; clients only display it. Null until the draft has started.
   current_turn_started_at timestamptz,
-  -- How long before an episode's real-world airs_at this league's Pick 'Em
-  -- predictions close. Deliberately a per-league lead time, not a per-league
-  -- absolute lock timestamp: every league locks relative to the same real
-  -- air time, they just get to choose how much buffer they want.
-  prediction_lock_hours_before_air numeric not null default 0 check (prediction_lock_hours_before_air >= 0),
+  -- How long before this league's curtain its Pick 'Em predictions close.
+  -- Deliberately a per-league lead time, not a per-league absolute lock
+  -- timestamp: every league locks relative to a real air time, they just get
+  -- to choose how much buffer they want. Negative = after the curtain;
+  -- prediction_lock_at caps it at the end of the broadcast.
+  prediction_lock_hours_before_air numeric not null default 0,
+  -- Which broadcast that curtain is: east = episodes.airs_at, west = 8pm PT
+  -- on that air date (the West feed), for leagues that watch on West time.
+  prediction_lock_coast text not null default 'east' check (prediction_lock_coast in ('east', 'west')),
   created_at timestamptz not null default now(),
 
   constraint waiver_method_required check (
@@ -1381,6 +1385,7 @@ create function public.update_league_settings(
   p_waiver_claim_method text,
   p_pick_time_limit_seconds int,
   p_prediction_lock_hours_before_air numeric,
+  p_prediction_lock_coast text,
   p_draft_type text,
   p_draft_scheduled_at timestamptz
 )
@@ -1404,6 +1409,7 @@ begin
     waiver_claim_method = p_waiver_claim_method,
     pick_time_limit_seconds = p_pick_time_limit_seconds,
     prediction_lock_hours_before_air = p_prediction_lock_hours_before_air,
+    prediction_lock_coast = p_prediction_lock_coast,
     draft_type = case when draft_status = 'not_started' then p_draft_type else draft_type end,
     -- Switching away from 'custom' drops the stale sequence, so a later switch
     -- back cannot silently reuse an order built for a different member list.
@@ -1581,9 +1587,9 @@ begin
 end;
 $$;
 
-revoke execute on function public.update_league_settings(uuid, text, text, int, numeric) from public;
+revoke execute on function public.update_league_settings(uuid, text, text, int, numeric, text, text, timestamptz) from public;
 revoke execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text, boolean) from public;
-grant execute on function public.update_league_settings(uuid, text, text, int, numeric) to authenticated;
+grant execute on function public.update_league_settings(uuid, text, text, int, numeric, text, text, timestamptz) to authenticated;
 grant execute on function public.update_scoring_categories(uuid, boolean, boolean, boolean, numeric, numeric, numeric, int, text, numeric, int, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, numeric, text, boolean) to authenticated;
 
 -- ============================================================
@@ -2609,14 +2615,16 @@ using (public.is_league_member(league_id));
 
 grant select on public.predictions to authenticated;
 
--- Each league locks relative to the same real first-airs_at of the
--- competition week, just with its own configurable lead time
--- (leagues.prediction_lock_hours_before_air) — so the lock moment isn't a
--- single column anywhere, it's computed. Shared by the RLS policy below and
--- submit_prediction so the two can't drift apart. Multi-night weeks lock
--- before Night One.
--- Lock hours must be a scalar subquery: min(airs_at) minus a joined
--- leagues.prediction_lock_hours_before_air is 42803 (must GROUP BY).
+-- Each league locks relative to the competition week's first night, on its
+-- own coast (leagues.prediction_lock_coast: the East airs_at, or 8pm PT that
+-- day for the West feed), with its own lead time
+-- (leagues.prediction_lock_hours_before_air; negative = after the curtain) —
+-- so the lock moment isn't a single column anywhere, it's computed. Capped at
+-- the end of that broadcast (duration_minutes) so picks never stay open once
+-- the elimination is announced. Shared by the RLS policy below and
+-- submit_prediction so the two can't drift apart; curtainCallLockAt
+-- (src/lib/curtain-call-lock.ts) mirrors it for the League Settings preview.
+-- Multi-night weeks lock against Night One.
 create function public.prediction_lock_at(p_league_id uuid, p_week_id uuid)
 returns timestamptz
 language sql
@@ -2624,13 +2632,31 @@ security definer
 set search_path = ''
 stable
 as $$
-  select min(e.airs_at) - (
-    (select l.prediction_lock_hours_before_air
-     from public.leagues l
-     where l.id = p_league_id) * interval '1 hour'
+  with first_night as (
+    select e.airs_at, e.duration_minutes
+    from public.episodes e
+    where e.week_id = p_week_id
+    order by e.airs_at
+    limit 1
+  ),
+  curtain as (
+    select
+      case
+        when l.prediction_lock_coast = 'west'
+          then ((n.airs_at at time zone 'America/Los_Angeles')::date + time '20:00') at time zone 'America/Los_Angeles'
+        else n.airs_at
+      end as at,
+      n.duration_minutes,
+      l.prediction_lock_hours_before_air as hours_before
+    from first_night n
+    cross join public.leagues l
+    where l.id = p_league_id
   )
-  from public.episodes e
-  where e.week_id = p_week_id;
+  select least(
+    c.at - c.hours_before * interval '1 hour',
+    c.at + c.duration_minutes * interval '1 minute'
+  )
+  from curtain c;
 $$;
 
 revoke execute on function public.prediction_lock_at(uuid, uuid) from public;

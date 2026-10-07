@@ -290,22 +290,22 @@ export type Database = {
       }
       draft_couple_releases: {
         Row: {
-          episode_id: string
           couple_id: string
+          episode_id: string
           released_at: string
-          released_by: string | null
+          released_by: string
         }
         Insert: {
-          episode_id: string
           couple_id: string
+          episode_id: string
           released_at?: string
-          released_by?: string | null
+          released_by: string
         }
         Update: {
-          episode_id?: string
           couple_id?: string
+          episode_id?: string
           released_at?: string
-          released_by?: string | null
+          released_by?: string
         }
         Relationships: [
           {
@@ -957,55 +957,6 @@ export type Database = {
           },
         ]
       }
-      grand_finale_predictions: {
-        Row: {
-          couple_id: string
-          id: string
-          league_id: string
-          manager_id: string
-          predicted_position: number
-          submitted_at: string
-        }
-        Insert: {
-          couple_id: string
-          id?: string
-          league_id: string
-          manager_id: string
-          predicted_position: number
-          submitted_at?: string
-        }
-        Update: {
-          couple_id?: string
-          id?: string
-          league_id?: string
-          manager_id?: string
-          predicted_position?: number
-          submitted_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "grand_finale_predictions_couple_id_fkey"
-            columns: ["couple_id"]
-            isOneToOne: false
-            referencedRelation: "couples"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "grand_finale_predictions_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "grand_finale_predictions_manager_id_fkey"
-            columns: ["manager_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       grand_finale_late_unlocks: {
         Row: {
           ineligible_couple_ids: string[]
@@ -1052,6 +1003,55 @@ export type Database = {
           {
             foreignKeyName: "grand_finale_late_unlocks_unlocked_by_fkey"
             columns: ["unlocked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grand_finale_predictions: {
+        Row: {
+          couple_id: string
+          id: string
+          league_id: string
+          manager_id: string
+          predicted_position: number
+          submitted_at: string
+        }
+        Insert: {
+          couple_id: string
+          id?: string
+          league_id: string
+          manager_id: string
+          predicted_position: number
+          submitted_at?: string
+        }
+        Update: {
+          couple_id?: string
+          id?: string
+          league_id?: string
+          manager_id?: string
+          predicted_position?: number
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grand_finale_predictions_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_finale_predictions_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grand_finale_predictions_manager_id_fkey"
+            columns: ["manager_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1165,6 +1165,7 @@ export type Database = {
           invite_code: string
           name: string
           pick_time_limit_seconds: number
+          prediction_lock_coast: string
           prediction_lock_hours_before_air: number
           roster_size: number
           waiver_claim_method: string | null
@@ -1182,6 +1183,7 @@ export type Database = {
           invite_code: string
           name: string
           pick_time_limit_seconds?: number
+          prediction_lock_coast?: string
           prediction_lock_hours_before_air?: number
           roster_size?: number
           waiver_claim_method?: string | null
@@ -1199,6 +1201,7 @@ export type Database = {
           invite_code?: string
           name?: string
           pick_time_limit_seconds?: number
+          prediction_lock_coast?: string
           prediction_lock_hours_before_air?: number
           roster_size?: number
           waiver_claim_method?: string | null
@@ -1757,6 +1760,7 @@ export type Database = {
           invite_code: string
           name: string
           pick_time_limit_seconds: number
+          prediction_lock_coast: string
           prediction_lock_hours_before_air: number
           roster_size: number
           waiver_claim_method: string | null
@@ -1833,6 +1837,7 @@ export type Database = {
           invite_code: string
           name: string
           pick_time_limit_seconds: number
+          prediction_lock_coast: string
           prediction_lock_hours_before_air: number
           roster_size: number
           waiver_claim_method: string | null
@@ -1859,6 +1864,7 @@ export type Database = {
           invite_code: string
           name: string
           pick_time_limit_seconds: number
+          prediction_lock_coast: string
           prediction_lock_hours_before_air: number
           roster_size: number
           waiver_claim_method: string | null
@@ -1913,10 +1919,6 @@ export type Database = {
         }
       }
       mark_episodes_watched_through: {
-        Args: { p_week_number: number }
-        Returns: undefined
-      }
-      unlock_draft_scores_through: {
         Args: { p_week_number: number }
         Returns: undefined
       }
@@ -2000,6 +2002,7 @@ export type Database = {
           invite_code: string
           name: string
           pick_time_limit_seconds: number
+          prediction_lock_coast: string
           prediction_lock_hours_before_air: number
           roster_size: number
           waiver_claim_method: string | null
@@ -2052,6 +2055,7 @@ export type Database = {
           invite_code: string
           name: string
           pick_time_limit_seconds: number
+          prediction_lock_coast: string
           prediction_lock_hours_before_air: number
           roster_size: number
           waiver_claim_method: string | null
@@ -2132,12 +2136,30 @@ export type Database = {
         }
       }
       undo_last_pick: { Args: { p_league_id: string }; Returns: undefined }
+      unlock_draft_scores_through: {
+        Args: { p_week_number: number }
+        Returns: undefined
+      }
+      unlock_grand_finale_late: {
+        Args: {
+          p_acknowledge_resolved: boolean
+          p_late_factor: number
+          p_league_id: string
+          p_manager_id: string
+        }
+        Returns: undefined
+      }
+      unmark_episodes_watched_from: {
+        Args: { p_week_number: number }
+        Returns: undefined
+      }
       update_league_settings: {
         Args: {
           p_draft_scheduled_at: string
           p_draft_type: string
           p_league_id: string
           p_pick_time_limit_seconds: number
+          p_prediction_lock_coast: string
           p_prediction_lock_hours_before_air: number
           p_waiver_claim_method: string
           p_waiver_mode: string
@@ -2154,6 +2176,7 @@ export type Database = {
           invite_code: string
           name: string
           pick_time_limit_seconds: number
+          prediction_lock_coast: string
           prediction_lock_hours_before_air: number
           roster_size: number
           waiver_claim_method: string | null
@@ -2165,31 +2188,6 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
-      }
-      unlock_grand_finale_late: {
-        Args: {
-          p_acknowledge_resolved: boolean
-          p_late_factor: number
-          p_league_id: string
-          p_manager_id: string
-        }
-        Returns: undefined
-      }
-      unmark_episodes_watched_from: {
-        Args: { p_week_number: number }
-        Returns: undefined
-      }
-      visible_draft_dance_scores: {
-        Args: never
-        Returns: {
-          couple_id: string
-          created_at: string
-          dance_style_name: string
-          episode_id: string
-          total_score: number
-          week_id: string
-          week_number: number
-        }[]
       }
       update_scoring_categories: {
         Args: {
@@ -2251,6 +2249,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      visible_draft_dance_scores: {
+        Args: never
+        Returns: {
+          couple_id: string
+          created_at: string
+          dance_style_name: string
+          episode_id: string
+          total_score: number
+          week_id: string
+          week_number: number
+        }[]
       }
     }
     Enums: {

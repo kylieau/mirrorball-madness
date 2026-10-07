@@ -1,7 +1,9 @@
 export type EpisodeBannerState =
   | { kind: "picks_open"; weekNumber: number; airsAtIso: string; picksModuleOn: boolean }
   | { kind: "picks_locked"; weekNumber: number; airsAtIso: string }
-  | { kind: "on_air"; weekNumber: number; picksModuleOn: boolean }
+  // picksOpen: a league that locks after the curtain (West Coast, or a lock
+  // set past air time) still takes picks while the East broadcast is on.
+  | { kind: "on_air"; weekNumber: number; picksModuleOn: boolean; picksOpen: boolean }
   | { kind: "results_soon"; weekNumber: number }
   | { kind: "results_in"; weekNumber: number }
   | { kind: "west_soon"; weekNumber: number; westStartIso: string }
@@ -22,7 +24,8 @@ export type BannerWeek = { weekNumber: number; episodes: BannerEpisode[] };
 export type EpisodeBannerInput = {
   weeks: BannerWeek[];
   picksModuleOn: boolean;
-  // Earliest Curtain Call lock across the viewer's leagues; null when none is on.
+  // Latest Curtain Call lock across the viewer's leagues, so "Picks Locked"
+  // only shows once none of them is still taking picks; null when none is on.
   curtainCallLockAtIso: string | null;
 };
 
@@ -30,7 +33,7 @@ const HOUR_MS = 60 * 60 * 1000;
 const RESULTS_IN_LEAD_MS = 48 * HOUR_MS;
 const RESULTS_IN_HOLD_MS = 48 * HOUR_MS;
 const FINAL_RESULTS_HOLD_MS = 7 * 24 * HOUR_MS;
-const WEST_FEED_START_HOUR = 20;
+export const WEST_FEED_START_HOUR = 20;
 const WEST_FEED_END_HOUR = 22;
 // Wide enough that the lock, air, West-feed and 10pm transitions on an episode
 // night all land inside it.
@@ -55,7 +58,7 @@ function pacificParts(date: Date) {
 }
 
 // The instant it is `hour`:00 Pacific on the same Pacific calendar day as `reference`.
-function pacificClockOnSameDay(reference: Date, hour: number): Date {
+export function pacificClockOnSameDay(reference: Date, hour: number): Date {
   const { year, month, day } = pacificParts(reference);
   for (const utcOffsetHours of [7, 8]) {
     const candidate = new Date(Date.UTC(year, month - 1, day, hour + utcOffsetHours));
@@ -215,9 +218,16 @@ export function computeEpisodeBannerState(
 
   const end = new Date(airs.getTime() + driver.durationMinutes * 60 * 1000);
   if (now >= end) return { kind: "results_soon", weekNumber: live.weekNumber };
-  if (now >= airs) return { kind: "on_air", weekNumber: live.weekNumber, picksModuleOn: input.picksModuleOn };
-
   const lockAt = input.picksModuleOn && input.curtainCallLockAtIso ? new Date(input.curtainCallLockAtIso) : null;
+  if (now >= airs) {
+    return {
+      kind: "on_air",
+      weekNumber: live.weekNumber,
+      picksModuleOn: input.picksModuleOn,
+      picksOpen: !!lockAt && now < lockAt,
+    };
+  }
+
   if (lockAt && now >= lockAt) {
     return { kind: "picks_locked", weekNumber: live.weekNumber, airsAtIso: driver.airsAt };
   }
