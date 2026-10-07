@@ -104,7 +104,16 @@ async function up() {
     .eq("season_id", season.id)
     .eq("status", "active")
     .limit(3);
-  if (nextWeek && couples.length >= 3) {
+  // Between air and publish the next unpublished week is already locked; the
+  // league is still useful without the pick, so skip it rather than fail.
+  const lockAt = nextWeek
+    ? await rpc(viewer, "prediction_lock_at", { p_league_id: league.id, p_week_id: nextWeek.id })
+    : null;
+  const pickOpen = lockAt !== null && new Date(lockAt) > new Date();
+  if (nextWeek && !pickOpen) {
+    console.log(`Week ${nextWeek.week_number} is locked; skipping the Curtain Call pick.`);
+  }
+  if (nextWeek && pickOpen && couples.length >= 3) {
     await rpc(viewer, "submit_prediction", {
       p_league_id: league.id,
       p_week_id: nextWeek.id,
