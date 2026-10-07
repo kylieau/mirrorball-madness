@@ -27,7 +27,7 @@ All committed and pushed; see above. **Not ours, leave unstaged:** `ios/App/App.
 
 ## 4. Backlog & Next Steps
 - **User action pending:** publish Week 4 (scores Bryan's pick); flip any West Coast leagues' Air Time in League Settings.
-- **Ask the user, don't act:** a live league named "Carrie Ann's Unbelievably Long Ballroom Dynasty Supercalifragilisticexpialidocious" (`cfa75bd2…`) exists that no current `.qa-state.json` tracks — likely stranded by an earlier failed seed run (before the `0014a31` fix). Confirm it's a scratch league before deleting it and its throwaway `qa-*@mirrorball-test.local` users.
+- Stranded scratch league from an Oct 5 seed run (`cfa75bd2…`, "Carrie Ann's Unbelievably Long…") and its 4 `qa-*@mirrorball-test.local` users: deleted 2026-10-07 with the user's OK. Live leagues are now only the user's five real ones.
 - Deferred work otherwise in `BACKLOG.md` "Up next".
 
 Next command: none pending.
