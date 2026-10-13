@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { recomputeWeekForReveal } from "@/lib/results";
 import { couplesRevealState } from "@/lib/reveal-state";
+import { scaledJudgesScore } from "@/lib/scoring";
 
 async function episodeIsUnpublished(admin: SupabaseClient<Database>, episodeId: string): Promise<string | null> {
   const { data: episode, error } = await admin
@@ -102,6 +103,7 @@ export async function revealCouple(
         dance_style_id: dance.dance_style_id,
         song_title: dance.song_title,
         total_score: judgeScores.reduce((sum, js) => sum + Number(js.score), 0),
+        scaled_score: scaledJudgesScore(judgeScores.map((js) => Number(js.score))),
       })
       .select()
       .single();

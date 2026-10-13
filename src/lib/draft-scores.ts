@@ -1,5 +1,5 @@
 import { buildCoupleDisplayNames, formatCoupleName } from "./couple-display";
-import { computeWeeklyScores } from "./scoring";
+import { computeWeeklyScores, type DanceScore } from "./scoring";
 
 // A night with at least one couple's drafted dance released (per couple, via
 // draft_couple_releases -- someone with propose access, a commissioner or a
@@ -155,7 +155,7 @@ export function draftWeekManagerScores(input: {
   judgesScoreMultiplier: number;
   judgesCategoryWeight: number;
   rosterSlots: { managerId: string; coupleId: string }[];
-  danceScores: { coupleId: string; totalScore: number }[];
+  danceScores: DanceScore[];
 }): DraftManagerScore[] {
   if (input.weekNumber < input.anchorWeek || input.danceScores.length === 0 || input.rosterSlots.length === 0) {
     return [];
@@ -222,9 +222,9 @@ export function scoresReplacingDraftWeek(
 // couples (per-couple, not the whole night), so any other couple's entry for
 // this week -- e.g. one independently live-revealed via per-couple Publish --
 // must stay, not get wiped by a lone released couple's draft dance.
-export function replaceWeekDanceScores<T extends { weekNumber: number; danceScores: { coupleId: string; totalScore: number }[] }>(
+export function replaceWeekDanceScores<T extends { weekNumber: number; danceScores: DanceScore[] }>(
   weeks: T[],
-  draft: { weekNumber: number; danceScores: { coupleId: string; totalScore: number }[] } | null
+  draft: { weekNumber: number; danceScores: DanceScore[] } | null
 ): T[] {
   if (!draft) return weeks;
   const draftCoupleIds = new Set(draft.danceScores.map((d) => d.coupleId));

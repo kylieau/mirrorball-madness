@@ -117,7 +117,7 @@ export async function loadScoreHistory(
       .eq("league_id", leagueId)
       .eq("manager_id", managerId)
       .maybeSingle(),
-    supabase.from("dance_scores").select("episode_id, couple_id, total_score").in("episode_id", episodeIds),
+    supabase.from("dance_scores").select("episode_id, couple_id, total_score, scaled_score").in("episode_id", episodeIds),
     supabase.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
     supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id").in("episode_id", episodeIds),
   ]);
@@ -136,6 +136,7 @@ export async function loadScoreHistory(
       episode_id: dance.episodeId,
       couple_id: dance.coupleId,
       total_score: dance.total,
+      scaled_score: dance.scaled,
     })) ?? []),
   ];
   const weeks: HistoryWeekData[] = allowedWeeks.map((week) => {

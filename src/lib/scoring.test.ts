@@ -14,6 +14,7 @@ import {
   curtainCallPayout,
   curtainCallPreviewCopy,
   resolveCurtainCallGuess,
+  scaledJudgesScore,
   sumDanceScoresByCouple,
   type ScoringSettings,
 } from "./scoring";
@@ -46,8 +47,8 @@ describe("computeWeeklyScores", () => {
         { managerId: "bob", coupleId: "couple-2" },
       ],
       danceScores: [
-        { coupleId: "couple-1", totalScore: 24 },
-        { coupleId: "couple-2", totalScore: 18 },
+        { coupleId: "couple-1", totalScore: 24, scaledScore: 24 },
+        { coupleId: "couple-2", totalScore: 18, scaledScore: 18 },
       ],
       episodeOutcomes: [
         { coupleId: "couple-1", outcome: "safe", bonusPoints: 0, finalPlacement: null },
@@ -70,8 +71,8 @@ describe("computeWeeklyScores", () => {
       scoringSettings: settings,
       rosterSlots: [{ managerId: "alice", coupleId: "couple-1" }],
       danceScores: [
-        { coupleId: "couple-1", totalScore: 24 },
-        { coupleId: "couple-1", totalScore: 27 },
+        { coupleId: "couple-1", totalScore: 24, scaledScore: 24 },
+        { coupleId: "couple-1", totalScore: 27, scaledScore: 27 },
       ],
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 0, finalPlacement: null }],
       predictions: [],
@@ -86,7 +87,7 @@ describe("computeWeeklyScores", () => {
     const result = computeWeeklyScores({
       scoringSettings: settings,
       rosterSlots: [{ managerId: "alice", coupleId: "couple-1" }],
-      danceScores: [{ coupleId: "couple-1", totalScore: 20 }],
+      danceScores: [{ coupleId: "couple-1", totalScore: 20, scaledScore: 20 }],
       // saved_by_judges is a historical flag the DB stores, but the scoring
       // function only looks at the final `outcome` — this couple was saved
       // by judges, so outcome is "safe".
@@ -114,9 +115,9 @@ describe("computeWeeklyScores", () => {
         { managerId: "carol", coupleId: "third-couple" },
       ],
       danceScores: [
-        { coupleId: "winner-couple", totalScore: 30 },
-        { coupleId: "runner-up-couple", totalScore: 29 },
-        { coupleId: "third-couple", totalScore: 28 },
+        { coupleId: "winner-couple", totalScore: 30, scaledScore: 30 },
+        { coupleId: "runner-up-couple", totalScore: 29, scaledScore: 29 },
+        { coupleId: "third-couple", totalScore: 28, scaledScore: 28 },
       ],
       episodeOutcomes: [
         { coupleId: "winner-couple", outcome: "winner", bonusPoints: 0, finalPlacement: 1 },
@@ -170,7 +171,7 @@ describe("computeWeeklyScores", () => {
     const result = computeWeeklyScores({
       scoringSettings: settings,
       rosterSlots: [{ managerId: "alice", coupleId: "couple-1" }],
-      danceScores: [{ coupleId: "couple-1", totalScore: 30 }],
+      danceScores: [{ coupleId: "couple-1", totalScore: 30, scaledScore: 30 }],
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "winner", bonusPoints: 0, finalPlacement: null }],
       predictions: [],
       isDoubleElimination: false,
@@ -185,7 +186,7 @@ describe("computeWeeklyScores", () => {
     const result = computeWeeklyScores({
       scoringSettings: settings,
       rosterSlots: [{ managerId: "alice", coupleId: "couple-1" }],
-      danceScores: [{ coupleId: "couple-1", totalScore: 10 }],
+      danceScores: [{ coupleId: "couple-1", totalScore: 10, scaledScore: 10 }],
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "eliminated", bonusPoints: 0, finalPlacement: 6 }],
       predictions: [],
       isDoubleElimination: false,
@@ -234,7 +235,7 @@ describe("computeWeeklyScores", () => {
     const result = computeWeeklyScores({
       scoringSettings: settings,
       rosterSlots: [{ managerId: "alice", coupleId: "couple-1" }],
-      danceScores: [{ coupleId: "couple-1", totalScore: 20 }],
+      danceScores: [{ coupleId: "couple-1", totalScore: 20, scaledScore: 20 }],
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 3, finalPlacement: null }],
       predictions: [],
       isDoubleElimination: false,
@@ -249,8 +250,8 @@ describe("computeWeeklyScores", () => {
       scoringSettings: settings,
       rosterSlots: [],
       danceScores: [
-        { coupleId: "couple-1", totalScore: 24 },
-        { coupleId: "couple-2", totalScore: 27 },
+        { coupleId: "couple-1", totalScore: 24, scaledScore: 24 },
+        { coupleId: "couple-2", totalScore: 27, scaledScore: 27 },
       ],
       episodeOutcomes: [
         { coupleId: "couple-1", outcome: "safe", bonusPoints: 0, finalPlacement: null },
@@ -275,7 +276,7 @@ describe("computeWeeklyScores", () => {
     const result = computeWeeklyScores({
       scoringSettings: settings,
       rosterSlots: [{ managerId: "alice", coupleId: "couple-1" }],
-      danceScores: [{ coupleId: "couple-1", totalScore: 20 }],
+      danceScores: [{ coupleId: "couple-1", totalScore: 20, scaledScore: 20 }],
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 0, finalPlacement: null }],
       predictions: [
         { managerId: "alice", predictedEliminatedCoupleId: null, predictedEliminatedCoupleId2: null, predictedTopScorerCoupleId: "couple-1" },
@@ -297,7 +298,7 @@ describe("computeWeeklyScores", () => {
     const result = computeWeeklyScores({
       scoringSettings: settings,
       rosterSlots: [{ managerId: "alice", coupleId: "couple-1" }],
-      danceScores: [{ coupleId: "couple-1", totalScore: 20 }],
+      danceScores: [{ coupleId: "couple-1", totalScore: 20, scaledScore: 20 }],
       episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 0, finalPlacement: null }],
       predictions: [],
       isDoubleElimination: false,
@@ -306,6 +307,50 @@ describe("computeWeeklyScores", () => {
 
     expect(result[0].totalPoints).toBe(30);
     expect(result[0].grandFinalePoints).toBe(0);
+  });
+});
+
+describe("scaledJudgesScore", () => {
+  it("leaves a standing three-judge panel's total alone", () => {
+    expect(scaledJudgesScore([8, 9, 9])).toBe(26);
+  });
+
+  it("puts a four-judge guest night on the 30-point basis", () => {
+    expect(scaledJudgesScore([10, 9, 9, 9])).toBe(27.75);
+  });
+
+  it("scales a night a judge missed up, not down", () => {
+    expect(scaledJudgesScore([9, 9])).toBe(27);
+  });
+
+  it("is 0 before any judge has scored", () => {
+    expect(scaledJudgesScore([])).toBe(0);
+  });
+});
+
+describe("computeWeeklyScores — guest-judge night", () => {
+  it("pays roster points on the scaled score but picks the top scorer on the TV total", () => {
+    const [alice] = computeWeeklyScores({
+      scoringSettings: settings,
+      rosterSlots: [{ managerId: "alice", coupleId: "couple-1" }],
+      danceScores: [
+        { coupleId: "couple-1", totalScore: 38, scaledScore: 28.5 },
+        { coupleId: "couple-2", totalScore: 37, scaledScore: 27.75 },
+      ],
+      episodeOutcomes: [{ coupleId: "couple-1", outcome: "safe", bonusPoints: 0, finalPlacement: null }],
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: null,
+          predictedEliminatedCoupleId2: null,
+          predictedTopScorerCoupleId: "couple-1",
+        },
+      ],
+      isDoubleElimination: false,
+      ...noScaling,
+    });
+    expect(alice.rosterPoints).toBe(28.5 + settings.survivalPoints);
+    expect(alice.predictionPoints).toBe(settings.topScorerPredictionPoints);
   });
 });
 
@@ -330,8 +375,8 @@ describe("computeWeeklyScores — couples-remaining scaling", () => {
       scoringSettings: settings,
       rosterSlots: [],
       danceScores: [
-        { coupleId: "couple-1", totalScore: 24 },
-        { coupleId: "couple-2", totalScore: 27 },
+        { coupleId: "couple-1", totalScore: 24, scaledScore: 24 },
+        { coupleId: "couple-2", totalScore: 27, scaledScore: 27 },
       ],
       episodeOutcomes: [
         { coupleId: "couple-1", outcome: "eliminated", bonusPoints: 0, finalPlacement: null },
@@ -605,9 +650,9 @@ describe("Curtain Call In Jeopardy", () => {
       scoringSettings: settings,
       rosterSlots: [],
       danceScores: [
-        { coupleId: "high", totalScore: 30 },
-        { coupleId: "within", totalScore: 29 },
-        { coupleId: "third", totalScore: 28 },
+        { coupleId: "high", totalScore: 30, scaledScore: 30 },
+        { coupleId: "within", totalScore: 29, scaledScore: 29 },
+        { coupleId: "third", totalScore: 28, scaledScore: 28 },
       ],
       episodeOutcomes: [safe("high"), safe("within"), safe("third")],
       predictions: [
@@ -671,8 +716,8 @@ describe("Curtain Call In Jeopardy", () => {
       scoringSettings: { ...settings, curtainCallNearMissEnabled: false },
       rosterSlots: [],
       danceScores: [
-        { coupleId: "high", totalScore: 30 },
-        { coupleId: "within", totalScore: 29 },
+        { coupleId: "high", totalScore: 30, scaledScore: 30 },
+        { coupleId: "within", totalScore: 29, scaledScore: 29 },
       ],
       episodeOutcomes: [eliminated("gone"), safe("called-down"), safe("high"), safe("within")],
       predictions: [

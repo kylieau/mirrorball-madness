@@ -56,7 +56,11 @@ export async function loadHomeLeagueData(
     ? {
         weekId: draftContext.night.weekId,
         weekNumber: draftContext.night.weekNumber,
-        dances: draftContext.night.dances.map((dance) => ({ coupleId: dance.coupleId, totalScore: dance.total })),
+        dances: draftContext.night.dances.map((dance) => ({
+          coupleId: dance.coupleId,
+          totalScore: dance.total,
+          scaledScore: dance.scaled,
+        })),
       }
     : null;
 

@@ -38,6 +38,8 @@ export default async function SchedulePage() {
         participantsByEpisode={data.participantsByEpisode}
         roundTypes={data.roundTypes}
         roundTypesByEpisode={data.roundTypesByEpisode}
+        judges={data.judges}
+        guestJudgesByEpisode={data.guestJudgesByEpisode}
       />
     </div>
   );

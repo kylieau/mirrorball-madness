@@ -28,7 +28,7 @@ import {
   selectableCast,
 } from "@/lib/episode-cast";
 import { exhibitionEpisodes, groupEpisodesByWeek } from "@/lib/competition-week";
-import { ChevronRightIcon, PlusIcon } from "lucide-react";
+import { ChevronRightIcon, PlusIcon, XIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { DEFAULT_EPISODE_DURATION_MINUTES } from "@/lib/episode-banner";
 
@@ -45,6 +45,7 @@ type Episode = {
   status: string;
 };
 type RoundType = { id: string; name: string };
+type Judge = { id: string; name: string; archivedAt: string | null };
 type CompetitionWeek = {
   id: string;
   week_number: number;
@@ -187,6 +188,8 @@ export function ScheduleManager({
   participantsByEpisode,
   roundTypes,
   roundTypesByEpisode,
+  judges,
+  guestJudgesByEpisode,
 }: {
   // The schedule is readable by anyone signed in, but scheduling episodes is
   // season-wide structural config — admin only.
@@ -200,6 +203,8 @@ export function ScheduleManager({
   participantsByEpisode: Record<string, string[]>;
   roundTypes: RoundType[];
   roundTypesByEpisode: Record<string, string[]>;
+  judges: Judge[];
+  guestJudgesByEpisode: Record<string, string[]>;
 }) {
   const sortedEpisodes = [...episodes].sort(
     (a, b) => a.episode_number - b.episode_number || a.airs_at.localeCompare(b.airs_at)
@@ -208,6 +213,12 @@ export function ScheduleManager({
   const exhibition = exhibitionEpisodes(episodes);
   const weekById = new Map(weeks.map((week) => [week.id, week]));
   const browserTimeZone = useBrowserTimeZone();
+  const judgeNameById = new Map(judges.map((j) => [j.id, j.name]));
+  const guestNamesFor = (episodeId: string) =>
+    (guestJudgesByEpisode[episodeId] ?? []).flatMap((id) => judgeNameById.get(id) ?? []);
+  // Earlier guests are off the standing panel (archived), so suggesting them
+  // never offers someone who already scores every night.
+  const pastGuestNames = judges.filter((j) => j.archivedAt != null).map((j) => j.name);
 
   const nextEpisodeNumber =
     sortedEpisodes.length > 0 ? Math.max(...sortedEpisodes.map((e) => e.episode_number)) + 1 : 1;
@@ -229,6 +240,8 @@ export function ScheduleManager({
   const [judgesSaveAvailable, setJudgesSaveAvailable] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(DEFAULT_EPISODE_DURATION_MINUTES);
   const [roundTypeIds, setRoundTypeIds] = useState<Set<string>>(new Set());
+  const [guestJudgeNames, setGuestJudgeNames] = useState<string[]>([]);
+  const [newGuestName, setNewGuestName] = useState("");
 
   const parsedWeekNumber = competitionWeek.trim() === "" ? null : Number(competitionWeek);
   const assignedWeek =
@@ -303,6 +316,8 @@ export function ScheduleManager({
     setDurationMinutes(e.duration_minutes);
     const assignedNames = new Set(roundTypesByEpisode[e.id] ?? []);
     setRoundTypeIds(new Set(roundTypes.filter((rt) => assignedNames.has(rt.name)).map((rt) => rt.id)));
+    setGuestJudgeNames(guestNamesFor(e.id));
+    setNewGuestName("");
     setSheetOpen(true);
   }
 
@@ -324,6 +339,15 @@ export function ScheduleManager({
     setJudgesSaveAvailable(false);
     setDurationMinutes(DEFAULT_EPISODE_DURATION_MINUTES);
     setRoundTypeIds(new Set());
+    setGuestJudgeNames([]);
+    setNewGuestName("");
+  }
+
+  function addGuestJudge() {
+    const name = newGuestName.trim();
+    if (!name) return;
+    setGuestJudgeNames((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    setNewGuestName("");
   }
 
   function toggleParticipant(coupleId: string) {
@@ -388,6 +412,7 @@ export function ScheduleManager({
       isDoubleEliminationWeek: parsedWeekNumber != null ? isDoubleEliminationWeek : false,
       participantCoupleIds: participantIdsToPersist(participantCoupleIds, selectableIds),
       roundTypeIds: [...roundTypeIds],
+      guestJudgeNames: newGuestName.trim() ? [...guestJudgeNames, newGuestName.trim()] : guestJudgeNames,
       expectedDanceCount,
       judgesSaveAvailable,
       durationMinutes,
@@ -417,6 +442,7 @@ export function ScheduleManager({
   function EpisodeRow({ episodeId }: { episodeId: string }) {
     const e = episodes.find((episode) => episode.id === episodeId);
     if (!e) return null;
+    const guestNames = guestNamesFor(e.id);
     // Matches AllResultsView: a published episode always reads as Published
     // here too, regardless of a correction draft quietly in progress in
     // Enter Results -- Schedule isn't the draft-workflow page, and showing
@@ -453,11 +479,16 @@ export function ScheduleManager({
             })}
             {count > 0 && ` · ${count} couple${count === 1 ? "" : "s"} scored`}
           </p>
-          {(roundTypesByEpisode[e.id] ?? []).length > 0 && (
+          {((roundTypesByEpisode[e.id] ?? []).length > 0 || guestNames.length > 0) && (
             <div className="flex flex-wrap gap-1">
-              {roundTypesByEpisode[e.id].map((name) => (
+              {(roundTypesByEpisode[e.id] ?? []).map((name) => (
                 <Badge key={name} variant="secondary">
                   {name}
+                </Badge>
+              ))}
+              {guestNames.map((name) => (
+                <Badge key={name} variant="outline">
+                  Guest Judge · {name}
                 </Badge>
               ))}
             </div>
@@ -596,6 +627,52 @@ export function ScheduleManager({
                 </p>
               </div>
               <Switch id="judgesSaveAvailable" checked={judgesSaveAvailable} onCheckedChange={setJudgesSaveAvailable} />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="guestJudgeName">Guest Judges</Label>
+              <p className="text-xs text-muted-foreground">
+                Adds a score box for this night only, next to the standing panel from Show Settings.
+              </p>
+              {guestJudgeNames.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {guestJudgeNames.map((name) => (
+                    <Badge key={name} variant="secondary" className="gap-1">
+                      {name}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${name}`}
+                        onClick={() => setGuestJudgeNames((prev) => prev.filter((n) => n !== name))}
+                      >
+                        <XIcon className="size-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  id="guestJudgeName"
+                  list="pastGuestJudges"
+                  placeholder="Judge Name"
+                  value={newGuestName}
+                  onChange={(e) => setNewGuestName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addGuestJudge();
+                    }
+                  }}
+                />
+                <datalist id="pastGuestJudges">
+                  {pastGuestNames.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+                <Button type="button" variant="outline" onClick={addGuestJudge} disabled={!newGuestName.trim()}>
+                  <PlusIcon className="size-4" />
+                  Add
+                </Button>
+              </div>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="durationMinutes">Duration (Minutes)</Label>

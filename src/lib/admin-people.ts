@@ -104,3 +104,34 @@ export async function renameScoringJudge(
   if (error?.code === "23505") return { error: "A judge with that name already exists" };
   return { error: error?.message ?? null };
 }
+
+// A guest typed on Schedule reuses any judge row with that name (standing or
+// archived); a new name is created archived so it never joins the standing
+// panel's score boxes on other nights.
+export async function resolveGuestJudgeIds(
+  admin: SupabaseClient<Database>,
+  names: string[]
+): Promise<{ ids: string[]; error: string | null }> {
+  const trimmed = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+  if (trimmed.length === 0) return { ids: [], error: null };
+
+  const { data: existing, error: lookupError } = await admin
+    .from("people")
+    .select("id, name")
+    .eq("role", "judge")
+    .in("name", trimmed);
+  if (lookupError) return { ids: [], error: lookupError.message };
+
+  const idByName = new Map((existing ?? []).map((p) => [p.name, p.id]));
+  const missing = trimmed.filter((name) => !idByName.has(name));
+  if (missing.length > 0) {
+    const { data: created, error: insertError } = await admin
+      .from("people")
+      .insert(missing.map((name) => ({ name, role: "judge", archived_at: new Date().toISOString() })))
+      .select("id, name");
+    if (insertError) return { ids: [], error: insertError.message };
+    for (const p of created ?? []) idByName.set(p.name, p.id);
+  }
+
+  return { ids: trimmed.map((name) => idByName.get(name)!), error: null };
+}

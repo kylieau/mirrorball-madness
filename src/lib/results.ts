@@ -7,6 +7,7 @@ import {
   couplesRemainingAtWeek,
   inJeopardyIdsToPersist,
   RESOLVING_OUTCOMES,
+  scaledJudgesScore,
   type GrandFinaleMethod,
   type Outcome,
   type TierPayStyle,
@@ -14,6 +15,7 @@ import {
 import { eligibleGrandFinalePredictions, scaleGrandFinaleLateFactors } from "@/lib/grand-finale-late";
 import { participantIdsToPersist, selectableCast } from "@/lib/episode-cast";
 import { sortJudgesForDisplay } from "@/lib/couple-display";
+import { resolveGuestJudgeIds } from "@/lib/admin-people";
 import type { ScoringJudge } from "@/lib/scoring-judges";
 
 export type JudgeScoreSubmission = { judgeId: string; score: number };
@@ -168,6 +170,8 @@ export type ScheduleEpisodeInput = {
   // two-night premiere where half the cast dances each night).
   participantCoupleIds: string[];
   roundTypeIds: string[];
+  // Names, not ids, so Schedule can add a first-time guest in the same save.
+  guestJudgeNames: string[];
   expectedDanceCount: number;
   judgesSaveAvailable: boolean;
   durationMinutes: number;
@@ -291,6 +295,16 @@ export async function applyEpisodeSchedule(
     if (roundTypesErr) return { error: roundTypesErr.message };
   }
 
+  const { ids: guestJudgeIds, error: guestsErr } = await resolveGuestJudgeIds(admin, input.guestJudgeNames);
+  if (guestsErr) return { error: guestsErr };
+  await admin.from("episode_guest_judges").delete().eq("episode_id", episode.id);
+  if (guestJudgeIds.length > 0) {
+    const { error: guestInsertErr } = await admin.from("episode_guest_judges").insert(
+      guestJudgeIds.map((judgeId) => ({ episode_id: episode.id, judge_id: judgeId }))
+    );
+    if (guestInsertErr) return { error: guestInsertErr.message };
+  }
+
   return { error: null };
 }
 
@@ -371,7 +385,7 @@ export async function recomputeWeekScores(
   { reveal = false }: { reveal?: boolean } = {}
 ): Promise<string | null> {
   const [{ data: allDances, error: dancesErr }, { data: allOutcomes, error: outcomesErr }] = await Promise.all([
-    admin.from("dance_scores").select("couple_id, total_score").in("episode_id", episodeIds),
+    admin.from("dance_scores").select("couple_id, total_score, scaled_score").in("episode_id", episodeIds),
     admin.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
   ]);
   if (dancesErr) return dancesErr.message;
@@ -380,6 +394,7 @@ export async function recomputeWeekScores(
   const danceScoreInputs = (allDances ?? []).map((row) => ({
     coupleId: row.couple_id,
     totalScore: Number(row.total_score),
+    scaledScore: Number(row.scaled_score),
   }));
   const otherOutcomes = (allOutcomes ?? []).filter((row) => row.episode_id !== thisEpisodeId);
   const rawOutcomeRows = [
@@ -690,6 +705,7 @@ export async function applyEpisodeResults(
           dance_style_id: dance.danceStyleId,
           song_title: dance.songTitle,
           total_score: totalScore,
+          scaled_score: scaledJudgesScore(dance.judgeScores.map((js) => js.score)),
         })
         .select()
         .single();

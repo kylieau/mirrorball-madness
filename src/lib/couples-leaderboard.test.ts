@@ -26,10 +26,10 @@ const weeks = [
   {
     weekNumber: 1,
     danceScores: [
-      { coupleId: "A", totalScore: 20 },
-      { coupleId: "B", totalScore: 18 },
-      { coupleId: "C", totalScore: 16 },
-      { coupleId: "D", totalScore: 10 },
+      { coupleId: "A", totalScore: 20, scaledScore: 20 },
+      { coupleId: "B", totalScore: 18, scaledScore: 18 },
+      { coupleId: "C", totalScore: 16, scaledScore: 16 },
+      { coupleId: "D", totalScore: 10, scaledScore: 10 },
     ],
     outcomes: [
       { coupleId: "A", outcome: "safe" as const, bonusPoints: 0 },
@@ -41,9 +41,9 @@ const weeks = [
   {
     weekNumber: 2,
     danceScores: [
-      { coupleId: "A", totalScore: 28 },
-      { coupleId: "B", totalScore: 26 },
-      { coupleId: "C", totalScore: 14 },
+      { coupleId: "A", totalScore: 28, scaledScore: 28 },
+      { coupleId: "B", totalScore: 26, scaledScore: 26 },
+      { coupleId: "C", totalScore: 14, scaledScore: 14 },
     ],
     outcomes: [
       { coupleId: "A", outcome: "winner" as const, bonusPoints: 0 },

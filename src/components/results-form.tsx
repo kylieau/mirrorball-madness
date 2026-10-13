@@ -213,6 +213,7 @@ export function ResultsForm({
   releasedCoupleIdsByEpisode,
   forceSelectEpisodeId,
   participantsByEpisode,
+  guestJudgesByEpisode,
 }: {
   // Commissioners draft results; only is_super_admin publishes them.
   // Server-side requireAdminAccess is the real gate — this just avoids
@@ -233,6 +234,7 @@ export function ResultsForm({
   // to open already pointed at that episode.
   forceSelectEpisodeId?: string | null;
   participantsByEpisode: Record<string, string[]>;
+  guestJudgesByEpisode: Record<string, string[]>;
 }) {
   const weekById = new Map(weeks.map((week) => [week.id, week]));
   const nightsCountByWeek = new Map<string, number>();
@@ -705,7 +707,7 @@ export function ResultsForm({
     const scoredIds = Object.entries(dance.scores)
       .filter(([, v]) => v !== "")
       .map(([id]) => id);
-    return judgesForScoreInputs(judges, scoredIds);
+    return judgesForScoreInputs(judges, scoredIds, guestJudgesByEpisode[selectedEpisodeId] ?? []);
   }
   const episodeItems = Object.fromEntries(
     sortedEpisodes.map((e) => {

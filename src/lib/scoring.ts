@@ -19,7 +19,17 @@ export type ScoringSettings = {
 
 export type RosterSlot = { managerId: string; coupleId: string };
 
-export type DanceScore = { coupleId: string; totalScore: number };
+// totalScore is the raw judges' sum fans see (Curtain Call's top scorer
+// compares it within one night). scaledScore is the judges' average × 3,
+// which Dance Card pays on so a guest-judge night isn't worth a third more.
+export type DanceScore = { coupleId: string; totalScore: number; scaledScore: number };
+
+export const STANDING_PANEL_SIZE = 3;
+
+export function scaledJudgesScore(judgeScores: number[]): number {
+  if (judgeScores.length === 0) return 0;
+  return (judgeScores.reduce((sum, score) => sum + score, 0) * STANDING_PANEL_SIZE) / judgeScores.length;
+}
 
 export type Outcome =
   | "safe"
@@ -96,10 +106,20 @@ export const NO_SURVIVAL_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn",
 // picks pay out.
 export const RESOLVING_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn", "winner", "runner_up", "third_place"]);
 
-export function sumDanceScoresByCouple(danceScores: DanceScore[]): Map<string, number> {
+export type RawDanceScore = Pick<DanceScore, "coupleId" | "totalScore">;
+
+export function sumDanceScoresByCouple(danceScores: RawDanceScore[]): Map<string, number> {
   const totals = new Map<string, number>();
   for (const { coupleId, totalScore } of danceScores) {
     totals.set(coupleId, (totals.get(coupleId) ?? 0) + totalScore);
+  }
+  return totals;
+}
+
+export function sumScaledScoresByCouple(danceScores: Pick<DanceScore, "coupleId" | "scaledScore">[]): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const { coupleId, scaledScore } of danceScores) {
+    totals.set(coupleId, (totals.get(coupleId) ?? 0) + scaledScore);
   }
   return totals;
 }
@@ -116,7 +136,7 @@ function findTopScorerCoupleIdsFromTotals(totals: Map<string, number>): Set<stri
   );
 }
 
-export function findTopScorerCoupleIds(danceScores: DanceScore[]): Set<string> {
+export function findTopScorerCoupleIds(danceScores: RawDanceScore[]): Set<string> {
   return findTopScorerCoupleIdsFromTotals(sumDanceScoresByCouple(danceScores));
 }
 
@@ -277,6 +297,7 @@ export function computeWeeklyScores({
   inJeopardyCoupleIds?: string[];
 }): WeeklyManagerScore[] {
   const coupleTotalScore = sumDanceScoresByCouple(danceScores);
+  const coupleScaledScore = sumScaledScoresByCouple(danceScores);
   const outcomeByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.outcome]));
   const bonusPointsByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.bonusPoints]));
   const finalPlacementByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.finalPlacement]));
@@ -296,7 +317,7 @@ export function computeWeeklyScores({
 
   const rosterPointsByManager = new Map<string, number>();
   for (const { managerId, coupleId } of rosterSlots) {
-    let points = (coupleTotalScore.get(coupleId) ?? 0) * scoringSettings.judgesScoreMultiplier;
+    let points = (coupleScaledScore.get(coupleId) ?? 0) * scoringSettings.judgesScoreMultiplier;
 
     const outcome = outcomeByCouple.get(coupleId);
     if (outcome && !NO_SURVIVAL_OUTCOMES.has(outcome)) {

@@ -29,4 +29,8 @@ describe("judgesForScoreInputs", () => {
   it("does not revive an archived judge just because another dance mentioned them", () => {
     expect(judgesForScoreInputs(panel, ["dh"]).map((j) => j.id)).toEqual(["cai", "dh"]);
   });
+
+  it("adds this episode's guest judge to empty score boxes", () => {
+    expect(judgesForScoreInputs(panel, [], ["ag"]).map((j) => j.id)).toEqual(["cai", "dh", "ag"]);
+  });
 });

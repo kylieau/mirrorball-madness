@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -222,6 +222,7 @@ export type Database = {
           dance_style_id: string
           episode_id: string
           id: string
+          scaled_score: number
           song_title: string | null
           total_score: number
         }
@@ -231,6 +232,7 @@ export type Database = {
           dance_style_id: string
           episode_id: string
           id?: string
+          scaled_score?: number
           song_title?: string | null
           total_score: number
         }
@@ -240,6 +242,7 @@ export type Database = {
           dance_style_id?: string
           episode_id?: string
           id?: string
+          scaled_score?: number
           song_title?: string | null
           total_score?: number
         }
@@ -338,6 +341,7 @@ export type Database = {
           dance_style_id: string
           episode_id: string
           id: string
+          scaled_score: number
           song_title: string | null
           total_score: number
         }
@@ -347,6 +351,7 @@ export type Database = {
           dance_style_id: string
           episode_id: string
           id?: string
+          scaled_score?: number
           song_title?: string | null
           total_score?: number
         }
@@ -356,6 +361,7 @@ export type Database = {
           dance_style_id?: string
           episode_id?: string
           id?: string
+          scaled_score?: number
           song_title?: string | null
           total_score?: number
         }
@@ -730,6 +736,39 @@ export type Database = {
             columns: ["episode_id"]
             isOneToOne: false
             referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      episode_guest_judges: {
+        Row: {
+          created_at: string
+          episode_id: string
+          judge_id: string
+        }
+        Insert: {
+          created_at?: string
+          episode_id: string
+          judge_id: string
+        }
+        Update: {
+          created_at?: string
+          episode_id?: string
+          judge_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_guest_judges_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_guest_judges_judge_id_fkey"
+            columns: ["judge_id"]
+            isOneToOne: false
+            referencedRelation: "people"
             referencedColumns: ["id"]
           },
         ]
@@ -2257,6 +2296,7 @@ export type Database = {
           created_at: string
           dance_style_name: string
           episode_id: string
+          scaled_score: number
           total_score: number
           week_id: string
           week_number: number

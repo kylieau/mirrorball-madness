@@ -6,7 +6,7 @@ import {
   NO_SURVIVAL_OUTCOMES,
   RESOLVING_OUTCOMES,
   eliminationPositionRanges,
-  sumDanceScoresByCouple,
+  sumScaledScoresByCouple,
   type ScoringSettings,
 } from "./scoring";
 
@@ -62,7 +62,7 @@ export function buildCouplesLeaderboard({
 
   for (const week of weeks) {
     if (week.weekNumber < anchorWeek) continue;
-    const totals = sumDanceScoresByCouple(week.danceScores);
+    const totals = sumScaledScoresByCouple(week.danceScores);
     const lastOutcome = new Map(week.outcomes.map((o) => [o.coupleId, o]));
 
     for (const couple of couples) {

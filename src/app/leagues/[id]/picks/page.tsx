@@ -225,22 +225,22 @@ export default async function LeaguePicksPage({
     leagueSlotPeriods.length > 0 && episodeWeekNumber.size > 0
       ? await supabase
           .from("dance_scores")
-          .select("couple_id, episode_id, total_score")
+          .select("couple_id, episode_id, scaled_score")
           .in("episode_id", [...episodeWeekNumber.keys()])
           .in("couple_id", [...new Set(leagueSlotPeriods.map((slot) => slot.coupleId))])
-      : { data: [] as { couple_id: string; episode_id: string; total_score: number }[] };
+      : { data: [] as { couple_id: string; episode_id: string; scaled_score: number }[] };
   const judgePointsInputs = {
     scores: [
       ...excludeReleasedCoupleRows(leagueDanceScores ?? [], draftNight?.releasedCoupleIdsByEpisode ?? {})
         .map((row) => ({
           coupleId: row.couple_id,
           weekNumber: episodeWeekNumber.get(row.episode_id) ?? 0,
-          totalScore: row.total_score,
+          scaledScore: Number(row.scaled_score),
         })),
       ...(draftNight?.dances.map((dance) => ({
         coupleId: dance.coupleId,
         weekNumber: draftNight.weekNumber,
-        totalScore: dance.total,
+        scaledScore: dance.scaled,
       })) ?? []),
     ],
     judgesScoreStartsWeek: scoringSettings?.judges_score_starts_week ?? 1,

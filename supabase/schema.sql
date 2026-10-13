@@ -541,6 +541,9 @@ create table dance_scores (
   dance_style_id uuid not null references dance_styles(id),
   song_title text,
   total_score numeric not null, -- e.g. 24 for 24/30 — sum of judge_scores
+  -- Judges' average × 3: what fantasy judges points use, so a guest-judge
+  -- night (out of 40) pays on the same 30-point basis the defaults assume.
+  scaled_score numeric not null default 0,
   created_at timestamptz not null default now()
 );
 
@@ -2415,6 +2418,7 @@ create table draft_dance_scores (
   dance_style_id uuid not null references dance_styles(id),
   song_title text,
   total_score numeric not null default 0,
+  scaled_score numeric not null default 0,
   created_at timestamptz not null default now()
 );
 
@@ -2569,6 +2573,19 @@ create table episode_round_types (
 
 create index idx_episode_round_types_episode on episode_round_types(episode_id);
 
+-- Guest judges for one airing, set on Schedule (applyEpisodeSchedule). Enter
+-- Results shows score boxes for the standing panel (role = judge, not
+-- archived) plus only that episode's guests. A guest added by name on
+-- Schedule is created archived, so they never join the standing panel.
+create table episode_guest_judges (
+  episode_id uuid not null references episodes(id) on delete cascade,
+  judge_id uuid not null references people(id),
+  created_at timestamptz not null default now(),
+  primary key (episode_id, judge_id)
+);
+
+create index idx_episode_guest_judges_episode on episode_guest_judges(episode_id);
+
 grant select on public.episode_participants to authenticated;
 create policy "episode participants are viewable by all authenticated users"
 on public.episode_participants for select
@@ -2577,6 +2594,11 @@ using (true);
 grant select on public.episode_round_types to authenticated;
 create policy "episode round types are viewable by all authenticated users"
 on public.episode_round_types for select
+using (true);
+
+grant select on public.episode_guest_judges to authenticated;
+create policy "episode guest judges are viewable by all authenticated users"
+on public.episode_guest_judges for select
 using (true);
 
 -- Couples the show called down who were not eliminated. Source of truth for
@@ -3470,6 +3492,7 @@ returns table (
   couple_id uuid,
   dance_style_name text,
   total_score numeric,
+  scaled_score numeric,
   created_at timestamptz
 )
 language sql
@@ -3484,6 +3507,7 @@ as $$
     d.couple_id,
     s.name,
     d.total_score,
+    d.scaled_score,
     d.created_at
   from public.draft_dance_scores d
   join public.episodes e on e.id = d.episode_id

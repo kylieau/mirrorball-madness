@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { inJeopardyIdsToPersist, type Outcome } from "@/lib/scoring";
+import { inJeopardyIdsToPersist, scaledJudgesScore, type Outcome } from "@/lib/scoring";
 import { applyEpisodeResults, type EntrySubmission } from "@/lib/results";
 import { loadRevealedCouples, loadRevealedDances } from "@/lib/results-reveal";
 import { unpostedCoupleIds } from "@/lib/reveal-state";
@@ -152,6 +152,7 @@ export async function saveDraftResults(
           dance_style_id: dance.danceStyleId,
           song_title: dance.songTitle,
           total_score: totalScore,
+          scaled_score: scaledJudgesScore(dance.judgeScores.map((js) => js.score)),
         })
         .select()
         .single();
@@ -450,7 +451,7 @@ export async function startCorrection(
     admin.from("episodes").select("guest_judge_name, judges_save_available").eq("id", episodeId).single(),
     admin
       .from("dance_scores")
-      .select("couple_id, dance_style_id, song_title, total_score, judge_scores(judge_id, score)")
+      .select("couple_id, dance_style_id, song_title, total_score, scaled_score, judge_scores(judge_id, score)")
       .eq("episode_id", episodeId),
     admin.from("episode_results").select("*").eq("episode_id", episodeId),
     admin.from("episode_custom_moments").select("couple_id, label").eq("episode_id", episodeId),
@@ -477,6 +478,7 @@ export async function startCorrection(
         dance_style_id: d.dance_style_id,
         song_title: d.song_title,
         total_score: d.total_score,
+        scaled_score: d.scaled_score,
       })
       .select()
       .single();

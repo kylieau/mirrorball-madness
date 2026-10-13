@@ -26,9 +26,9 @@ describe("judgePointsThroughWeek", () => {
       categoryWeight: 0.5,
       slots: [slot("a", 1)],
       scores: [
-        { coupleId: "a", weekNumber: 1, totalScore: 25 },
-        { coupleId: "a", weekNumber: 2, totalScore: 26 },
-        { coupleId: "a", weekNumber: 3, totalScore: 27 },
+        { coupleId: "a", weekNumber: 1, scaledScore: 25 },
+        { coupleId: "a", weekNumber: 2, scaledScore: 26 },
+        { coupleId: "a", weekNumber: 3, scaledScore: 27 },
       ],
     });
     expect(points.get("a")).toEqual({ week: 27, total: 78 }); // 27*2*.5, (25+26+27)*2*.5
@@ -40,10 +40,10 @@ describe("judgePointsThroughWeek", () => {
       judgesScoreStartsWeek: 2,
       slots: [slot("a", 1), slot("b", 3)],
       scores: [
-        { coupleId: "a", weekNumber: 1, totalScore: 20 },
-        { coupleId: "a", weekNumber: 2, totalScore: 20 },
-        { coupleId: "b", weekNumber: 2, totalScore: 20 },
-        { coupleId: "b", weekNumber: 3, totalScore: 20 },
+        { coupleId: "a", weekNumber: 1, scaledScore: 20 },
+        { coupleId: "a", weekNumber: 2, scaledScore: 20 },
+        { coupleId: "b", weekNumber: 2, scaledScore: 20 },
+        { coupleId: "b", weekNumber: 3, scaledScore: 20 },
       ],
     });
     expect(points.get("a")).toEqual({ week: 0, total: 40 });
@@ -56,8 +56,8 @@ describe("judgePointsThroughWeek", () => {
       week: 2,
       slots: [slot("a", 1, 2)],
       scores: [
-        { coupleId: "a", weekNumber: 2, totalScore: 10 },
-        { coupleId: "a", weekNumber: 3, totalScore: 99 },
+        { coupleId: "a", weekNumber: 2, scaledScore: 10 },
+        { coupleId: "a", weekNumber: 3, scaledScore: 99 },
       ],
     });
     expect(points.get("a")).toEqual({ week: 20, total: 20 });

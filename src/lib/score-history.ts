@@ -13,6 +13,7 @@ import {
   findEliminatedCoupleIds,
   resolveCurtainCallGuess,
   sumDanceScoresByCouple,
+  sumScaledScoresByCouple,
   type CategoryWeights,
   type CurtainCallVerdict,
   type DanceScore,
@@ -52,7 +53,7 @@ type EpisodeRows<T> = ({ episode_id: string } & T)[];
 // last result row per couple decides survival and bonus, as in the engine).
 export function weekResults(
   episodeIds: string[],
-  danceRows: EpisodeRows<{ couple_id: string; total_score: number }>,
+  danceRows: EpisodeRows<{ couple_id: string; total_score: number; scaled_score: number }>,
   outcomeRows: EpisodeRows<{ couple_id: string; outcome: string; bonus_points: number }>
 ): Pick<HistoryWeekData, "danceScores" | "outcomes"> {
   const inWeek = new Set(episodeIds);
@@ -60,7 +61,11 @@ export function weekResults(
   return {
     danceScores: danceRows
       .filter((row) => inWeek.has(row.episode_id))
-      .map((row) => ({ coupleId: row.couple_id, totalScore: Number(row.total_score) })),
+      .map((row) => ({
+        coupleId: row.couple_id,
+        totalScore: Number(row.total_score),
+        scaledScore: Number(row.scaled_score),
+      })),
     outcomes: outcomeRows
       .filter((row) => inWeek.has(row.episode_id))
       .sort((a, b) => episodeOrder.get(a.episode_id)! - episodeOrder.get(b.episode_id)!)
@@ -185,6 +190,7 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
     const w = week.weekNumber;
     if (w < input.anchorWeek) continue;
     const totals = sumDanceScoresByCouple(week.danceScores);
+    const scaledTotals = sumScaledScoresByCouple(week.danceScores);
     const lastOutcome = new Map(week.outcomes.map((o) => [o.coupleId, o]));
     const resolvedThisWeek = [...lastOutcome.values()]
       .filter((o) => RESOLVING_OUTCOMES.has(o.outcome) && positionRanges.has(o.coupleId));
@@ -247,12 +253,16 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       const name = nameOf(slot.coupleId);
       const outcome = lastOutcome.get(slot.coupleId);
 
-      const judgesTotal = totals.get(slot.coupleId) ?? 0;
+      const rawTotal = totals.get(slot.coupleId) ?? 0;
+      const judgesTotal = scaledTotals.get(slot.coupleId) ?? 0;
+      // A guest-judge night shows the TV total and the 30-point basis it pays on.
+      const judgesLabel =
+        rawTotal === judgesTotal ? trimNumber(judgesTotal) : `${trimNumber(rawTotal)}→${trimNumber(judgesTotal)}`;
       push(
         w,
         "danceCard",
         `judges:${slot.coupleId}`,
-        `${name}: Jdg ${trimNumber(judgesTotal)} × ${trimNumber(scoring.judgesScoreMultiplier)}`,
+        `${name}: Jdg ${judgesLabel} × ${trimNumber(scoring.judgesScoreMultiplier)}`,
         judgesTotal * scoring.judgesScoreMultiplier,
         weight
       );

@@ -11,7 +11,7 @@ export async function loadCoupleWeekResults(
   const episodeIds = weeks.flatMap((week) => week.episodeIds);
   if (episodeIds.length === 0) return [];
   const [{ data: danceRows }, { data: outcomeRows }] = await Promise.all([
-    supabase.from("dance_scores").select("episode_id, couple_id, total_score").in("episode_id", episodeIds),
+    supabase.from("dance_scores").select("episode_id, couple_id, total_score, scaled_score").in("episode_id", episodeIds),
     supabase.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
   ]);
   return weeks.map((week) => ({

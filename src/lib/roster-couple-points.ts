@@ -26,7 +26,7 @@ export function judgePointsThroughWeek({
   categoryWeight,
 }: {
   slots: RosterSlotPeriod[];
-  scores: { coupleId: string; weekNumber: number; totalScore: number }[];
+  scores: { coupleId: string; weekNumber: number; scaledScore: number }[];
   judgesScoreStartsWeek: number;
   week: number;
   multiplier: number;
@@ -38,15 +38,15 @@ export function judgePointsThroughWeek({
   for (const slot of slots) {
     const firstWeek = Math.max(slot.startWeek, judgesScoreStartsWeek);
     const lastWeek = Math.min(slot.endWeek ?? week, week);
-    let weekRaw = 0;
-    let totalRaw = 0;
+    let weekScaled = 0;
+    let totalScaled = 0;
     for (const row of scores) {
       if (row.coupleId !== slot.coupleId) continue;
       if (row.weekNumber < firstWeek || row.weekNumber > lastWeek) continue;
-      totalRaw += row.totalScore;
-      if (row.weekNumber === week) weekRaw += row.totalScore;
+      totalScaled += row.scaledScore;
+      if (row.weekNumber === week) weekScaled += row.scaledScore;
     }
-    points.set(slot.coupleId, { week: roundPoints(weekRaw * scale), total: roundPoints(totalRaw * scale) });
+    points.set(slot.coupleId, { week: roundPoints(weekScaled * scale), total: roundPoints(totalScaled * scale) });
   }
 
   return points;

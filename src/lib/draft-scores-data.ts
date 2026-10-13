@@ -17,6 +17,7 @@ export type VisibleDraftNight = DraftRelease & {
     coupleId: string;
     danceStyle: string;
     total: number;
+    scaled: number;
     at: string;
   }[];
 };
@@ -92,6 +93,7 @@ export async function loadDraftScoreContext(
           coupleId: row.couple_id,
           danceStyle: row.dance_style_name,
           total: Number(row.total_score),
+          scaled: Number(row.scaled_score),
           at: row.created_at,
         })),
     },
@@ -157,6 +159,10 @@ export async function draftManagerScoresForLeague(
     judgesScoreMultiplier: settings.judges_score_multiplier,
     judgesCategoryWeight: settings.judges_score_category_weight,
     rosterSlots,
-    danceScores: night.dances.map((dance) => ({ coupleId: dance.coupleId, totalScore: dance.total })),
+    danceScores: night.dances.map((dance) => ({
+      coupleId: dance.coupleId,
+      totalScore: dance.total,
+      scaledScore: dance.scaled,
+    })),
   });
 }

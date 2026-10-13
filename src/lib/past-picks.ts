@@ -6,7 +6,7 @@ import {
   resolveCurtainCallGuess,
   sumDanceScoresByCouple,
   type CurtainCallVerdict,
-  type DanceScore,
+  type RawDanceScore,
 } from "./scoring";
 
 export type PickMatch = {
@@ -199,7 +199,7 @@ export function matchTopScorerPick({
   nearMissEnabled,
 }: {
   predictedTopScorerCoupleId: string | null;
-  danceScores: DanceScore[];
+  danceScores: RawDanceScore[];
   exactPayout: number;
   nearMissEnabled: boolean;
 }): PickMatch {
@@ -229,7 +229,7 @@ export function buildPastPicksComparison({
   predictedEliminatedCoupleId2: string | null;
   predictedTopScorerCoupleId: string | null;
   episodeOutcomes: { coupleId: string; outcome: string }[];
-  danceScores: DanceScore[];
+  danceScores: RawDanceScore[];
   predictionPoints: number | null;
   inJeopardyCoupleIds?: Iterable<string>;
   nearMissEnabled: boolean;

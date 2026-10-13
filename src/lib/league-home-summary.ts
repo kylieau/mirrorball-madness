@@ -4,6 +4,7 @@ import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
 import { hasCurtainCallPicks } from "@/lib/curtain-call-picks";
 import { draftWeekManagerScores } from "@/lib/draft-scores";
 import type { CurtainCallState } from "@/lib/league-triage";
+import type { DanceScore } from "@/lib/scoring";
 import { slotActiveInWeek } from "@/lib/roster-couple-points";
 
 export type LeagueHomeSummary = {
@@ -49,7 +50,7 @@ export async function computeLeagueHomeSummary(
   revealingWeekId: string | null = null,
   // Released draft this viewer unlocked. Replaces that week's stored total
   // (a partial live reveal) with judges points from the full draft.
-  draftNight: { weekId: string; weekNumber: number; dances: { coupleId: string; totalScore: number }[] } | null = null
+  draftNight: { weekId: string; weekNumber: number; dances: DanceScore[] } | null = null
 ): Promise<LeagueHomeSummary> {
   const [{ data: scoringSettings }, { data: members }, { data: scores }] = await Promise.all([
     supabase

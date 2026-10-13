@@ -71,6 +71,7 @@ export default async function EnterResultsPage({
         releasedCoupleIdsByEpisode={data.releasedCoupleIdsByEpisode}
         forceSelectEpisodeId={episode ?? null}
         participantsByEpisode={data.participantsByEpisode}
+        guestJudgesByEpisode={data.guestJudgesByEpisode}
       />
     </div>
   );

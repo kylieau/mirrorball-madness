@@ -70,6 +70,8 @@ export type ResultsPageData = {
   } | null;
   participantsByEpisode: Record<string, string[]>;
   roundTypesByEpisode: Record<string, string[]>;
+  // Judge ids (people rows), per episode.
+  guestJudgesByEpisode: Record<string, string[]>;
   inJeopardyByEpisode: Record<string, string[]>;
 };
 
@@ -104,6 +106,7 @@ export async function loadResultsPageData(
     { data: episodeResults },
     { data: episodeParticipants },
     { data: episodeRoundTypes },
+    { data: episodeGuestJudges },
     { data: inJeopardyRows },
     { data: draftReleases },
   ] = await Promise.all([
@@ -140,6 +143,7 @@ export async function loadResultsPageData(
       ),
     supabase.from("episode_participants").select("episode_id, couple_id"),
     supabase.from("episode_round_types").select("episode_id, round_types(name)"),
+    supabase.from("episode_guest_judges").select("episode_id, judge_id"),
     supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id"),
     // Not season-scoped at the query level (draft_couple_releases has no
     // season_id column) -- the table only ever holds rows for currently-
@@ -213,6 +217,11 @@ export async function loadResultsPageData(
     names.sort((a, b) => a.localeCompare(b));
   }
 
+  const guestJudgesByEpisode: Record<string, string[]> = {};
+  for (const row of episodeGuestJudges ?? []) {
+    (guestJudgesByEpisode[row.episode_id] ??= []).push(row.judge_id);
+  }
+
   const inJeopardyByEpisode: Record<string, string[]> = {};
   for (const row of inJeopardyRows ?? []) {
     (inJeopardyByEpisode[row.episode_id] ??= []).push(row.couple_id);
@@ -244,6 +253,7 @@ export async function loadResultsPageData(
     season,
     participantsByEpisode,
     roundTypesByEpisode,
+    guestJudgesByEpisode,
     inJeopardyByEpisode,
   };
 }

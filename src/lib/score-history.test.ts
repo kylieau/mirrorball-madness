@@ -62,11 +62,11 @@ const weeks: HistoryWeekData[] = [
     weekNumber: 1,
     isDoubleElimination: false,
     danceScores: [
-      { coupleId: "A", totalScore: 30 },
-      { coupleId: "B", totalScore: 24 },
-      { coupleId: "C", totalScore: 20 },
-      { coupleId: "D", totalScore: 18 },
-      { coupleId: "E", totalScore: 12 },
+      { coupleId: "A", totalScore: 30, scaledScore: 30 },
+      { coupleId: "B", totalScore: 24, scaledScore: 24 },
+      { coupleId: "C", totalScore: 20, scaledScore: 20 },
+      { coupleId: "D", totalScore: 18, scaledScore: 18 },
+      { coupleId: "E", totalScore: 12, scaledScore: 12 },
     ],
     outcomes: [
       { coupleId: "A", outcome: "safe", bonusPoints: 0 },
@@ -77,14 +77,16 @@ const weeks: HistoryWeekData[] = [
     ],
     inJeopardyCoupleIds: [],
   },
+  // A guest-judge night: four judges, so totals are out of 40 and pay on the
+  // 30-point basis.
   {
     weekNumber: 2,
     isDoubleElimination: true,
     danceScores: [
-      { coupleId: "A", totalScore: 32 },
-      { coupleId: "B", totalScore: 28 },
-      { coupleId: "C", totalScore: 22 },
-      { coupleId: "D", totalScore: 16 },
+      { coupleId: "A", totalScore: 38, scaledScore: 28.5 },
+      { coupleId: "B", totalScore: 35, scaledScore: 26.25 },
+      { coupleId: "C", totalScore: 30, scaledScore: 22.5 },
+      { coupleId: "D", totalScore: 22, scaledScore: 16.5 },
     ],
     outcomes: [
       { coupleId: "A", outcome: "safe", bonusPoints: 0 },
@@ -98,8 +100,8 @@ const weeks: HistoryWeekData[] = [
     weekNumber: 3,
     isDoubleElimination: false,
     danceScores: [
-      { coupleId: "A", totalScore: 30 },
-      { coupleId: "B", totalScore: 29 },
+      { coupleId: "A", totalScore: 30, scaledScore: 30 },
+      { coupleId: "B", totalScore: 29, scaledScore: 29 },
     ],
     outcomes: [
       { coupleId: "A", outcome: "winner", bonusPoints: 0 },
@@ -261,6 +263,10 @@ describe("buildScoreHistory lines", () => {
     expect(lines.map((l) => l.label)).toContain("Whitney: Survival");
   });
 
+  it("shows a guest-judge night's TV total and the 30-point basis it pays on", () => {
+    expect(lines.map((l) => l.label)).toContain("Whitney: Jdg 38→28.5 × 0.15");
+  });
+
   it("gives an eliminated couple judges points but no survival", () => {
     const labels = lines.filter((l) => l.weekNumber === 1).map((l) => l.label);
     expect(labels).toContain("Ezra: Jdg 12 × 0.15");
@@ -417,8 +423,8 @@ describe("a week being revealed", () => {
     weekNumber: 3,
     isDoubleElimination: false,
     danceScores: [
-      { coupleId: "A", totalScore: 30 },
-      { coupleId: "B", totalScore: 29 },
+      { coupleId: "A", totalScore: 30, scaledScore: 30 },
+      { coupleId: "B", totalScore: 29, scaledScore: 29 },
     ],
     outcomes: [],
     inJeopardyCoupleIds: [],

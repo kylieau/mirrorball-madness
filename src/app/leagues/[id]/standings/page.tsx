@@ -188,7 +188,11 @@ export default async function LeagueStandingsPage({
           weeks: replaceWeekDanceScores(await loadCoupleWeekResults(supabase, visibleDanceWeeks), draftNight && draftNight.dances.length > 0
             ? {
                 weekNumber: draftNight.weekNumber,
-                danceScores: draftNight.dances.map((dance) => ({ coupleId: dance.coupleId, totalScore: dance.total })),
+                danceScores: draftNight.dances.map((dance) => ({
+                  coupleId: dance.coupleId,
+                  totalScore: dance.total,
+                  scaledScore: dance.scaled,
+                })),
               }
             : null),
           couples: seasonCouplesSpoilerSafe,

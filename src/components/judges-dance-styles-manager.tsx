@@ -250,10 +250,9 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
       <CardHeader>
         <CardTitle>Scoring Judges</CardTitle>
         <CardDescription>
-          The standing panel plus anyone who can give a score. Adding a name adds
-          a score box on every dance. Archive a guest when they&apos;re done —
-          history stays, they just drop off later weeks. Edit fixes a typo
-          without creating a new judge.
+          The standing panel, who score every dance. Add a one-night guest on
+          that episode in Schedule instead; guests and archived judges keep
+          their score history. Edit fixes a typo without creating a new judge.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -280,10 +279,10 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
         {archived.length > 0 && (
           <div className="flex flex-col gap-2 border-t border-border pt-4">
             <div>
-              <p className="text-sm font-medium">Archived</p>
+              <p className="text-sm font-medium">Guests &amp; Archived</p>
               <p className="text-xs text-muted-foreground">
-                Hidden from empty score boxes. Restore to put them back on every
-                dance.
+                Only score on the nights Schedule books them. Restore to put
+                them back on every dance.
               </p>
             </div>
             <ul className="flex flex-col gap-2">
