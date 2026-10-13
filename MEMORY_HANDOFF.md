@@ -27,7 +27,7 @@ All committed and pushed; see above. **Not ours, leave unstaged:** `ios/App/App.
 
 ## 4. Backlog & Next Steps
 - **Tonight (E06):** after the first couple's scores save, check its `scaled_score` (BACKLOG "To check: Schedule settings…" guest-judge item). Confirm the Vercel deploy of `e506707` is Ready.
-- **User action pending:** publish Week 4 if not done (scores Bryan's pick); flip any West Coast leagues' Air Time in League Settings.
+- **User action pending:** flip any West Coast leagues' Air Time in League Settings (Week 4 is published, so Bryan's late pick has scored).
 - Deferred work otherwise in `BACKLOG.md` "Up next" and Parked nits (guest-judge follow-ups, dead `computeCoupleWeeklyPoints`).
 
 Next command: none pending.
