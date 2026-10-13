@@ -242,6 +242,7 @@ export function ScheduleManager({
   const [roundTypeIds, setRoundTypeIds] = useState<Set<string>>(new Set());
   const [guestJudgeNames, setGuestJudgeNames] = useState<string[]>([]);
   const [newGuestName, setNewGuestName] = useState("");
+  const suggestedGuestNames = pastGuestNames.filter((name) => !guestJudgeNames.includes(name));
 
   const parsedWeekNumber = competitionWeek.trim() === "" ? null : Number(competitionWeek);
   const assignedWeek =
@@ -343,8 +344,8 @@ export function ScheduleManager({
     setNewGuestName("");
   }
 
-  function addGuestJudge() {
-    const name = newGuestName.trim();
+  function addGuestJudge(rawName: string) {
+    const name = rawName.trim();
     if (!name) return;
     setGuestJudgeNames((prev) => (prev.includes(name) ? prev : [...prev, name]));
     setNewGuestName("");
@@ -652,27 +653,37 @@ export function ScheduleManager({
               <div className="flex gap-2">
                 <Input
                   id="guestJudgeName"
-                  list="pastGuestJudges"
                   placeholder="Judge Name"
                   value={newGuestName}
                   onChange={(e) => setNewGuestName(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      addGuestJudge();
+                      addGuestJudge(newGuestName);
                     }
                   }}
                 />
-                <datalist id="pastGuestJudges">
-                  {pastGuestNames.map((name) => (
-                    <option key={name} value={name} />
-                  ))}
-                </datalist>
-                <Button type="button" variant="outline" onClick={addGuestJudge} disabled={!newGuestName.trim()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => addGuestJudge(newGuestName)}
+                  disabled={!newGuestName.trim()}
+                >
                   <PlusIcon className="size-4" />
                   Add
                 </Button>
               </div>
+              {suggestedGuestNames.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-xs text-muted-foreground">Past Guests</span>
+                  {suggestedGuestNames.map((name) => (
+                    <Button key={name} type="button" size="xs" variant="outline" onClick={() => addGuestJudge(name)}>
+                      <PlusIcon className="size-3" />
+                      {name}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="durationMinutes">Duration (Minutes)</Label>
