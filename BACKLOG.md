@@ -38,6 +38,7 @@ Shipped in `b4254a8`; the user checked it on their phone. Still open:
 ## To check: Schedule settings that used to live on Enter Results
 
 - **Judges' Save Active** now lives on the Schedule episode form (`episodes.judges_save_available`, no SQL needed) and Enter Results reads it; the switch is gone from Enter Results. Check it saves and that the Judges' Save column appears in Finish Week for that episode.
+- **Guest judges + scaled judges points** (`e554bd2`, `e506707`, checked in a headless browser on 2026-10-13, Joe Buck booked on E06): after the first E06 couple is saved, confirm its `draft_dance_scores.scaled_score` is the judges' average × 3 (four 9s → 36 raw, 27 scaled), then that Score History shows `Jdg 36→27` and roster/standings points pay on 27 after reveal or publish.
 - **Team Dance:** the Score a Team Dance sheet is removed. A team-dance night is now marked by its Round Type on the Schedule form, and each couple's dance is entered on its own. Check this covers how team dances are actually entered.
 
 ## Spoiler-Free strip: extended past Home — unverified in a browser
@@ -179,7 +180,7 @@ Settings sheet order A shipped: Profile, Spoiler-Free, Notifications, Add to Hom
 - **Draft-complete judges multiplier lock** — shipped (#44). `update_scoring_categories` rejects a different `judges_score_multiplier` once `draft_status = completed`. It is not part of the Season Clock lock, so a late `start_draft` can still write the roster-size calibration. `reset_draft` lifts it.
 - **Strong-play ceiling recalibration** — shipped in code (2026-09-28). Weights are shares of a strong-play season ceiling, not Monte Carlo standings spread, and the baked Grand Finale 3/5 cap is gone. New leagues take the defaults. The four live leagues are updated by `supabase/apply-strong-play-ceilings.sql`, which the owner runs in the SQL editor: it keeps each league's module on/off and category weights, writes the new point budgets, and recomputes `weekly_manager_scores`. Toggle auto-redistribute and Reset to Neutral shipped in League Settings after this: a module toggle splits weight evenly across the modules that stay on and does not rewrite point values; Reset to Neutral restores these defaults plus that split. Both stop at the Season Clock lock. The draft-complete judges multiplier lock is unchanged, and Reset leaves that multiplier alone.
 - **Dance Card ~25% calibration overshoot** — a finding from the retired variance model. Do not patch those old multipliers; the ceiling solve replaced them.
-- **Refit the ceiling parameters against a finished Season 35** — cast size, finale field, and the judge band in `src/lib/strong-play-ceilings.ts`, once results are final. The variance Monte Carlo script is gone. Not blocked on a database token.
+- **Refit the ceiling parameters against a finished Season 35** — cast size, finale field, and the judge band in `src/lib/strong-play-ceilings.ts`, once results are final. Also fold in multi-dance nights: the model assumes one dance per couple per week, so semi-final/finale nights with two or three dances inflate Dance Card the way a guest judge used to (guest/missing judges are now handled by `scaled_score`). The variance Monte Carlo script is gone. Not blocked on a database token.
 - **Equal-EV / neutral fair scoring defaults** — parked. Separate from equal strong-play ceilings, which shipped.
 
 ## Draft order editing placement
@@ -222,6 +223,9 @@ Built (per-couple publish and undo, Finish Week, Home and every page reading a r
 
 - Dead `'You are not a member of this league'` branch in `set_custom_draft_order` (`supabase/schema.sql`) — unreachable, never cleaned up.
 - League Settings' "✓ Settings saved" banner (`league-modules-form.tsx`) doesn't clear when you edit again.
+- Guest judges (Schedule): `episodes.guest_judge_name` and its draft-save passthrough are dead and could be dropped; guest names match exactly (a double space makes a second judge); a failed episode save can leave a new archived guest row with no booking.
+- `computeCoupleWeeklyPoints` (`src/lib/roster-weekly-points.ts`) is only used by its own test.
+- `supabase/queries/prefill-s35-e06-dances.sql` is an uncommitted one-off (already run 2026-10-13); delete it rather than commit it.
 - A human click-through of the custom-draft lobby UI was never done. Raise when next season's drafts start.
 
 ## Known scoring/data limitations (not bugs, just scoped-out edge cases)
