@@ -110,4 +110,32 @@ describe("buildCouplesLeaderboard", () => {
     const owned = [...rows.values()].filter((r) => r.ownerId === "m2");
     expect(owned.reduce((sum, r) => sum + r.totalPoints, 0)).toBeCloseTo(engineTotal, 2);
   });
+
+  it("gives both couples of a top-five double the better placement's bonus", () => {
+    const doubleCouples = [
+      { id: "A", status: "winner", elimination_week: null },
+      { id: "C", status: "eliminated", elimination_week: 1 },
+      { id: "D", status: "eliminated", elimination_week: 1 },
+    ];
+    const doubleWeek = {
+      weekNumber: 1,
+      danceScores: [],
+      outcomes: [
+        { coupleId: "C", outcome: "eliminated" as const, bonusPoints: 0 },
+        { coupleId: "D", outcome: "eliminated" as const, bonusPoints: 0 },
+      ],
+    };
+    const doubleRows = byId(
+      buildCouplesLeaderboard({
+        scoring,
+        anchorWeek: 1,
+        categoryWeight: 1,
+        weeks: [doubleWeek],
+        couples: doubleCouples,
+        slots: [],
+      })
+    );
+    expect(doubleRows.get("C")?.bonusPoints).toBe(scoring.secondPlacePoints);
+    expect(doubleRows.get("D")?.bonusPoints).toBe(scoring.secondPlacePoints);
+  });
 });

@@ -472,6 +472,13 @@ export function eliminationPositionRanges(
   return ranges;
 }
 
+// Dance Card finish (1 = winner) from a couple's position range. Couples
+// out in the same week can't be told apart, so each takes the best
+// placement in the shared range — matching Grand Finale's best-of-range.
+export function finalPlacementFromRange(range: { start: number; end: number }, totalCouples: number): number {
+  return totalCouples - range.end + 1;
+}
+
 // One couple's Grand Finale payout once its actual position is known —
 // shared by the scoring engine and the Picks card. When the couple went out
 // in a multi-couple week the order within that week is unknowable, so the

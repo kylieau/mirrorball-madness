@@ -12,6 +12,7 @@ import {
   computeGrandFinalePoints,
   computeWeeklyScores,
   eliminationPositionRanges,
+  finalPlacementFromRange,
   RESOLVING_OUTCOMES,
   type CategoryWeights,
   type ScoringSettings,
@@ -187,7 +188,7 @@ function engineWeek(input: ManagerHistoryInput, week: HistoryWeekData) {
     danceScores: week.danceScores,
     episodeOutcomes: week.outcomes.map((o) => ({
       ...o,
-      finalPlacement: RESOLVING_OUTCOMES.has(o.outcome) ? total - ranges.get(o.coupleId)!.start + 1 : null,
+      finalPlacement: RESOLVING_OUTCOMES.has(o.outcome) ? finalPlacementFromRange(ranges.get(o.coupleId)!, total) : null,
     })),
     predictions: prediction && started
       ? [
@@ -278,6 +279,11 @@ describe("buildScoreHistory lines", () => {
     expect(labels).toContain("Season Podium: Whitney, 1st Place");
     expect(labels).toContain("Season Podium: Ilona, 2nd Place");
     expect(lines.find((l) => l.label.startsWith("Season Podium: Robert"))?.weekNumber).toBe(2);
+  });
+
+  it("gives a couple out in a top-five double the better of the shared placements", () => {
+    const robert = lines.find((l) => l.label.startsWith("Season Podium: Robert"));
+    expect(robert).toMatchObject({ label: "Season Podium: Robert, 3rd Place", points: scoring.thirdPlacePoints });
   });
 
   it("scores both Curtain Call elimination picks on a double-elimination week and skips a miss", () => {

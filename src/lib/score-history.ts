@@ -2,6 +2,7 @@ import { roundPoints } from "./format-points";
 import { latePenaltySuffix } from "./grand-finale-late";
 import {
   DANCE_CARD_PLACEMENT_KEY,
+  finalPlacementFromRange,
   NO_SURVIVAL_OUTCOMES,
   RESOLVING_OUTCOMES,
   classifyEliminationGuess,
@@ -272,7 +273,7 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       }
 
       const range = outcome && RESOLVING_OUTCOMES.has(outcome.outcome) ? positionRanges.get(slot.coupleId) : undefined;
-      const placement = range ? totalCouples - range.start + 1 : null;
+      const placement = range ? finalPlacementFromRange(range, totalCouples) : null;
       if (placement !== null && placement in DANCE_CARD_PLACEMENT_KEY) {
         push(
           w,

@@ -6,6 +6,7 @@ import {
   classifyTopScorerGuess,
   computeGrandFinalePoints,
   eliminationPositionRanges,
+  finalPlacementFromRange,
   grandFinaleBestCasePoints,
   grandFinalePredictionPoints,
   computeWeeklyScores,
@@ -919,6 +920,22 @@ describe("eliminationPositionRanges", () => {
     ]);
     expect(ranges.get("b")).toEqual({ start: 2, end: 2 });
     expect([ranges.get("w")?.start, ranges.get("r")?.start, ranges.get("t")?.start]).toEqual([5, 4, 3]);
+  });
+});
+
+describe("finalPlacementFromRange", () => {
+  it("maps a single position to its placement", () => {
+    expect(finalPlacementFromRange({ start: 12, end: 12 }, 16)).toBe(5);
+  });
+
+  it("gives both couples of a top-five double the better placement", () => {
+    // 16 couples, 4th and 5th place go out together at positions 12–13.
+    expect(finalPlacementFromRange({ start: 12, end: 13 }, 16)).toBe(4);
+  });
+
+  it("lifts a semi-final double into the fifth-place bonus", () => {
+    // Six left, two go home: positions 11–12 are 6th and 5th place.
+    expect(finalPlacementFromRange({ start: 11, end: 12 }, 16)).toBe(5);
   });
 });
 

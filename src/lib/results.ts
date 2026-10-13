@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import {
   computeGrandFinalePoints,
   eliminationPositionRanges,
+  finalPlacementFromRange,
   computeWeeklyScores,
   couplesRemainingAtWeek,
   inJeopardyIdsToPersist,
@@ -435,8 +436,8 @@ export async function recomputeWeekScores(
   // — see computeWeeklyScores in src/lib/scoring.ts. No new couples.status
   // value, no new admin UI: 4th/5th place is derived, not entered.
   const finalPlacementByCouple = new Map<string, number>();
-  for (const [coupleId, actualPosition] of actualPositionByCouple) {
-    const placement = totalCouples - actualPosition + 1;
+  for (const [coupleId, range] of positionRanges) {
+    const placement = finalPlacementFromRange(range, totalCouples);
     if (placement <= 5) finalPlacementByCouple.set(coupleId, placement);
   }
 

@@ -3,6 +3,7 @@ import type { RosterSlotPeriod } from "./roster-couple-points";
 import type { HistoryWeekData } from "./score-history";
 import {
   DANCE_CARD_PLACEMENT_KEY,
+  finalPlacementFromRange,
   NO_SURVIVAL_OUTCOMES,
   RESOLVING_OUTCOMES,
   eliminationPositionRanges,
@@ -87,7 +88,7 @@ export function buildCouplesLeaderboard({
       const range = RESOLVING_OUTCOMES.has(outcome.outcome)
         ? positionRanges.get(couple.id)
         : undefined;
-      const placement = range ? totalCouples - range.start + 1 : null;
+      const placement = range ? finalPlacementFromRange(range, totalCouples) : null;
       if (placement !== null && placement in DANCE_CARD_PLACEMENT_KEY) {
         add(bonusRaw, couple.id, scoring[DANCE_CARD_PLACEMENT_KEY[placement]]);
       }

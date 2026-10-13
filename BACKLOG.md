@@ -197,10 +197,6 @@ Shipped: per-manager Score History that expands in place under each leaderboard 
 
 - **Draft-complete screen** ("Draft complete!", roster card with "Not Drafted") has no entry point in the UI; it is only reachable at `/leagues/<id>/draft` for a completed draft. Not manually verified after the Dance Cards `unrostered` prop change. Raise when a draft next completes (next season).
 
-## Grand Finale / Dance Card review items
-
-- Double elimination in the top five gives both couples the lower placement's 4th/5th bonus; review before the finale.
-
 ## Home curtain banner follow-ups
 
 Shipped: new state machine, West overlays, relative "Airs", `episodes.duration_minutes`. See CLAUDE.md. Still worth deciding or checking:
