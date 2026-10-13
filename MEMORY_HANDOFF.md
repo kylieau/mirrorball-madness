@@ -1,13 +1,13 @@
 # Session Handoff
 
 ## 1. Current State
-**Everything shipped; nothing uncommitted of ours.** Local `main` == `origin/main` at `e506707` plus this sync. Deploy not confirmed from here (no dashboard access). Landed 2026-10-13, ahead of S35 E06 (Super Bowl Night, Tue Oct 13, 8pm ET, Joe Buck guest judging):
+**Everything shipped; nothing uncommitted of ours.** Local `main` == `origin/main` at `1ff9eee` plus this sync. Deploy not confirmed from here (no dashboard access). Landed 2026-10-13, ahead of S35 E06 (Super Bowl Night, Tue Oct 13, 8pm ET, Joe Buck guest judging):
 1. **E06 dances prefilled**: all 11 couples' style + song title (title only, no artist, matching earlier weeks) in `draft_dance_scores`, no judge scores, via `supabase/queries/prefill-s35-e06-dances.sql` the user ran. Couples read In progress; nothing released or live.
 2. **Per-episode guest judges** (`e554bd2`, chips fix `e506707`): Schedule's episode sheet has Guest Judges (under Judges' Save Active) with Past Guests chips. `episode_guest_judges` table (`supabase/apply-episode-guest-judges.sql`, applied live). Enter Results shows standing panel + that night's guests. **Joe Buck is booked on E06** (archived `people` row, so never on the standing panel); E05 still shows 3 judges, verified headless.
 3. **Scaled judges points** (same commit): `dance_scores.scaled_score` / `draft_dance_scores.scaled_score` = judges' average × 3, written on draft save, publish, per-couple reveal and correction seed (`supabase/apply-scaled-judges-score.sql`, applied live; all 55 live + 58 draft rows backfilled equal to total). Dance Card, roster lines, Couples Leaderboard, draft-night points pay on it; raw `total_score` stays for display and Curtain Call top scorer. Score History shows `Jdg 38→28.5` on a guest night. Types regenerated from live (matched hand edits).
 4. Deleted the unused archived judge "test" (no scores, drafts or bookings) with the user's OK.
 
-**Unpushed branch `fixes/finale-bonus-audit-schedule`** (3 commits on top of `origin/main`, no rebase needed as of 2026-10-13; push/merge only when the user says):
+**Also landed 2026-10-13, fast-forwarded to `main` and pushed** (via branch `fixes/finale-bonus-audit-schedule`, also on origin):
 - `50ba866` Top-five double elimination: each couple takes the *better* placement in the shared range (user chose this rule), via `finalPlacementFromRange` in `scoring.ts`, used by `results.ts`, Score History and Couples Leaderboard. Semi-final 6→4 double now pays both the 5th-place bonus. Takes effect on next publish; no S35 week needs recompute.
 - `af0d8c4` `npm audit fix` (lockfile only). `9c35838` next 15.5.25 → 15.5.27, `shadcn` moved to devDependencies (it's a generator plus a build-time CSS import, like tailwindcss). First deploy on the new Next: watch Vercel go Ready.
 - S35 schedule: E08 Horror Movie Night corrected by the user to Tue Oct 27 (ABC listing; it was Wed Oct 28). Live E09 Disney Night is Mon Nov 2 (Election Day bump). `supabase/apply-season-35-schedule.sql` still has the old dates; left stale on purpose, since it skips existing rows.
@@ -32,8 +32,8 @@ All committed and pushed; see above. **Not ours, leave unstaged:** `ios/App/App.
 - **`BACKLOG.md` edits:** `Edit` or a targeted script, never `Write`.
 
 ## 4. Backlog & Next Steps
-- **Tonight (E06):** after the first couple's scores save, check its `scaled_score` (BACKLOG "To check: Schedule settings…" guest-judge item). Confirm the Vercel deploy of `e506707` is Ready.
+- **Tonight (E06):** after the first couple's scores save, check its `scaled_score` (BACKLOG "To check: Schedule settings…" guest-judge item). Confirm the Vercel deploy of `1ff9eee` is Ready (first deploy on next 15.5.27).
 - **West Coast Air Time: done.** #supportSWEKylie and Pen & Paso (Doble) are West; the user confirmed the other three stay East.
 - Deferred work otherwise in `BACKLOG.md` "Up next" and Parked nits (guest-judge follow-ups, dead `computeCoupleWeeklyPoints`).
 
-Next command: none pending (branch awaits the user's push/merge call).
+Next command: none pending.
