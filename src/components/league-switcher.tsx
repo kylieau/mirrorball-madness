@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDownIcon, CheckIcon } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -32,9 +32,9 @@ export function LeagueSwitcher({
   const [failed, setFailed] = useState(false);
   const latestRequest = useRef(0);
 
-  if (leagues.length <= 1) return null;
-
-  // Read on every open: Picks Due and rank change while the page stays put.
+  // Fetched once after paint so the sheet is usually ready when opened, then
+  // again on every open: Picks Due and rank change while the page stays put.
+  // The previous rows stay on screen while a refetch runs.
   async function loadSummaries() {
     const request = ++latestRequest.current;
     setFailed(false);
@@ -46,6 +46,14 @@ export function LeagueSwitcher({
     }
     setSummaries(new Map(result.summaries.map((summary) => [summary.id, summary])));
   }
+
+  const multipleLeagues = leagues.length > 1;
+  useEffect(() => {
+    if (multipleLeagues) void loadSummaries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [multipleLeagues, currentLeagueId]);
+
+  if (!multipleLeagues) return null;
 
   return (
     <Sheet onOpenChange={(open) => open && void loadSummaries()}>
