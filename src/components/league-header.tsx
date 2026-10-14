@@ -23,6 +23,7 @@ export function LeagueHeader({
   justCreated,
   scoringConfigured,
   switcherLeagues,
+  switcherCurrent,
   accountSettingsData,
   viewerEmail,
   spoilerFreeStrip,
@@ -37,6 +38,7 @@ export function LeagueHeader({
   justCreated: boolean;
   scoringConfigured: boolean;
   switcherLeagues: SwitcherLeague[];
+  switcherCurrent: { rank: number; totalMembers: number };
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
   // Same strip as Home/Results; when present it takes over as the sticky
@@ -65,7 +67,12 @@ export function LeagueHeader({
   const pageHeader = (
     <PageHeader title={title}>
       {switcherLeagues.length > 1 && (
-        <LeagueSwitcher currentLeagueId={leagueId} leagues={switcherLeagues} tab={tab} />
+        <LeagueSwitcher
+          currentLeagueId={leagueId}
+          leagues={switcherLeagues}
+          currentStanding={switcherCurrent}
+          tab={tab}
+        />
       )}
     </PageHeader>
   );

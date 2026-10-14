@@ -34,6 +34,7 @@ export function LeaguePageShell({
           justCreated={justCreated === "1"}
           scoringConfigured={scoringSettings?.scoring_configured ?? true}
           switcherLeagues={base.switcherLeagues}
+          switcherCurrent={base.switcherCurrent}
           accountSettingsData={base.accountSettingsData}
           viewerEmail={base.user.email ?? ""}
           spoilerFreeStrip={spoilerFreeStrip}

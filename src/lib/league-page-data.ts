@@ -7,7 +7,6 @@ import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { draftManagerScoresForLeague, loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { homeStripChoice, scoresReplacingDraftWeek } from "@/lib/draft-scores";
-import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { formatManagerName } from "@/lib/manager-display";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
@@ -190,7 +189,6 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
 
   const latestCompletedWeekId = cutoff.effectiveLatestEpisode?.id ?? null;
   const latestCompletedWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;
-  const latestCompletedResultsPublishedAt = cutoff.effectiveLatestEpisode?.results_published_at ?? null;
 
   const nameByManager = Object.fromEntries(
     (members ?? []).map((m) => [
@@ -281,38 +279,11 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     ...draftDanceWeek,
   ].sort((a, b) => a.week_number - b.week_number);
 
-  const RECENT_JOIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-  const joinCutoffMs = Date.now() - RECENT_JOIN_WINDOW_MS;
-
-  const otherLeagueSummaries = await Promise.all(
-    myMemberships
-      .map((m) => m.leagues!)
-      .filter((l) => l.id !== id)
-      .map((otherLeague) =>
-        computeLeagueHomeSummary(
-          supabase,
-          user.id,
-          otherLeague,
-          upcomingEpisode ?? null,
-          latestCompletedWeekId,
-          latestCompletedResultsPublishedAt,
-          joinCutoffMs,
-          cutoff.allowedEpisodeIds
-        )
-      )
-  );
-
+  // Other leagues' rank and Picks Due load when the switcher opens
+  // (getSwitcherSummaries), not on every render and refresh.
   const switcherLeagues = [
-    // The switcher shows a checkmark, not a Picks Due pill, for the league
-    // being viewed, so Standings doesn't have to load picks state for it.
-    { id, name: league.name, rank, totalMembers: standings.length, picksDue: false },
-    ...otherLeagueSummaries.map((l) => ({
-      id: l.id,
-      name: l.name,
-      rank: l.rank,
-      totalMembers: l.totalMembers,
-      picksDue: l.picksDue,
-    })),
+    { id, name: league.name },
+    ...myMemberships.flatMap((m) => (m.leagues && m.leagues.id !== id ? [{ id: m.leagues.id, name: m.leagues.name }] : [])),
   ];
 
   return {
@@ -361,5 +332,6 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     leagueSlotPeriods,
     visibleDanceWeeks,
     switcherLeagues,
+    switcherCurrent: { rank, totalMembers: standings.length },
   };
 }
