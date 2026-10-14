@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { loadSpoilerProgress } from "./viewer-season-data";
 
 export type SpoilerCutoff<E extends { id: string; week_number: number }> = {
   spoilerFreeMode: boolean;
@@ -51,14 +52,7 @@ export async function resolveSpoilerCutoff<E extends { id: string; week_number: 
 
   // Loaded with Spoiler-Free off too: a live-posting week stays gated for
   // everyone until they choose Stay Updated or Mark Watched (scoredWeekIds).
-  const { data: progress } = await supabase
-    .from("spoiler_watch_progress")
-    .select("last_watched_week")
-    .eq("user_id", userId)
-    .eq("season_id", seasonId)
-    .maybeSingle();
-
-  const lastWatchedWeek = progress?.last_watched_week ?? 0;
+  const { lastWatchedWeek } = await loadSpoilerProgress(supabase, userId, seasonId);
 
   if (!spoilerFreeMode) {
     return {

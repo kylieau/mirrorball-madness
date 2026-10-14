@@ -5,6 +5,7 @@ import { nextPredictedElimination } from "@/lib/grand-finale-pins";
 import type { LeagueHomeSummary } from "@/lib/league-home-summary";
 import { danceCardRosterNames, type ModuleStackInput } from "@/lib/league-triage";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
+import { loadAllCouples } from "@/lib/viewer-season-data";
 
 // The viewer's own per-module state for each league, batched into one query per table.
 // spoilerCutoffWeek is the latest week the viewer may see results for; every
@@ -16,14 +17,10 @@ export async function loadModuleStackInputs(
   context: { activeSeasonId: string | null; spoilerCutoffWeek: number | null; finaleWeekNumber: number | null }
 ): Promise<Map<string, ModuleStackInput>> {
   const leagueIds = summaries.map((s) => s.id);
-  const [{ data: leagues }, { data: slots }, { data: couples }, { data: predictions }] = await Promise.all([
+  const [{ data: leagues }, { data: slots }, couples, { data: predictions }] = await Promise.all([
     supabase.from("leagues").select("id, draft_status").in("id", leagueIds),
     supabase.from("roster_slots").select("league_id, manager_id, couple_id, slot_number").in("league_id", leagueIds).is("end_week", null),
-    supabase
-      .from("couples")
-      .select(
-        "id, season_id, status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
-      ),
+    loadAllCouples(supabase),
     supabase
       .from("grand_finale_predictions")
       .select("league_id, manager_id, couple_id, predicted_position")
@@ -32,7 +29,7 @@ export async function loadModuleStackInputs(
       .order("predicted_position", { ascending: true }),
   ]);
   const names = buildCoupleDisplayNames(
-    (couples ?? []).map((c) => ({
+    couples.map((c) => ({
       id: c.id,
       celebrity_name: c.celebrity?.name ?? "Unknown",
       pro_name: c.pro?.name ?? "Unknown",
@@ -40,7 +37,7 @@ export async function loadModuleStackInputs(
   );
   const fullNameOf = (id: string | null) => (id ? (names.get(id) ?? null) : null);
   const draftStatusByLeague = new Map((leagues ?? []).map((l) => [l.id, l.draft_status]));
-  const seasonCouples = (couples ?? [])
+  const seasonCouples = couples
     .filter((c) => c.season_id === context.activeSeasonId)
     .map((c) => ({
       id: c.id,
@@ -80,7 +77,7 @@ export async function loadModuleStackInputs(
                 )
                 .sort((a, b) => a.slot_number - b.slot_number)
                 .map((slot) => slot.couple_id),
-              (couples ?? []).map((c) => ({
+              couples.map((c) => ({
                 id: c.id,
                 celebrityName: c.celebrity?.name ?? "Unknown",
                 proName: c.pro?.name ?? "Unknown",

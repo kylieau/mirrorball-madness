@@ -19,6 +19,7 @@ import { excludeReleasedCoupleRows, homeStripChoice } from "@/lib/draft-scores";
 import type { ModuleStackInput } from "@/lib/league-triage";
 import { loadModuleStackInputs } from "@/lib/league-module-stack-data";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
+import { loadAllCouples, loadViewerMemberships } from "@/lib/viewer-season-data";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -30,16 +31,12 @@ export default async function Home() {
     redirect("/login");
   }
 
-  const [{ data: memberships }, accountSettingsData] = await Promise.all([
-    supabase
-      .from("league_members")
-      .select("role, joined_at, leagues(id, name)")
-      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`)
-      .order("joined_at", { ascending: true }),
+  const [memberships, accountSettingsData] = await Promise.all([
+    loadViewerMemberships(supabase, user.id),
     getAccountSettingsData(supabase, user.id),
   ]);
 
-  const rows = (memberships ?? []).filter((m) => m.leagues);
+  const rows = memberships.filter((m) => m.leagues);
   const leagueRefs = rows.map((m) => m.leagues!);
 
   if (leagueRefs.length === 0) {
@@ -89,7 +86,7 @@ export default async function Home() {
   }
   const draftEpisodeIds = new Set(draftNight?.episodeIds ?? []);
   if (visibleEpisodeIds.length > 0 || draftEpisodeIds.size > 0) {
-    const [{ data: episodeResults }, { data: danceScores }, { data: couples }] = await Promise.all([
+    const [{ data: episodeResults }, { data: danceScores }, couples] = await Promise.all([
       visibleEpisodeIds.length > 0
         ? supabase.from("episode_results").select("episode_id, couple_id, outcome").in("episode_id", visibleEpisodeIds)
         : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
@@ -99,12 +96,10 @@ export default async function Home() {
             .select("episode_id, couple_id, total_score, created_at, dance_styles(name)")
             .in("episode_id", visibleEpisodeIds)
         : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; total_score: number; created_at: string; dance_styles: { name: string } | null }[] }),
-      supabase
-        .from("couples")
-        .select("id, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"),
+      loadAllCouples(supabase),
     ]);
     const displayNames = buildCoupleDisplayNames(
-      (couples ?? []).map((c) => ({
+      couples.map((c) => ({
         id: c.id,
         celebrity_name: c.celebrity?.name ?? "Unknown",
         pro_name: c.pro?.name ?? "Unknown",

@@ -11,6 +11,7 @@ import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { formatManagerName } from "@/lib/manager-display";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { loadAllCouples, loadViewerMemberships, loadViewerSeason } from "@/lib/viewer-season-data";
 import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
 import { toBannerWeeks } from "@/lib/episode-banner";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
@@ -29,16 +30,16 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     redirect("/login");
   }
 
+  const draftContextPending = loadDraftScoreContext(supabase, user.id);
   const [
     { data: league },
     { data: scoringSettings },
     { data: members },
     { data: allScores },
-    { data: allCouples },
+    allCouples,
     accountSettingsData,
-    { data: activeSeasonId },
-    { data: myMemberships },
-    draftContext,
+    season,
+    myMemberships,
   ] = await Promise.all([
     supabase.from("leagues").select("*").eq("id", id).single(),
     supabase.from("scoring_settings").select("*").eq("league_id", id).single(),
@@ -53,18 +54,10 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
       .from("weekly_manager_scores")
       .select("week_id, manager_id, roster_points, prediction_points, grand_finale_points, total_points")
       .eq("league_id", id),
-    supabase
-      .from("couples")
-      .select(
-        "id, status, season_id, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
-      ),
+    loadAllCouples(supabase),
     getAccountSettingsData(supabase, user.id),
-    supabase.rpc("active_season_id"),
-    supabase
-      .from("league_members")
-      .select("leagues(id, name)")
-      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`),
-    loadDraftScoreContext(supabase, user.id),
+    loadViewerSeason(supabase, user.id),
+    loadViewerMemberships(supabase, user.id),
   ]);
 
   if (!league) {
@@ -85,16 +78,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
   // Everyone's current roster is public once the draft is done — the standings
   // are read through who holds which couples.
   const showLeagueRosters = danceCardOn && league.draft_status === "completed";
-  const [{ data: weekRows }, { data: episodeRows }, { data: allLeagueSlots }] = await Promise.all([
-    supabase
-      .from("competition_weeks")
-      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
-      .eq("season_id", activeSeasonId ?? "")
-      .order("week_number", { ascending: true }),
-    supabase
-      .from("episodes")
-      .select("id, episode_number, week_id, airs_at, duration_minutes, theme, status, results_published_at")
-      .eq("season_id", activeSeasonId ?? ""),
+  const allLeagueSlotsPending =
     showLeagueRosters
       ? supabase
           .from("roster_slots")
@@ -103,9 +87,8 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
           .order("slot_number")
       : Promise.resolve({
           data: [] as { manager_id: string; couple_id: string | null; start_week: number; end_week: number | null }[],
-        }),
-  ]);
-  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+        });
+  const groupedWeeks = groupEpisodesByWeek(season.weekRows, season.episodeRows);
   const liveWeek = liveCompetitionWeek(groupedWeeks);
   const upcomingEpisode = liveWeek
     ? {
@@ -139,14 +122,17 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
   const cutoffPending = resolveSpoilerCutoff(
     supabase,
     user.id,
-    activeSeasonId ?? null,
+    season.seasonId,
     accountSettingsData.spoilerFreeMode,
     completedEpisodes ?? []
   );
-  const [cutoff, { revealing, scoredIds, visible: revealingVisible }] = await Promise.all([
-    cutoffPending,
-    loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
-  ]);
+  const [cutoff, { revealing, scoredIds, visible: revealingVisible }, draftContext, { data: allLeagueSlots }] =
+    await Promise.all([
+      cutoffPending,
+      loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
+      draftContextPending,
+      allLeagueSlotsPending,
+    ]);
   const draftNight = draftContext.night;
   const { strip: spoilerFreeStrip, prompt: livePrompt, refreshWindows } = buildLiveAirChrome({
     spoilerFreeMode: accountSettingsData.spoilerFreeMode,
@@ -218,7 +204,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     [...standings].sort((a, b) => b.totalPoints - a.totalPoints).findIndex((s) => s.managerId === myTeamId) + 1
   );
 
-  const flatCouples = (allCouples ?? []).map((c) => ({
+  const flatCouples = allCouples.map((c) => ({
     id: c.id,
     status: c.status,
     season_id: c.season_id,
@@ -229,14 +215,14 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
 
   const activeCouples = flatCouples.filter(
     (c) =>
-      c.season_id === activeSeasonId &&
+      c.season_id === season.seasonId &&
       isSpoilerSafeActive(
         { status: c.status, eliminationWeek: c.elimination_week },
         latestCompletedWeek,
         finaleWeekNumber
       )
   );
-  const seasonCouples = flatCouples.filter((c) => c.season_id === activeSeasonId);
+  const seasonCouples = flatCouples.filter((c) => c.season_id === season.seasonId);
   // Grand Finale needs every season couple (to rank them), with status
   // spoiler-clamped. Pick 'Em / Recast availability use isSpoilerSafeActive
   // so a revealed elim is gone and an unrevealed one still looks competing.
@@ -299,7 +285,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
   const joinCutoffMs = Date.now() - RECENT_JOIN_WINDOW_MS;
 
   const otherLeagueSummaries = await Promise.all(
-    (myMemberships ?? [])
+    myMemberships
       .map((m) => m.leagues!)
       .filter((l) => l.id !== id)
       .map((otherLeague) =>

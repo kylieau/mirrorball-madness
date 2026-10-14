@@ -8,6 +8,7 @@ import {
   type GrandFinaleDestination,
   planQueueDestination,
 } from "./copy-picks";
+import { loadViewerMemberships } from "@/lib/viewer-season-data";
 
 type Client = SupabaseClient<Database>;
 
@@ -41,11 +42,8 @@ export async function loadOtherLeaguePicks(
   // A co-manager's predictions in another league live under that league's
   // primary user_id, not the viewer's own auth uid — user_id on the matched
   // row (whichever side matched) already gives us that team's real id.
-  const { data: memberships } = await supabase
-    .from("league_members")
-    .select("user_id, leagues(id, name)")
-    .or(`user_id.eq.${userId},co_manager_id.eq.${userId}`);
-  const others = (memberships ?? []).flatMap((m) =>
+  const memberships = await loadViewerMemberships(supabase, userId);
+  const others = memberships.flatMap((m) =>
     m.leagues && m.leagues.id !== currentLeagueId ? [{ ...m.leagues, teamId: m.user_id }] : []
   );
   if (others.length === 0) return empty;

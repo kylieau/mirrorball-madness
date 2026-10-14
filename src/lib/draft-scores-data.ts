@@ -9,6 +9,7 @@ import {
   type DraftManagerScore,
   type DraftRelease,
 } from "@/lib/draft-scores";
+import { loadAllCouples, loadViewerSeason } from "@/lib/viewer-season-data";
 
 export type VisibleDraftNight = DraftRelease & {
   isDoubleElimination: boolean;
@@ -41,24 +42,16 @@ export async function loadDraftScoreContext(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<DraftScoreContext> {
-  const { data: seasonId } = await supabase.rpc("active_season_id");
-  if (!seasonId) return EMPTY_CONTEXT;
-
-  const [{ data: progress }, { data: episodes }, { data: weeks }, { data: releases }] = await Promise.all([
-    supabase
-      .from("spoiler_watch_progress")
-      .select("draft_unlocked_week")
-      .eq("user_id", userId)
-      .eq("season_id", seasonId)
-      .maybeSingle(),
-    supabase.from("episodes").select("id, week_id, results_published_at").eq("season_id", seasonId),
-    supabase.from("competition_weeks").select("id, week_number, is_double_elimination_week").eq("season_id", seasonId),
+  const [season, { data: releases }] = await Promise.all([
+    loadViewerSeason(supabase, userId),
     // Not season-scoped at the query level (no season_id column) -- filtered
     // to this season's episode ids below, same as loadResultsPageData.
     supabase.from("draft_couple_releases").select("episode_id, couple_id, released_at"),
   ]);
+  const { seasonId, episodeRows: episodes, weekRows: weeks } = season;
+  if (!seasonId) return EMPTY_CONTEXT;
 
-  const seasonEpisodeIds = new Set((episodes ?? []).map((e) => e.id));
+  const seasonEpisodeIds = new Set(episodes.map((e) => e.id));
   const releasedCoupleIdsByEpisode = new Map<string, string[]>();
   for (const row of releases ?? []) {
     if (!seasonEpisodeIds.has(row.episode_id)) continue;
@@ -67,18 +60,20 @@ export async function loadDraftScoreContext(
     releasedCoupleIdsByEpisode.set(row.episode_id, list);
   }
 
-  const weekNumberById = new Map((weeks ?? []).map((week) => [week.id, week.week_number]));
-  const release = findDraftRelease(episodes ?? [], weekNumberById, releasedCoupleIdsByEpisode);
-  const unlockedWeek = progress?.draft_unlocked_week ?? 0;
-  const latestRelease = release ? await loadLatestRelease(supabase, seasonId, releases ?? [], release) : null;
-  if (!release || !draftScoresVisible(unlockedWeek, release.weekNumber)) {
+  const weekNumberById = new Map(weeks.map((week) => [week.id, week.week_number]));
+  const release = findDraftRelease(episodes, weekNumberById, releasedCoupleIdsByEpisode);
+  const unlockedWeek = season.draftUnlockedWeek;
+  const visible = !!release && draftScoresVisible(unlockedWeek, release.weekNumber);
+  const [latestRelease, dancesResult] = await Promise.all([
+    release ? loadLatestRelease(supabase, seasonId, releases ?? [], release) : null,
+    visible ? supabase.rpc("visible_draft_dance_scores") : null,
+  ]);
+  if (!release || !dancesResult || dancesResult.error || !dancesResult.data) {
     return { release, latestRelease, unlockedWeek, night: null };
   }
+  const dances = dancesResult.data;
 
-  const { data: dances, error } = await supabase.rpc("visible_draft_dance_scores");
-  if (error || !dances) return { release, latestRelease, unlockedWeek, night: null };
-
-  const week = (weeks ?? []).find((row) => row.id === release.weekId);
+  const week = weeks.find((row) => row.id === release.weekId);
   return {
     release,
     latestRelease,
@@ -109,15 +104,12 @@ async function loadLatestRelease(
   const weekReleases = releases.filter((row) => release.episodeIds.includes(row.episode_id));
   const latest = [...weekReleases].sort((a, b) => b.released_at.localeCompare(a.released_at))[0];
   if (!latest) return null;
-  const { data: couples } = await supabase
-    .from("couples")
-    .select("id, status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)")
-    .eq("season_id", seasonId);
+  const couples = (await loadAllCouples(supabase)).filter((couple) => couple.season_id === seasonId);
   return draftReleaseLabel({
     latestCoupleId: latest.couple_id,
     releasedCoupleIds: weekReleases.map((row) => row.couple_id),
     weekNumber: release.weekNumber,
-    seasonCouples: (couples ?? []).map((c) => ({
+    seasonCouples: couples.map((c) => ({
       id: c.id,
       celebrity_name: c.celebrity?.name ?? "Unknown",
       pro_name: c.pro?.name ?? "Unknown",

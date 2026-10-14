@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { loadViewerMemberships } from "@/lib/viewer-season-data";
 
 export type AccountSettingsLeague = { id: string; name: string; isCommissioner: boolean };
 
@@ -25,23 +26,17 @@ export async function getAccountSettingsData(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<AccountSettingsData> {
-  const [{ data }, { data: memberships }] = await Promise.all([
+  const [{ data }, memberships] = await Promise.all([
     supabase
       .from("profiles")
       .select("display_name, is_super_admin, deletion_requested_at, spoiler_free_mode")
       .eq("id", userId)
       .single(),
-    // A co-manager's auth uid never appears as user_id — it's on
-    // co_manager_id — so both must be checked or a co-manager sees zero
-    // leagues under Account Settings.
-    supabase
-      .from("league_members")
-      .select("role, leagues(id, name)")
-      .or(`user_id.eq.${userId},co_manager_id.eq.${userId}`),
+    loadViewerMemberships(supabase, userId),
   ]);
 
   const isSuperAdmin = data?.is_super_admin ?? false;
-  const leagues = (memberships ?? [])
+  const leagues = memberships
     .filter((m) => m.leagues)
     .map((m) => ({ id: m.leagues!.id, name: m.leagues!.name, isCommissioner: m.role === "commissioner" }))
     .sort((a, b) => a.name.localeCompare(b.name));

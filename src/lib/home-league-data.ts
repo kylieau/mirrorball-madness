@@ -5,6 +5,7 @@ import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
+import { loadViewerSeason } from "@/lib/viewer-season-data";
 
 const RECENT_JOIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -16,21 +17,10 @@ export async function loadHomeLeagueData(
   spoilerFreeMode: boolean,
   leagueRefs: { id: string; name: string }[]
 ) {
-  const [{ data: activeSeasonId }, draftContext] = await Promise.all([
-    supabase.rpc("active_season_id"),
-    loadDraftScoreContext(supabase, userId),
-  ]);
-  const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
-    supabase
-      .from("competition_weeks")
-      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
-      .eq("season_id", activeSeasonId ?? ""),
-    supabase
-      .from("episodes")
-      .select("id, episode_number, week_id, airs_at, duration_minutes, theme, status, results_published_at")
-      .eq("season_id", activeSeasonId ?? ""),
-  ]);
-  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const draftContextPending = loadDraftScoreContext(supabase, userId);
+  const season = await loadViewerSeason(supabase, userId);
+  const activeSeasonId = season.seasonId;
+  const groupedWeeks = groupEpisodesByWeek(season.weekRows, season.episodeRows);
   const liveWeek = liveCompetitionWeek(groupedWeeks);
   const upcomingEpisode = liveWeek ? { id: liveWeek.id, week_number: liveWeek.week_number } : null;
   const completedWeeks = groupedWeeks
@@ -48,10 +38,11 @@ export async function loadHomeLeagueData(
       episodeIds: week.episodes.map((episode) => episode.id),
     }));
 
-  const cutoffPending = resolveSpoilerCutoff(supabase, userId, activeSeasonId ?? null, spoilerFreeMode, completedWeeks);
-  const [cutoff, { revealing, scoredIds, visible: revealingVisible }] = await Promise.all([
+  const cutoffPending = resolveSpoilerCutoff(supabase, userId, activeSeasonId, spoilerFreeMode, completedWeeks);
+  const [cutoff, { revealing, scoredIds, visible: revealingVisible }, draftContext] = await Promise.all([
     cutoffPending,
     loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
+    draftContextPending,
   ]);
   const revealingWeek = revealing && revealingVisible ? revealing.week : null;
   const draftNight = draftContext.night
@@ -101,7 +92,7 @@ export async function loadHomeLeagueData(
     summaries,
     liveWeekNumber: upcomingEpisode?.week_number ?? null,
     draftContext,
-    activeSeasonId: activeSeasonId ?? null,
+    activeSeasonId,
     finaleWeekNumber: groupedWeeks.find((week) => week.is_finale)?.week_number ?? null,
   };
 }

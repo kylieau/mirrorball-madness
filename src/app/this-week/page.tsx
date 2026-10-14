@@ -21,6 +21,7 @@ import { nextPredictedElimination } from "@/lib/grand-finale-pins";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
+import { loadAllCouples, loadViewerMemberships, loadViewerSeason } from "@/lib/viewer-season-data";
 import {
   adjacentThisWeekWeeks,
   buildThisWeekCarouselWeeks,
@@ -43,25 +44,16 @@ export default async function ThisWeekPage({
     redirect("/login");
   }
 
-  const [{ data: memberships }, accountSettingsData, { data: activeSeasonId }, draftContext, { data: danceStyles }, { data: allCouples }] =
-    await Promise.all([
-      supabase
-        .from("league_members")
-        .select("user_id, joined_at, leagues(id, name)")
-        .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`)
-        .order("joined_at", { ascending: true }),
-      getAccountSettingsData(supabase, user.id),
-      supabase.rpc("active_season_id"),
-      loadDraftScoreContext(supabase, user.id),
-      supabase.from("dance_styles").select("id, name").order("name"),
-      supabase
-        .from("couples")
-        .select(
-          "id, status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
-        ),
-    ]);
+  const draftContextPending = loadDraftScoreContext(supabase, user.id);
+  const [memberships, accountSettingsData, season, { data: danceStyles }, allCouples] = await Promise.all([
+    loadViewerMemberships(supabase, user.id),
+    getAccountSettingsData(supabase, user.id),
+    loadViewerSeason(supabase, user.id),
+    supabase.from("dance_styles").select("id, name").order("name"),
+    loadAllCouples(supabase),
+  ]);
 
-  const leagueRefs = (memberships ?? []).map((m) => m.leagues!).filter(Boolean);
+  const leagueRefs = memberships.map((m) => m.leagues!).filter(Boolean);
 
   if (leagueRefs.length === 0) {
     redirect("/leagues");
@@ -72,27 +64,16 @@ export default async function ThisWeekPage({
   const leagueNameById = new Map(leagueRefs.map((l) => [l.id, l.name]));
   // Each league's team-scoped data (roster, predictions) is keyed to the
   // primary's user_id even when the viewer is a co-manager there.
-  const myTeamIds = [...new Set((memberships ?? []).map((m) => m.user_id))];
+  const myTeamIds = [...new Set(memberships.map((m) => m.user_id))];
 
-  const [{ data: weekRows }, { data: episodeRows }, { data: rosterSlots }] = await Promise.all([
-    supabase
-      .from("competition_weeks")
-      .select("id, week_number, theme, is_finale, is_elimination_week, is_double_elimination_week")
-      .eq("season_id", activeSeasonId ?? "")
-      .order("week_number", { ascending: false }),
-    supabase
-      .from("episodes")
-      .select("id, episode_number, week_id, airs_at, duration_minutes, theme, status, results_published_at")
-      .eq("season_id", activeSeasonId ?? ""),
-    supabase
-      .from("roster_slots")
-      .select("league_id, couple_id")
-      .in("manager_id", myTeamIds)
-      .in("league_id", leagueIds)
-      .is("end_week", null),
-  ]);
+  const rosterSlotsPending = supabase
+    .from("roster_slots")
+    .select("league_id, couple_id")
+    .in("manager_id", myTeamIds)
+    .in("league_id", leagueIds)
+    .is("end_week", null);
 
-  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const groupedWeeks = groupEpisodesByWeek(season.weekRows, season.episodeRows);
   const seasonWeeks = groupedWeeks.map((week) => ({
     id: week.id,
     week_number: week.week_number,
@@ -112,13 +93,15 @@ export default async function ThisWeekPage({
   const cutoffPending = resolveSpoilerCutoff(
     supabase,
     user.id,
-    activeSeasonId ?? null,
+    season.seasonId,
     accountSettingsData.spoilerFreeMode,
     completedWeeks
   );
-  const [cutoff, { revealing, visible: revealingVisible }] = await Promise.all([
+  const [cutoff, { revealing, visible: revealingVisible }, draftContext, { data: rosterSlots }] = await Promise.all([
     cutoffPending,
     loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
+    draftContextPending,
+    rosterSlotsPending,
   ]);
 
   // Carousel = spoiler-visible completed weeks + upcoming/locked for a
@@ -191,7 +174,7 @@ export default async function ThisWeekPage({
       : Promise.resolve({ data: [] as { league_id: string; couple_id: string; predicted_position: number }[] }),
   ]);
 
-  const flatCouples = (allCouples ?? []).map((c) => ({
+  const flatCouples = allCouples.map((c) => ({
     id: c.id,
     celebrity_name: c.celebrity?.name ?? "Unknown",
     pro_name: c.pro?.name ?? "Unknown",
@@ -232,7 +215,7 @@ export default async function ThisWeekPage({
   // page is already showing) — the predicted winner is a separate, rarer
   // note that only means anything once the season's actually deciding
   // itself, so it's gated to the semi-final/finale window.
-  const gfCouples = (allCouples ?? []).map((c) => ({
+  const gfCouples = allCouples.map((c) => ({
     id: c.id,
     celebrity_name: c.celebrity?.name ?? "Unknown",
     status: selectedWeek

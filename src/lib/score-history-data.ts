@@ -9,6 +9,7 @@ import { buildScoreHistory, weekResults, type HistoryWeekData, type ScoreHistory
 import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { isOwnMembership } from "@/lib/acting-manager";
+import { loadAllCouples, loadViewerSeason } from "@/lib/viewer-season-data";
 
 // Matches the fallback the scoring engine (results.ts) applies, not the Picks UI default.
 const GRAND_FINALE_SCORED_METHOD_FALLBACK: GrandFinaleMethod = "exact_position";
@@ -28,24 +29,17 @@ export async function loadScoreHistory(
   if (!members?.some((m) => isOwnMembership(m, userId))) return { lines: null, error: "Not a member of this league" };
   if (!members.some((m) => m.user_id === managerId)) return { lines: null, error: "Manager not found in this league" };
 
-  const { data: seasonId } = await supabase.rpc("active_season_id");
-  if (!seasonId) return { lines: [], error: null };
-
-  const [{ data: weekRows }, { data: episodeRows }, { data: profile }, { data: settings }] = await Promise.all([
-    supabase
-      .from("competition_weeks")
-      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
-      .eq("season_id", seasonId),
-    supabase
-      .from("episodes")
-      .select("id, episode_number, week_id, airs_at, theme, status")
-      .eq("season_id", seasonId),
+  const draftContextPending = loadDraftScoreContext(supabase, userId);
+  const [season, { data: profile }, { data: settings }] = await Promise.all([
+    loadViewerSeason(supabase, userId),
     supabase.from("profiles").select("spoiler_free_mode").eq("id", userId).single(),
     supabase.from("scoring_settings").select("*").eq("league_id", leagueId).single(),
   ]);
+  const { seasonId, weekRows, episodeRows } = season;
+  if (!seasonId) return { lines: [], error: null };
   if (!settings) return { lines: null, error: "Scoring settings not found" };
 
-  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const groupedWeeks = groupEpisodesByWeek(weekRows, episodeRows);
   const completedWeeks = groupedWeeks
     .filter((week) => week.status === "completed")
     .sort((a, b) => b.week_number - a.week_number);
@@ -62,7 +56,7 @@ export async function loadScoreHistory(
   const [cutoff, { revealing, visible: revealingVisible }, draftContext] = await Promise.all([
     cutoffPending,
     loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
-    loadDraftScoreContext(supabase, userId),
+    draftContextPending,
   ]);
   const completedAllowedWeeks = completedWeeks.filter((week) => cutoff.allowedEpisodeIds.has(week.id));
   const draftNight = draftContext.night;
@@ -83,7 +77,7 @@ export async function loadScoreHistory(
   const weekIds = completedAllowedWeeks.map((week) => week.id);
 
   const [
-    { data: couples },
+    allCouples,
     { data: slots },
     { data: predictions },
     { data: grandFinalePredictions },
@@ -92,10 +86,7 @@ export async function loadScoreHistory(
     { data: outcomeRows },
     { data: jeopardyRows },
   ] = await Promise.all([
-    supabase
-      .from("couples")
-      .select("id, status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)")
-      .eq("season_id", seasonId),
+    loadAllCouples(supabase),
     supabase
       .from("roster_slots")
       .select("couple_id, start_week, end_week")
@@ -122,9 +113,10 @@ export async function loadScoreHistory(
     supabase.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
     supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id").in("episode_id", episodeIds),
   ]);
+  const couples = allCouples.filter((couple) => couple.season_id === seasonId);
 
   const nameParts = buildCoupleDisplayNames(
-    (couples ?? []).map((c) => ({ id: c.id, celebrity_name: c.celebrity?.name ?? "?", pro_name: c.pro?.name ?? "?" }))
+    couples.map((c) => ({ id: c.id, celebrity_name: c.celebrity?.name ?? "?", pro_name: c.pro?.name ?? "?" }))
   );
   const coupleNames = new Map([...nameParts].map(([id, parts]) => [id, parts.celebrity]));
 
@@ -181,7 +173,7 @@ export async function loadScoreHistory(
       tierPayStyle: settings.bonus_picks_tier_pay_style as TierPayStyle,
       pointsPerCorrect: settings.bonus_picks_points_per_correct,
     },
-    couples: (couples ?? []).map((c) => ({ id: c.id, status: c.status, elimination_week: c.elimination_week })),
+    couples: couples.map((c) => ({ id: c.id, status: c.status, elimination_week: c.elimination_week })),
     coupleNames,
     weeks,
     rosterSlots: (slots ?? [])
@@ -200,7 +192,7 @@ export async function loadScoreHistory(
             },
           ];
     }),
-    weekSchedule: (weekRows ?? []).map((week) => ({
+    weekSchedule: weekRows.map((week) => ({
       weekNumber: week.week_number,
       eliminations: week.is_double_elimination_week ? 2 : week.is_elimination_week ? 1 : 0,
     })),
