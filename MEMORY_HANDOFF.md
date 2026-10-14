@@ -1,20 +1,23 @@
 # Session Handoff
 
 ## 1. Current State
-**Performance audit (BACKLOG.md "Performance audit — 2026-10-14"): fixes #1 and #2 are committed and pushed to `origin/main`; #3 not started.** Branch `main`, at `b7ccdea` before this sync. Vercel deploy not yet confirmed for either.
-- **#1 `82fea94`**: flattened serial query waterfalls (`league-home-summary.ts` 5 rounds → 2, Picks in two parallel stages, Results one `Promise.all`, `loadRevealingWeek` alongside the cutoff). Verified during the live E06 reveal: signed-in SSR HTML identical before/after across 28 page/state pairs (including open and locked picks, Grand Finale on/off, Spoiler-Free states, drafts unlocked); dev medians Home 2.7 → 2.2s, Picks 3.6 → 3.0s.
-- **#2 `fc08b22`**: per-request `React.cache` loaders in `src/lib/viewer-season-data.ts` (active season, spoiler progress with both marks, weeks/episodes, viewer memberships, all couples), reused by the draft context, spoiler cutoff, account settings, other-league picks, module stack and the Home/Results/league/Score History loaders. Draft context and roster reads overlap the cutoff. HTML identical across 28 pairs; dev medians Picks 3.2 → 2.2s, Standings 1.9 → 1.3s, Home unchanged. **Gap:** tested after E06 was published (05:01 UTC), so it had no revealing week, no released drafts and no open picks. Re-check on E07's live night.
-- Build, `eslint src` and 609 tests pass. Full `npm run lint`/`npm test` fail only on another session's `.codex-private/` folder.
-- **E06 is officially published** (2026-10-14 05:01 UTC). Its 11 live `dance_scores` rows have 4 judges each and `scaled_score` = total × 3/4, so guest-judge scaling is verified in the stored data.
-- The earlier `384f78d` work (atomic publication, autosave fix, redirect validation, spacing pass) is pushed; the atomic publication migration is installed live. Whether E06's publish ran on a deploy with the atomic path wasn't checked.
+**Performance audit (BACKLOG.md "Performance audit — 2026-10-14"): all three top fixes are committed and pushed to `origin/main`.** Branch `main`, at `7a23800`. Vercel deploy not yet confirmed.
+- **#1 `82fea94`**: flattened serial query waterfalls (home summary 5 rounds → 2, Picks in two parallel stages, Results one `Promise.all`, `loadRevealingWeek` alongside the cutoff). Dev medians Home 2.7 → 2.2s, Picks 3.6 → 3.0s.
+- **#2 `fc08b22`**: per-request `React.cache` loaders in `src/lib/viewer-season-data.ts` (season, spoiler progress, weeks/episodes, memberships, couples) reused by the nested loaders. Picks 3.2 → 2.2s, Standings 1.9 → 1.3s.
+- **#3 `91d789d`, prefetch `7a23800`**: `loadLeaguePageBase` no longer computes other leagues' summaries. The switcher calls `getSwitcherSummaries` (`src/app/leagues/[id]/switcher/actions.ts`, through `loadHomeLeagueData`) once after mount and on every open, so rows follow Home's rank rule (resolves the "switcher rank ≠ Home rank" flag; the user never answered the question, so this was a default, easy to reverse). Picks ~2.5 → ~2.1s with two other leagues; tab taps not measurably slower.
+- **Verified:** signed-in SSR HTML identical before/after (28 page/state pairs for #1/#2); switcher rows equal Home's cards in a three-league check. Build, `eslint src`, 609 tests pass.
+- **Not verified (needs a live night, E07 Tue Oct 20 ET):** #2 and #3 with a revealing week, released drafts, a live-revealed couple and open picks (all post-E06 runs had none). The #3 check couldn't catch rows attached to the wrong league (both extra leagues had identical values); submit a pick in one extra league to settle it.
+- **E06 is officially published** (2026-10-14 05:01 UTC); its 11 live `dance_scores` rows have 4 judges and `scaled_score` = total × 3/4. Score History `Jdg 36→27` lines not yet checked in a real league.
+- Earlier `384f78d` work (atomic publication, autosave fix, redirect validation, spacing pass) is pushed; the atomic publication migration is installed live.
 
 ## 2. Changes Made
-This session: `src/lib/viewer-season-data.ts` (new), `league-home-summary.ts`, `league-page-data.ts`, `home-league-data.ts`, `revealing-week-data.ts`, `score-history-data.ts`, `draft-scores-data.ts`, `spoiler-cutoff.ts`, `account-settings-data.ts`, `other-league-picks.ts`, `league-module-stack-data.ts`, `src/app/(fan)/page.tsx`, `src/app/this-week/page.tsx`, Picks `page.tsx`, plus BACKLOG.md, CLAUDE.md (page-loader convention now names `viewer-season-data.ts`) and this file. All committed and pushed. Scratch QA leagues/accounts were removed; temp scripts deleted.
+This session (all committed and pushed): `src/lib/viewer-season-data.ts` (new), `src/app/leagues/[id]/switcher/actions.ts` (new), and edits to the page loaders (`league-home-summary.ts`, `league-page-data.ts`, `home-league-data.ts`, `revealing-week-data.ts`, `score-history-data.ts`, `draft-scores-data.ts`, `spoiler-cutoff.ts`, `account-settings-data.ts`, `other-league-picks.ts`, `league-module-stack-data.ts`), `(fan)/page.tsx`, Results and Picks pages, `league-switcher.tsx`, `league-header.tsx`, `league-page-shell.tsx`, BACKLOG.md, CLAUDE.md. Scratch QA leagues/accounts removed; temp scripts deleted.
 
 **Not ours; leave unstaged:** `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile.codex`, `.devcontainer/devcontainer-lock.json`, `.gitignore` (adds `/.codex-private/`), `ios/App/App.xcodeproj/project.pbxproj`, `supabase/queries/prefill-s35-e06-dances.sql`, `supabase/queries/add-bryan-s35-w05-curtain-call.sql` (both already run).
 
 ## 3. Key Decisions
 - **No cross-request caching** for episodes, weeks, scores, results, predictions or spoiler progress (spoiler cutoff and reveal state depend on them; reads run under each viewer's RLS). `React.cache` per request only.
+- **Attribution:** commits this session end with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` (per the harness reminder for the current model).
 - **Perf verification method:** seed scratch league (`scripts/qa-screenshots/seed.mjs up`) + a second league via `create_league`; sign in with playwright; fetch SSR HTML with scripts/links stripped for each Spoiler-Free state; swap changed files to `HEAD` for "before". **Restart `next dev` fresh for each side**: repeated hot swaps grew next-server to 3.3 GB in this ~8 GB container and requests timed out. Kill it with `kill $(pgrep -f "^next-server")`; `pkill -f "next dev"` also kills the calling shell.
 - **Vitest doesn't resolve `@/`**: modules imported by tests (e.g. `spoiler-cutoff.ts`) use relative imports.
 - **Curtain Call lock** (settled 2026-10-07): per-league coast + signed offset, capped at the broadcast's end; Grand Finale deadline stays East. See CLAUDE.md.
@@ -32,9 +35,9 @@ This session: `src/lib/viewer-season-data.ts` (new), `league-home-summary.ts`, `
 - **`BACKLOG.md` edits**: `Edit` or a targeted script, never `Write`.
 
 ## 4. Backlog & Next Steps
-- **#3 (league-switcher summaries off the Picks/Standings critical path) waits on a user decision:** on a live night the switcher's rank can differ from Home's (`loadLeaguePageBase` doesn't pass `scoredIds`/`revealingWeekId`/`draftNight` to `computeLeagueHomeSummary`). Ask whether to align it with Home as part of #3. Details and other ride-along flags in BACKLOG.md.
-- **E07 live night (Tue Oct 20 ET):** re-check #2 with a released draft and a live-revealed couple (Home, Results, Picks, Standings); also confirm Score History shows `Jdg 36→27`-style lines on a guest night (BACKLOG "To check").
+- **E07 live night (Tue Oct 20 ET):** re-check Home/Results/Picks/Standings and the switcher with a released draft and a live-revealed couple; confirm Score History shows `Jdg 36→27`-style lines on a guest night (BACKLOG "To check").
+- Remaining perf ride-alongs are behavior questions for the user (Home refreshes in more cases than other pages; overlapping 20s refreshes on slow renders; `loadOtherLeaguePicks` still recomputes lock/deadline per other league; `getUser()` runs more than once per render). Details in BACKLOG.md.
 - Confirm Vercel is Ready for `main` (first deploys with the perf changes and Next 15.5.27).
 - Merged branch `fixes/finale-bonus-audit-schedule` is still on origin, safe to delete.
 
-Next command: none pending. Ask the user the #3 rank-alignment question before starting it.
+Next command: none pending. Ask the user which ride-along flag, if any, to take next.
