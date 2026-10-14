@@ -212,7 +212,7 @@ export default async function Home() {
       {draftVisible ? (
         <>
           <HomeDraftChrome {...accountSettingsData} email={user.email ?? ""} />
-          <div className={cn("flex flex-col gap-4 pt-4", BOTTOM_NAV_CLEARANCE)}>
+          <div className={cn("flex flex-col gap-3 pt-3", BOTTOM_NAV_CLEARANCE)}>
             <PageHeader title="Home" />
             {dashboard}
           </div>
@@ -225,7 +225,7 @@ export default async function Home() {
             email={user.email ?? ""}
             state={spoilerFreeStrip}
           />
-          <div className={cn("flex flex-col gap-4 pt-4", BOTTOM_NAV_CLEARANCE)}>
+          <div className={cn("flex flex-col gap-3 pt-3", BOTTOM_NAV_CLEARANCE)}>
             <PageHeader title="Home" />
             {dashboard}
           </div>
@@ -233,7 +233,7 @@ export default async function Home() {
       ) : (
         <>
           <StickyTopBar {...accountSettingsData} email={user.email ?? ""} />
-          <div className={cn("flex flex-col gap-4 pt-4", BOTTOM_NAV_CLEARANCE)}>
+          <div className={cn("flex flex-col gap-3 pt-3", BOTTOM_NAV_CLEARANCE)}>
             <PageHeader title="Home" />
             {dashboard}
           </div>

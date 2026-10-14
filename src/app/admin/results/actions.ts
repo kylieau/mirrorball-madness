@@ -12,7 +12,6 @@ import {
   saveDraftResults,
   addDraftCustomMoment,
   removeDraftCustomMoment,
-  publishEpisodeDraft,
   releaseDraftCouple,
   withdrawDraftCouple,
   startCorrection,
@@ -20,6 +19,7 @@ import {
   type SaveDraftResultsInput,
   type SeasonSettingsInput,
 } from "@/lib/results-draft";
+import { publishEpisodeAtomically } from "@/lib/episode-publication";
 import { revealCouple, undoReveal } from "@/lib/results-reveal";
 import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
 
@@ -136,7 +136,7 @@ export async function publishEpisodeResults(episodeId: string): Promise<{ error:
   const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
-  const result = await publishEpisodeDraft(createAdminClient(), episodeId, access.userId);
+  const result = await publishEpisodeAtomically(createAdminClient(), episodeId, access.userId);
   if (!result.error) {
     revalidatePath("/admin/results", "layout");
     revalidatePath("/admin/schedule");

@@ -60,14 +60,14 @@ export function StandingsLeaderboard({
               onClick={() => toggle(row.managerId)}
               className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left"
             >
-              <span aria-hidden className="w-3 text-[10px]">
+              <span aria-hidden className="w-3 shrink-0 text-[10px]">
                 {row.change === "up" && <span className="text-rank-up">▲</span>}
                 {row.change === "down" && <span className="text-rank-down">▼</span>}
                 {row.change === "same" && <span className="text-muted-foreground">–</span>}
               </span>
               <span
                 className={cn(
-                  "w-5 text-center font-rank text-sm font-bold",
+                  "w-5 shrink-0 text-center font-rank text-sm font-bold",
                   isYou ? "text-accent" : "text-muted-foreground"
                 )}
               >
@@ -75,8 +75,13 @@ export function StandingsLeaderboard({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2 text-sm font-semibold">
-                  {row.displayName}
-                  {isYou && <YouPill />}
+                  <span
+                    className={cn("min-w-0 flex-1 [overflow-wrap:anywhere]", !isOpen && "line-clamp-2")}
+                    title={row.displayName}
+                  >
+                    {row.displayName}
+                  </span>
+                  {isYou && <span className="shrink-0"><YouPill /></span>}
                 </span>
                 {row.weekPoints !== null && (
                   <span className={cn("block font-heading text-xs", isYou ? "text-accent" : "text-muted-foreground")}>
@@ -84,7 +89,7 @@ export function StandingsLeaderboard({
                   </span>
                 )}
               </span>
-              <span className="font-heading text-sm font-semibold">{formatPoints(row.totalPoints)}</span>
+              <span className="shrink-0 font-heading text-sm font-semibold tabular-nums">{formatPoints(row.totalPoints)}</span>
               {isOpen ? (
                 <ChevronDownIcon aria-hidden className="size-4 shrink-0 text-accent" />
               ) : (

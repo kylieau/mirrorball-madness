@@ -59,7 +59,7 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
         </div>
 
         {stack.length > 0 && (
-          <dl className="flex flex-col gap-1.5 border-y border-border py-3 text-sm">
+          <dl className="flex flex-col gap-1.5 border-y border-border py-2 text-sm">
             {stack.map((line) => {
               const toneClass = cn(
                 "min-w-0 break-words",
@@ -130,21 +130,13 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
         )}
 
         <div className="flex gap-2">
-          {picksLabel && action === "locked" && (
-            <Button
-              size="lg"
-              className="flex-1 border-transparent bg-muted/40 text-muted-foreground disabled:opacity-100 dark:bg-muted/40"
-              disabled
-            >
-              {picksLabel}
-            </Button>
-          )}
-          {picksLabel && action !== "locked" && (
+          {picksLabel && (
             <Button
               size="lg"
               variant={action === "make" ? "default" : "outline"}
               className={cn(
                 "flex-1",
+                action === "locked" && GOLD_OUTLINE,
                 action === "edit" && cn(GOLD_OUTLINE, "bg-primary/10 hover:bg-primary/15 dark:bg-primary/10 dark:hover:bg-primary/15")
               )}
               nativeButton={false}

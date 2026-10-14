@@ -25,7 +25,7 @@ export default async function AdminAccountsPage() {
   const { requests, error } = await listPendingAccountDeletions(createAdminClient());
 
   return (
-    <div className="flex w-full flex-col gap-4 px-4 pt-8 pb-8">
+    <div className="flex w-full flex-col gap-3 px-4 py-4">
       <TopBar {...accountSettingsData} email={user.email ?? ""} />
       <PageHeader title="Accounts" />
       <p className="text-sm text-muted-foreground">

@@ -134,10 +134,10 @@ export function buildModuleStack(input: ModuleStackInput): ModuleLine[] {
 
 export type PicksAction = "make" | "edit" | "locked" | "none";
 
-// Locked keeps the Make Picks label and renders muted, so a caught-up card
-// doesn't grow a second "Picks Locked" label.
-export function picksButtonLabel(action: PicksAction): "Make Picks" | "Edit Picks" | null {
-  if (action === "make" || action === "locked") return "Make Picks";
+// Locked picks remain viewable from the league card.
+export function picksButtonLabel(action: PicksAction): "Make Picks" | "Edit Picks" | "See Picks" | null {
+  if (action === "make") return "Make Picks";
+  if (action === "locked") return "See Picks";
   if (action === "edit") return "Edit Picks";
   return null;
 }

@@ -1,9 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { inJeopardyIdsToPersist, scaledJudgesScore, type Outcome } from "@/lib/scoring";
-import { applyEpisodeResults, type EntrySubmission } from "@/lib/results";
-import { loadRevealedCouples, loadRevealedDances } from "@/lib/results-reveal";
-import { unpostedCoupleIds } from "@/lib/reveal-state";
+import { loadRevealedDances } from "@/lib/results-reveal";
 
 export type DraftJudgeScoreInput = { judgeId: string; score: number };
 
@@ -73,8 +71,7 @@ const EMPTY_DRAFT_STATE: DraftState = {
   inJeopardyCoupleIds: [],
 };
 
-// Like replaceInJeopardyCouples (src/lib/results.ts), but scoped to
-// coupleIds instead of replacing the whole episode's list -- a concurrent
+// Scope to edited couples instead of replacing the whole episode list: a concurrent
 // save from someone else touching other couples must not clobber theirs.
 async function replaceInJeopardyForCouples(
   admin: SupabaseClient<Database>,
@@ -98,8 +95,7 @@ async function replaceInJeopardyForCouples(
 }
 
 // Autosave path — cheap and draft-only. Does NOT touch couples.status or
-// call computeWeeklyScores; that only happens at Publish, via the existing
-// applyEpisodeResults. Scoped to only the couples in input.entries -- the
+// recompute standings; publication commits them through the atomic RPC. Scoped to only the couples in input.entries -- the
 // caller (buildDraftInput/flushDraft in results-form.tsx) sends only the
 // couples actually edited since the last save, never the whole roster, so
 // two commissioners entering different couples' scores at the same time
@@ -140,7 +136,7 @@ export async function saveDraftResults(
 
   // Inserted one dance at a time (not a bulk insert) so each row's real id
   // is known before inserting its judge_scores — same reasoning as
-  // applyEpisodeResults.
+  // atomic publication.
   for (const entry of entries) {
     for (const dance of entry.dances) {
       const totalScore = dance.judgeScores.reduce((sum, js) => sum + js.score, 0);
@@ -185,9 +181,7 @@ export async function saveDraftResults(
     if (error) return { error: error.message };
   }
 
-  // Scoped to coupleIds too, via replaceInJeopardyForCouples below -- not
-  // the shared whole-episode replaceInJeopardyCouples publish uses, which
-  // is fine there since publish is a single, exclusive, admin-only action.
+  // A commissioner saving another couple must not lose their jeopardy flag.
   const jeopardyErr = await replaceInJeopardyForCouples(
     admin,
     input.episodeId,
@@ -300,90 +294,6 @@ async function deleteAllDraftRows(admin: SupabaseClient<Database>, episodeId: st
   await admin.from("draft_episode_custom_moments").delete().eq("episode_id", episodeId);
   await admin.from("draft_episode_in_jeopardy_couples").delete().eq("episode_id", episodeId);
   await admin.from("draft_couple_releases").delete().eq("episode_id", episodeId);
-}
-
-// Builds an EpisodeResultsInput from the draft tables and calls
-// applyEpisodeResults — the scoring/prediction/Grand-Finale logic is never
-// forked for drafts. On success, promotes the episode-level fields and
-// custom moments into the live tables and deletes every draft row; on
-// error, returns it and leaves all draft rows intact so nothing gets
-// promoted. expected_dance_count is not derived here: Schedule owns it,
-// and publish must not clobber it.
-export async function publishEpisodeDraft(
-  admin: SupabaseClient<Database>,
-  episodeId: string,
-  publishedBy: string
-): Promise<{ error: string | null }> {
-  const draft = await loadDraftForEpisode(admin, episodeId);
-  if (!draft.hasDraft) return { error: "No draft to publish for this episode" };
-
-  const { data: episode, error: episodeErr } = await admin
-    .from("episodes")
-    .select("id, week_id, airs_at, theme")
-    .eq("id", episodeId)
-    .single();
-  if (episodeErr || !episode) return { error: episodeErr?.message ?? "Episode not found" };
-
-  const dancesByCouple = new Map<string, DraftDanceState[]>();
-  for (const d of draft.dances) {
-    const list = dancesByCouple.get(d.coupleId) ?? [];
-    list.push(d);
-    dancesByCouple.set(d.coupleId, list);
-  }
-
-  const entries: EntrySubmission[] = draft.entries.map((e) => ({
-    coupleId: e.coupleId,
-    dances: (dancesByCouple.get(e.coupleId) ?? []).map((d) => ({
-      danceStyleId: d.danceStyleId,
-      songTitle: d.songTitle,
-      judgeScores: d.judgeScores,
-    })),
-    outcome: e.outcome,
-    savedByJudges: e.savedByJudges,
-    hadImmunity: e.hadImmunity,
-    bonusPoints: e.bonusPoints,
-    bonusNote: e.bonusNote,
-  }));
-
-  const revealedCoupleIds = new Set((await loadRevealedCouples(admin, episodeId)).keys());
-  const unposted = unpostedCoupleIds(draft.dances, revealedCoupleIds);
-  if (unposted.length > 0) {
-    return { error: `Post every couple's scores before publishing results (${unposted.length} still to post).` };
-  }
-
-  const result = await applyEpisodeResults(
-    admin,
-    { episodeId, entries, inJeopardyCoupleIds: draft.inJeopardyCoupleIds },
-    revealedCoupleIds
-  );
-  if (result.error) return result;
-
-  const { error: publishErr } = await admin
-    .from("episodes")
-    .update({
-      guest_judge_name: draft.guestJudgeName,
-      judges_save_available: draft.judgesSaveAvailable,
-      results_published_at: new Date().toISOString(),
-      results_published_by: publishedBy,
-    })
-    .eq("id", episodeId);
-  if (publishErr) return { error: publishErr.message };
-
-  await admin.from("episode_custom_moments").delete().eq("episode_id", episodeId);
-  if (draft.customMoments.length > 0) {
-    const { error: momentsErr } = await admin.from("episode_custom_moments").insert(
-      draft.customMoments.map((m) => ({
-        episode_id: episodeId,
-        couple_id: m.coupleId,
-        label: m.label,
-        created_by: publishedBy,
-      }))
-    );
-    if (momentsErr) return { error: momentsErr.message };
-  }
-
-  await deleteAllDraftRows(admin, episodeId);
-  return { error: null };
 }
 
 // Releases one couple's drafted dance for fans who marked the week watched.

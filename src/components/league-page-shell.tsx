@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { cn } from "cn";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { LeagueHeader, type LeagueTab } from "@/components/league-header";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
@@ -24,7 +23,7 @@ export function LeaguePageShell({
   const { league, scoringSettings, spoilerFreeStrip } = base;
   return (
     <div className="flex flex-col px-4">
-      <div className={cn("flex flex-col gap-4", spoilerFreeStrip || base.draftScoresStrip ? "pt-4" : "py-8")}>
+      <div className="flex flex-col gap-3">
         <LeagueHeader
           tab={tab}
           leagueId={league.id}

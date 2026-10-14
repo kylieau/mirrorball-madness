@@ -98,7 +98,7 @@ export const DANCE_CARD_PLACEMENT_KEY: Record<
 // complete the week, but it's nobody's fault, so just no bonus rather than
 // treating it like a vote-off. bye: sat out but still competing overall —
 // also no bonus for a week they didn't dance, but see NO_SURVIVAL_OUTCOMES
-// vs. the couples.status sync in applyEpisodeResults, where bye is different
+// vs. the couples.status sync in buildPublicationPlan, where bye is different
 // again (doesn't open the roster slot, unlike eliminated/withdrawn).
 export const NO_SURVIVAL_OUTCOMES = new Set<Outcome>(["eliminated", "withdrawn", "bye"]);
 
@@ -517,7 +517,7 @@ export function grandFinaleBestCasePoints({
 }
 
 // Pure and DB-free, same design as computeWeeklyScores — the caller resolves
-// which couples newly became known this call (see applyEpisodeResults) and
+// which couples newly became known this call (see buildPublicationPlan) and
 // passes in only those, since a couple's Grand Finale points are earned once,
 // the moment its actual position becomes known, not recomputed every week.
 export function computeGrandFinalePoints({

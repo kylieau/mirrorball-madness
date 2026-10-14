@@ -62,8 +62,8 @@ export default async function LeaguesPage({
     .sort((a, b) => Number(b.picksDue) - Number(a.picksDue));
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-8">
-      <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-3 px-4 py-4">
+      <div className="flex flex-col gap-4">
         <TopBar {...accountSettingsData} email={user.email ?? ""} />
 
         {leagues.length > 0 && (

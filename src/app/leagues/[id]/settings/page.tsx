@@ -92,7 +92,7 @@ export default async function LeagueSettingsPage({
         isCommissioner ? "pb-36" : "pb-8"
       }`}
     >
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         <div className="sticky top-0 z-30 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight">League Settings</h1>
@@ -318,7 +318,7 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8">
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         <div className="sticky top-0 z-30 -mx-4 flex items-center justify-between gap-3 border-b border-border bg-background px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight">League Settings</h1>

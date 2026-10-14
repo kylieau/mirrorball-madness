@@ -35,6 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BOTTOM_NAV_STACK_ABOVE } from "@/components/bottom-nav";
+import { DraftSaveQueue } from "@/lib/draft-save-queue";
 import { couplesRevealState, undoSecondsLeft } from "@/lib/reveal-state";
 import { buildPeopleDisplayNames, type CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName, coupleNameNode } from "@/components/couple-name";
@@ -345,7 +346,8 @@ export function ResultsForm({
   // Couples edited since the last successful save. flushDraft only sends
   // these, never the whole roster, so a concurrent save from someone else
   // editing different couples can't silently wipe their rows.
-  const dirtyCoupleIds = useRef<Set<string>>(new Set());
+  const draftSaveQueue = useRef(new DraftSaveQueue());
+  const draftInputRef = useRef(buildDraftInput);
 
   function coupleParts(c: Couple): CoupleNameParts {
     return (
@@ -383,7 +385,7 @@ export function ResultsForm({
       setShowLeaderboard(false);
       setUnlockedForCorrectionCoupleIds(new Set());
       setCoupleViewMode(selectedEpisode.results_published_at != null ? "published" : "inProgress");
-      dirtyCoupleIds.current.clear();
+      draftSaveQueue.current.reset();
     }
     const wasSelfTriggered = justSavedEpisodeId.current === selectedEpisode.id;
     justSavedEpisodeId.current = null;
@@ -399,7 +401,7 @@ export function ResultsForm({
         setCustomMoments([]);
         setHasDraft(false);
         setError(null);
-        dirtyCoupleIds.current.clear();
+        draftSaveQueue.current.reset();
         startEpisodeCorrection(selectedEpisode.id).then((result) => {
           if (result.error) {
             seedingEpisodeId.current = null;
@@ -462,10 +464,10 @@ export function ResultsForm({
   }, [revealedCoupleIds.size]);
 
   // Only the couples actually edited since the last save -- see
-  // dirtyCoupleIds' comment. A stale coupleId (removed from the entry list
+  // draftSaveQueue's comment. A stale coupleId (removed from the entry list
   // since it was marked dirty) is dropped rather than sent.
-  function buildDraftInput() {
-    const dirtyCouples = episodeCouples.filter((c) => dirtyCoupleIds.current.has(c.id));
+  function buildDraftInput(ids: string[]) {
+    const dirtyCouples = episodeCouples.filter((c) => ids.includes(c.id));
     return {
       episodeId: selectedEpisode!.id,
       // Caption column is no longer editable here (it never drove scores or
@@ -501,23 +503,24 @@ export function ResultsForm({
     };
   }
 
+  draftInputRef.current = buildDraftInput;
+
   async function flushDraft(): Promise<{ error: string | null }> {
-    if (!selectedEpisode || dirtyCoupleIds.current.size === 0) return { error: null };
+    if (!selectedEpisode) return { error: null };
     setSavingDraft(true);
-    justSavedEpisodeId.current = selectedEpisode.id;
-    const input = buildDraftInput();
-    const result = await saveEpisodeDraft(input);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setError(null);
-      // Only the couples this save actually sent -- not a blind clear, so a
-      // couple edited again while this request was in flight stays dirty
-      // and gets picked up by the next flush.
-      for (const entry of input.entries) dirtyCoupleIds.current.delete(entry.coupleId);
-      setDraftSavedAt(new Date().toISOString());
-      setHasDraft(true);
-    }
+    const result = await draftSaveQueue.current.flush(
+      (ids) => draftInputRef.current(ids),
+      async (input) => {
+        justSavedEpisodeId.current = input.episodeId;
+        const saved = await saveEpisodeDraft(input);
+        if (!saved.error) {
+          setDraftSavedAt(new Date().toISOString());
+          setHasDraft(true);
+        }
+        return saved;
+      }
+    );
+    setError(result.error);
     setSavingDraft(false);
     return result;
   }
@@ -647,7 +650,7 @@ export function ResultsForm({
 
   function updateRow(coupleId: string, patch: Partial<CoupleRow>) {
     setRows((prev) => ({ ...prev, [coupleId]: { ...(prev[coupleId] ?? emptyRow()), ...patch } }));
-    dirtyCoupleIds.current.add(coupleId);
+    draftSaveQueue.current.markDirty(coupleId);
     scheduleAutosave();
   }
 
@@ -794,7 +797,7 @@ export function ResultsForm({
           {rank != null && <span className="ml-1.5 text-muted-foreground">· {coupleTotal(row)} pts</span>}
         </p>
 
-        <fieldset disabled={locked} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
+        <fieldset disabled={locked || revealBusy || publishing || releasing} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
           {row.dances.map((d) => (
             <div key={d.key} className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-1.5">
               <div className="flex flex-wrap items-end gap-1.5">
@@ -993,7 +996,7 @@ export function ResultsForm({
   }
 
   return (
-    <div className="flex flex-col gap-6 pb-24">
+    <div className="flex flex-col gap-4 pb-24">
       {justPublished && selectedEpisode && (
         <div className="rounded-xl border border-emerald/40 bg-emerald/10 px-4 py-3 text-sm text-emerald-text">
           <p className="font-medium">
@@ -1039,6 +1042,7 @@ export function ResultsForm({
           ) : (
             <Select
               items={episodeItems}
+              disabled={savingDraft || revealBusy || publishing || releasing}
               value={selectedEpisodeId}
               onValueChange={(v) => setSelectedEpisodeId(v ?? "")}
             >

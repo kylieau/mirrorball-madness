@@ -225,7 +225,7 @@ export function WeeklyResultsView({
 
       {managerScores.length > 0 && nameByManager && (
         <>
-          <div className="mb-2 mt-6 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
+          <div className="mb-2 mt-4 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-accent">
             <span>Points by Team</span>
             <span className="font-normal text-muted-foreground">{managerScores.length} managers</span>
           </div>

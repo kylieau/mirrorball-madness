@@ -19,7 +19,7 @@ import { formatEpisodeCasual } from "@/lib/format-week";
 const TRACK_NODES = 7;
 const MIN_FUTURE_DOTS = 3;
 
-// Titles longer than this drop a size step so the fixed-height curtain still fits.
+// Longer titles step down in size; the curtain grows when text wraps.
 const SHORT_TITLE_MAX = 12;
 
 const CURTAIN_FOLDS =
@@ -149,7 +149,7 @@ export function EpisodeBanner({
   const weekLabel = formatEpisodeCasual(state.weekNumber);
 
   return (
-    <div className="relative mb-4 h-48 overflow-hidden rounded-2xl bg-[radial-gradient(ellipse_at_50%_62%,rgba(255,232,170,0.4),rgba(255,232,170,0.07)_58%,#14060f_88%)] shadow-[0_6px_22px_rgba(0,0,0,0.45)]">
+    <div className="relative mb-3 overflow-hidden rounded-2xl bg-[radial-gradient(ellipse_at_50%_62%,rgba(255,232,170,0.4),rgba(255,232,170,0.07)_58%,#14060f_88%)] shadow-[0_6px_22px_rgba(0,0,0,0.45)]">
       <div className="absolute inset-x-0 top-0 z-10 h-1.5 border-b-2 border-primary bg-linear-to-b from-[#3b0a17] to-[#5c1022]" />
       <div
         className={cn(
@@ -163,7 +163,7 @@ export function EpisodeBanner({
           CURTAIN_FOLDS
         )}
       />
-      <div className="relative mx-[13%] flex h-full flex-col items-center justify-center gap-2 px-3 pt-2 text-center">
+      <div className="relative mx-[13%] flex min-h-40 flex-col items-center justify-center gap-1.5 px-3 py-3 text-center">
         <p className="flex items-center gap-1.5 rounded-full border border-primary/60 bg-black/30 px-3 py-1 text-xs font-semibold text-primary">
           {live && <span className="inline-block size-[7px] rounded-full bg-[#ff4d5e]" />}
           {weekLabel}

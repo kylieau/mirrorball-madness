@@ -25,7 +25,7 @@ export function HomeDashboard({
     <div>
       <EpisodeBanner {...episodeBanner} />
 
-      <div className="mb-2 flex items-center justify-between border-t border-border pt-4 text-sm font-semibold text-accent">
+      <div className="mb-2 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-accent">
         <span>Your Leagues</span>
         {chrome.showManage && (
           <Link href="/leagues" className="shrink-0 pl-3 font-normal text-muted-foreground">
@@ -47,11 +47,11 @@ export function HomeDashboard({
 
       {recentActivity.length > 0 && (
         <>
-          <div className="mb-2 mt-6 border-t border-border pt-4 text-sm font-semibold text-accent">
+          <div className="mb-2 mt-4 border-t border-border pt-3 text-sm font-semibold text-accent">
             Recent Activity
           </div>
           <Card className="py-0">
-            <ScrollFade className="flex h-72 flex-col px-4">
+            <ScrollFade className="flex max-h-72 flex-col px-4">
               {recentActivity.map((line) => (
                 <p
                   key={line.key}

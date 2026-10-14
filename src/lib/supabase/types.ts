@@ -1780,6 +1780,15 @@ export type Database = {
         Args: { p_league_id: string; p_manager_id: string }
         Returns: undefined
       }
+      commit_episode_publication: {
+        Args: {
+          p_episode_id: string
+          p_plan: Json
+          p_published_by: string
+          p_snapshot: Json
+        }
+        Returns: undefined
+      }
       create_league: {
         Args: {
           p_curtain_call_enabled?: boolean
@@ -1824,6 +1833,10 @@ export type Database = {
       effective_hard_deadline_week: {
         Args: { p_league_id: string }
         Returns: number
+      }
+      episode_publication_snapshot: {
+        Args: { p_episode_id: string }
+        Returns: Json
       }
       finalize_waiver_claim: {
         Args: { p_claim_id: string }

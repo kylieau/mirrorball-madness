@@ -52,8 +52,8 @@ export default async function SettingsPage({
   const spoilerProgress = spoilerFreeMode ? await loadSpoilerProgress(supabase, user.id) : null;
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-8">
-      <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-3 px-4 py-4">
+      <div className="flex flex-col gap-4">
         <Link href={backHref} aria-label="Close" className="text-muted-foreground hover:text-foreground">
           <XIcon className="size-5" />
         </Link>

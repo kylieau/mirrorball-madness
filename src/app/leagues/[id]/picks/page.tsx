@@ -560,7 +560,7 @@ export default async function LeaguePicksPage({
 
   return (
     <LeaguePageShell tab="picks" base={base} error={error} message={message} justCreated={justCreated}>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         {curtainCallOn && (
           <div className="flex flex-col gap-3">
             {showSectionLabels && <SectionLabel module="curtainCall" first />}
@@ -747,7 +747,7 @@ function SectionLabel({ module, first }: { module: ScoringModuleKey; first?: boo
       className={
         first
           ? "flex items-center gap-1.5 text-sm font-semibold text-accent"
-          : "flex items-center gap-1.5 border-t border-border pt-4 text-sm font-semibold text-accent"
+          : "flex items-center gap-1.5 border-t border-border pt-3 text-sm font-semibold text-accent"
       }
     >
       <span>{icon}</span>

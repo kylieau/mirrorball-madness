@@ -2,6 +2,18 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Code review — 2026-10-13
+
+All three findings now have fixes in the working tree; not committed, pushed or deployed. `npm test` passes 609 tests across 55 files; lint, type check and production build pass. Chromium exercised the real ResultsForm with isolated fixtures/mocked actions: a newer edit survives an in-flight save, and Publish flushes the latest values. No live data changed. The PostgreSQL tests run in PGlite (dev dependency) against the project schema and migration.
+
+- **Autosave edit loss fixed**: `DraftSaveQueue` (`src/lib/draft-save-queue.ts`) tracks per-couple edit revisions, serializes saves, drains newer edits before publish/release, and keeps failed edits dirty for retry. Episode switching waits for saves; fields lock while publish/release is busy. Queue tests cover overlapping flushes, failures and episode changes.
+- **Partial publication fixed; migration verified live**: `publishEpisodeAtomically` (`src/lib/episode-publication.ts`) prepares all score rows through `buildWeeklyScoreRows`; service-only snapshot/commit RPCs persist results, standings, couple status, future-cast pruning, metadata, moments and draft cleanup together. A changed snapshot or failed write aborts the transaction. PostgreSQL tests cover rollback (including corrections), stale-input rejection, permission checks, revealed-score preservation, guest scaling, anchor week, multi-night scores and Grand Finale. **Migration applied by the user and verified live**: snapshot RPC succeeds and both RPCs appear in the API schema; types regenerated. No real episode was published as a test; observe the next real publish after deployment. Missing RPCs fail before any live write.
+- **Redirect validation fixed**: `safeRelativePath` rejects backslashes/control characters and checks the resolved origin. Regression tests cover the `/\example.com` authority bypass and valid local paths.
+
+## Spacing pass — 2026-10-13
+
+Implemented in the working tree: removed duplicated PageHeader margins, standardized 12px section/card vertical spacing, reduced 24px module/settings gaps to 16px, aligned Picks/Standings sticky chrome with Home/Results, and made the Home curtain and activity feed content-sized. Horizontal gutters, fonts, controls and bottom-navigation clearance remain intact. Before/after screenshots of Home, Results, Picks, Standings and Manage Leagues at 360px/390px are in `/tmp/dwts-spacing-before` and `/tmp/dwts-spacing-after`. These are temporary artifacts; the scratch league/accounts were removed after validation. Narrow-phone (320px), 390px and desktop (1024px) checks found no page-wide horizontal overflow across fan/settings/admin screens; long standings names stay within two collapsed lines and show their full text when expanded. Lint and production build pass. Publication migration is now applied and verified live.
+
 ## Up next, in order
 
 1. **Check the Spoiler-Free strip's new mounts on Results and the league hub (Picks/Standings) in a real browser** — see "Spoiler-Free strip: extended past Home" below for the full rundown; this container has no browser so none of it has actually been seen rendered.

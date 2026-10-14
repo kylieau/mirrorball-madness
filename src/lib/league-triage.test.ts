@@ -197,9 +197,9 @@ describe("home hybrid chrome", () => {
     expect(showHybridStatusPill(false, 0)).toBe(false);
   });
 
-  it("keeps Make Picks as the locked label", () => {
+  it("offers See Picks when picks are locked", () => {
     expect(picksButtonLabel("make")).toBe("Make Picks");
-    expect(picksButtonLabel("locked")).toBe("Make Picks");
+    expect(picksButtonLabel("locked")).toBe("See Picks");
     expect(picksButtonLabel("edit")).toBe("Edit Picks");
     expect(picksButtonLabel("none")).toBeNull();
   });

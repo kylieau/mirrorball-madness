@@ -19,7 +19,7 @@ const COLUMNS = "grid grid-cols-[1.25rem_minmax(0,1fr)_3.25rem_3.25rem_4rem] ite
 
 export function CouplesLeaderboard({ rows }: { rows: CoupleLeaderboardRow[] }) {
   return (
-    <section id="couples" className="mt-6 scroll-mt-4">
+    <section id="couples" className="mt-4 scroll-mt-4">
       <h2 className="font-heading text-lg font-semibold text-accent">Couples Leaderboard</h2>
 
       <ScrollFade

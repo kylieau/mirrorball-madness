@@ -1,41 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import {
-  computeGrandFinalePoints,
-  eliminationPositionRanges,
-  finalPlacementFromRange,
-  computeWeeklyScores,
-  couplesRemainingAtWeek,
-  inJeopardyIdsToPersist,
-  RESOLVING_OUTCOMES,
-  scaledJudgesScore,
-  type GrandFinaleMethod,
-  type Outcome,
-  type TierPayStyle,
-} from "@/lib/scoring";
-import { eligibleGrandFinalePredictions, scaleGrandFinaleLateFactors } from "@/lib/grand-finale-late";
+import { buildWeeklyScoreRows } from "@/lib/weekly-score-rows";
 import { participantIdsToPersist, selectableCast } from "@/lib/episode-cast";
 import { sortJudgesForDisplay } from "@/lib/couple-display";
 import { resolveGuestJudgeIds } from "@/lib/admin-people";
 import type { ScoringJudge } from "@/lib/scoring-judges";
-
-export type JudgeScoreSubmission = { judgeId: string; score: number };
-
-export type DanceSubmission = {
-  danceStyleId: string;
-  songTitle: string | null;
-  judgeScores: JudgeScoreSubmission[];
-};
-
-export type EntrySubmission = {
-  coupleId: string;
-  dances: DanceSubmission[];
-  outcome: Outcome;
-  savedByJudges: boolean;
-  hadImmunity: boolean;
-  bonusPoints: number;
-  bonusNote: string | null;
-};
 
 // The "propose" tier: a commissioner of any league can draft results, while
 // only is_super_admin can publish them. Not league-scoped like
@@ -88,70 +57,6 @@ async function getActiveSeasonId(
     .eq("is_active", true)
     .single();
   return { seasonId: season?.id ?? null, error: error?.message ?? (season ? null : "No active season") };
-}
-
-async function pruneDepartedCouplesFromFutureEpisodes(
-  admin: SupabaseClient<Database>,
-  seasonId: string,
-  afterWeekNumber: number,
-  current: { id: string; episodeNumber: number; weekId: string | null },
-  coupleIds: string[]
-): Promise<string | null> {
-  if (coupleIds.length === 0) return null;
-
-  const [{ data: weeks, error: weeksErr }, { data: unpublished, error }] = await Promise.all([
-    admin.from("competition_weeks").select("id, week_number").eq("season_id", seasonId),
-    admin
-      .from("episodes")
-      .select("id, week_id, episode_number")
-      .eq("season_id", seasonId)
-      .is("results_published_at", null),
-  ]);
-  if (weeksErr) return weeksErr.message;
-  if (error) return error.message;
-
-  const weekNumberById = new Map((weeks ?? []).map((week) => [week.id, week.week_number]));
-  const futureIds = (unpublished ?? [])
-    .filter((episode) => {
-      if (episode.id === current.id) return false;
-      if (episode.week_id && weekNumberById.get(episode.week_id)! > afterWeekNumber) return true;
-      if (episode.week_id && episode.week_id === current.weekId && episode.episode_number > current.episodeNumber) {
-        return true;
-      }
-      return episode.week_id == null && episode.episode_number > current.episodeNumber;
-    })
-    .map((episode) => episode.id);
-  if (futureIds.length === 0) return null;
-
-  const { error: participantsErr } = await admin
-    .from("episode_participants")
-    .delete()
-    .in("episode_id", futureIds)
-    .in("couple_id", coupleIds);
-  if (participantsErr) return participantsErr.message;
-
-  const { error: draftResultsErr } = await admin
-    .from("draft_episode_results")
-    .delete()
-    .in("episode_id", futureIds)
-    .in("couple_id", coupleIds);
-  if (draftResultsErr) return draftResultsErr.message;
-
-  const { error: draftDancesErr } = await admin
-    .from("draft_dance_scores")
-    .delete()
-    .in("episode_id", futureIds)
-    .in("couple_id", coupleIds);
-  if (draftDancesErr) return draftDancesErr.message;
-
-  const { error: draftMomentsErr } = await admin
-    .from("draft_episode_custom_moments")
-    .delete()
-    .in("episode_id", futureIds)
-    .in("couple_id", coupleIds);
-  if (draftMomentsErr) return draftMomentsErr.message;
-
-  return null;
 }
 
 export type ScheduleEpisodeInput = {
@@ -346,27 +251,6 @@ export async function recomputeWeekForReveal(
   );
 }
 
-export type EpisodeResultsInput = {
-  episodeId: string;
-  entries: EntrySubmission[];
-  inJeopardyCoupleIds: string[];
-};
-
-export async function replaceInJeopardyCouples(
-  admin: SupabaseClient<Database>,
-  table: "episode_in_jeopardy_couples" | "draft_episode_in_jeopardy_couples",
-  episodeId: string,
-  coupleIds: string[]
-): Promise<string | null> {
-  const { error: deleteError } = await admin.from(table).delete().eq("episode_id", episodeId);
-  if (deleteError) return deleteError.message;
-  if (coupleIds.length === 0) return null;
-  const { error } = await admin.from(table).insert(
-    coupleIds.map((coupleId) => ({ episode_id: episodeId, couple_id: coupleId }))
-  );
-  return error?.message ?? null;
-}
-
 // Exported for retroactive recomputes from a script (a scoring-logic change
 // applied to already-published weeks); in-app callers are below.
 export async function recomputeWeekScores(
@@ -385,408 +269,34 @@ export async function recomputeWeekScores(
   // the final publish.
   { reveal = false }: { reveal?: boolean } = {}
 ): Promise<string | null> {
-  const [{ data: allDances, error: dancesErr }, { data: allOutcomes, error: outcomesErr }] = await Promise.all([
+  const reads = await Promise.all([
     admin.from("dance_scores").select("couple_id, total_score, scaled_score").in("episode_id", episodeIds),
     admin.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
+    admin.from("couples").select("id, status, elimination_week").eq("season_id", seasonId),
+    admin.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", episodeIds),
+    admin.from("leagues").select("id"),
+    admin.from("scoring_settings").select("*"),
+    admin.from("roster_slots").select("league_id, manager_id, couple_id, start_week, end_week"),
+    admin.from("predictions").select("*").eq("week_id", week.id),
+    admin.from("grand_finale_late_unlocks").select("*"),
+    admin.from("grand_finale_predictions").select("*"),
   ]);
-  if (dancesErr) return dancesErr.message;
-  if (outcomesErr) return outcomesErr.message;
-
-  const danceScoreInputs = (allDances ?? []).map((row) => ({
-    coupleId: row.couple_id,
-    totalScore: Number(row.total_score),
-    scaledScore: Number(row.scaled_score),
-  }));
-  const otherOutcomes = (allOutcomes ?? []).filter((row) => row.episode_id !== thisEpisodeId);
-  const rawOutcomeRows = [
-    ...otherOutcomes.map((row) => ({
-      coupleId: row.couple_id,
-      outcome: row.outcome as Outcome,
-      bonusPoints: Number(row.bonus_points),
-    })),
-    ...thisEpisodeOutcomeRows.map((row) => ({
-      coupleId: row.couple_id,
-      outcome: row.outcome as Outcome,
-      bonusPoints: row.bonus_points,
-    })),
-  ];
-
-  const { data: leagues, error: leaguesErr } = await admin.from("leagues").select("id");
-  if (leaguesErr) return leaguesErr.message;
-
-  const newlyResolvedCoupleIds = thisEpisodeOutcomeRows
-    .filter((r) => RESOLVING_OUTCOMES.has(r.outcome as Outcome))
-    .map((r) => r.couple_id);
-
-  // Fetched unconditionally (not just on a resolving week) because
-  // couplesRemaining/totalCouples now feed Curtain Call's couples-remaining
-  // scaling every week, not just weeks where a couple's fate newly resolved.
-  const { data: seasonCouples, error: seasonCouplesErr } = await admin
-    .from("couples")
-    .select("id, status, elimination_week")
-    .eq("season_id", seasonId);
-  if (seasonCouplesErr) return seasonCouplesErr.message;
-
-  const totalCouples = (seasonCouples ?? []).length;
-  const positionRanges = eliminationPositionRanges(seasonCouples ?? []);
-  const actualPositionByCouple = new Map([...positionRanges].map(([id, range]) => [id, range.start]));
-
-  // finalPlacement: 1 = winner .. 5 = fifth place, reusing the same numeric
-  // position Grand Finale's full-order prediction already resolves against
-  // — see computeWeeklyScores in src/lib/scoring.ts. No new couples.status
-  // value, no new admin UI: 4th/5th place is derived, not entered.
-  const finalPlacementByCouple = new Map<string, number>();
-  for (const [coupleId, range] of positionRanges) {
-    const placement = finalPlacementFromRange(range, totalCouples);
-    if (placement <= 5) finalPlacementByCouple.set(coupleId, placement);
-  }
-
-  // How many couples were still in the running going into this week, before
-  // any of this week's own eliminations — matches what managers saw when
-  // they locked their Curtain Call pick. Using "< week.week_number" (not a
-  // live couples.status check) makes this correct regardless of whether
-  // this call is entering one of several episodes sharing this week, or
-  // correcting a week whose couples.status has already been mutated above.
-  const couplesRemaining = couplesRemainingAtWeek(
-    (seasonCouples ?? []).map((c) => ({ eliminationWeek: c.elimination_week })),
-    week.week_number
-  );
-
-  // Only the row that settles a couple's fate carries its placement. Every
-  // other row of the same couple (a "safe" week) would otherwise re-award the
-  // podium bonus when an earlier week is recomputed after the finale.
-  const episodeOutcomeInputs = rawOutcomeRows.map((row) => ({
-    ...row,
-    finalPlacement: RESOLVING_OUTCOMES.has(row.outcome) ? (finalPlacementByCouple.get(row.coupleId) ?? null) : null,
-  }));
-
-  let inJeopardyCoupleIds: string[] = [];
-  if (episodeIds.length > 0 && !reveal) {
-    const { data: jeopardyRows, error: jeopardyErr } = await admin
-      .from("episode_in_jeopardy_couples")
-      .select("couple_id")
-      .in("episode_id", episodeIds);
-    if (jeopardyErr) return jeopardyErr.message;
-    inJeopardyCoupleIds = [...new Set((jeopardyRows ?? []).map((row) => row.couple_id))];
-  }
-
-  for (const league of leagues ?? []) {
-    const [{ data: scoringSettings }, { data: rosterSlots }, { data: predictions }, { data: lateUnlocks, error: lateErr }] =
-      await Promise.all([
-      admin.from("scoring_settings").select("*").eq("league_id", league.id).single(),
-      admin
-        .from("roster_slots")
-        .select("manager_id, couple_id")
-        .eq("league_id", league.id)
-        .lte("start_week", week.week_number)
-        .or(`end_week.is.null,end_week.gte.${week.week_number}`),
-      admin
-        .from("predictions")
-        .select("manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
-        .eq("league_id", league.id)
-        .eq("week_id", week.id),
-      admin
-        .from("grand_finale_late_unlocks")
-        .select("manager_id, late_factor, ineligible_couple_ids, submitted_at")
-        .eq("league_id", league.id),
-    ]);
-    if (lateErr) return lateErr.message;
-
-    if (!scoringSettings || !rosterSlots) continue;
-
-    // The league's Anchor Week is when scoring begins for every module: a
-    // week that aired before it pays nothing, even where picks exist for it.
-    const scoringStarted = week.week_number >= scoringSettings.judges_score_starts_week;
-
-    let grandFinalePointsByManager: Record<string, number> = {};
-    if (scoringStarted && newlyResolvedCoupleIds.length > 0) {
-      const { data: grandFinalePredictions, error: gfpErr } = await admin
-        .from("grand_finale_predictions")
-        .select("manager_id, couple_id, predicted_position")
-        .eq("league_id", league.id)
-        .in("couple_id", newlyResolvedCoupleIds);
-      if (gfpErr) return gfpErr.message;
-
-      const lateByManager = new Map(
-        (lateUnlocks ?? [])
-          .filter((row) => row.submitted_at)
-          .map((row) => [
-            row.manager_id,
-            {
-              lateFactor: Number(row.late_factor),
-              ineligibleCoupleIds: new Set(row.ineligible_couple_ids ?? []),
-            },
-          ])
-      );
-      // Couples already resolved when a late bracket was saved never pay,
-      // including if this week is republished. The factor scales the raw
-      // total; category weight is applied in computeWeeklyScores.
-      grandFinalePointsByManager = scaleGrandFinaleLateFactors(
-        computeGrandFinalePoints({
-        predictions: eligibleGrandFinalePredictions(
-          (grandFinalePredictions ?? []).map((p) => ({
-            managerId: p.manager_id,
-            coupleId: p.couple_id,
-            predictedPosition: p.predicted_position,
-          })),
-          lateByManager
-        ),
-        resolvedCouples: newlyResolvedCoupleIds
-          .filter((id) => actualPositionByCouple.has(id))
-          .map((id) => ({
-            coupleId: id,
-            actualPosition: positionRanges.get(id)!.start,
-            actualPositionEnd: positionRanges.get(id)!.end,
-          })),
-        totalCouples,
-        method: (scoringSettings.bonus_picks_scoring_method as GrandFinaleMethod) ?? "exact_position",
-        distancePenalty: scoringSettings.bonus_picks_distance_penalty,
-        tierSize: scoringSettings.bonus_picks_tier_size,
-        tierPayStyle: scoringSettings.bonus_picks_tier_pay_style as TierPayStyle,
-        pointsPerCorrect: scoringSettings.bonus_picks_points_per_correct,
-      }),
-        lateByManager
-      );
+  for (const read of reads) if (read.error) return read.error.message;
+  const [dances, outcomes, couples, jeopardy, leagues, settings, rosters, predictions, lateUnlocks, grandFinalePredictions] = reads;
+  const rows = buildWeeklyScoreRows({
+    dances: dances.data ?? [], outcomes: outcomes.data ?? [], couples: couples.data ?? [],
+    jeopardy: jeopardy.data ?? [], leagues: leagues.data ?? [], settings: settings.data ?? [],
+    rosters: rosters.data ?? [], predictions: predictions.data ?? [],
+    lateUnlocks: lateUnlocks.data ?? [], grandFinalePredictions: grandFinalePredictions.data ?? [],
+  }, week, thisEpisodeId, thisEpisodeOutcomeRows, { reveal });
+  for (const league of leagues.data ?? []) {
+    const { error: deleteErr } = await admin.from("weekly_manager_scores").delete().eq("league_id", league.id).eq("week_id", week.id);
+    if (deleteErr) return deleteErr.message;
+    const leagueRows = rows.filter((r) => r.league_id === league.id);
+    if (leagueRows.length > 0) {
+      const { error } = await admin.from("weekly_manager_scores").insert(leagueRows);
+      if (error) return error.message;
     }
-
-    const scores = computeWeeklyScores({
-      scoringSettings: {
-        judgesScoreMultiplier: scoringSettings.judges_score_multiplier,
-        survivalPoints: scoringSettings.survival_points,
-        eliminationPredictionPoints: scoringSettings.elimination_prediction_points,
-        topScorerPredictionPoints: scoringSettings.top_scorer_prediction_points,
-        firstPlacePoints: scoringSettings.first_place_points,
-        secondPlacePoints: scoringSettings.second_place_points,
-        thirdPlacePoints: scoringSettings.third_place_points,
-        fourthPlacePoints: scoringSettings.fourth_place_points,
-        fifthPlacePoints: scoringSettings.fifth_place_points,
-        curtainCallNearMissEnabled: scoringSettings.curtain_call_near_miss_enabled !== false,
-      },
-      rosterSlots: scoringStarted
-        ? rosterSlots
-            .filter((r): r is { manager_id: string; couple_id: string } => r.couple_id !== null)
-            .map((r) => ({ managerId: r.manager_id, coupleId: r.couple_id }))
-        : [],
-      danceScores: danceScoreInputs,
-      episodeOutcomes: episodeOutcomeInputs,
-      predictions: scoringStarted && !reveal
-        ? (predictions ?? []).map((p) => ({
-            managerId: p.manager_id,
-            predictedEliminatedCoupleId: p.predicted_eliminated_couple_id,
-            predictedEliminatedCoupleId2: p.predicted_eliminated_couple_id_2,
-            predictedTopScorerCoupleId: p.predicted_top_scorer_couple_id,
-          }))
-        : [],
-      isDoubleElimination: week.is_double_elimination_week,
-      couplesRemaining,
-      totalCouples,
-      categoryWeights: {
-        judges: scoringSettings.judges_score_category_weight,
-        eliminations: scoringSettings.eliminations_category_weight,
-        bonus: scoringSettings.bonus_picks_category_weight,
-      },
-      grandFinalePointsByManager,
-      inJeopardyCoupleIds,
-    });
-
-    await admin.from("weekly_manager_scores").delete().eq("league_id", league.id).eq("week_id", week.id);
-
-    if (scores.length === 0) continue;
-
-    const { error: upsertErr } = await admin.from("weekly_manager_scores").upsert(
-      scores.map((s) => ({
-        league_id: league.id,
-        manager_id: s.managerId,
-        week_id: week.id,
-        roster_points: s.rosterPoints,
-        prediction_points: s.predictionPoints,
-        grand_finale_points: s.grandFinalePoints,
-        total_points: s.totalPoints,
-      })),
-      { onConflict: "league_id,manager_id,week_id" }
-    );
-    if (upsertErr) return upsertErr.message;
   }
-
   return null;
-}
-
-// Takes an already-authorized admin (service-role) client — the caller is
-// responsible for verifying publish access (profiles.is_super_admin) first.
-// Kept separate from the 'use server' action so it can be exercised directly
-// in tests without a Next.js request context.
-export async function applyEpisodeResults(
-  admin: SupabaseClient<Database>,
-  input: EpisodeResultsInput,
-  // Couples whose dances were already revealed keep their live rows as-is, so
-  // a final publish never blanks or re-ids a score viewers can already see.
-  preserveDanceCoupleIds: ReadonlySet<string> = new Set()
-): Promise<{ error: string | null }> {
-  const { seasonId, error: seasonErr } = await getActiveSeasonId(admin);
-  if (seasonErr || !seasonId) return { error: seasonErr };
-
-  const { data: episode, error: episodeErr } = await admin
-    .from("episodes")
-    .update({
-      status: input.entries.length > 0 ? "completed" : "upcoming",
-      results_published_at: input.entries.length > 0 ? new Date().toISOString() : null,
-    })
-    .eq("id", input.episodeId)
-    .select()
-    .single();
-
-  if (episodeErr) return { error: episodeErr.message };
-
-  const week = episode.week_id
-    ? (
-        await admin
-          .from("competition_weeks")
-          .select("id, week_number, is_double_elimination_week")
-          .eq("id", episode.week_id)
-          .single()
-      ).data
-    : null;
-
-  const { data: previousOutcomes } = await admin
-    .from("episode_results")
-    .select("couple_id, outcome")
-    .eq("episode_id", episode.id);
-
-  const previouslyResolvedIds = new Set(
-    (previousOutcomes ?? [])
-      .filter((r) => RESOLVING_OUTCOMES.has(r.outcome as Outcome))
-      .map((r) => r.couple_id)
-  );
-  const nowResolvedIds = new Set(
-    input.entries.filter((e) => RESOLVING_OUTCOMES.has(e.outcome)).map((e) => e.coupleId)
-  );
-  const revertedIds = [...previouslyResolvedIds].filter((id) => !nowResolvedIds.has(id));
-  if (revertedIds.length > 0) {
-    let stillResolved = new Set<string>();
-    if (week) {
-      const { data: siblingEpisodes } = await admin
-        .from("episodes")
-        .select("id")
-        .eq("week_id", week.id)
-        .neq("id", episode.id);
-      const siblingIds = (siblingEpisodes ?? []).map((row) => row.id);
-      if (siblingIds.length > 0) {
-        const { data: siblingOutcomes } = await admin
-          .from("episode_results")
-          .select("couple_id, outcome")
-          .in("episode_id", siblingIds);
-        stillResolved = new Set(
-          (siblingOutcomes ?? [])
-            .filter((row) => RESOLVING_OUTCOMES.has(row.outcome as Outcome))
-            .map((row) => row.couple_id)
-        );
-      }
-    }
-    const toRevert = revertedIds.filter((id) => !stillResolved.has(id));
-    if (toRevert.length > 0) {
-      await admin.from("couples").update({ status: "active", elimination_week: null }).in("id", toRevert);
-    }
-  }
-
-  const staleDances = admin.from("dance_scores").delete().eq("episode_id", episode.id);
-  await (preserveDanceCoupleIds.size > 0
-    ? staleDances.not("couple_id", "in", `(${[...preserveDanceCoupleIds].join(",")})`)
-    : staleDances);
-  await admin.from("episode_results").delete().eq("episode_id", episode.id);
-
-  for (const e of input.entries) {
-    if (preserveDanceCoupleIds.has(e.coupleId)) continue;
-    for (const dance of e.dances) {
-      const totalScore = dance.judgeScores.reduce((sum, js) => sum + js.score, 0);
-      const { data: danceScoreRow, error: danceErr } = await admin
-        .from("dance_scores")
-        .insert({
-          episode_id: episode.id,
-          couple_id: e.coupleId,
-          dance_style_id: dance.danceStyleId,
-          song_title: dance.songTitle,
-          total_score: totalScore,
-          scaled_score: scaledJudgesScore(dance.judgeScores.map((js) => js.score)),
-        })
-        .select()
-        .single();
-      if (danceErr) return { error: danceErr.message };
-
-      if (dance.judgeScores.length > 0) {
-        const { error: judgeErr } = await admin.from("judge_scores").insert(
-          dance.judgeScores.map((js) => ({
-            dance_score_id: danceScoreRow.id,
-            judge_id: js.judgeId,
-            score: js.score,
-          }))
-        );
-        if (judgeErr) return { error: judgeErr.message };
-      }
-    }
-  }
-
-  const outcomeRows = input.entries.map((e) => ({
-    episode_id: episode.id,
-    couple_id: e.coupleId,
-    outcome: e.outcome,
-    saved_by_judges: e.savedByJudges,
-    had_immunity: e.hadImmunity,
-    bonus_points: e.bonusPoints,
-    bonus_note: e.bonusNote,
-  }));
-  if (outcomeRows.length > 0) {
-    const { error } = await admin.from("episode_results").insert(outcomeRows);
-    if (error) return { error: error.message };
-  }
-
-  const jeopardyErr = await replaceInJeopardyCouples(
-    admin,
-    "episode_in_jeopardy_couples",
-    episode.id,
-    inJeopardyIdsToPersist(input.inJeopardyCoupleIds, input.entries)
-  );
-  if (jeopardyErr) return { error: jeopardyErr };
-
-  if (week) {
-    for (const e of input.entries) {
-      if (e.outcome === "eliminated" || e.outcome === "withdrawn") {
-        await admin
-          .from("couples")
-          .update({ status: e.outcome, elimination_week: week.week_number })
-          .eq("id", e.coupleId);
-      } else if (e.outcome === "winner" || e.outcome === "runner_up" || e.outcome === "third_place") {
-        await admin.from("couples").update({ status: e.outcome, elimination_week: null }).eq("id", e.coupleId);
-      }
-    }
-
-    const departedIds = input.entries
-      .filter((e) => RESOLVING_OUTCOMES.has(e.outcome))
-      .map((e) => e.coupleId);
-    const pruneErr = await pruneDepartedCouplesFromFutureEpisodes(
-      admin,
-      seasonId,
-      week.week_number,
-      { id: episode.id, episodeNumber: episode.episode_number, weekId: week.id },
-      departedIds
-    );
-    if (pruneErr) return { error: pruneErr };
-
-    const { data: weekEpisodes, error: weekEpisodesErr } = await admin
-      .from("episodes")
-      .select("id")
-      .eq("week_id", week.id);
-    if (weekEpisodesErr) return { error: weekEpisodesErr.message };
-
-    const scoreErr = await recomputeWeekScores(
-      admin,
-      seasonId,
-      week,
-      (weekEpisodes ?? []).map((row) => row.id),
-      outcomeRows.map((r) => ({ couple_id: r.couple_id, outcome: r.outcome, bonus_points: r.bonus_points })),
-      episode.id
-    );
-    if (scoreErr) return { error: scoreErr };
-  }
-
-  return { error: null };
 }

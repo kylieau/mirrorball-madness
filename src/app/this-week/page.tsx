@@ -351,7 +351,7 @@ export default async function ThisWeekPage({
       {draftVisible ? (
         <>
           <HomeDraftChrome {...accountSettingsData} email={user.email ?? ""} />
-          <div className="flex flex-col gap-4 pt-4">
+          <div className="flex flex-col gap-3 pt-3">
             {pageHeader}
             {resultsContent}
           </div>
@@ -364,7 +364,7 @@ export default async function ThisWeekPage({
             email={user.email ?? ""}
             state={spoilerFreeStrip}
           />
-          <div className="flex flex-col gap-4 pt-4">
+          <div className="flex flex-col gap-3 pt-3">
             {pageHeader}
             {resultsContent}
           </div>
@@ -372,7 +372,7 @@ export default async function ThisWeekPage({
       ) : (
         <>
           <StickyTopBar {...accountSettingsData} email={user.email ?? ""} />
-          <div className="flex flex-col gap-4 pt-4">
+          <div className="flex flex-col gap-3 pt-3">
             {pageHeader}
             {resultsContent}
           </div>

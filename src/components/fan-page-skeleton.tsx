@@ -10,7 +10,7 @@ function Block({ className }: { className: string }) {
 export function FanPageSkeleton() {
   return (
     <div className="flex flex-col px-4" role="status" aria-label="Loading">
-      <div className={`flex flex-col gap-4 py-8 ${BOTTOM_NAV_CLEARANCE}`}>
+      <div className={`flex flex-col gap-3 pt-3 ${BOTTOM_NAV_CLEARANCE}`}>
         <Block className="h-8 w-40" />
         <Block className="h-28 w-full" />
         <Block className="h-44 w-full" />

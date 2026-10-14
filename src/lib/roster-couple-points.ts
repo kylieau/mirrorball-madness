@@ -13,7 +13,7 @@ export function slotActiveInWeek(slot: RosterSlotPeriod, week: number): boolean 
 
 // Judges' points a rostered couple earned for its manager: `week` is that one
 // week, `total` is the running sum through it. Only weeks the slot was held
-// and Dance Card was scoring count (mirrors which weeks applyEpisodeResults
+// and Dance Card was scoring count (mirrors which weeks buildWeeklyScoreRows
 // credits a roster slot). Deliberately judges' points only — survival and
 // placement bonuses are manager-level and stay out of per-couple lines.
 // Pass only slots active in `week`, so each couple appears once.

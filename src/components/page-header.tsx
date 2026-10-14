@@ -9,8 +9,8 @@ export function PageHeader({ title, children }: { title: string; children?: Reac
   return (
     <div>
       <h1 className="font-heading text-2xl font-semibold">{title}</h1>
-      <div className={children ? "mt-2.5 h-0.5 w-9 rounded-full bg-primary" : "mt-2.5 mb-4 h-0.5 w-9 rounded-full bg-primary"} />
-      {children && <div className="mb-4 mt-2">{children}</div>}
+      <div className="mt-2 h-0.5 w-9 rounded-full bg-primary" />
+      {children && <div className="mt-2">{children}</div>}
     </div>
   );
 }
