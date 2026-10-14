@@ -49,21 +49,22 @@ export async function loadScoreHistory(
   const completedWeeks = groupedWeeks
     .filter((week) => week.status === "completed")
     .sort((a, b) => b.week_number - a.week_number);
-  const cutoff = await resolveSpoilerCutoff(
+  const cutoffPending = resolveSpoilerCutoff(
     supabase,
     userId,
     seasonId,
     profile?.spoiler_free_mode ?? false,
     completedWeeks
   );
-  const completedAllowedWeeks = completedWeeks.filter((week) => cutoff.allowedEpisodeIds.has(week.id));
   // A week being revealed has judges points but no outcomes yet: it is listed
   // (posted episodes only), and Curtain Call / Grand Finale lines stay out
   // until the final publish.
-  const [{ revealing, visible: revealingVisible }, draftContext] = await Promise.all([
-    loadRevealingWeek(supabase, groupedWeeks, cutoff),
+  const [cutoff, { revealing, visible: revealingVisible }, draftContext] = await Promise.all([
+    cutoffPending,
+    loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
     loadDraftScoreContext(supabase, userId),
   ]);
+  const completedAllowedWeeks = completedWeeks.filter((week) => cutoff.allowedEpisodeIds.has(week.id));
   const draftNight = draftContext.night;
   const revealingWeek =
     revealing && revealingVisible

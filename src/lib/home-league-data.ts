@@ -48,9 +48,11 @@ export async function loadHomeLeagueData(
       episodeIds: week.episodes.map((episode) => episode.id),
     }));
 
-  const cutoff = await resolveSpoilerCutoff(supabase, userId, activeSeasonId ?? null, spoilerFreeMode, completedWeeks);
-
-  const { revealing, scoredIds, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
+  const cutoffPending = resolveSpoilerCutoff(supabase, userId, activeSeasonId ?? null, spoilerFreeMode, completedWeeks);
+  const [cutoff, { revealing, scoredIds, visible: revealingVisible }] = await Promise.all([
+    cutoffPending,
+    loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
+  ]);
   const revealingWeek = revealing && revealingVisible ? revealing.week : null;
   const draftNight = draftContext.night
     ? {

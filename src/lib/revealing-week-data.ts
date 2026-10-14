@@ -10,19 +10,23 @@ type WeekLike = {
 
 // One query: which unpublished episodes already have live dance scores.
 // `visible` is whether this viewer's Spoiler-Free setting lets them see it.
+// The cutoff arrives as a promise because the query doesn't need it, so the
+// two reads overlap instead of running back to back.
 export async function loadRevealingWeek<W extends WeekLike>(
   supabase: SupabaseClient<Database>,
   weeks: W[],
-  cutoff: { spoilerFreeMode: boolean; lastWatchedWeek: number | null; allowedEpisodeIds: ReadonlySet<string> }
+  cutoffPending: Promise<{ spoilerFreeMode: boolean; lastWatchedWeek: number | null; allowedEpisodeIds: ReadonlySet<string> }>
 ) {
   const unpublishedEpisodeIds = weeks
     .flatMap((week) => week.episodes)
     .filter((episode) => episode.status !== "completed" && !episode.results_published_at)
     .map((episode) => episode.id);
-  const { data: posted } =
+  const [{ data: posted }, cutoff] = await Promise.all([
     unpublishedEpisodeIds.length > 0
-      ? await supabase.from("dance_scores").select("episode_id").in("episode_id", unpublishedEpisodeIds)
-      : { data: [] as { episode_id: string }[] };
+      ? supabase.from("dance_scores").select("episode_id").in("episode_id", unpublishedEpisodeIds)
+      : Promise.resolve({ data: [] as { episode_id: string }[] }),
+    cutoffPending,
+  ]);
 
   const revealing = findRevealingWeek(weeks, new Set((posted ?? []).map((row) => row.episode_id)));
   const scoredIds = scoredWeekIds(cutoff, revealing ? { id: revealing.week.id, week_number: revealing.week.week_number } : null);

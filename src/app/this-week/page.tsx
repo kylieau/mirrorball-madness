@@ -109,19 +109,22 @@ export default async function ThisWeekPage({
   // finale is what that means here, per Schedule's own theme naming.
   const finaleWeekNumber = groupedWeeks.find((week) => week.is_finale)?.week_number ?? null;
 
-  const cutoff = await resolveSpoilerCutoff(
+  const cutoffPending = resolveSpoilerCutoff(
     supabase,
     user.id,
     activeSeasonId ?? null,
     accountSettingsData.spoilerFreeMode,
     completedWeeks
   );
+  const [cutoff, { revealing, visible: revealingVisible }] = await Promise.all([
+    cutoffPending,
+    loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
+  ]);
 
   // Carousel = spoiler-visible completed weeks + upcoming/locked for a
   // theme peek. ?week= honors that list; an unrecognized or unwatched
   // completed id falls back instead of leaking results.
   const carouselWeeks = buildThisWeekCarouselWeeks(seasonWeeks, cutoff.allowedEpisodeIds);
-  const { revealing, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
   const { episode: selectedWeek, mode: selectedMode } = selectThisWeekEpisode(
     carouselWeeks,
     weekParam,
@@ -146,43 +149,31 @@ export default async function ThisWeekPage({
     ? { weekNumber: cutoff.pendingRevealEpisode.week_number, theme: cutoff.pendingRevealEpisode.theme }
     : null;
 
-  const [{ data: danceScores }, { data: episodeResults }, { data: inJeopardyRows }] =
-    await Promise.all([
-      showResults && selectedEpisodeIds.length > 0
-        ? supabase
-            .from("dance_scores")
-            .select("id, episode_id, couple_id, dance_style_id, song_title, total_score")
-            .in("episode_id", selectedEpisodeIds)
-        : Promise.resolve({ data: [] }),
-      showResults && selectedEpisodeIds.length > 0
-        ? supabase
-            .from("episode_results")
-            .select("episode_id, couple_id, outcome")
-            .in("episode_id", selectedEpisodeIds)
-        : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
-      showResults && selectedEpisodeIds.length > 0
-        ? supabase
-            .from("episode_in_jeopardy_couples")
-            .select("couple_id")
-            .in("episode_id", selectedEpisodeIds)
-        : Promise.resolve({ data: [] as { couple_id: string }[] }),
-    ]);
-
-  const flatCouples = (allCouples ?? []).map((c) => ({
-    id: c.id,
-    celebrity_name: c.celebrity?.name ?? "Unknown",
-    pro_name: c.pro?.name ?? "Unknown",
-  }));
-  const coupleDisplayNames = buildCoupleDisplayNames(flatCouples);
-
-  // Which of the viewer's own leagues have each couple on their Dance Card
-  // roster right now, plus which leagues they picked this couple as this
-  // week's elimination/top-scorer call — this is what makes eliminations
-  // and safe calls read as personally relevant instead of just generic
-  // show news. Picks are looked up against the episode being shown here
-  // (whichever week is selected), not the upcoming episode Your Picks deals
-  // with — a past call, not a pending one.
-  const [{ data: pastPredictions }, { data: grandFinaleRows }] = await Promise.all([
+  const [
+    { data: danceScores },
+    { data: episodeResults },
+    { data: inJeopardyRows },
+    { data: pastPredictions },
+    { data: grandFinaleRows },
+  ] = await Promise.all([
+    showResults && selectedEpisodeIds.length > 0
+      ? supabase
+          .from("dance_scores")
+          .select("id, episode_id, couple_id, dance_style_id, song_title, total_score")
+          .in("episode_id", selectedEpisodeIds)
+      : Promise.resolve({ data: [] }),
+    showResults && selectedEpisodeIds.length > 0
+      ? supabase
+          .from("episode_results")
+          .select("episode_id, couple_id, outcome")
+          .in("episode_id", selectedEpisodeIds)
+      : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
+    showResults && selectedEpisodeIds.length > 0
+      ? supabase
+          .from("episode_in_jeopardy_couples")
+          .select("couple_id")
+          .in("episode_id", selectedEpisodeIds)
+      : Promise.resolve({ data: [] as { couple_id: string }[] }),
     selectedMode === "results" && selectedWeekId
       ? supabase
           .from("predictions")
@@ -200,6 +191,20 @@ export default async function ThisWeekPage({
       : Promise.resolve({ data: [] as { league_id: string; couple_id: string; predicted_position: number }[] }),
   ]);
 
+  const flatCouples = (allCouples ?? []).map((c) => ({
+    id: c.id,
+    celebrity_name: c.celebrity?.name ?? "Unknown",
+    pro_name: c.pro?.name ?? "Unknown",
+  }));
+  const coupleDisplayNames = buildCoupleDisplayNames(flatCouples);
+
+  // Which of the viewer's own leagues have each couple on their Dance Card
+  // roster right now, plus which leagues they picked this couple as this
+  // week's elimination/top-scorer call — this is what makes eliminations
+  // and safe calls read as personally relevant instead of just generic
+  // show news. Picks are looked up against the episode being shown here
+  // (whichever week is selected), not the upcoming episode Your Picks deals
+  // with — a past call, not a pending one.
   const rosterLeaguesByCouple: Record<string, string[]> = {};
   for (const slot of rosterSlots ?? []) {
     if (!slot.couple_id) continue;

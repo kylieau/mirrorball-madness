@@ -92,9 +92,108 @@ export default async function LeaguePicksPage({
     visibleDanceWeeks,
   } = base;
 
-  const grandFinaleDeadline = grandFinaleOn
-    ? (await supabase.rpc("effective_grand_finale_deadline", { p_league_id: id })).data ?? null
+  const curtainCallWeekId = upcomingEpisode && curtainCallOn ? upcomingEpisode.id : null;
+
+  const latestVisibleDanceWeek = visibleDanceWeeks[visibleDanceWeeks.length - 1] ?? null;
+  const yourRosterWeek =
+    visibleDanceWeeks.find((w) => w.id === rosterWeekParam) ?? latestVisibleDanceWeek;
+  const yourRosterWeekEpisodeIds =
+    groupedWeeks.find((w) => w.id === yourRosterWeek?.id)?.episodes.map((e) => e.id) ?? [];
+
+  const episodeWeekNumber = new Map<string, number>();
+  for (const week of groupedWeeks) {
+    if (!scoredIds.has(week.id) && week.id !== draftNight?.weekId) continue;
+    for (const episode of week.episodes) episodeWeekNumber.set(episode.id, week.week_number);
+  }
+  if (draftNight) {
+    for (const episodeId of draftNight.episodeIds) episodeWeekNumber.set(episodeId, draftNight.weekNumber);
+  }
+
+  const curtainCallSelection = curtainCallOn
+    ? selectCurtainCallWeek(completedEpisodes ?? [], upcomingEpisode ?? null, cutoff.allowedEpisodeIds, weekParam)
+    : { episode: null, mode: null };
+  const curtainCallEpisode = curtainCallSelection.episode;
+  const curtainCallMode = curtainCallSelection.mode;
+  const pastPicksLocked =
+    curtainCallMode === "recap" && curtainCallEpisode
+      ? isPastPicksLocked(curtainCallEpisode.id, cutoff.allowedEpisodeIds)
+      : false;
+  const recapEpisode = curtainCallMode === "recap" && curtainCallEpisode && !pastPicksLocked ? curtainCallEpisode : null;
+
+  // None of these depends on another, so they start together and are awaited
+  // where they're used instead of one round trip after another.
+  const ownPredictionPending = curtainCallWeekId
+    ? supabase
+        .from("predictions")
+        .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
+        .eq("league_id", id)
+        .eq("week_id", curtainCallWeekId)
+        .eq("manager_id", myTeamId)
+        .maybeSingle()
+    : Promise.resolve({ data: null });
+  const ownGrandFinalePicksPending = grandFinaleOn
+    ? supabase
+        .from("grand_finale_predictions")
+        .select("couple_id, predicted_position")
+        .eq("league_id", id)
+        .eq("manager_id", myTeamId)
+        .order("predicted_position", { ascending: true })
+    : Promise.resolve({ data: null });
+  const leagueDanceScoresPending =
+    leagueSlotPeriods.length > 0 && episodeWeekNumber.size > 0
+      ? supabase
+          .from("dance_scores")
+          .select("couple_id, episode_id, scaled_score")
+          .in("episode_id", [...episodeWeekNumber.keys()])
+          .in("couple_id", [...new Set(leagueSlotPeriods.map((slot) => slot.coupleId))])
+      : Promise.resolve({ data: [] as { couple_id: string; episode_id: string; scaled_score: number }[] });
+  const yourRosterWeekJeopardyPending =
+    yourRosterWeekEpisodeIds.length > 0
+      ? supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", yourRosterWeekEpisodeIds)
+      : Promise.resolve({ data: [] as { couple_id: string }[] });
+  const draftPickCountPending =
+    danceCardOn && league.draft_status === "in_progress"
+      ? supabase.from("draft_picks").select("id", { count: "exact", head: true }).eq("league_id", id)
+      : Promise.resolve({ count: null });
+  const recapEpisodeIds = recapEpisode?.episodeIds ?? [];
+  const recapPending = recapEpisode
+    ? Promise.all([
+        supabase
+          .from("predictions")
+          .select(
+            "manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
+          )
+          .eq("league_id", id)
+          .eq("week_id", recapEpisode.id),
+        recapEpisodeIds.length > 0
+          ? supabase.from("episode_results").select("couple_id, outcome").in("episode_id", recapEpisodeIds)
+          : Promise.resolve({ data: [] as { couple_id: string; outcome: string }[] }),
+        recapEpisodeIds.length > 0
+          ? supabase.from("dance_scores").select("couple_id, total_score").in("episode_id", recapEpisodeIds)
+          : Promise.resolve({ data: [] as { couple_id: string; total_score: number }[] }),
+        recapEpisodeIds.length > 0
+          ? supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", recapEpisodeIds)
+          : Promise.resolve({ data: [] as { couple_id: string }[] }),
+      ])
     : null;
+
+  const [{ data: grandFinaleDeadlineData }, { data: computedLockAt }, { data: rosterSlots }] = await Promise.all([
+    grandFinaleOn
+      ? supabase.rpc("effective_grand_finale_deadline", { p_league_id: id })
+      : Promise.resolve({ data: null }),
+    curtainCallWeekId
+      ? supabase.rpc("prediction_lock_at", { p_league_id: id, p_week_id: curtainCallWeekId })
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("roster_slots")
+      .select(
+        "slot_number, couple_id, couples(status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name))"
+      )
+      .eq("league_id", id)
+      .eq("manager_id", myTeamId)
+      .is("end_week", null),
+  ]);
+  const grandFinaleDeadline = grandFinaleDeadlineData ?? null;
   const grandFinaleLocked = !!grandFinaleDeadline && new Date() >= new Date(grandFinaleDeadline);
   const grandFinaleScoring = {
     method: (scoringSettings?.bonus_picks_scoring_method as GrandFinaleMethod | null) ?? GRAND_FINALE_DEFAULT_METHOD,
@@ -112,123 +211,96 @@ export default async function LeaguePicksPage({
   // apart — a single-module league goes straight to its content.
   const showSectionLabels = [curtainCallOn, danceCardOn, grandFinaleOn].filter(Boolean).length >= 2;
 
-  let isLocked = false;
-  let lockAt: string | null = null;
-  let ownPrediction = null;
-  let curtainCallPicksEntries: CurtainCallLeagueEntry[] = [];
+  const lockAt = computedLockAt ?? null;
+  const isLocked = !!lockAt && new Date() >= new Date(lockAt);
 
-  if (upcomingEpisode && curtainCallOn) {
-    const { data: computedLockAt } = await supabase.rpc("prediction_lock_at", {
-      p_league_id: id,
-      p_week_id: upcomingEpisode.id,
-    });
-    lockAt = computedLockAt;
-    isLocked = !!lockAt && new Date() >= new Date(lockAt);
+  const recastSlotSource = (rosterSlots ?? [])
+    .filter((s) => s.couples)
+    .map((s) => ({
+      slotNumber: s.slot_number,
+      coupleId: s.couple_id!,
+      celebrity: s.couples!.celebrity?.name ?? "Unknown",
+      pro: s.couples!.pro?.name ?? "Unknown",
+      status: s.couples!.status,
+      eliminationWeek: s.couples!.elimination_week,
+    }));
+  const { revealedOpen: revealedRecastSlots, hiddenOpenCount: hiddenRecastOpenCount } =
+    partitionRecastSlots(recastSlotSource, latestCompletedWeek, finaleWeekNumber);
+  const recastOn = danceCardOn && waiversOn && revealedRecastSlots.length > 0;
 
-    const { data } = await supabase
-      .from("predictions")
-      .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
-      .eq("league_id", id)
-      .eq("week_id", upcomingEpisode.id)
-      .eq("manager_id", myTeamId)
-      .maybeSingle();
-    ownPrediction = data;
+  // Peer picks stay behind the lock/deadline checks; RLS gates them too, but
+  // the page decides what to show from these flags.
+  const [
+    { data: allPredictions },
+    { data: lateRows },
+    { data: allGrandFinalePicks },
+    otherLeaguePicks,
+    { data: leagueRosteredSlots },
+  ] = await Promise.all([
+    curtainCallWeekId && isLocked
+      ? supabase
+          .from("predictions")
+          .select(
+            "manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
+          )
+          .eq("league_id", id)
+          .eq("week_id", curtainCallWeekId)
+      : Promise.resolve({ data: null }),
+    grandFinaleOn && grandFinaleLocked
+      ? supabase.from("grand_finale_late_unlocks").select("manager_id, late_factor, submitted_at").eq("league_id", id)
+      : Promise.resolve({ data: null }),
+    // League at a Glance is visible to everyone once the season-wide deadline
+    // has passed, regardless of the viewer's own submission — no manager_id
+    // filter, unlike the viewer's own order.
+    grandFinaleOn && grandFinaleLocked
+      ? supabase.from("grand_finale_predictions").select("manager_id, couple_id, predicted_position").eq("league_id", id)
+      : Promise.resolve({ data: null }),
+    loadOtherLeaguePicks(supabase, {
+      userId: user.id,
+      currentLeagueId: id,
+      curtainCallWeekId: curtainCallWeekId && !isLocked ? curtainCallWeekId : null,
+      includeGrandFinale: grandFinaleOn && !grandFinaleLocked,
+      now: new Date(),
+    }),
+    recastOn
+      ? supabase.from("roster_slots").select("couple_id").eq("league_id", id).is("end_week", null)
+      : Promise.resolve({ data: null }),
+  ]);
 
-    if (isLocked) {
-      const { data: allPredictions } = await supabase
-        .from("predictions")
-        .select(
-          "manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
-        )
-        .eq("league_id", id)
-        .eq("week_id", upcomingEpisode.id);
+  const { data: ownPrediction } = await ownPredictionPending;
+  const curtainCallPicksEntries: CurtainCallLeagueEntry[] = (allPredictions ?? [])
+    .filter((p) => p.manager_id !== myTeamId)
+    .map((p) => ({
+      managerId: p.manager_id,
+      displayName: nameByManager[p.manager_id] ?? "Unknown",
+      eliminatedId: p.predicted_eliminated_couple_id,
+      eliminatedId2: p.predicted_eliminated_couple_id_2,
+      topScorerId: p.predicted_top_scorer_couple_id,
+      comparison: null,
+    }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
-      curtainCallPicksEntries = (allPredictions ?? [])
-        .filter((p) => p.manager_id !== myTeamId)
-        .map((p) => ({
-          managerId: p.manager_id,
-          displayName: nameByManager[p.manager_id] ?? "Unknown",
-          eliminatedId: p.predicted_eliminated_couple_id,
-          eliminatedId2: p.predicted_eliminated_couple_id_2,
-          topScorerId: p.predicted_top_scorer_couple_id,
-          comparison: null,
-        }))
-        .sort((a, b) => a.displayName.localeCompare(b.displayName));
-    }
-  }
+  const { data: ownGrandFinalePicks } = await ownGrandFinalePicksPending;
+  const grandFinaleOrder =
+    ownGrandFinalePicks && ownGrandFinalePicks.length > 0 ? ownGrandFinalePicks.map((p) => p.couple_id) : null;
 
-  let grandFinaleOrder: string[] | null = null;
-  let ownLateEntry: { factor: number; open: boolean } | null = null;
-  let lateFactorByManager: Record<string, number> = {};
-  if (grandFinaleOn) {
-    const { data: ownGrandFinalePicks } = await supabase
-      .from("grand_finale_predictions")
-      .select("couple_id, predicted_position")
-      .eq("league_id", id)
-      .eq("manager_id", myTeamId)
-      .order("predicted_position", { ascending: true });
-    grandFinaleOrder = ownGrandFinalePicks && ownGrandFinalePicks.length > 0
-      ? ownGrandFinalePicks.map((p) => p.couple_id)
-      : null;
-  }
+  const lateFactorByManager: Record<string, number> = Object.fromEntries(
+    (lateRows ?? []).map((row) => [row.manager_id, Number(row.late_factor)])
+  );
+  const ownLate = (lateRows ?? []).find((row) => row.manager_id === myTeamId);
+  const ownLateEntry = ownLate ? { factor: Number(ownLate.late_factor), open: ownLate.submitted_at == null } : null;
 
-  if (grandFinaleOn && grandFinaleLocked) {
-    const { data: lateRows } = await supabase
-      .from("grand_finale_late_unlocks")
-      .select("manager_id, late_factor, submitted_at")
-      .eq("league_id", id);
-    lateFactorByManager = Object.fromEntries(
-      (lateRows ?? []).map((row) => [row.manager_id, Number(row.late_factor)])
-    );
-    const own = (lateRows ?? []).find((row) => row.manager_id === myTeamId);
-    if (own) ownLateEntry = { factor: Number(own.late_factor), open: own.submitted_at == null };
-  }
+  const leagueGrandFinale =
+    grandFinaleOn && grandFinaleLocked
+      ? buildLeagueGrandFinalePredictions({
+          predictions: allGrandFinalePicks ?? [],
+          members: members ?? [],
+          viewerTeamId: myTeamId,
+          lateFactorByManager,
+        })
+      : [];
 
-  // League at a Glance is visible to everyone once the season-wide deadline
-  // has passed, regardless of the viewer's own submission — no manager_id
-  // filter, unlike the query above.
-  let leagueGrandFinale: ReturnType<typeof buildLeagueGrandFinalePredictions> = [];
-  if (grandFinaleOn && grandFinaleLocked) {
-    const { data: allGrandFinalePicks } = await supabase
-      .from("grand_finale_predictions")
-      .select("manager_id, couple_id, predicted_position")
-      .eq("league_id", id);
-    leagueGrandFinale = buildLeagueGrandFinalePredictions({
-      predictions: allGrandFinalePicks ?? [],
-      members: members ?? [],
-      viewerTeamId: myTeamId,
-      lateFactorByManager,
-    });
-  }
-
-  const otherLeaguePicks = await loadOtherLeaguePicks(supabase, {
-    userId: user.id,
-    currentLeagueId: id,
-    curtainCallWeekId: curtainCallOn && upcomingEpisode && !isLocked ? upcomingEpisode.id : null,
-    includeGrandFinale: grandFinaleOn && !grandFinaleLocked,
-    now: new Date(),
-  });
-
-  const latestVisibleDanceWeek = visibleDanceWeeks[visibleDanceWeeks.length - 1] ?? null;
-  const yourRosterWeek =
-    visibleDanceWeeks.find((w) => w.id === rosterWeekParam) ?? latestVisibleDanceWeek;
-
-  const episodeWeekNumber = new Map<string, number>();
-  for (const week of groupedWeeks) {
-    if (!scoredIds.has(week.id) && week.id !== draftNight?.weekId) continue;
-    for (const episode of week.episodes) episodeWeekNumber.set(episode.id, week.week_number);
-  }
-  if (draftNight) {
-    for (const episodeId of draftNight.episodeIds) episodeWeekNumber.set(episodeId, draftNight.weekNumber);
-  }
-  const { data: leagueDanceScores } =
-    leagueSlotPeriods.length > 0 && episodeWeekNumber.size > 0
-      ? await supabase
-          .from("dance_scores")
-          .select("couple_id, episode_id, scaled_score")
-          .in("episode_id", [...episodeWeekNumber.keys()])
-          .in("couple_id", [...new Set(leagueSlotPeriods.map((slot) => slot.coupleId))])
-      : { data: [] as { couple_id: string; episode_id: string; scaled_score: number }[] };
+  const { data: leagueDanceScores } = await leagueDanceScoresPending;
   const judgePointsInputs = {
     scores: [
       ...excludeReleasedCoupleRows(leagueDanceScores ?? [], draftNight?.releasedCoupleIdsByEpisode ?? {})
@@ -292,12 +364,7 @@ export default async function LeaguePicksPage({
         })
       )
     : 0;
-  const yourRosterWeekEpisodeIds =
-    groupedWeeks.find((w) => w.id === yourRosterWeek?.id)?.episodes.map((e) => e.id) ?? [];
-  const { data: yourRosterWeekJeopardy } =
-    yourRosterWeekEpisodeIds.length > 0
-      ? await supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", yourRosterWeekEpisodeIds)
-      : { data: [] as { couple_id: string }[] };
+  const { data: yourRosterWeekJeopardy } = await yourRosterWeekJeopardyPending;
   const yourRosterWeekInJeopardy = new Set((yourRosterWeekJeopardy ?? []).map((row) => row.couple_id));
   const rosterCouples = yourSlotsForWeek.flatMap((slot) => {
     const couple = flatCouplesById.get(slot.coupleId);
@@ -381,40 +448,14 @@ export default async function LeaguePicksPage({
     );
   }
 
-  const { data: rosterSlots } = await supabase
-    .from("roster_slots")
-    .select(
-      "slot_number, couple_id, couples(status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name))"
-    )
-    .eq("league_id", id)
-    .eq("manager_id", myTeamId)
-    .is("end_week", null);
-  const recastSlotSource = (rosterSlots ?? [])
-    .filter((s) => s.couples)
-    .map((s) => ({
-      slotNumber: s.slot_number,
-      coupleId: s.couple_id!,
-      celebrity: s.couples!.celebrity?.name ?? "Unknown",
-      pro: s.couples!.pro?.name ?? "Unknown",
-      status: s.couples!.status,
-      eliminationWeek: s.couples!.elimination_week,
-    }));
-  const { revealedOpen: revealedRecastSlots, hiddenOpenCount: hiddenRecastOpenCount } =
-    partitionRecastSlots(recastSlotSource, latestCompletedWeek, finaleWeekNumber);
-
   let recastOpenSlots: { slotNumber: number; formerCoupleName: string }[] = [];
   let recastAvailableCouples: { id: string; celebrity_name: string; pro_name: string }[] = [];
-  if (danceCardOn && waiversOn && revealedRecastSlots.length > 0) {
+  if (recastOn) {
     recastOpenSlots = revealedRecastSlots.map((s) => ({
       slotNumber: s.slotNumber,
       formerCoupleName: formatCoupleName(allDisplayNames.get(s.coupleId) ?? { celebrity: s.celebrity, pro: s.pro }),
     }));
 
-    const { data: leagueRosteredSlots } = await supabase
-      .from("roster_slots")
-      .select("couple_id")
-      .eq("league_id", id)
-      .is("end_week", null);
     const rosteredCoupleIds = new Set((leagueRosteredSlots ?? []).map((s) => s.couple_id));
     recastAvailableCouples = activeCouples
       .filter((c) => !rosteredCoupleIds.has(c.id))
@@ -432,10 +473,7 @@ export default async function LeaguePicksPage({
   let draftPickCount = 0;
   let onTheClockAutopilot = false;
   if (danceCardOn && league.draft_status === "in_progress") {
-    const { count } = await supabase
-      .from("draft_picks")
-      .select("id", { count: "exact", head: true })
-      .eq("league_id", id);
+    const { count } = await draftPickCountPending;
     draftPickCount = count ?? 0;
     const onTheClockId = managerIdForPick(
       draftPickCount + 1,
@@ -454,15 +492,6 @@ export default async function LeaguePicksPage({
     onTheClockAutopilot = onTheClock?.draft_autopilot ?? false;
   }
 
-  const curtainCallSelection = curtainCallOn
-    ? selectCurtainCallWeek(completedEpisodes ?? [], upcomingEpisode ?? null, cutoff.allowedEpisodeIds, weekParam)
-    : { episode: null, mode: null };
-  const curtainCallEpisode = curtainCallSelection.episode;
-  const curtainCallMode = curtainCallSelection.mode;
-  const pastPicksLocked =
-    curtainCallMode === "recap" && curtainCallEpisode
-      ? isPastPicksLocked(curtainCallEpisode.id, cutoff.allowedEpisodeIds)
-      : false;
   const curtainCallWeeks = buildCurtainCallWeeks(
     (completedEpisodes ?? []).map((e) => ({
       id: e.id,
@@ -476,32 +505,14 @@ export default async function LeaguePicksPage({
 
   let pastPicksComparison = null;
   let curtainCallRecapEntries: CurtainCallLeagueEntry[] = [];
-  if (curtainCallMode === "recap" && curtainCallEpisode && !pastPicksLocked) {
-    const recapEpisodeIds = curtainCallEpisode.episodeIds;
+  if (recapEpisode && recapPending) {
     const [{ data: allPastPredictions }, { data: pastResults }, { data: pastDanceScores }, { data: pastJeopardy }] =
-      await Promise.all([
-      supabase
-        .from("predictions")
-        .select(
-          "manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
-        )
-        .eq("league_id", id)
-        .eq("week_id", curtainCallEpisode.id),
-      recapEpisodeIds.length > 0
-        ? supabase.from("episode_results").select("couple_id, outcome").in("episode_id", recapEpisodeIds)
-        : Promise.resolve({ data: [] as { couple_id: string; outcome: string }[] }),
-      recapEpisodeIds.length > 0
-        ? supabase.from("dance_scores").select("couple_id, total_score").in("episode_id", recapEpisodeIds)
-        : Promise.resolve({ data: [] as { couple_id: string; total_score: number }[] }),
-      recapEpisodeIds.length > 0
-        ? supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", recapEpisodeIds)
-        : Promise.resolve({ data: [] as { couple_id: string }[] }),
-    ]);
+      await recapPending;
 
     const nearMissEnabled = scoringSettings?.curtain_call_near_miss_enabled !== false;
     const remaining = couplesRemainingAtWeek(
       seasonCouples.map((c) => ({ eliminationWeek: c.elimination_week })),
-      curtainCallEpisode.week_number
+      recapEpisode.week_number
     );
     const episodeOutcomes = (pastResults ?? []).map((r) => ({ coupleId: r.couple_id, outcome: r.outcome }));
     const danceScores = (pastDanceScores ?? []).map((s) => ({ coupleId: s.couple_id, totalScore: Number(s.total_score) }));
@@ -523,14 +534,14 @@ export default async function LeaguePicksPage({
       predicted_top_scorer_couple_id: string | null;
     } | undefined, managerId: string) =>
       buildPastPicksComparison({
-        isDoubleElimination: curtainCallEpisode.is_double_elimination_week,
+        isDoubleElimination: recapEpisode.is_double_elimination_week,
         predictedEliminatedCoupleId: prediction?.predicted_eliminated_couple_id ?? null,
         predictedEliminatedCoupleId2: prediction?.predicted_eliminated_couple_id_2 ?? null,
         predictedTopScorerCoupleId: prediction?.predicted_top_scorer_couple_id ?? null,
         episodeOutcomes,
         danceScores,
         predictionPoints:
-          scoreRows.find((row) => row.week_id === curtainCallEpisode.id && row.manager_id === managerId)
+          scoreRows.find((row) => row.week_id === recapEpisode.id && row.manager_id === managerId)
             ?.prediction_points ?? 0,
         inJeopardyCoupleIds,
         nearMissEnabled,

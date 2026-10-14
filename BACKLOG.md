@@ -2,6 +2,47 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Performance audit — 2026-10-14
+
+**#1 below is implemented and verified in the working tree, uncommitted** (`league-home-summary.ts`, Picks `page.tsx`, `this-week/page.tsx`, `revealing-week-data.ts` and its four callers). Production build, `eslint src` and 609 tests pass. Signed-in before/after SSR comparison (2026-10-14, during the E06 reveal, scratch viewer in two leagues: one locked/drafted/GF on, one West-coast open/undrafted/GF off; Spoiler-Free off gated, on gated, on watched through Week 4, off with drafts unlocked; Home, Results, both Picks and Standings, Manage Leagues): HTML identical apart from countdowns, random empty-standings taglines and a couple posted mid-run. Dev-mode medians, before → after: Home 2.7 → 2.2s, Picks 3.6 → 3.0s (locked) and 3.2 → 2.9s (open), Results 1.6 → 1.4s, Standings and Manage Leagues within noise. `npm run lint`/`npm test` also pick up another session's `.codex-private/` folder (lint errors, 8 failing test files); that's unrelated to this change.
+
+Static trace of Home, Results, Picks and Standings plus the dev server's `.next/trace` (the only log available; Vercel logs weren't reachable from the container). **Measured** (dev mode, one viewer, container → Supabase, so shape only, not production numbers): during the E06 East broadcast, Home auto-refresh RSC renders took 2.4–4.5s (n=6, 01:48–01:50 UTC) at a ~23s cadence; Picks RSC renders 3.6–6.8s (n=9, two outliers 11.5s/24.8s); Results 0.9s (n=1). Each request also shows a short 0.1–0.7s span the trace doesn't explain. **Code-derived**: every fan page re-runs its whole loader on each 20s `router.refresh()`; there is no cross-request caching anywhere (correctly so). **Hypothesis**: DB load = viewers × ~30–60 queries per 20s; viewer count and DB metrics unknown, so no claim the database is saturated.
+
+Do **not** add cross-request caching (`unstable_cache`, fetch cache, `"use cache"`) for episodes, weeks, dance scores, results, predictions or spoiler progress: `episodes.status`/`results_published_at`/live `dance_scores` drive the spoiler cutoff and reveal state, and the reads run under each viewer's RLS. React `cache()` (per request) is the only dedupe proposed.
+
+Top three, in recommended order:
+
+1. **Flatten serial waterfalls (implement first, after the episode).** Pure reordering: same queries, RLS and data.
+   - `computeLeagueHomeSummary` (`src/lib/league-home-summary.ts`) runs up to 5 serial rounds per league (settings/members/scores → roster_slots → `effective_grand_finale_deadline` → `prediction_lock_at` + own prediction → own GF pick). The two RPCs need only league/week id, so they belong in round one; the rest go in round two after `myTeamId`. That gives 2 rounds, on Home's critical path and the league switcher's.
+   - Picks after `loadLeaguePageBase` (`src/app/leagues/[id]/picks/page.tsx:95-499`) awaits about 14 queries one by one. Group them into two stages: independent reads first (GF deadline, lock, own prediction, own GF order, dance scores, jeopardy, own/league roster slots, draft-pick count), then reads that depend on the lock or deadline (peer predictions only when `isLocked`, late unlocks and peer GF picks only when GF is locked, other-league picks, recap). Keep peer reads conditional exactly as now.
+   - Results: the predictions/GF reads (`this-week/page.tsx` after line 186) don't depend on the dance/results reads before them, so the two `Promise.all` calls can merge.
+   - `loadRevealingWeek`'s dance_scores query needs only grouped weeks, not the cutoff, so it can run alongside `resolveSpoilerCutoff`.
+   - Validate by rendering the same viewer before and after (Home with 2+ leagues, Picks locked and open, GF on/off, Spoiler-Free on/off, a revealing week): the HTML must match, and `.next/trace` render time should drop. Risk: an accidental unconditional peer-pick read (RLS still gates it, but the UI keys off `isLocked`).
+2. **Request-scoped viewer/season context.** Each page reads several things twice:
+   - viewer's `league_members` (3× on Picks, via `loadOtherLeaguePicks`)
+   - `active_season_id`
+   - `competition_weeks` + `episodes` (once in `loadDraftScoreContext`, once in the page loader)
+   - `spoiler_watch_progress` (`draft_unlocked_week` and `last_watched_week` in two queries)
+   - `couples` (twice on Home, plus `loadLatestRelease` while drafts are out)
+
+   Also, `loadHomeLeagueData` makes weeks/episodes wait for the whole `loadDraftScoreContext` chain. Fix: one per-request `cache()`d loader passed into `loadDraftScoreContext`, `resolveSpoilerCutoff` and the page loaders.
+
+   This saves roughly 6–8 queries and 2–3 serial rounds per render on every fan page. It's riskier than #1 because it touches the draft/spoiler context all four pages share. Validate across the same viewer states as #1, plus draft-released/unlocked and East/West live-air states.
+3. **Take the league-switcher summaries off the Picks/Standings critical path.** `loadLeaguePageBase` runs `computeLeagueHomeSummary` (3–8 queries each) for every *other* league on every render and refresh, only to fill rank/Picks Due in a sheet that's usually closed (`league-switcher.tsx`). Options:
+   - Load them in a server action when the sheet opens. The action must re-derive the cutoff server-side.
+   - Pass an unawaited promise behind Suspense.
+
+   Separately, `loadOtherLeaguePicks` (`src/lib/other-league-picks.ts`) recomputes `prediction_lock_at` / `effective_grand_finale_deadline` for those same leagues, so reuse base's values or batch them.
+
+Ride-along flags (behavior questions, not perf, so decide separately):
+- **Switcher rank ≠ Home rank on a live night.** `loadLeaguePageBase` passes `cutoff.allowedEpisodeIds` to `computeLeagueHomeSummary` but not `scoredIds`/`revealingWeekId`/`draftNight`, which Home passes. Decide whether to align before or with #3.
+- **Home refreshes in more cases than the other pages.** Home's `RevealAutoRefresh active={!!revealing}` (`(fan)/page.tsx:246`) refreshes for gated viewers and after the live window while revealed-but-unpublished scores remain. Results and the league pages use `revealingVisible`. How often this matters is a hypothesis.
+- **Refreshes can overlap on slow renders.** `RevealAutoRefresh` restarts its interval whenever `windows` gets a new array identity (each refresh), hence the measured ~23s cadence. A render slower than 20s (dev outliers 19.1s/24.8s) can overlap the next tick.
+- **League pages re-read data they already have.** `draftManagerScoresForLeague` re-reads `scoring_settings` and `roster_slots` that the base already loaded. Picks' own and league `roster_slots` queries are derivable from `leagueSlotPeriods` + `flatCouples` once the draft is complete.
+- **`getUser()` runs three times per render** (already noted in item 8). SiteHeader's call runs in parallel with the page's, so it costs requests, not latency; a `cache()`d getter in the same request removes one.
+- **Not bottlenecks at current scale** (code-derived): `couples` reads without a season filter, `select("*")` on `leagues`/`scoring_settings`, the season's `weekly_manager_scores`, missing indexes, and the per-row `prediction_lock_at` in the predictions RLS policy.
+- **Later, if load matters**: refresh only when a cheap "live version" (latest `dance_scores.created_at`, release and publish stamps) changes, instead of every 20s. Clock-driven chrome (East→gap→West) is computed server-side with `now`, so this needs care to avoid missing those transitions.
+
 ## Code review — 2026-10-13
 
 All three fixes are committed and pushed to main in `384f78d`; deployment not yet confirmed. `npm test` passes 609 tests across 55 files; lint, type check and production build pass. Chromium exercised the real ResultsForm with isolated fixtures/mocked actions: a newer edit survives an in-flight save, and Publish flushes the latest values. No live data changed. The PostgreSQL tests run in PGlite (dev dependency) against the project schema and migration.

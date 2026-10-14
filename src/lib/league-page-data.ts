@@ -136,15 +136,17 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     }));
   const finaleWeekNumber = groupedWeeks.find((week) => week.is_finale)?.week_number ?? null;
 
-  const cutoff = await resolveSpoilerCutoff(
+  const cutoffPending = resolveSpoilerCutoff(
     supabase,
     user.id,
     activeSeasonId ?? null,
     accountSettingsData.spoilerFreeMode,
     completedEpisodes ?? []
   );
-
-  const { revealing, scoredIds, visible: revealingVisible } = await loadRevealingWeek(supabase, groupedWeeks, cutoff);
+  const [cutoff, { revealing, scoredIds, visible: revealingVisible }] = await Promise.all([
+    cutoffPending,
+    loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
+  ]);
   const draftNight = draftContext.night;
   const { strip: spoilerFreeStrip, prompt: livePrompt, refreshWindows } = buildLiveAirChrome({
     spoilerFreeMode: accountSettingsData.spoilerFreeMode,

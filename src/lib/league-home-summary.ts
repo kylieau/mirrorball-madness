@@ -72,12 +72,46 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
   // below resolves through myTeamId instead of the raw viewer id.
   const myTeamId = findOwnMembership(members ?? [], userId)?.user_id ?? userId;
 
+  const danceCardOn = scoringSettings?.judges_score_category_enabled ?? true;
+  const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
+  const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
+  const curtainCallWeekId = curtainCallOn && upcomingEpisode ? upcomingEpisode.id : null;
+
+  // Everything left needs only the settings and myTeamId above, so it goes out
+  // as one round instead of a query per module.
+  const [{ data: slots }, { data: grandFinaleDeadlineData }, { data: lockData }, { data: prediction }, { data: ownGrandFinalePick }] =
+    await Promise.all([
+      draftNight && draftNight.dances.length > 0 && scoringSettings
+        ? supabase.from("roster_slots").select("manager_id, couple_id, start_week, end_week").eq("league_id", league.id)
+        : Promise.resolve({ data: null }),
+      grandFinaleOn
+        ? supabase.rpc("effective_grand_finale_deadline", { p_league_id: league.id })
+        : Promise.resolve({ data: null }),
+      curtainCallWeekId
+        ? supabase.rpc("prediction_lock_at", { p_league_id: league.id, p_week_id: curtainCallWeekId })
+        : Promise.resolve({ data: null }),
+      curtainCallWeekId
+        ? supabase
+            .from("predictions")
+            .select("predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
+            .eq("league_id", league.id)
+            .eq("week_id", curtainCallWeekId)
+            .eq("manager_id", myTeamId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      grandFinaleOn
+        ? supabase
+            .from("grand_finale_predictions")
+            .select("manager_id")
+            .eq("league_id", league.id)
+            .eq("manager_id", myTeamId)
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
   let draftTotals: Map<string, number> | null = null;
   if (draftNight && draftNight.dances.length > 0 && scoringSettings) {
-    const { data: slots } = await supabase
-      .from("roster_slots")
-      .select("manager_id, couple_id, start_week, end_week")
-      .eq("league_id", league.id);
     const rosterSlots = (slots ?? []).flatMap((slot) => {
       if (!slot.couple_id) return [];
       const period = {
@@ -137,32 +171,14 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
       )
     : null;
 
-  const danceCardOn = scoringSettings?.judges_score_category_enabled ?? true;
-  const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
-  const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
-  const grandFinaleDeadline = grandFinaleOn
-    ? (await supabase.rpc("effective_grand_finale_deadline", { p_league_id: league.id })).data ?? null
-    : null;
+  const grandFinaleDeadline = grandFinaleDeadlineData ?? null;
   const grandFinaleLocked = !!grandFinaleDeadline && new Date() >= new Date(grandFinaleDeadline);
 
-  let lockAt: string | null = null;
+  const lockAt = lockData ?? null;
+  const ownPrediction = prediction ?? null;
   let curtainCallPicksDue = false;
   let curtainCallState: CurtainCallState = "no_week";
-  let ownPrediction: { predicted_eliminated_couple_id: string | null; predicted_top_scorer_couple_id: string | null } | null =
-    null;
-  if (curtainCallOn && upcomingEpisode) {
-    const [{ data: lockData }, { data: prediction }] = await Promise.all([
-      supabase.rpc("prediction_lock_at", { p_league_id: league.id, p_week_id: upcomingEpisode.id }),
-      supabase
-        .from("predictions")
-        .select("predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
-        .eq("league_id", league.id)
-        .eq("week_id", upcomingEpisode.id)
-        .eq("manager_id", myTeamId)
-        .maybeSingle(),
-    ]);
-    lockAt = lockData;
-    ownPrediction = prediction;
+  if (curtainCallWeekId) {
     const locked = !!lockAt && new Date() >= new Date(lockAt);
     // Don't nag about the next week's pick until the previous week's
     // results are actually published — a league on its first week (no
@@ -172,17 +188,7 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
     curtainCallPicksDue = curtainCallState === "open" && !hasCurtainCallPicks(ownPrediction);
   }
 
-  let hasGrandFinalePrediction = false;
-  if (grandFinaleOn) {
-    const { data: ownGrandFinalePick } = await supabase
-      .from("grand_finale_predictions")
-      .select("manager_id")
-      .eq("league_id", league.id)
-      .eq("manager_id", myTeamId)
-      .limit(1)
-      .maybeSingle();
-    hasGrandFinalePrediction = !!ownGrandFinalePick;
-  }
+  const hasGrandFinalePrediction = !!ownGrandFinalePick;
   const grandFinalePicksDue = grandFinaleOn && !grandFinaleLocked && !hasGrandFinalePrediction;
 
   return {
