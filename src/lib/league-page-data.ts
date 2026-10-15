@@ -80,7 +80,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
   // has a roster, not only when the roster cards show.
   const allLeagueSlotsPending = supabase
     .from("roster_slots")
-    .select("manager_id, couple_id, start_week, end_week")
+    .select("slot_number, manager_id, couple_id, start_week, end_week")
     .eq("league_id", id)
     .order("slot_number");
   const groupedWeeks = groupEpisodesByWeek(season.weekRows, season.episodeRows);
@@ -234,9 +234,18 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
   const allDisplayNames = buildCoupleDisplayNames(flatCouples);
   const activeDisplayNames = buildCoupleDisplayNames(activeCouples);
 
-  const leagueSlotPeriods = (showLeagueRosters ? (allLeagueSlots ?? []) : [])
+  // Every held slot, with its number: Recast reads the viewer's current seats
+  // from this even when the league's roster cards are hidden.
+  const rosterSlotPeriods = (allLeagueSlots ?? [])
     .filter((r): r is typeof r & { couple_id: string } => !!r.couple_id)
-    .map((r) => ({ managerId: r.manager_id, coupleId: r.couple_id, startWeek: r.start_week, endWeek: r.end_week }));
+    .map((r) => ({
+      slotNumber: r.slot_number,
+      managerId: r.manager_id,
+      coupleId: r.couple_id,
+      startWeek: r.start_week,
+      endWeek: r.end_week,
+    }));
+  const leagueSlotPeriods = showLeagueRosters ? rosterSlotPeriods : [];
 
   // Flipping model shared with Curtain Call: visible completed weeks only,
   // latest by default. With none yet, roster views show who holds what now,
@@ -326,6 +335,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     activeDisplayNames,
     showLeagueRosters,
     leagueSlotPeriods,
+    rosterSlotPeriods,
     visibleDanceWeeks,
     switcherLeagues,
     switcherCurrent: { rank, totalMembers: standings.length },

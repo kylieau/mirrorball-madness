@@ -89,6 +89,7 @@ export default async function LeaguePicksPage({
     activeDisplayNames,
     showLeagueRosters,
     leagueSlotPeriods,
+    rosterSlotPeriods,
     visibleDanceWeeks,
   } = base;
 
@@ -177,21 +178,13 @@ export default async function LeaguePicksPage({
       ])
     : null;
 
-  const [{ data: grandFinaleDeadlineData }, { data: computedLockAt }, { data: rosterSlots }] = await Promise.all([
+  const [{ data: grandFinaleDeadlineData }, { data: computedLockAt }] = await Promise.all([
     grandFinaleOn
       ? supabase.rpc("effective_grand_finale_deadline", { p_league_id: id })
       : Promise.resolve({ data: null }),
     curtainCallWeekId
       ? supabase.rpc("prediction_lock_at", { p_league_id: id, p_week_id: curtainCallWeekId })
       : Promise.resolve({ data: null }),
-    supabase
-      .from("roster_slots")
-      .select(
-        "slot_number, couple_id, couples(status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name))"
-      )
-      .eq("league_id", id)
-      .eq("manager_id", myTeamId)
-      .is("end_week", null),
   ]);
   const grandFinaleDeadline = grandFinaleDeadlineData ?? null;
   const grandFinaleLocked = !!grandFinaleDeadline && new Date() >= new Date(grandFinaleDeadline);
@@ -214,16 +207,24 @@ export default async function LeaguePicksPage({
   const lockAt = computedLockAt ?? null;
   const isLocked = !!lockAt && new Date() >= new Date(lockAt);
 
-  const recastSlotSource = (rosterSlots ?? [])
-    .filter((s) => s.couples)
-    .map((s) => ({
-      slotNumber: s.slot_number,
-      coupleId: s.couple_id!,
-      celebrity: s.couples!.celebrity?.name ?? "Unknown",
-      pro: s.couples!.pro?.name ?? "Unknown",
-      status: s.couples!.status,
-      eliminationWeek: s.couples!.elimination_week,
-    }));
+  const flatCouplesById = new Map(flatCouples.map((c) => [c.id, c]));
+  const recastSlotSource = rosterSlotPeriods
+    .filter((slot) => slot.managerId === myTeamId && slot.endWeek === null)
+    .flatMap((slot) => {
+      const couple = flatCouplesById.get(slot.coupleId);
+      return couple
+        ? [
+            {
+              slotNumber: slot.slotNumber,
+              coupleId: slot.coupleId,
+              celebrity: couple.celebrity_name,
+              pro: couple.pro_name,
+              status: couple.status,
+              eliminationWeek: couple.elimination_week,
+            },
+          ]
+        : [];
+    });
   const { revealedOpen: revealedRecastSlots, hiddenOpenCount: hiddenRecastOpenCount } =
     partitionRecastSlots(recastSlotSource, latestCompletedWeek, finaleWeekNumber);
   const recastOn = danceCardOn && waiversOn && revealedRecastSlots.length > 0;
@@ -315,7 +316,6 @@ export default async function LeaguePicksPage({
     multiplier: scoringSettings?.judges_score_multiplier ?? 1,
     categoryWeight: scoringSettings?.judges_score_category_weight ?? 1,
   };
-  const flatCouplesById = new Map(flatCouples.map((c) => [c.id, c]));
 
   // Your Picks → Your roster: the viewer's roster as it stood in the selected
   // week (so a Recast swap reads correctly), that week's points per couple
