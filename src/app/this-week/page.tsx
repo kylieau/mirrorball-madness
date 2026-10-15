@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
@@ -36,9 +36,7 @@ export default async function ThisWeekPage({
 }) {
   const { week: weekParam } = await searchParams;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) {
     redirect("/login");

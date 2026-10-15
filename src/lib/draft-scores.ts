@@ -1,4 +1,5 @@
 import { buildCoupleDisplayNames, formatCoupleName } from "./couple-display";
+import { slotActiveInWeek } from "./roster-couple-points";
 import { computeWeeklyScores, type DanceScore } from "./scoring";
 
 // A night with at least one couple's drafted dance released (per couple, via
@@ -186,6 +187,41 @@ export function draftWeekManagerScores(input: {
     rosterPoints: row.rosterPoints,
     totalPoints: row.totalPoints,
   }));
+}
+
+// The league's draft-night standings from rows the page already loaded: only
+// roster periods that held a couple that week count.
+export function draftManagerScoresForNight(
+  settings: {
+    judges_score_multiplier: number;
+    judges_score_category_weight: number;
+    judges_score_starts_week: number;
+  },
+  slots: { manager_id: string; couple_id: string | null; start_week: number; end_week: number | null }[],
+  night: { weekNumber: number; dances: { coupleId: string; total: number; scaled: number }[] }
+): DraftManagerScore[] {
+  const rosterSlots = slots.flatMap((slot) => {
+    if (!slot.couple_id) return [];
+    const period = {
+      managerId: slot.manager_id,
+      coupleId: slot.couple_id,
+      startWeek: slot.start_week,
+      endWeek: slot.end_week,
+    };
+    return slotActiveInWeek(period, night.weekNumber) ? [{ managerId: period.managerId, coupleId: period.coupleId }] : [];
+  });
+  return draftWeekManagerScores({
+    weekNumber: night.weekNumber,
+    anchorWeek: settings.judges_score_starts_week,
+    judgesScoreMultiplier: settings.judges_score_multiplier,
+    judgesCategoryWeight: settings.judges_score_category_weight,
+    rosterSlots,
+    danceScores: night.dances.map((dance) => ({
+      coupleId: dance.coupleId,
+      totalScore: dance.total,
+      scaledScore: dance.scaled,
+    })),
+  });
 }
 
 export type WeekManagerScoreRow = {

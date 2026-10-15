@@ -1,12 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { getAuthUser } from "@/lib/supabase/server";
 import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
-import { draftManagerScoresForLeague, loadDraftScoreContext } from "@/lib/draft-scores-data";
-import { homeStripChoice, scoresReplacingDraftWeek } from "@/lib/draft-scores";
+import { loadDraftScoreContext } from "@/lib/draft-scores-data";
+import { draftManagerScoresForNight, homeStripChoice, scoresReplacingDraftWeek } from "@/lib/draft-scores";
 import { formatManagerName } from "@/lib/manager-display";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
@@ -21,9 +22,7 @@ export type LeaguePageBase = Awaited<ReturnType<typeof loadLeaguePageBase>>;
 // (standings, spoiler cutoff, revealing/draft weeks, the league header), so
 // each page only adds its own queries on top and the two can't drift.
 export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id: string) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) {
     redirect("/login");
@@ -77,16 +76,13 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
   // Everyone's current roster is public once the draft is done — the standings
   // are read through who holds which couples.
   const showLeagueRosters = danceCardOn && league.draft_status === "completed";
-  const allLeagueSlotsPending =
-    showLeagueRosters
-      ? supabase
-          .from("roster_slots")
-          .select("manager_id, couple_id, start_week, end_week")
-          .eq("league_id", id)
-          .order("slot_number")
-      : Promise.resolve({
-          data: [] as { manager_id: string; couple_id: string | null; start_week: number; end_week: number | null }[],
-        });
+  // Also feeds the draft-night manager scores, so it loads whenever the league
+  // has a roster, not only when the roster cards show.
+  const allLeagueSlotsPending = supabase
+    .from("roster_slots")
+    .select("manager_id, couple_id, start_week, end_week")
+    .eq("league_id", id)
+    .order("slot_number");
   const groupedWeeks = groupEpisodesByWeek(season.weekRows, season.episodeRows);
   const liveWeek = liveCompetitionWeek(groupedWeeks);
   const upcomingEpisode = liveWeek
@@ -143,7 +139,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     bannerWeeks: toBannerWeeks(groupedWeeks),
   });
   const draftManagers =
-    draftNight && scoringSettings ? await draftManagerScoresForLeague(supabase, id, draftNight) : [];
+    draftNight && scoringSettings ? draftManagerScoresForNight(scoringSettings, allLeagueSlots ?? [], draftNight) : [];
   const scoreRows =
     draftNight && draftManagers.length > 0
       ? scoresReplacingDraftWeek(allScores ?? [], draftNight.weekId, draftManagers)
@@ -238,7 +234,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
   const allDisplayNames = buildCoupleDisplayNames(flatCouples);
   const activeDisplayNames = buildCoupleDisplayNames(activeCouples);
 
-  const leagueSlotPeriods = (allLeagueSlots ?? [])
+  const leagueSlotPeriods = (showLeagueRosters ? (allLeagueSlots ?? []) : [])
     .filter((r): r is typeof r & { couple_id: string } => !!r.couple_id)
     .map((r) => ({ managerId: r.manager_id, coupleId: r.couple_id, startWeek: r.start_week, endWeek: r.end_week }));
 

@@ -1,12 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { slotActiveInWeek } from "@/lib/roster-couple-points";
 import {
   draftReleaseLabel,
   draftScoresVisible,
-  draftWeekManagerScores,
   findDraftRelease,
-  type DraftManagerScore,
   type DraftRelease,
 } from "@/lib/draft-scores";
 import { loadAllCouples, loadViewerSeason } from "@/lib/viewer-season-data";
@@ -115,46 +112,6 @@ async function loadLatestRelease(
       pro_name: c.pro?.name ?? "Unknown",
       status: c.status,
       elimination_week: c.elimination_week,
-    })),
-  });
-}
-
-export async function draftManagerScoresForLeague(
-  supabase: SupabaseClient<Database>,
-  leagueId: string,
-  night: VisibleDraftNight
-): Promise<DraftManagerScore[]> {
-  const [{ data: settings }, { data: slots }] = await Promise.all([
-    supabase
-      .from("scoring_settings")
-      .select("judges_score_multiplier, judges_score_category_weight, judges_score_starts_week")
-      .eq("league_id", leagueId)
-      .single(),
-    supabase.from("roster_slots").select("manager_id, couple_id, start_week, end_week").eq("league_id", leagueId),
-  ]);
-  if (!settings) return [];
-
-  const rosterSlots = (slots ?? []).flatMap((slot) => {
-    if (!slot.couple_id) return [];
-    const period = {
-      managerId: slot.manager_id,
-      coupleId: slot.couple_id,
-      startWeek: slot.start_week,
-      endWeek: slot.end_week,
-    };
-    return slotActiveInWeek(period, night.weekNumber) ? [{ managerId: period.managerId, coupleId: period.coupleId }] : [];
-  });
-
-  return draftWeekManagerScores({
-    weekNumber: night.weekNumber,
-    anchorWeek: settings.judges_score_starts_week,
-    judgesScoreMultiplier: settings.judges_score_multiplier,
-    judgesCategoryWeight: settings.judges_score_category_weight,
-    rosterSlots,
-    danceScores: night.dances.map((dance) => ({
-      coupleId: dance.coupleId,
-      totalScore: dance.total,
-      scaledScore: dance.scaled,
     })),
   });
 }

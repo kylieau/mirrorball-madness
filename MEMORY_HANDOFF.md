@@ -9,6 +9,7 @@
 - **Not verified (needs a live night, E07 Tue Oct 20 ET):** #2 and #3 with a revealing week, released drafts, a live-revealed couple and open picks (all post-E06 runs had none). The #3 check couldn't catch rows attached to the wrong league (both extra leagues had identical values); submit a pick in one extra league to settle it.
 - **E06 is officially published** (2026-10-14 05:01 UTC); its 11 live `dance_scores` rows have 4 judges and `scaled_score` = total × 3/4. Score History `Jdg 36→27` lines not yet checked in a real league.
 - **2026-10-15:** Vercel confirmed Ready for `main` (`35a56d1`, status success). The #3 wrong-league gap is closed (one extra league submitted CC + GF; only its switcher row read "All caught up", matching Home from all three leagues). `RevealAutoRefresh` no longer overlaps refreshes on slow renders (transition + timer cleared while in flight, windows via ref); verified with a temp delayed-render page and faked clock, old component overlapped, new one doesn't. Merged branch `fixes/finale-bonus-audit-schedule` deleted from origin.
+- **Also 2026-10-15:** Home's auto-refresh now matches the other pages (`!!revealing && revealingVisible`); `getAuthUser` (`React.cache`) dedupes `getUser()` across layout/page/loader; the draft-night manager scores reuse the base's roster slots instead of a serial re-query (`draftManagerScoresForNight`, tested). Build, lint, tsc, 611 tests pass; signed-in/out smoke on a production build. Not seen on a live night.
 - Earlier `384f78d` work (atomic publication, autosave fix, redirect validation, spacing pass) is pushed; the atomic publication migration is installed live.
 
 ## 2. Changes Made
@@ -38,6 +39,6 @@ This session (all committed and pushed): `src/lib/viewer-season-data.ts` (new), 
 
 ## 4. Backlog & Next Steps
 - **E07 live night (Tue Oct 20 ET):** re-check Home/Results/Picks/Standings and the switcher with a released draft and a live-revealed couple; confirm Score History shows `Jdg 36→27`-style lines on a guest night (BACKLOG "To check").
-- Remaining perf ride-alongs: Home refreshes in more cases than other pages (behavior question, left alone before E07 so the live-air prompt can't be disturbed); `loadOtherLeaguePicks` recomputes lock/deadline per other league (values are genuinely per league, probably leave); `getUser()` runs more than once per render (optional, a `React.cache` getter in its own commit). Details in BACKLOG.md.
+- Perf ride-alongs are done except `loadOtherLeaguePicks` (lock/deadline are genuinely per league, leave) and Picks' own/league `roster_slots` queries (parallel, no latency). Watch Home refresh behavior and the draft-night standings on E07.
 
 Next command: none pending. Ask the user which ride-along flag, if any, to take next.

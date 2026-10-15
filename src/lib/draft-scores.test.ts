@@ -4,6 +4,7 @@ import {
   DRAFT_SCORES_STRIP_LABEL,
   draftReleaseLabel,
   draftScoresVisible,
+  draftManagerScoresForNight,
   draftWeekManagerScores,
   excludeReleasedCoupleRows,
   findDraftRelease,
@@ -228,5 +229,28 @@ describe("draftReleaseLabel", () => {
     expect(draftReleaseLabel({ latestCoupleId: "c1", releasedCoupleIds: ["c1"], weekNumber: 1, seasonCouples: clash })).toBe(
       "Ciara M. & Brandon · 1/5"
     );
+  });
+});
+
+describe("draftManagerScoresForNight", () => {
+  const settings = { judges_score_multiplier: 1, judges_score_category_weight: 1, judges_score_starts_week: 1 };
+  const night = { weekNumber: 4, dances: [{ coupleId: "c1", total: 30, scaled: 22.5 }] };
+
+  it("pays the manager who held the couple that week, on the scaled score", () => {
+    const slots = [
+      { manager_id: "a", couple_id: "c1", start_week: 1, end_week: 3 },
+      { manager_id: "b", couple_id: "c1", start_week: 4, end_week: null },
+      { manager_id: "c", couple_id: null, start_week: 1, end_week: null },
+    ];
+    expect(draftManagerScoresForNight(settings, slots, night)).toEqual([
+      { managerId: "b", rosterPoints: 22.5, totalPoints: 22.5 },
+    ]);
+  });
+
+  it("pays nothing before the anchor week", () => {
+    const slots = [{ manager_id: "a", couple_id: "c1", start_week: 1, end_week: null }];
+    expect(
+      draftManagerScoresForNight({ ...settings, judges_score_starts_week: 5 }, slots, night)
+    ).toEqual([]);
   });
 });

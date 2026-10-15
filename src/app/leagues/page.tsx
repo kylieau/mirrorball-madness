@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "cn";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { LeagueTriageCard, type LeagueTriage } from "@/components/league-triage-card";
 import { TopBar } from "@/components/top-bar";
@@ -18,9 +18,7 @@ export default async function LeaguesPage({
   const { error } = await searchParams;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) {
     redirect("/login");

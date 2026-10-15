@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cn } from "cn";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { HomeDashboard } from "@/components/home-dashboard";
 import { PageHeader } from "@/components/page-header";
@@ -23,9 +23,7 @@ import { loadAllCouples, loadViewerMemberships } from "@/lib/viewer-season-data"
 
 export default async function Home() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) {
     redirect("/login");
@@ -238,7 +236,7 @@ export default async function Home() {
       {livePrompt && (
         <LiveScoresPrompt {...livePrompt} spoilerFreeMode={accountSettingsData.spoilerFreeMode} />
       )}
-      <RevealAutoRefresh active={!!revealing} windows={refreshWindows} />
+      <RevealAutoRefresh active={!!revealing && revealingVisible} windows={refreshWindows} />
       <FanBottomNav active="home" leagueId={firstLeagueId} />
     </div>
   );

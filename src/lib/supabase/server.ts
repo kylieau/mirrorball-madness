@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/supabase/types";
@@ -27,3 +28,13 @@ export async function createClient() {
     }
   );
 }
+
+// One Auth round trip per render: the layout, the page and its loaders all ask
+// who is signed in, and each getUser() is a network call.
+export const getAuthUser = cache(async () => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
+});
