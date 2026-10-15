@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { RefreshWindow } from "@/lib/episode-banner";
 
@@ -10,19 +10,29 @@ const REFRESH_MS = 20_000;
 // route re-fetches. Runs while a reveal is already happening (active) or while
 // the clock is inside an episode night's window (checked each tick, so a page
 // opened before the curtain starts refreshing on its own), and only for a
-// visible tab.
+// visible tab. The timer is cleared while a refresh is in flight, so a slow
+// render is never overlapped by the next tick.
 export function RevealAutoRefresh({ active, windows = [] }: { active: boolean; windows?: RefreshWindow[] }) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const windowsRef = useRef(windows);
+  const hasWindows = windows.length > 0;
 
   useEffect(() => {
-    if (!active && windows.length === 0) return;
+    windowsRef.current = windows;
+  }, [windows]);
+
+  useEffect(() => {
+    if (isPending || (!active && !hasWindows)) return;
     const timer = setInterval(() => {
       const now = Date.now();
-      const inWindow = windows.some((window) => now >= window.startMs && now < window.endMs);
-      if ((active || inWindow) && document.visibilityState === "visible") router.refresh();
+      const inWindow = windowsRef.current.some((window) => now >= window.startMs && now < window.endMs);
+      if ((active || inWindow) && document.visibilityState === "visible") {
+        startTransition(() => router.refresh());
+      }
     }, REFRESH_MS);
     return () => clearInterval(timer);
-  }, [active, windows, router]);
+  }, [active, hasWindows, isPending, router]);
 
   return null;
 }
