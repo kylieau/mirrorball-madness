@@ -235,7 +235,6 @@ export default async function LeaguePicksPage({
     { data: lateRows },
     { data: allGrandFinalePicks },
     otherLeaguePicks,
-    { data: leagueRosteredSlots },
   ] = await Promise.all([
     curtainCallWeekId && isLocked
       ? supabase
@@ -262,9 +261,6 @@ export default async function LeaguePicksPage({
       includeGrandFinale: grandFinaleOn && !grandFinaleLocked,
       now: new Date(),
     }),
-    recastOn
-      ? supabase.from("roster_slots").select("couple_id").eq("league_id", id).is("end_week", null)
-      : Promise.resolve({ data: null }),
   ]);
 
   const { data: ownPrediction } = await ownPredictionPending;
@@ -456,7 +452,9 @@ export default async function LeaguePicksPage({
       formerCoupleName: formatCoupleName(allDisplayNames.get(s.coupleId) ?? { celebrity: s.celebrity, pro: s.pro }),
     }));
 
-    const rosteredCoupleIds = new Set((leagueRosteredSlots ?? []).map((s) => s.couple_id));
+    const rosteredCoupleIds = new Set(
+      leagueSlotPeriods.filter((slot) => slot.endWeek === null).map((slot) => slot.coupleId)
+    );
     recastAvailableCouples = activeCouples
       .filter((c) => !rosteredCoupleIds.has(c.id))
       .map((c) => ({ id: c.id, celebrity_name: c.celebrity_name, pro_name: c.pro_name }))

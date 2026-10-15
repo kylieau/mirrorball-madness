@@ -39,6 +39,6 @@ This session (all committed and pushed): `src/lib/viewer-season-data.ts` (new), 
 
 ## 4. Backlog & Next Steps
 - **E07 live night (Tue Oct 20 ET):** re-check Home/Results/Picks/Standings and the switcher with a released draft and a live-revealed couple; confirm Score History shows `Jdg 36→27`-style lines on a guest night (BACKLOG "To check").
-- Perf ride-alongs are done except `loadOtherLeaguePicks` (lock/deadline are genuinely per league, leave) and Picks' own/league `roster_slots` queries (parallel, no latency). Watch Home refresh behavior and the draft-night standings on E07.
+- Perf ride-alongs are all done (`loadOtherLeaguePicks` flattened to two rounds; recast roster query derived from base slots). Only Picks' own-roster `roster_slots` query remains, parallel with the lock RPCs, no latency. Watch Home refresh behavior and the draft-night standings on E07.
 
 Next command: none pending. Ask the user which ride-along flag, if any, to take next.

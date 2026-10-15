@@ -48,18 +48,41 @@ export async function loadOtherLeaguePicks(
   );
   if (others.length === 0) return empty;
 
+  // The picks don't depend on module settings, so they load with them; only
+  // the per-league lock RPCs wait for the settings.
   const otherIds = others.map((l) => l.id);
-  const { data: settings } = await supabase
-    .from("scoring_settings")
-    .select("league_id, eliminations_category_enabled, bonus_picks_category_enabled")
-    .in("league_id", otherIds);
+  const teamIds = others.map((l) => l.teamId);
+  const [{ data: settings }, { data: predictionRows }, { data: grandFinaleRows }] = await Promise.all([
+    supabase
+      .from("scoring_settings")
+      .select("league_id, eliminations_category_enabled, bonus_picks_category_enabled")
+      .in("league_id", otherIds),
+    curtainCallWeekId
+      ? supabase
+          .from("predictions")
+          .select(
+            "league_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
+          )
+          .in("league_id", otherIds)
+          .eq("week_id", curtainCallWeekId)
+          .in("manager_id", teamIds)
+      : Promise.resolve({ data: null }),
+    includeGrandFinale
+      ? supabase
+          .from("grand_finale_predictions")
+          .select("league_id, couple_id, predicted_position")
+          .in("league_id", otherIds)
+          .in("manager_id", teamIds)
+          .order("predicted_position", { ascending: true })
+      : Promise.resolve({ data: null }),
+  ]);
   const settingsByLeague = new Map((settings ?? []).map((s) => [s.league_id, s]));
 
   const [curtainCall, grandFinale] = await Promise.all([
     curtainCallWeekId
-      ? loadCurtainCall(supabase, curtainCallWeekId, others, settingsByLeague, now)
+      ? planCurtainCall(supabase, curtainCallWeekId, others, predictionRows ?? [], settingsByLeague, now)
       : [],
-    includeGrandFinale ? loadGrandFinale(supabase, others, settingsByLeague, now) : [],
+    includeGrandFinale ? planGrandFinale(supabase, others, grandFinaleRows ?? [], settingsByLeague, now) : [],
   ]);
   return { curtainCall, grandFinale };
 }
@@ -70,21 +93,21 @@ type Settings = Map<
   { eliminations_category_enabled: boolean; bonus_picks_category_enabled: boolean }
 >;
 
-async function loadCurtainCall(
+async function planCurtainCall(
   supabase: Client,
   weekId: string,
   leagues: League[],
+  rows: {
+    league_id: string;
+    predicted_eliminated_couple_id: string | null;
+    predicted_eliminated_couple_id_2: string | null;
+    predicted_top_scorer_couple_id: string | null;
+  }[],
   settings: Settings,
   now: Date
 ): Promise<CurtainCallDestination[]> {
-  const { data: rows } = await supabase
-    .from("predictions")
-    .select("league_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
-    .in("league_id", leagues.map((l) => l.id))
-    .eq("week_id", weekId)
-    .in("manager_id", leagues.map((l) => l.teamId));
   const pickByLeague = new Map<string, CurtainCallPick>();
-  for (const r of rows ?? []) {
+  for (const r of rows) {
     const pick = {
       elim1: r.predicted_eliminated_couple_id,
       elim2: r.predicted_eliminated_couple_id_2,
@@ -117,20 +140,15 @@ async function loadCurtainCall(
   );
 }
 
-async function loadGrandFinale(
+async function planGrandFinale(
   supabase: Client,
   leagues: League[],
+  rows: { league_id: string; couple_id: string }[],
   settings: Settings,
   now: Date
 ): Promise<GrandFinaleDestination[]> {
-  const { data: rows } = await supabase
-    .from("grand_finale_predictions")
-    .select("league_id, couple_id, predicted_position")
-    .in("league_id", leagues.map((l) => l.id))
-    .in("manager_id", leagues.map((l) => l.teamId))
-    .order("predicted_position", { ascending: true });
   const orderByLeague = new Map<string, string[]>();
-  for (const r of rows ?? []) orderByLeague.set(r.league_id, [...(orderByLeague.get(r.league_id) ?? []), r.couple_id]);
+  for (const r of rows) orderByLeague.set(r.league_id, [...(orderByLeague.get(r.league_id) ?? []), r.couple_id]);
 
   return Promise.all(
     leagues.map(async (league) => {
