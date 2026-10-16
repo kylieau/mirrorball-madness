@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { cn } from "cn";
 import {
   computeEpisodeBannerState,
@@ -25,14 +25,21 @@ const SHORT_TITLE_MAX = 12;
 const CURTAIN_FOLDS =
   "bg-[repeating-linear-gradient(90deg,#5c1022_0_9px,#7d1a33_9px_18px,#5c1022_18px_27px)]";
 
-type BannerCopy = { chip: string; title: string | null; sub: string | null; live: boolean };
+type BannerCopy = { chip: string; title: string | null; sub: ReactNode; live: boolean };
 
 const LETS_DANCE = "💃Let's Dance🕺";
 
 // Chip = where the broadcast is, title = what the league can do, sub = what
 // changes next. Times are viewer-local, so the labels arrive after mount.
 function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
-  const at = (prefix: string) => (timeLabel ? `${prefix} · ${timeLabel}` : null);
+  // The sub wraps on phones; the time stays in one piece so the zone is never
+  // stranded on its own line, and the dot stays on the first line.
+  const at = (prefix: string) =>
+    timeLabel ? (
+      <>
+        {prefix}&nbsp;· <span className="whitespace-nowrap">{timeLabel}</span>
+      </>
+    ) : null;
   switch (state.kind) {
     case "picks_open":
       return {

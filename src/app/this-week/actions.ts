@@ -13,8 +13,9 @@ export async function markEpisodesWatchedThrough(weekNumber: number): Promise<{ 
   return { error: null };
 }
 
-// Mark Watched / I've finished the East broadcast. Also unlocks a released
-// score draft for that week. Stay Updated keeps the watch-only call above.
+// Mark Watched, East Stay Updated and the Settings "I last watched" picker
+// moving forward. Also unlocks a released score draft for that week. West
+// Stay Updated keeps the watch-only call above.
 export async function markWatchedAndUnlockDrafts(weekNumber: number): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const { error } = await supabase.rpc("unlock_draft_scores_through", { p_week_number: weekNumber });
