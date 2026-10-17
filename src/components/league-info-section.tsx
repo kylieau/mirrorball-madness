@@ -115,7 +115,7 @@ export function LeagueInfoSection({
         </div>
 
         <div className="flex flex-col gap-2 border-t border-border pt-4">
-          <p className="text-sm font-medium text-danger-text">Danger zone</p>
+          <p className="text-sm font-medium text-danger-text">Danger Zone</p>
           {draftWasReset && (
             <p role="status" className="text-sm text-muted-foreground">
               Draft reset.{" "}
@@ -135,7 +135,7 @@ export function LeagueInfoSection({
             )}
             <Dialog>
               <DialogTrigger render={<Button variant="destructive" />}>
-                Delete league
+                Delete League
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>

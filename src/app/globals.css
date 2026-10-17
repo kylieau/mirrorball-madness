@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* One fixed dark look: without this, dark: follows the phone's appearance
+   setting, and light-mode phones got different fields and buttons. */
+@custom-variant dark (&:where(:root, :root *));
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
@@ -63,6 +67,7 @@
    * lives directly in :root rather than behind a .dark class.
    */
   :root {
+    color-scheme: dark;
     --background: #1e1420;
     --foreground: #f2e8d8;
     --card: #271a29;
