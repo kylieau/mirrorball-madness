@@ -120,7 +120,7 @@ export function LiveScoresSheet({
           <Switch checked={spoilerFree} onCheckedChange={handleSpoilerFree} disabled={togglePending} />
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <div className="flex w-full flex-col gap-1">
           <Button
             size="lg"

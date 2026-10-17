@@ -32,7 +32,7 @@ export default async function AdminAccountsPage() {
         Queue only — clearing a request does not delete the auth user or league
         history. There is still no safe automatic wipe.
       </p>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
       <PendingAccountDeletions requests={requests} />
     </div>
   );

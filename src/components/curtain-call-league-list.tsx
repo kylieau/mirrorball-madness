@@ -29,7 +29,7 @@ function PickPoints({ pick, pickKind }: { pick: PickMatch; pickKind: "eliminatio
       </span>
     );
   }
-  return <span className="font-heading font-semibold text-destructive">✗</span>;
+  return <span className="font-heading font-semibold text-danger-text">✗</span>;
 }
 
 // Lives inside CurtainCallCard's own CardContent, stacked after PickEmBox or

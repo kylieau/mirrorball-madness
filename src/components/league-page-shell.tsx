@@ -41,7 +41,7 @@ export function LeaguePageShell({
           draftScoresStrip={base.draftScoresStrip}
         />
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         {message && <p className="text-sm text-muted-foreground">{message}</p>}
 
         {base.livePrompt && (

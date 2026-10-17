@@ -122,7 +122,7 @@ export function WaiversPanel({
         <p className="mt-1 text-sm capitalize text-muted-foreground">
           {claimMethod.replace("_", " ")} recast method
         </p>
-        {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-sm text-danger-text">{error}</p>}
         {message && <p className="mt-2 text-sm text-muted-foreground">{message}</p>}
       </div>
 

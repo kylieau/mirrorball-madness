@@ -73,7 +73,7 @@ function NamedItemsCard({
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         {items.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {items.map((item) => (
@@ -256,7 +256,7 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         {active.length > 0 ? (
           <ul className="flex flex-col gap-2">
             {active.map((judge) => renderJudgeRow(judge, false))}
@@ -339,7 +339,7 @@ function DanceStylesCard({ danceStyles }: { danceStyles: DanceStyle[] }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         {danceStyles.length > 0 ? (
           <ul className="flex flex-col gap-2">
             {danceStyles.map((style) => (

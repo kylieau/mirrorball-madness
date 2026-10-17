@@ -843,7 +843,7 @@ export function ResultsForm({
                 <Button
                   size="xs"
                   variant="ghost"
-                  className="text-destructive"
+                  className="text-danger-text"
                   onClick={() => clearDance(c.id, d.key)}
                 >
                   Clear
@@ -860,9 +860,8 @@ export function ResultsForm({
                 <>
                   <Badge>Posted</Badge>
                   <Button
-                    size="xs"
                     variant="ghost"
-                    className="text-destructive"
+                    className="text-danger-text"
                     disabled={revealBusy}
                     onClick={() => void handleUndoReveal(c.id)}
                   >
@@ -875,9 +874,8 @@ export function ResultsForm({
                     <>
                       <Badge>Drafted</Badge>
                       <Button
-                        size="xs"
                         variant="ghost"
-                        className="text-destructive"
+                        className="text-danger-text"
                         disabled={releasing}
                         onClick={() => void handleWithdrawDraftCouple(c.id)}
                       >
@@ -886,7 +884,6 @@ export function ResultsForm({
                     </>
                   ) : (
                     <Button
-                      size="xs"
                       variant="outline"
                       disabled={releasing || !row.dances.some((d) => Object.values(d.scores).some((v) => v !== ""))}
                       onClick={() => void handleReleaseDraftCouple(c.id)}
@@ -896,7 +893,6 @@ export function ResultsForm({
                   )}
                   {publishPerCouple && (
                     <Button
-                      size="xs"
                       disabled={!!publishBlocker || savingDraft || revealBusy}
                       onClick={() => void handlePublishCouple(c.id)}
                     >
@@ -918,7 +914,6 @@ export function ResultsForm({
           <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
             {correctionLocked ? (
               <Button
-                size="xs"
                 variant="outline"
                 onClick={() => setUnlockedForCorrectionCoupleIds((prev) => new Set(prev).add(c.id))}
               >
@@ -1012,7 +1007,7 @@ export function ResultsForm({
         </div>
       )}
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
 
       <Card>
         <CardHeader>

@@ -97,7 +97,7 @@ export function LeagueInfoSection({
         <CardTitle>League Info</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {nameError && <p className="text-sm text-destructive">{nameError}</p>}
+        {nameError && <p role="alert" className="text-sm text-danger-text">{nameError}</p>}
         {nameSaved && <p className="text-sm text-muted-foreground">Name saved.</p>}
         <div className="flex flex-col gap-2">
           <Label htmlFor="leagueName">League Name</Label>
@@ -115,7 +115,7 @@ export function LeagueInfoSection({
         </div>
 
         <div className="flex flex-col gap-2 border-t border-border pt-4">
-          <p className="text-sm font-medium text-destructive">Danger zone</p>
+          <p className="text-sm font-medium text-danger-text">Danger zone</p>
           {draftWasReset && (
             <p role="status" className="text-sm text-muted-foreground">
               Draft reset.{" "}
@@ -155,7 +155,7 @@ export function LeagueInfoSection({
                     onChange={(e) => setConfirmName(e.target.value)}
                   />
                 </div>
-                {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+                {deleteError && <p role="alert" className="text-sm text-danger-text">{deleteError}</p>}
                 <DialogFooter>
                   <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
                   <Button

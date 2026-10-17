@@ -78,7 +78,7 @@ export function LeaveLeagueButton({
               : "You'll lose access to this league. Your historical scores stay on the record for the league's own standings."}
           </DialogDescription>
         </DialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button variant="destructive" onClick={handleLeave} disabled={submitting}>

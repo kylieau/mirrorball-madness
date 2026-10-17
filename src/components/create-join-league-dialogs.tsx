@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { cn } from "cn";
 import { createLeague, joinWithCode } from "@/app/leagues/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,17 +26,30 @@ function SubmitButton({ idleLabel, pendingLabel }: { idleLabel: string; pendingL
   );
 }
 
+// prominent: full-size buttons for a viewer with no league yet, where these
+// are the only actions on the page.
 export function CreateJoinLeagueDialogs({
   stacked = false,
   quiet = false,
+  prominent = false,
 }: {
   stacked?: boolean;
   quiet?: boolean;
+  prominent?: boolean;
 }) {
+  const size = prominent ? "lg" : "xs";
   return (
-    <div className={quiet ? "flex items-center gap-2" : stacked ? "flex flex-col items-stretch gap-1.5" : "flex gap-2"}>
+    <div
+      className={
+        quiet
+          ? "flex items-center gap-2"
+          : stacked || prominent
+            ? cn("flex flex-col items-stretch", prominent ? "gap-3" : "gap-1.5")
+            : "flex gap-2"
+      }
+    >
       <Dialog>
-        <DialogTrigger render={<Button size="xs" variant="default" />}>
+        <DialogTrigger render={<Button size={size} variant="default" />}>
           {quiet ? "Create a League" : "+ Create a League"}
         </DialogTrigger>
         <DialogContent>
@@ -78,7 +92,7 @@ export function CreateJoinLeagueDialogs({
       </Dialog>
 
       <Dialog>
-        <DialogTrigger render={<Button variant="outline" size="xs" />}>
+        <DialogTrigger render={<Button variant="outline" size={size} />}>
           {quiet ? "Join a League" : "Join with Code"}
         </DialogTrigger>
         <DialogContent>

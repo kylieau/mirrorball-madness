@@ -29,7 +29,7 @@ export function ProfileForm({ displayName }: { displayName: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
       {saved && <p className="text-sm text-muted-foreground">Saved.</p>}
       <div className="flex flex-col gap-2">
         <Label htmlFor="displayName">Display Name</Label>

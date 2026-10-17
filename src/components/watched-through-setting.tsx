@@ -53,7 +53,7 @@ export function WatchedThroughSetting({ progress }: { progress: SpoilerProgress 
           </SelectContent>
         </Select>
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-xs text-danger-text">{error}</p>}
     </div>
   );
 }

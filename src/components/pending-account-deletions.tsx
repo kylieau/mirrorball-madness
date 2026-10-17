@@ -74,7 +74,7 @@ function ClearRequestButton({
             from the queue — they can request deletion again from Settings.
           </DialogDescription>
         </DialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button onClick={handleClear} disabled={submitting}>

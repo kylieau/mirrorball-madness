@@ -370,7 +370,7 @@ export function GrandFinaleBox({
       <CardContent className="flex flex-col gap-4">
         {lateEntry && <LateEntryBanner factor={lateEntry.factor} />}
         <GrandFinaleScoringExplainer scoring={scoring} totalCouples={totalCouples} />
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         {filledFrom && (
           <p className="text-xs text-muted-foreground">Filled in from {filledFrom} — review, then save.</p>
         )}
@@ -402,6 +402,7 @@ export function GrandFinaleBox({
                   <Button
                     variant="ghost"
                     size="icon-sm"
+                    aria-label={`Move ${nameFor(coupleId)} up`}
                     disabled={displayIndex === 0 || actualIndex < pinnedCount}
                     onClick={() => moveEntry(actualIndex, 1)}
                   >
@@ -410,6 +411,7 @@ export function GrandFinaleBox({
                   <Button
                     variant="ghost"
                     size="icon-sm"
+                    aria-label={`Move ${nameFor(coupleId)} down`}
                     disabled={actualIndex <= pinnedCount}
                     onClick={() => moveEntry(actualIndex, -1)}
                   >

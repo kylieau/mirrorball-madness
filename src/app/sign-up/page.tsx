@@ -16,7 +16,7 @@ export default async function SignUpPage({
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6 px-4 py-24">
       <h1 className="text-2xl font-semibold tracking-tight">Create an Account</h1>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
       <form action={signUp} className="flex flex-col gap-4">
         {next && <input type="hidden" name="next" value={next} />}
         <div className="flex flex-col gap-2">

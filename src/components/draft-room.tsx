@@ -569,7 +569,7 @@ export function DraftRoom({
           </p>
         )}
         <DraftAwayNote pickTimeLimitSeconds={league.pick_time_limit_seconds} />
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         {isCommissioner ? (
           <>
             {draftType === "custom" ? (
@@ -602,6 +602,7 @@ export function DraftRoom({
                     <Button
                       variant="ghost"
                       size="icon-sm"
+                      aria-label={`Move ${managerLabel(userId)} up`}
                       disabled={i === 0}
                       onClick={() => moveOrderEntry(i, -1)}
                     >
@@ -610,6 +611,7 @@ export function DraftRoom({
                     <Button
                       variant="ghost"
                       size="icon-sm"
+                      aria-label={`Move ${managerLabel(userId)} down`}
                       disabled={i === draftOrder.length - 1}
                       onClick={() => moveOrderEntry(i, 1)}
                     >
@@ -761,7 +763,7 @@ export function DraftRoom({
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{league.name} draft</h1>
-        {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-sm text-danger-text">{error}</p>}
         <p className="mt-1 text-sm text-muted-foreground">
           Round {round} · Pick {nextPickNumber} of {totalSlots} —{" "}
           <span className="font-medium text-foreground">

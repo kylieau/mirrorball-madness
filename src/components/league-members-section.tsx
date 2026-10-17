@@ -62,7 +62,7 @@ function PromoteMemberButton({ leagueId, member }: { leagueId: string; member: M
             management, and draft controls — same as you.
           </DialogDescription>
         </DialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button onClick={handlePromote} disabled={submitting}>
@@ -102,7 +102,7 @@ function DemoteMemberButton({ leagueId, member }: { leagueId: string; member: Me
             Blocked if they&apos;re the league&apos;s last remaining commissioner.
           </DialogDescription>
         </DialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button variant="destructive" onClick={handleDemote} disabled={submitting}>
@@ -142,7 +142,7 @@ function RemoveMemberButton({ leagueId, member }: { leagueId: string; member: Me
             record for the league&apos;s own standings.
           </DialogDescription>
         </DialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button variant="destructive" onClick={handleRemove} disabled={submitting}>
@@ -184,7 +184,7 @@ function InviteCoManagerButton({ leagueId, member }: { leagueId: string; member:
             roster, same picks, same standings.
           </DialogDescription>
         </DialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         {code ? (
           <CopyInviteLinkButton
             inviteCode={code}
@@ -233,7 +233,7 @@ function RemoveCoManagerButton({ leagueId, member }: { leagueId: string; member:
             history, and can invite a new co-manager any time.
           </DialogDescription>
         </DialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button variant="destructive" onClick={handleRemove} disabled={submitting}>

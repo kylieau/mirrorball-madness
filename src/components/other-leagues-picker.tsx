@@ -130,7 +130,7 @@ export function OtherLeagueSaveSummary({
     <ul className="flex flex-col gap-1 text-xs">
       {results.map((r) =>
         r.error ? (
-          <li key={r.leagueId} className="text-destructive">
+          <li key={r.leagueId} className="text-danger-text">
             Couldn&apos;t save to {nameFor(r.leagueId)}: {r.error}
           </li>
         ) : (

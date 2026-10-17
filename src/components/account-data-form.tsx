@@ -28,7 +28,7 @@ function EmailForm({ currentEmail }: { currentEmail: string }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">Currently {currentEmail}</p>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
       {sent && <p className="text-sm text-muted-foreground">Check your new email to confirm the change.</p>}
       <div className="flex flex-col gap-2">
         <Label htmlFor="email">New Email</Label>
@@ -66,7 +66,7 @@ function PasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
       {saved && <p className="text-sm text-muted-foreground">Password updated.</p>}
       <div className="flex flex-col gap-2">
         <Label htmlFor="password">New Password</Label>
@@ -121,7 +121,7 @@ function DangerZone({ deletionRequestedAt }: { deletionRequestedAt: string | nul
           Deletion requested on {new Date(deletionRequestedAt).toLocaleDateString()}. It hasn&apos;t been
           processed yet — you can still cancel.
         </p>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <Button variant="outline" onClick={handleCancel} disabled={canceling} className="self-start">
           {canceling ? "Canceling..." : "Cancel deletion request"}
         </Button>
@@ -152,7 +152,7 @@ export function AccountDataForm({
         <PasswordForm />
       </div>
       <div className="border-t border-border pt-4">
-        <p className="mb-2 text-sm font-semibold text-destructive">Danger Zone</p>
+        <p className="mb-2 text-sm font-semibold text-danger-text">Danger Zone</p>
         <DangerZone deletionRequestedAt={deletionRequestedAt} />
       </div>
     </div>

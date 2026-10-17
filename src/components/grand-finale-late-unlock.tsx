@@ -166,7 +166,7 @@ export function GrandFinaleLateUnlock({
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="rounded-full px-3 text-destructive"
+                          className="rounded-full px-3 text-danger-text"
                           disabled={closingUserId === row.userId}
                           onClick={() => void handleClose(row)}
                         >
@@ -176,7 +176,7 @@ export function GrandFinaleLateUnlock({
                     )}
                   </div>
                   {closeError?.userId === row.userId && (
-                    <p className="px-1 text-xs text-destructive">{closeError.message}</p>
+                    <p role="alert" className="px-1 text-xs text-danger-text">{closeError.message}</p>
                   )}
                 </div>
               );
@@ -275,7 +275,7 @@ export function GrandFinaleLateUnlock({
               </label>
             </div>
           )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
           <Button className="h-11 w-full text-base font-semibold" onClick={handleUnlock} disabled={!canConfirm}>
             {submitting
               ? "Saving…"

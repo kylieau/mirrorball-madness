@@ -96,7 +96,7 @@ export function RecastNudgeCard({
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-4 pb-4">
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
 
           {singleSlot ? (
             <div className="flex flex-col gap-2">

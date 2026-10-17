@@ -78,9 +78,9 @@ export default async function LeaguesPage({
                 Week {liveWeekNumber}
               </p>
             )}
-            {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+            {error && <p role="alert" className="mt-2 text-sm text-danger-text">{error}</p>}
           </div>
-          <CreateJoinLeagueDialogs stacked />
+          {leagues.length > 0 && <CreateJoinLeagueDialogs stacked />}
         </div>
 
         {leagues.length > 0 ? (
@@ -90,9 +90,12 @@ export default async function LeaguesPage({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            You haven&apos;t joined a league yet — create one or join with an invite code above.
-          </p>
+          <>
+            <p className="text-sm text-muted-foreground">
+              You haven&apos;t joined a league yet — create one or join with an invite code.
+            </p>
+            <CreateJoinLeagueDialogs prominent />
+          </>
         )}
       </div>
     </div>

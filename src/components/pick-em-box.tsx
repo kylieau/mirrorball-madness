@@ -225,7 +225,7 @@ export function PickEmBox({
             ⚡ Double Elimination — two couples go home tonight, call &apos;em both.
           </div>
         )}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <OtherLeagueSaveSummary results={otherResults} destinations={otherLeagues} />
 
         {!isLocked ? (

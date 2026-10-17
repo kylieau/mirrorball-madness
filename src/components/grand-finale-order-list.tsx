@@ -108,7 +108,7 @@ export function PointsTag({
       <span
         className={cn(
           "rounded-full px-2 py-0.5 font-heading text-[10px] font-semibold",
-          points > 0 ? "bg-emerald/20 text-emerald-text" : "bg-destructive/15 text-destructive"
+          points > 0 ? "bg-emerald/20 text-emerald-text" : "bg-destructive/15 text-danger-text"
         )}
       >
         +{formatPoints(points)} pts

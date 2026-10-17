@@ -110,7 +110,7 @@ function SeasonSettingsCard({ season, readOnly }: { season: Season; readOnly: bo
         <CardTitle>Season Settings</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="flex flex-col gap-2">
             <Label>Premiere Date</Label>
@@ -555,7 +555,7 @@ export function ScheduleManager({
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-4 px-4 pb-4">
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
             <div className="flex flex-col gap-2">
               <Label>Episode Number</Label>
               <Input

@@ -60,7 +60,7 @@ export default async function SettingsPage({
 
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="mt-2 text-sm text-danger-text">{error}</p>}
           {message && <p className="mt-2 text-sm text-muted-foreground">{message}</p>}
         </div>
 

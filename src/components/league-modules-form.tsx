@@ -1248,7 +1248,7 @@ export function LeagueModulesForm({
               >
                 {syncingAnchor ? "Updating..." : "Update Anchor to match lock"}
               </Button>
-              {syncError && <p className="text-sm text-destructive">{syncError}</p>}
+              {syncError && <p role="alert" className="text-sm text-danger-text">{syncError}</p>}
             </div>
           )}
         </CardContent>
@@ -1256,7 +1256,7 @@ export function LeagueModulesForm({
 
       <BottomNav>
         <div className="flex flex-col gap-2 py-3">
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
           {success && (
             <p
               role="status"

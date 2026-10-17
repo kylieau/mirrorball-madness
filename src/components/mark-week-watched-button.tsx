@@ -25,7 +25,7 @@ export function MarkWeekWatchedButton({ weekNumber }: { weekNumber: number }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
       <Button onClick={handleClick} disabled={pending} className="self-start">
         {pending ? "Marking as watched..." : `Mark ${formatEpisodeCasual(weekNumber)} as watched`}
       </Button>

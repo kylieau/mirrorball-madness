@@ -208,7 +208,7 @@ function MarkWatchedStrip({ state }: { state: MarkableState }) {
               </div>
             </div>
           )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
           <Button size="lg" className="w-full" onClick={handleMark} disabled={pending}>
             {pending ? "Marking..." : picking ? `Mark Through ${throughLabel}` : `Mark ${throughLabel} Watched`}
           </Button>
