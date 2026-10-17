@@ -9,11 +9,12 @@ import { Button } from "@/components/ui/button";
 export function SubmitButton({
   idleLabel,
   pendingLabel,
+  disabled,
   ...props
 }: { idleLabel: string; pendingLabel: string } & Omit<ComponentProps<typeof Button>, "type" | "children">) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending} {...props}>
+    <Button type="submit" disabled={pending || disabled} {...props}>
       {pending ? pendingLabel : idleLabel}
     </Button>
   );

@@ -23,7 +23,7 @@ Severity:
 
 ---
 
-## Status (2026-10-17)
+## Status (2026-10-18)
 
 **Fixed:**
 - **T1:** `Button` has a touch-only 44px hit area; Enter Results' per-couple actions are standard size; empty Manage Leagues shows full-size Create/Join.
@@ -31,17 +31,17 @@ Severity:
 - **V2:** error text uses `text-danger-text` with `role="alert"`.
 - **S1:** branded `not-found.tsx` and `error.tsx`.
 - **C2:** every lock and deadline time goes through `formatAirsAt`.
-- **V1, part:** the amber text is a fixed `--amber-text` token.
+- **V1:** the amber text is a fixed `--amber-text` token, `dark:` always applies and `color-scheme` is dark, so light-mode and dark-mode phones render identically (the dark-mode look was chosen).
 - **L1:** long names wrap, and the draft page's back button truncates.
 - **C1:** Title Case and "…" pass.
 - **A4:** autofill hints.
 - **A2, part:** sign-in, sign-up and join buttons show a pending state.
+- **A3:** the invite page names the league and team count, flags an unknown code, and blocks joining mid-draft.
 
 **Still open:**
 - **A1, forgot password:** needs auth email confirmed working on this Supabase project. A cross-device reset also needs a `token_hash` email template.
 - **A2, rest:** keeping typed values after an error, and dropping the `?error=` text.
-- **V1, rest:** the `dark:` styles on inputs and outline buttons. Waiting on which appearance the owner's phone uses.
-- **A3, A5, V3, V4, T2, T3, S2, N1, N2, N4, C3.**
+- **A5, V3, V4, T2, T3, S2, N1, N2, N4, C3.**
 
 ## Top 10
 

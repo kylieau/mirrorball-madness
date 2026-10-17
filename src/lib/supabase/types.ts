@@ -1929,6 +1929,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      league_invite_preview: {
+        Args: { p_invite_code: string }
+        Returns: {
+          draft_in_progress: boolean
+          league_name: string
+          team_count: number
+        }[]
+      }
       leave_league: { Args: { p_league_id: string }; Returns: undefined }
       make_auto_draft_pick: {
         Args: { p_league_id: string }

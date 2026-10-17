@@ -893,6 +893,23 @@ begin
 end;
 $$;
 
+-- Invite page preview: name, team count and whether a draft is running, for
+-- an exact invite-code match. The one function signed-out visitors (anon)
+-- may call; anyone holding a code could join with it anyway.
+create function public.league_invite_preview(p_invite_code text)
+returns table (league_name text, team_count integer, draft_in_progress boolean)
+language sql
+stable
+security definer set search_path = ''
+as $$
+  select
+    l.name,
+    (select count(*)::integer from public.league_members m where m.league_id = l.id),
+    l.draft_status = 'in_progress'
+  from public.leagues l
+  where l.invite_code = trim(upper(p_invite_code));
+$$;
+
 -- Deliberately does NOT cascade-delete roster_slots/predictions/
 -- grand_finale_predictions/weekly_manager_scores for the departing manager —
 -- those stay intact for the league's own history/standings math. Leaving
@@ -1257,6 +1274,7 @@ $$;
 
 revoke execute on function public.create_league(text, boolean, boolean, boolean) from public;
 revoke execute on function public.join_league(text) from public;
+revoke execute on function public.league_invite_preview(text) from public;
 revoke execute on function public.leave_league(uuid) from public;
 revoke execute on function public.remove_league_member(uuid, uuid) from public;
 revoke execute on function public.promote_to_commissioner(uuid, uuid) from public;
@@ -1265,6 +1283,7 @@ revoke execute on function public.rename_league(uuid, text) from public;
 revoke execute on function public.delete_league(uuid) from public;
 grant execute on function public.create_league(text, boolean, boolean, boolean) to authenticated;
 grant execute on function public.join_league(text) to authenticated;
+grant execute on function public.league_invite_preview(text) to anon, authenticated;
 grant execute on function public.leave_league(uuid) to authenticated;
 grant execute on function public.remove_league_member(uuid, uuid) to authenticated;
 grant execute on function public.promote_to_commissioner(uuid, uuid) to authenticated;
