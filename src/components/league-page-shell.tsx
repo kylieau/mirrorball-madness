@@ -48,8 +48,8 @@ export function LeaguePageShell({
           <LiveScoresPrompt {...base.livePrompt} spoilerFreeMode={base.accountSettingsData.spoilerFreeMode} />
         )}
         <RevealAutoRefresh active={base.revealingVisible} windows={base.refreshWindows} />
-        <FanBottomNav active={tab} leagueId={league.id} />
         <div className={BOTTOM_NAV_CLEARANCE}>{children}</div>
+        <FanBottomNav active={tab} leagueId={league.id} />
       </div>
     </div>
   );

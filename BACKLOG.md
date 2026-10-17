@@ -28,11 +28,9 @@ Full findings and fix status: `docs/ux-audit.md` (Status section at the top). Sh
   - V4 tiny text;
   - T2 bottom-sheet safe area / max-height;
   - T3 draft-room tooltips;
-  - S2 `loading.tsx` for League Settings, draft, waivers, settings, admin;
   - N1 duplicate Settings menu and mixed ×/‹ Back patterns;
-  - N2 tab-bar `aria-current`;
-  - N4 reduced motion;
   - C3 jargon ("Account-Wide", "Hard Deadline", "players").
+- **Enter Results drops a pending autosave when the page unmounts** (`results-form.tsx`, the unmount effect only `clearTimeout`s the 1.5s timer). Typing a score and leaving within 1.5s loses that edit; leaving for Home already does this, because Home's skeleton unmounts the page at once. Fix after E07, as its own deploy: flush the pending draft on unmount (or on `pagehide`) instead of cancelling it. Once fixed, admin can get the same `PageSkeleton` as the other pages (left out of S2 for this reason).
 - **Conflicts with settled decisions** (pull-to-refresh disabled, middle-dot/all-caps/→ conventions): listed in the audit for Kylie to decide; nothing to build unless she asks.
 - **`npm test` (`vitest run`) also picks up 8 broken test files under the gitignored `.codex-private/`** (another tool's folder). All app tests pass. Excluding them in the vitest config is an option if Kylie wants it; it hasn't been asked for.
 

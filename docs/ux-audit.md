@@ -37,11 +37,14 @@ Severity:
 - **A4:** autofill hints.
 - **A2, part:** sign-in, sign-up and join buttons show a pending state.
 - **A3:** the invite page names the league and team count, flags an unknown code, and blocks joining mid-draft.
+- **S2:** League Settings, draft, waivers, Settings, Notifications and Manage Leagues have a loading skeleton. Admin deliberately has none (an instant skeleton would unmount Enter Results and drop a pending autosave).
+- **N2:** the fan tab bar is a `Main` nav landmark, the current tab carries `aria-current="page"` (still plain text, so tapping it doesn't reload or drop `?week=`), and on Picks/Standings it comes after the page content.
+- **N4:** with Reduce Motion on, animations and transitions finish instantly (pulsing live dots and skeletons stop, sheets appear without sliding).
 
 **Still open:**
 - **A1, forgot password:** needs auth email confirmed working on this Supabase project. A cross-device reset also needs a `token_hash` email template.
 - **A2, rest:** keeping typed values after an error, and dropping the `?error=` text.
-- **A5, V3, V4, T2, T3, S2, N1, N2, N4, C3.**
+- **A5, V3, V4, T2, T3, N1, C3.**
 
 ## Top 10
 
@@ -86,7 +89,7 @@ Details for each are in the sections below (finding IDs in brackets: 1 = A1, 2 =
 - **Fix:** add a "Forgot Password?" link to a page that calls `supabase.auth.resetPasswordForEmail` with a redirect back to an update-password page. The update-password form already exists in Account & Data (`account-data-form.tsx`).
 
 **A2 · Auth errors clear the form, there's no pending state, and error text comes from the URL** — Medium
-- **Where:** `src/app/auth/actions.ts:24` and `:45`; `src/app/login/page.tsx:19`; `src/app/sign-up/page.tsx:19`; also `src/app/leagues/actions.ts:18`, `:35`, `:65` and `src/app/leagues/page.tsx:81`.
+- **Where:** `src/app/auth/actions.ts:24` and `:45`; `src/app/login/page.tsx:19`; `src/app/sign-up/page.tsx:19`; also `src/app/leagues/actions.ts:18`, `:35`, `:65` and `src/app/leagues/(manage)/page.tsx:81`.
 - **What's wrong:**
   - A failed sign-in or sign-up redirects to `?error=`, which empties every field (display name, email, password).
   - The submit button gives no feedback while the request is in flight, so people double-tap.
@@ -126,7 +129,7 @@ Details for each are in the sections below (finding IDs in brackets: 1 = A1, 2 =
 - **Fix:** add `@custom-variant dark (&:where(:root, :root *));` and `color-scheme: dark` on `:root` in `globals.css`, so the dark styles always apply. Better still, replace the `text-amber-800 dark:text-amber-300` pairs with one token (e.g. `--partial-text`).
 
 **V2 · Error text fails contrast and isn't announced** — High
-- **Where:** 52 uses of `text-destructive` for text in `src/app` and `src/components`, e.g. `src/app/login/page.tsx:19`, `src/components/pick-em-box.tsx:228`, `src/app/leagues/page.tsx:81`. `--danger-text` is used once.
+- **Where:** 52 uses of `text-destructive` for text in `src/app` and `src/components`, e.g. `src/app/login/page.tsx:19`, `src/components/pick-em-box.tsx:228`, `src/app/leagues/(manage)/page.tsx:81`. `--danger-text` is used once.
 - **What's wrong:**
   - `#a9524f` is 3.4:1 on the background and 3.2:1 on cards; AA for small text needs 4.5:1.
   - None of these messages has `role="alert"` or `aria-live`, so a screen reader never hears that Save failed.

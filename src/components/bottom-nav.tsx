@@ -17,11 +17,11 @@ const ITEM_CLASS =
 
 export function BottomNav({ children }: { children: ReactNode }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40">
+    <div className="fixed inset-x-0 bottom-0 z-40">
       <div className="mx-auto w-full max-w-(--frame-width) border-t border-border bg-background px-4 pb-[env(safe-area-inset-bottom)]">
         {children}
       </div>
-    </nav>
+    </div>
   );
 }
 
@@ -45,8 +45,13 @@ function FanTabItem({
       <span className="text-[10px] sm:text-sm">{label}</span>
     </>
   );
+  // Kept off a link so tapping the current tab doesn't reload it and drop its ?week=.
   if (active) {
-    return <span className={className}>{body}</span>;
+    return (
+      <span className={className} aria-current="page">
+        {body}
+      </span>
+    );
   }
   return (
     <Link href={href} className={className}>
@@ -64,7 +69,7 @@ export function FanBottomNav({
 }) {
   return (
     <BottomNav>
-      <div className={BOTTOM_NAV_TABS_CLASS}>
+      <nav aria-label="Main" className={BOTTOM_NAV_TABS_CLASS}>
         <FanTabItem href="/" active={active === "home"} icon={HomeIcon} label="Home" />
         <FanTabItem href="/this-week" active={active === "results"} icon={ListChecksIcon} label="Results" />
         <FanTabItem
@@ -79,7 +84,7 @@ export function FanBottomNav({
           icon={TrophyIcon}
           label="Standings"
         />
-      </div>
+      </nav>
     </BottomNav>
   );
 }

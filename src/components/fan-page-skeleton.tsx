@@ -28,3 +28,16 @@ export function FanPageSkeleton() {
     </div>
   );
 }
+
+// The same instant paint for pages outside the fan tabs (settings, draft,
+// waivers, admin), which have no tab bar.
+export function PageSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 px-4 py-4" role="status" aria-label="Loading">
+      <Block className="h-5 w-24" />
+      <Block className="h-8 w-48" />
+      <Block className="h-44 w-full" />
+      <Block className="h-44 w-full" />
+    </div>
+  );
+}
