@@ -2,6 +2,40 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## UX audit follow-ups — 2026-10-18
+
+Full findings and fix status: `docs/ux-audit.md` (Status section at the top). Shipped and deployed through `d4f20d0`.
+
+**Still open:**
+- **Forgot password (A1):** blocked on email delivery. The project has no custom SMTP: the built-in mailer allows 2 emails/hour, only to team addresses (checked via the Management API auth config, 2026-10-17). Before building, Kylie connects an SMTP provider (e.g. Resend) in the Supabase dashboard.
+  - Build it as `resetPasswordForEmail` plus a `token_hash` + `verifyOtp` confirm route.
+  - The recovery email template needs `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`. The `?code=` callback only works if the same browser requests the reset and opens the link, which fails for iOS-app or Gmail in-app-browser resets.
+  - Test with `admin.generateLink({ type: "recovery" })`.
+- **Keep typed values after a failed sign-in/sign-up (rest of A2):** switch `signIn`/`signUp` to `useActionState` returning errors instead of redirecting to `?error=`. Ship it as its own deploy after the E07 live night, and test with throwaway accounts:
+  - wrong password keeps the email;
+  - success lands on Home;
+  - duplicate-email sign-up shows its error;
+  - `?next=/join/CODE` still lands on the join page.
+
+  Google/native/callback errors still use `?error=`.
+- **Phone checks:**
+  - Enter Results' per-couple row now uses standard-size buttons. Only a super admin sees Publish, so Kylie should look at it.
+  - The auto-opened Scores Are Going Live sheet shows a focus ring on the title's ⓘ (headless only?).
+  - The new touch hit areas (taps just outside small buttons).
+- **Remaining audit items:**
+  - A5 auth identity;
+  - V3 disabled-button contrast;
+  - V4 tiny text;
+  - T2 bottom-sheet safe area / max-height;
+  - T3 draft-room tooltips;
+  - S2 `loading.tsx` for League Settings, draft, waivers, settings, admin;
+  - N1 duplicate Settings menu and mixed ×/‹ Back patterns;
+  - N2 tab-bar `aria-current`;
+  - N4 reduced motion;
+  - C3 jargon ("Account-Wide", "Hard Deadline", "players").
+- **Conflicts with settled decisions** (pull-to-refresh disabled, middle-dot/all-caps/→ conventions): listed in the audit for Kylie to decide; nothing to build unless she asks.
+- **`npm test` (`vitest run`) also picks up 8 broken test files under the gitignored `.codex-private/`** (another tool's folder). All app tests pass. Excluding them in the vitest config is an option if Kylie wants it; it hasn't been asked for.
+
 ## Performance audit — 2026-10-14
 
 **#1 below is implemented, verified and pushed to main in `82fea94`** (deployment not yet confirmed) (`league-home-summary.ts`, Picks `page.tsx`, `this-week/page.tsx`, `revealing-week-data.ts` and its four callers). Production build, `eslint src` and 609 tests pass. Signed-in before/after SSR comparison (2026-10-14, during the E06 reveal, scratch viewer in two leagues: one locked/drafted/GF on, one West-coast open/undrafted/GF off; Spoiler-Free off gated, on gated, on watched through Week 4, off with drafts unlocked; Home, Results, both Picks and Standings, Manage Leagues): HTML identical apart from countdowns, random empty-standings taglines and a couple posted mid-run. Dev-mode medians, before → after: Home 2.7 → 2.2s, Picks 3.6 → 3.0s (locked) and 3.2 → 2.9s (open), Results 1.6 → 1.4s, Standings and Manage Leagues within noise. `npm run lint`/`npm test` also pick up another session's `.codex-private/` folder (lint errors, 8 failing test files); that's unrelated to this change.
