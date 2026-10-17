@@ -19,6 +19,10 @@ describe("formatAirsAt", () => {
   });
 
   it("falls back to a short date a week or more out", () => {
-    expect(formatAirsAt(at(29), now)).toMatch(/^Tue, Sep 29 8 PM/);
+    expect(formatAirsAt(at(29), now)).toMatch(/^Tue, Sep 29, 8 PM/);
+  });
+
+  it("dates anything in the past, yesterday included", () => {
+    expect(formatAirsAt(at(21), now)).toMatch(/^Mon, Sep 21, 8 PM/);
   });
 });

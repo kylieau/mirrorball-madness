@@ -5,7 +5,8 @@ function startOfLocalDay(date: Date): number {
 }
 
 // "Today 5 PM PT", "Tomorrow 5 PM PT", "Tuesday 5 PM PT" within the next
-// week, "Tue, Oct 6 5 PM PT" beyond (US zones drop daylight/standard). Runs in the viewer's own time zone, so
+// week, "Tue, Oct 6, 5 PM PT" otherwise, past dates included (US zones drop
+// daylight/standard). Runs in the viewer's own time zone, so
 // call it client-side after mount (see useFormattedDeadline).
 export function formatAirsAt(iso: string, now: Date = new Date()): string {
   const airs = new Date(iso);
@@ -18,10 +19,11 @@ export function formatAirsAt(iso: string, now: Date = new Date()): string {
     .format(airs)
     .replace(/([A-Z])[DS]T$/, "$1T");
 
-  let day: string;
-  if (daysAway === 0) day = "Today";
-  else if (daysAway === 1) day = "Tomorrow";
-  else if (daysAway > 1 && daysAway < 7) day = new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(airs);
-  else day = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(airs);
-  return `${day} ${time}`;
+  if (daysAway === 0) return `Today ${time}`;
+  if (daysAway === 1) return `Tomorrow ${time}`;
+  if (daysAway > 1 && daysAway < 7) {
+    return `${new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(airs)} ${time}`;
+  }
+  // The comma keeps "Oct 6 5 PM" from running the day into the hour.
+  return `${new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(airs)}, ${time}`;
 }

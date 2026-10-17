@@ -191,7 +191,7 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
               disabled={isPending}
             />
             <Button type="submit" size="sm" disabled={isPending || !editName.trim()}>
-              {isPending ? "Saving..." : "Save"}
+              {isPending ? "Saving…" : "Save"}
             </Button>
             <Button type="button" size="sm" variant="ghost" disabled={isPending} onClick={cancelEdit}>
               Cancel
@@ -228,7 +228,7 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
               disabled={rowLocked}
               onClick={() => handleRestore(judge.id)}
             >
-              {isPending ? "Restoring..." : "Restore"}
+              {isPending ? "Restoring…" : "Restore"}
             </Button>
           ) : (
             <Button
@@ -237,7 +237,7 @@ function ScoringJudgesCard({ judges }: { judges: ScoringJudge[] }) {
               disabled={rowLocked}
               onClick={() => handleArchive(judge.id)}
             >
-              {isPending ? "Archiving..." : "Archive"}
+              {isPending ? "Archiving…" : "Archive"}
             </Button>
           )}
         </div>

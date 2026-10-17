@@ -562,7 +562,7 @@ export function DraftRoom({
         >
           <XIcon className="size-5" />
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Draft hasn&apos;t started</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Draft Hasn&apos;t Started</h1>
         {league.draft_scheduled_at && (
           <p className="text-sm text-muted-foreground">
             Scheduled for {formattedScheduledAt || "…"}
@@ -739,7 +739,7 @@ export function DraftRoom({
 
         <div className="flex flex-col gap-2">
           <Button render={<Link href={`/leagues/${league.id}/picks`} />} nativeButton={false}>
-            Back to {league.name}
+            <span className="truncate">Back to {league.name}</span>
           </Button>
           <Button
             variant="outline"
@@ -767,7 +767,7 @@ export function DraftRoom({
         <p className="mt-1 text-sm text-muted-foreground">
           Round {round} · Pick {nextPickNumber} of {totalSlots} —{" "}
           <span className="font-medium text-foreground">
-            {isMyTurn ? "Your turn" : `${onTheClock ? managerLabel(onTheClock.user_id) : "..."}'s turn`}
+            {isMyTurn ? "Your turn" : `${onTheClock ? managerLabel(onTheClock.user_id) : "…"}'s turn`}
           </span>{" "}
           · {pendingAuto ? "Auto-picking…" : `${secondsRemaining}s`}
         </p>

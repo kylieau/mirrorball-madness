@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatAirsAt } from "@/lib/format-airs";
 
 // Reads on the client only, after mount — the server-rendered pass has no
 // meaningful browser time zone to report, and computing it during render
@@ -13,30 +14,15 @@ export function useBrowserTimeZone(): string {
   return timeZone;
 }
 
-// Every deadline/lock-time display in the app uses this — date plus hour
-// (minute only when it's not on the hour) and a timezone abbreviation, never
-// seconds. Runs client-side so getMinutes()/the formatter's default time
-// zone both reflect the viewer's own clock.
-export function formatDeadline(iso: string): string {
-  const d = new Date(iso);
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    hour: "numeric",
-    ...(d.getMinutes() !== 0 ? { minute: "2-digit" as const } : {}),
-    timeZoneName: "short",
-  }).format(d);
-}
-
-// formatDeadline() defaults to the runtime's own time zone, which differs
-// between the server's SSR pass and the browser — calling it directly during
-// render triggers a hydration mismatch. This mount-gates it the same way
-// useBrowserTimeZone() does, returning "" until the client has settled.
+// Every deadline/lock-time display uses formatAirsAt, the same "Tuesday 8 PM
+// ET" form as the Home curtain. It reads the runtime's own time zone, which
+// differs between the server's SSR pass and the browser, so this mount-gates
+// it the same way useBrowserTimeZone() does, returning "" until the client
+// has settled.
 export function useFormattedDeadline(iso: string | null | undefined): string {
   const [formatted, setFormatted] = useState("");
   useEffect(() => {
-    setFormatted(iso ? formatDeadline(iso) : "");
+    setFormatted(iso ? formatAirsAt(iso) : "");
   }, [iso]);
   return formatted;
 }

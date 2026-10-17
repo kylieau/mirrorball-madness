@@ -82,7 +82,7 @@ export function LeaveLeagueButton({
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button variant="destructive" onClick={handleLeave} disabled={submitting}>
-            {submitting ? "Leaving..." : "Leave league"}
+            {submitting ? "Leaving…" : "Leave League"}
           </Button>
         </DialogFooter>
       </DialogContent>

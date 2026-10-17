@@ -76,7 +76,7 @@ export function ResetDraftDialog({
             disabled={confirmName !== leagueName || resetting}
             onClick={handleReset}
           >
-            {resetting ? "Resetting..." : "Reset draft permanently"}
+            {resetting ? "Resetting…" : "Reset Draft Permanently"}
           </Button>
         </DialogFooter>
       </DialogContent>

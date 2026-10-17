@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { signUp } from "@/app/auth/actions";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
@@ -21,11 +21,11 @@ export default async function SignUpPage({
         {next && <input type="hidden" name="next" value={next} />}
         <div className="flex flex-col gap-2">
           <Label htmlFor="displayName">Display Name</Label>
-          <Input id="displayName" name="displayName" required />
+          <Input id="displayName" name="displayName" autoComplete="nickname" required />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" required />
+          <Input id="email" name="email" type="email" autoComplete="email" spellCheck={false} required />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="password">Password</Label>
@@ -33,11 +33,12 @@ export default async function SignUpPage({
             id="password"
             name="password"
             type="password"
+            autoComplete="new-password"
             minLength={6}
             required
           />
         </div>
-        <Button type="submit">Sign Up</Button>
+        <SubmitButton idleLabel="Sign Up" pendingLabel="Creating Account…" />
       </form>
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <div className="h-px flex-1 bg-border" />
@@ -48,7 +49,7 @@ export default async function SignUpPage({
       <p className="text-sm text-muted-foreground">
         Already have an account?{" "}
         <Link href={loginHref} className="underline underline-offset-4">
-          Sign in
+          Sign In
         </Link>
       </p>
     </div>

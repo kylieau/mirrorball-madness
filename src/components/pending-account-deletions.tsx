@@ -78,7 +78,7 @@ function ClearRequestButton({
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button onClick={handleClear} disabled={submitting}>
-            {submitting ? "Clearing..." : "Clear Request"}
+            {submitting ? "Clearing…" : "Clear Request"}
           </Button>
         </DialogFooter>
       </DialogContent>

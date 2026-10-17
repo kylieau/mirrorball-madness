@@ -191,7 +191,7 @@ export function PickEmBox({
   const lockLine = isLocked
     ? "Predictions are locked for this week."
     : lockAt && formattedLockAt
-      ? `Locks at ${formattedLockAt}`
+      ? `Locks ${formattedLockAt}`
       : null;
 
   // Same ratio applied server-side at scoring time (computeWeeklyScores in
@@ -221,7 +221,7 @@ export function PickEmBox({
     <div className="flex flex-col gap-4">
         {lockLine && <p className="text-sm text-muted-foreground">{lockLine}</p>}
         {isDoubleElimination && !isLocked && (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-text">
             ⚡ Double Elimination — two couples go home tonight, call &apos;em both.
           </div>
         )}
@@ -286,7 +286,7 @@ export function PickEmBox({
               />
               <div className="flex gap-2">
                 <Button onClick={handleSubmit} disabled={submitting || !eliminationPickValid}>
-                  {submitting ? "Saving..." : "Save prediction"}
+                  {submitting ? "Saving…" : "Save Prediction"}
                 </Button>
                 {hasSavedPick && (
                   <Button variant="outline" onClick={() => setEditing(false)} disabled={submitting}>

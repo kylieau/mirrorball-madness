@@ -165,7 +165,7 @@ function SeasonSettingsCard({ season, readOnly }: { season: Season; readOnly: bo
             ) : (
               <>
                 <Button size="sm" onClick={handleSave} disabled={submitting}>
-                  {submitting ? "Saving..." : "Save"}
+                  {submitting ? "Saving…" : "Save"}
                 </Button>
                 {saved && <p className="text-sm text-muted-foreground">Saved.</p>}
               </>
@@ -785,7 +785,7 @@ export function ScheduleManager({
             </div>
             <div className="flex gap-2">
               <Button onClick={handleSave} disabled={submitting || !airsAt}>
-                {submitting ? "Saving..." : editingId ? "Save changes" : "Add to schedule"}
+                {submitting ? "Saving…" : editingId ? "Save Changes" : "Add to Schedule"}
               </Button>
               <Button variant="ghost" onClick={() => setSheetOpen(false)}>
                 Cancel

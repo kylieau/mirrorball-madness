@@ -24,7 +24,7 @@ function PickPoints({ pick, pickKind }: { pick: PickMatch; pickKind: "eliminatio
   }
   if (pick.verdict === "near_miss" || pick.verdict === "near_miss_2") {
     return (
-      <span className="font-heading font-semibold text-amber-800 dark:text-amber-300">
+      <span className="font-heading font-semibold text-amber-text">
         {partialVerdictLabel(pickKind, pick.verdict)} +{formatPoints(pick.points)}
       </span>
     );

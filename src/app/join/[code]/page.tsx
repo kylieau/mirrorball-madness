@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { joinLeague } from "@/app/leagues/actions";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/submit-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function JoinLeaguePage({
@@ -22,7 +23,7 @@ export default async function JoinLeaguePage({
     <div className="mx-auto flex max-w-sm flex-col gap-6 px-4 py-24">
       <Card>
         <CardHeader>
-          <CardTitle>You&apos;ve been invited to a league</CardTitle>
+          <CardTitle>You&apos;ve Been Invited to a League</CardTitle>
           <CardDescription>
             Invite Code <span className="font-mono font-medium text-foreground">{inviteCode}</span>
           </CardDescription>
@@ -31,9 +32,7 @@ export default async function JoinLeaguePage({
           {user ? (
             <form action={joinLeague}>
               <input type="hidden" name="inviteCode" value={inviteCode} />
-              <Button type="submit" className="w-full">
-                Join League
-              </Button>
+              <SubmitButton idleLabel="Join League" pendingLabel="Joining…" className="w-full" />
             </form>
           ) : (
             <div className="flex flex-col gap-2">
@@ -42,7 +41,7 @@ export default async function JoinLeaguePage({
                 nativeButton={false}
                 className="w-full"
               >
-                Create an account to join
+                Create an Account to Join
               </Button>
               <Button
                 render={<Link href={`/login?next=${encodeURIComponent(nextPath)}`} />}
@@ -50,7 +49,7 @@ export default async function JoinLeaguePage({
                 variant="outline"
                 className="w-full"
               >
-                Sign in to join
+                Sign In to Join
               </Button>
             </div>
           )}

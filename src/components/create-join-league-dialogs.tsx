@@ -1,11 +1,11 @@
 "use client";
 
-import { useFormStatus } from "react-dom";
 import { cn } from "cn";
 import { createLeague, joinWithCode } from "@/app/leagues/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SubmitButton } from "@/components/submit-button";
 import {
   Dialog,
   DialogContent,
@@ -16,15 +16,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SCORING_MODULES } from "@/lib/scoring-modules";
-
-function SubmitButton({ idleLabel, pendingLabel }: { idleLabel: string; pendingLabel: string }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending ? pendingLabel : idleLabel}
-    </Button>
-  );
-}
 
 // prominent: full-size buttons for a viewer with no league yet, where these
 // are the only actions on the page.
@@ -62,7 +53,7 @@ export function CreateJoinLeagueDialogs({
           <form action={createLeague} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="name">League Name</Label>
-              <Input id="name" name="name" required />
+              <Input id="name" name="name" autoComplete="off" required />
             </div>
             <div className="flex flex-col gap-1">
               <Label>Scoring Modules</Label>
@@ -85,7 +76,7 @@ export function CreateJoinLeagueDialogs({
               </p>
             </div>
             <DialogFooter>
-              <SubmitButton idleLabel="Create league" pendingLabel="Creating..." />
+              <SubmitButton idleLabel="Create League" pendingLabel="Creating…" />
             </DialogFooter>
           </form>
         </DialogContent>
@@ -110,12 +101,15 @@ export function CreateJoinLeagueDialogs({
                 id="inviteCode"
                 name="inviteCode"
                 maxLength={6}
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
                 className="uppercase"
                 required
               />
             </div>
             <DialogFooter>
-              <SubmitButton idleLabel="Join League" pendingLabel="Joining..." />
+              <SubmitButton idleLabel="Join League" pendingLabel="Joining…" />
             </DialogFooter>
           </form>
         </DialogContent>

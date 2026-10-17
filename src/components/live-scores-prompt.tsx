@@ -132,7 +132,7 @@ export function LiveScoresSheet({
             }
             disabled={pending}
           >
-            {pending ? "Updating..." : "Stay Updated — I'm Watching Live"}
+            {pending ? "Updating…" : "Stay Updated — I'm Watching Live"}
           </Button>
           <p className="text-xs text-muted-foreground">
             {stayUnlocksDrafts ? "Follow along as scores are entered" : "Follow along as official scores post"}

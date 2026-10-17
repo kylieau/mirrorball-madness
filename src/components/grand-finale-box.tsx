@@ -288,7 +288,7 @@ export function GrandFinaleBox({
           <CardTitle>Your Season Bracket</CardTitle>
           <CardDescription>
             Tap couples in the order you think they&apos;ll be eliminated — first tap is who goes home first, last is your predicted winner. Saving needs every couple placed.
-            {lateEntry ? ` ${lateEntryNote(lateEntry.factor, "open")}` : deadline ? ` Locks at ${formattedDeadline}.` : ""}
+            {lateEntry ? ` ${lateEntryNote(lateEntry.factor, "open")}` : deadline ? ` Locks ${formattedDeadline}.` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -348,7 +348,7 @@ export function GrandFinaleBox({
             </div>
           </div>
 
-          <Button disabled>Save prediction ({order.length}/{couples.length})</Button>
+          <Button disabled>Save Prediction ({order.length}/{couples.length})</Button>
         </CardContent>
       </Card>
     );
@@ -364,7 +364,7 @@ export function GrandFinaleBox({
         <CardTitle>Your Season Bracket</CardTitle>
         <CardDescription>
           Review your predicted order, season winner to first eliminated. Use the arrows to fine-tune.
-          {lateEntry ? ` ${lateEntryNote(lateEntry.factor, "open")}` : deadline ? ` Locks at ${formattedDeadline}.` : ""}
+          {lateEntry ? ` ${lateEntryNote(lateEntry.factor, "open")}` : deadline ? ` Locks ${formattedDeadline}.` : ""}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -432,7 +432,7 @@ export function GrandFinaleBox({
 
         <div className="flex gap-2">
           <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Saving..." : "Save prediction"}
+            {submitting ? "Saving…" : "Save Prediction"}
           </Button>
           <Button variant="outline" onClick={startOver} disabled={submitting}>
             Start Over

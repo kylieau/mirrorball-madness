@@ -51,7 +51,7 @@ export function RequestDeletionButton() {
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button variant="destructive" onClick={handleRequest} disabled={submitting}>
-            {submitting ? "Requesting..." : "Request deletion"}
+            {submitting ? "Requesting…" : "Request Deletion"}
           </Button>
         </DialogFooter>
       </DialogContent>

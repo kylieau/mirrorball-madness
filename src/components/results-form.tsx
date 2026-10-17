@@ -888,7 +888,7 @@ export function ResultsForm({
                       disabled={releasing || !row.dances.some((d) => Object.values(d.scores).some((v) => v !== ""))}
                       onClick={() => void handleReleaseDraftCouple(c.id)}
                     >
-                      {releasing ? "Saving..." : "Save as Draft Score"}
+                      {releasing ? "Saving…" : "Save as Draft Score"}
                     </Button>
                   )}
                   {publishPerCouple && (
@@ -896,7 +896,7 @@ export function ResultsForm({
                       disabled={!!publishBlocker || savingDraft || revealBusy}
                       onClick={() => void handlePublishCouple(c.id)}
                     >
-                      {revealBusy ? "Publishing..." : "Publish"}
+                      {revealBusy ? "Publishing…" : "Publish"}
                     </Button>
                   )}
                 </>
@@ -1018,9 +1018,9 @@ export function ResultsForm({
           {selectedEpisode && (
             <CardDescription>
               {seedingCorrection
-                ? "Loading published results..."
+                ? "Loading published results…"
                 : savingDraft
-                  ? "Saving draft..."
+                  ? "Saving draft…"
                   : draftSavedAt
                     ? `Draft saved ${draftSavedAgo}`
                     : "Not saved yet"}
@@ -1083,9 +1083,9 @@ export function ResultsForm({
           {selectedEpisode.results_published_at &&
             selectedWeek &&
             selectedWeek.week_number !== mostRecentPublishedWeekNumber && (
-              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-text">
                 <p className="font-medium">Correcting an earlier week</p>
-                <p className="mt-0.5 text-amber-800/90 dark:text-amber-300/90">
+                <p className="mt-0.5 text-amber-text/90">
                   {formatEpisodeCasual(mostRecentPublishedWeekNumber)} has already been published
                   after this week — correcting an elimination here won&apos;t recompute that later
                   week automatically. Double-check it still makes sense afterward.
@@ -1093,9 +1093,9 @@ export function ResultsForm({
               </div>
             )}
           {selectedWeek?.is_double_elimination_week && (
-            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-text">
               <p className="font-medium">⚡ Double Elimination Week</p>
-              <p className="mt-0.5 text-amber-800/90 dark:text-amber-300/90">
+              <p className="mt-0.5 text-amber-text/90">
                 Mark two couples Eliminated below — Curtain Call is collecting two guesses from
                 managers this week.
               </p>
@@ -1233,7 +1233,7 @@ export function ResultsForm({
                         onClick={handleFinishWeek}
                         disabled={savingDraft || publishing || unpostedCount > 0}
                       >
-                        {publishing ? "Finishing..." : "Finish Week"}
+                        {publishing ? "Finishing…" : "Finish Week"}
                       </Button>
                     )}
                   </CardContent>
@@ -1382,7 +1382,7 @@ export function ResultsForm({
                 </p>
                 <div className="flex gap-2 sm:w-auto">
                   <Button className="flex-1 sm:flex-none" onClick={handlePublish} disabled={savingDraft || publishing || releasing}>
-                    {publishing ? "Publishing..." : "Publish Results"}
+                    {publishing ? "Publishing…" : "Publish Results"}
                   </Button>
                 </div>
               </div>

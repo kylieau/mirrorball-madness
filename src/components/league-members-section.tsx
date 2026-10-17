@@ -66,7 +66,7 @@ function PromoteMemberButton({ leagueId, member }: { leagueId: string; member: M
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button onClick={handlePromote} disabled={submitting}>
-            {submitting ? "Promoting..." : "Promote to commissioner"}
+            {submitting ? "Promoting…" : "Promote to Commissioner"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -106,7 +106,7 @@ function DemoteMemberButton({ leagueId, member }: { leagueId: string; member: Me
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button variant="destructive" onClick={handleDemote} disabled={submitting}>
-            {submitting ? "Demoting..." : "Demote to manager"}
+            {submitting ? "Demoting…" : "Demote to Manager"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -146,7 +146,7 @@ function RemoveMemberButton({ leagueId, member }: { leagueId: string; member: Me
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button variant="destructive" onClick={handleRemove} disabled={submitting}>
-            {submitting ? "Removing..." : "Remove member"}
+            {submitting ? "Removing…" : "Remove Member"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -194,7 +194,7 @@ function InviteCoManagerButton({ leagueId, member }: { leagueId: string; member:
           />
         ) : (
           <Button onClick={handleGenerate} disabled={generating}>
-            {generating ? "Generating..." : "Generate Invite Link"}
+            {generating ? "Generating…" : "Generate Invite Link"}
           </Button>
         )}
         <DialogFooter>
@@ -237,7 +237,7 @@ function RemoveCoManagerButton({ leagueId, member }: { leagueId: string; member:
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
           <Button variant="destructive" onClick={handleRemove} disabled={submitting}>
-            {submitting ? "Removing..." : "Remove co-manager"}
+            {submitting ? "Removing…" : "Remove Co-Manager"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -268,7 +268,7 @@ export function LeagueMembersSection({
           >
             <div className="min-w-0">
               <div>
-                <span className="font-medium">
+                <span className="font-medium wrap-anywhere">
                   {formatManagerName({ displayName: m.displayName, coManagerDisplayName: m.coManagerDisplayName })}
                 </span>
                 <span className="ml-2 capitalize text-muted-foreground">{m.role}</span>

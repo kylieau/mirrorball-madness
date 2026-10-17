@@ -64,7 +64,7 @@ export function LeagueRostersCard({
       <CardContent className="flex flex-col gap-3">
         {groups.map((g) => (
           <div key={g.managerId} className="flex flex-col gap-1.5 rounded-2xl border border-border px-3.5 py-3">
-            <p className="text-sm font-semibold">
+            <p className="text-sm font-semibold wrap-anywhere">
               {g.displayName}
               {g.isViewer && <span className="ml-2 text-xs font-normal text-muted-foreground">You</span>}
             </p>

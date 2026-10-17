@@ -36,7 +36,7 @@ export function ProfileForm({ displayName }: { displayName: string }) {
         <Input id="displayName" value={name} onChange={(e) => setName(e.target.value)} required />
       </div>
       <Button type="submit" className="self-start" disabled={submitting}>
-        {submitting ? "Saving..." : "Save"}
+        {submitting ? "Saving…" : "Save"}
       </Button>
     </form>
   );

@@ -1246,7 +1246,7 @@ export function LeagueModulesForm({
                 disabled={syncingAnchor || submitting}
                 onClick={handleSyncAnchor}
               >
-                {syncingAnchor ? "Updating..." : "Update Anchor to match lock"}
+                {syncingAnchor ? "Updating…" : "Update Anchor to Match Lock"}
               </Button>
               {syncError && <p role="alert" className="text-sm text-danger-text">{syncError}</p>}
             </div>
@@ -1268,7 +1268,7 @@ export function LeagueModulesForm({
           )}
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => handleSave()} disabled={submitting || syncingAnchor}>
-              {submitting ? "Saving..." : "Save"}
+              {submitting ? "Saving…" : "Save"}
             </Button>
             <Button variant="outline" onClick={() => handleSave(true)} disabled={submitting || syncingAnchor}>
               Save &amp; Exit

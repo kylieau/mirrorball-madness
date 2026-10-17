@@ -104,7 +104,7 @@ export function LeagueInfoSection({
           <div className="flex gap-2">
             <Input id="leagueName" value={name} onChange={(e) => setName(e.target.value)} />
             <Button onClick={handleRename} disabled={savingName}>
-              {savingName ? "Saving..." : "Save"}
+              {savingName ? "Saving…" : "Save"}
             </Button>
           </div>
         </div>
@@ -163,7 +163,7 @@ export function LeagueInfoSection({
                     disabled={confirmName !== leagueName || deleting}
                     onClick={handleDelete}
                   >
-                    {deleting ? "Deleting..." : "Delete league permanently"}
+                    {deleting ? "Deleting…" : "Delete League Permanently"}
                   </Button>
                 </DialogFooter>
               </DialogContent>

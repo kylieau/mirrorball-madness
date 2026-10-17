@@ -35,7 +35,7 @@ function EmailForm({ currentEmail }: { currentEmail: string }) {
         <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </div>
       <Button type="submit" className="self-start" disabled={submitting}>
-        {submitting ? "Updating..." : "Update email"}
+        {submitting ? "Updating…" : "Update Email"}
       </Button>
     </form>
   );
@@ -91,7 +91,7 @@ function PasswordForm() {
         />
       </div>
       <Button type="submit" className="self-start" disabled={submitting}>
-        {submitting ? "Updating..." : "Update password"}
+        {submitting ? "Updating…" : "Update Password"}
       </Button>
     </form>
   );
@@ -123,7 +123,7 @@ function DangerZone({ deletionRequestedAt }: { deletionRequestedAt: string | nul
         </p>
         {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <Button variant="outline" onClick={handleCancel} disabled={canceling} className="self-start">
-          {canceling ? "Canceling..." : "Cancel deletion request"}
+          {canceling ? "Canceling…" : "Cancel Deletion Request"}
         </Button>
       </div>
     );

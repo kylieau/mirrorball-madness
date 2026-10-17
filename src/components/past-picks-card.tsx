@@ -69,15 +69,15 @@ function ResultRows({
               key={`partial-${row.pickIds.join("-")}-${row.actualIds.join("-") || i}`}
               className="flex items-start justify-between gap-3"
             >
-              <span className="text-amber-800 dark:text-amber-300">{partialVerdictLabel(pickKind, row.verdict)}</span>
+              <span className="text-amber-text">{partialVerdictLabel(pickKind, row.verdict)}</span>
               <span className="inline-flex max-w-[75%] flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-right">
                 <CoupleNames
                   ids={row.pickIds}
                   names={names}
                   fallback="—"
-                  className="font-medium text-amber-800 dark:text-amber-300"
+                  className="font-medium text-amber-text"
                 />
-                <span className="font-heading font-semibold text-amber-800 dark:text-amber-300">+{row.points}</span>
+                <span className="font-heading font-semibold text-amber-text">+{row.points}</span>
                 {row.actualIds.length > 0 && (
                   <>
                     <span className="text-muted-foreground" aria-hidden>
