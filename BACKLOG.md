@@ -28,14 +28,10 @@ Still outstanding:
   submits between a week's air time and its publish. That isn't a deadline, but it
   closes the aired-but-unpublished gap she explicitly accepted on 2026-10-20 (CLAUDE.md
   Settled Decisions). Keep the pause or remove it before the release.
-- **Bug:** League Settings for a site admin who isn't a member of the league
-  (`SuperAdminManagers` in `settings/page.tsx`) reads with the service role, which
-  has no EXECUTE on `active_season_id`, `effective_grand_finale_deadline` or
-  `effective_hard_deadline_week`. So that view gets no season or deadline, and
-  Grand Finale's "Missed the lock" never appears there, despite CLAUDE.md saying a
-  super admin can unlock in any league. The member path is fine, and the Curtain
-  Call form reads the season directly. Fix: grant EXECUTE on those functions to
-  `service_role`, or read the season and deadline without them.
+- Fixed 2026-10-20 (`e2ca87f`, grants applied live by Kylie): League Settings for a
+  site admin who isn't in the league now reads the season and deadlines
+  (`apply-service-role-season-grants.sql`). Verified on production with a throwaway
+  site admin in #supportSWEKylie: Missed the lock and Record a Pick both appear.
 - Take and restore-test a private backup; provide a DB URL and PostgreSQL client
   on a trusted machine and schedule recurring backups.
 - Outside live scoring, stage/review the four prepared SQL scripts, regenerate
