@@ -28,6 +28,7 @@ import {
   selectThisWeekEpisode,
   thisWeekHref,
 } from "@/lib/this-week-carousel";
+import { GuestResults } from "./guest-results";
 
 export default async function ThisWeekPage({
   searchParams,
@@ -39,7 +40,7 @@ export default async function ThisWeekPage({
   const user = await getAuthUser();
 
   if (!user) {
-    redirect("/login");
+    return <GuestResults supabase={supabase} weekParam={weekParam} />;
   }
 
   const draftContextPending = loadDraftScoreContext(supabase, user.id);

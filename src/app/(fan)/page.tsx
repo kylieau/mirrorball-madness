@@ -20,13 +20,14 @@ import type { ModuleStackInput } from "@/lib/league-triage";
 import { loadModuleStackInputs } from "@/lib/league-module-stack-data";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 import { loadAllCouples, loadViewerMemberships } from "@/lib/viewer-season-data";
+import { GuestHome } from "./guest-home";
 
 export default async function Home() {
   const supabase = await createClient();
   const user = await getAuthUser();
 
   if (!user) {
-    redirect("/login");
+    return <GuestHome supabase={supabase} />;
   }
 
   const [memberships, accountSettingsData] = await Promise.all([

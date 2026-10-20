@@ -3,6 +3,7 @@ import { cn } from "cn";
 import { Card } from "@/components/ui/card";
 import { CreateJoinLeagueDialogs } from "@/components/create-join-league-dialogs";
 import { EpisodeBanner } from "@/components/episode-banner";
+import { GuestSignInCard } from "@/components/guest-sign-in-card";
 import { LeagueTriageCard, type LeagueTriage } from "@/components/league-triage-card";
 import { ScrollFade } from "@/components/scroll-fade";
 import type { EpisodeBannerInput, EpisodeBannerState } from "@/lib/episode-banner";
@@ -13,10 +14,12 @@ export function HomeDashboard({
   leagues,
   recentActivity,
   episodeBanner,
+  guest = false,
 }: {
   leagues: LeagueTriage[];
   recentActivity: ActivityLine[];
   episodeBanner: { input: EpisodeBannerInput; initialState: EpisodeBannerState | null };
+  guest?: boolean;
 }) {
   const shownLeagues = [...leagues].sort((a, b) => Number(b.picksDue) - Number(a.picksDue));
   const chrome = homeLeagueChrome(shownLeagues.length);
@@ -25,24 +28,35 @@ export function HomeDashboard({
     <div>
       <EpisodeBanner {...episodeBanner} />
 
-      <div className="mb-2 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-accent">
-        <span>Your Leagues</span>
-        {chrome.showManage && (
-          <Link href="/leagues" className="shrink-0 pl-3 font-normal text-muted-foreground">
-            Manage ›
-          </Link>
-        )}
-      </div>
-      <div className="flex flex-col gap-2.5">
-        {shownLeagues.map((league) => (
-          <LeagueTriageCard key={league.id} league={league} />
-        ))}
-      </div>
-
-      {chrome.quietCreateJoin && (
-        <div className="mt-3">
-          <CreateJoinLeagueDialogs quiet />
+      {guest ? (
+        <div className="border-t border-border pt-3">
+          <GuestSignInCard
+            title="Play Along"
+            description="Sign in to join a league, make your picks and climb the standings."
+          />
         </div>
+      ) : (
+        <>
+          <div className="mb-2 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-accent">
+            <span>Your Leagues</span>
+            {chrome.showManage && (
+              <Link href="/leagues" className="shrink-0 pl-3 font-normal text-muted-foreground">
+                Manage ›
+              </Link>
+            )}
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {shownLeagues.map((league) => (
+              <LeagueTriageCard key={league.id} league={league} />
+            ))}
+          </div>
+
+          {chrome.quietCreateJoin && (
+            <div className="mt-3">
+              <CreateJoinLeagueDialogs quiet />
+            </div>
+          )}
+        </>
       )}
 
       {recentActivity.length > 0 && (
