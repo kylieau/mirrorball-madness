@@ -30,11 +30,12 @@ export async function loadScoreHistory(
   if (!members.some((m) => m.user_id === managerId)) return { lines: null, error: "Manager not found in this league" };
 
   const draftContextPending = loadDraftScoreContext(supabase, userId);
-  const [season, { data: profile }, { data: settings }] = await Promise.all([
+  const [season, { data: profile, error: profileError }, { data: settings }] = await Promise.all([
     loadViewerSeason(supabase, userId),
     supabase.from("profiles").select("spoiler_free_mode").eq("id", userId).single(),
     supabase.from("scoring_settings").select("*").eq("league_id", leagueId).single(),
   ]);
+  if (profileError || !profile) return { lines: null, error: "Could not load spoiler preferences. Please try again." };
   const { seasonId, weekRows, episodeRows } = season;
   if (!seasonId) return { lines: [], error: null };
   if (!settings) return { lines: null, error: "Scoring settings not found" };

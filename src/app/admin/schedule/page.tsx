@@ -1,3 +1,4 @@
+import { summarizeDrafts } from "@/lib/results-view-data";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -32,7 +33,7 @@ export default async function SchedulePage() {
         episodes={data.episodes}
         weeks={data.weeks}
         danceScores={data.danceScores}
-        draftsByEpisode={data.draftsByEpisode}
+        draftSummariesByEpisode={summarizeDrafts(data.draftsByEpisode)}
         season={data.season}
         seasonCouples={data.allCouplesWithStatus}
         participantsByEpisode={data.participantsByEpisode}

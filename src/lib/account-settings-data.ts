@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { loadViewerMemberships } from "@/lib/viewer-season-data";
+import { loadViewerMemberships } from "./viewer-season-data";
 
 export type AccountSettingsLeague = { id: string; name: string; isCommissioner: boolean };
 
@@ -26,7 +26,7 @@ export async function getAccountSettingsData(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<AccountSettingsData> {
-  const [{ data }, memberships] = await Promise.all([
+  const [{ data, error }, memberships] = await Promise.all([
     supabase
       .from("profiles")
       .select("display_name, is_super_admin, deletion_requested_at, spoiler_free_mode")
@@ -34,6 +34,8 @@ export async function getAccountSettingsData(
       .single(),
     loadViewerMemberships(supabase, userId),
   ]);
+
+  if (error || !data) throw new Error("Could not load account preferences. Please try again.");
 
   const isSuperAdmin = data?.is_super_admin ?? false;
   const leagues = memberships

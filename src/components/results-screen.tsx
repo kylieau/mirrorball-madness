@@ -8,7 +8,7 @@ import { TopBar } from "@/components/top-bar";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import type { ScoringJudge } from "@/lib/scoring-judges";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
-import type { DraftState } from "@/lib/results-draft";
+import type { DraftSummary } from "@/lib/results-view-data";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -83,7 +83,7 @@ export function ResultsScreen({
   danceScores,
   judgeScores,
   episodeResults,
-  draftsByEpisode,
+  draftSummariesByEpisode,
   publishedByNames,
   season,
   participantsByEpisode,
@@ -105,7 +105,7 @@ export function ResultsScreen({
   danceScores: DanceScore[];
   judgeScores: JudgeScore[];
   episodeResults: EpisodeResult[];
-  draftsByEpisode: Record<string, DraftState>;
+  draftSummariesByEpisode: Record<string, DraftSummary>;
   publishedByNames: Record<string, string>;
   season: Season;
   participantsByEpisode: Record<string, string[]>;
@@ -154,7 +154,7 @@ export function ResultsScreen({
         coupleDisplayNames={allCoupleDisplayNames}
         judges={judges}
         danceStyles={danceStyles}
-        draftsByEpisode={draftsByEpisode}
+        draftSummariesByEpisode={draftSummariesByEpisode}
         publishedByNames={publishedByNames}
         onNavigateToEpisode={(episodeId) => router.push(`/admin/results/enter?episode=${episodeId}`)}
         seasonNumber={season?.season_number ?? null}

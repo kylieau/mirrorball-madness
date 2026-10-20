@@ -19,7 +19,7 @@ import {
   RESULTS_STATUS_BADGE_VARIANT,
   RESULTS_STATUS_BADGE_LABEL,
 } from "@/lib/results-status";
-import type { DraftState } from "@/lib/results-draft";
+import type { DraftSummary } from "@/lib/results-view-data";
 import { formatEpisodeCasualWithTheme, formatEpisodeLabel } from "@/lib/format-week";
 import {
   defaultCheckedParticipantIds,
@@ -182,7 +182,7 @@ export function ScheduleManager({
   episodes,
   weeks,
   danceScores,
-  draftsByEpisode,
+  draftSummariesByEpisode,
   season,
   seasonCouples,
   participantsByEpisode,
@@ -197,7 +197,7 @@ export function ScheduleManager({
   episodes: Episode[];
   weeks: CompetitionWeek[];
   danceScores: DanceScore[];
-  draftsByEpisode: Record<string, DraftState>;
+  draftSummariesByEpisode: Record<string, DraftSummary>;
   season: Season;
   seasonCouples: Couple[];
   participantsByEpisode: Record<string, string[]>;
@@ -436,7 +436,7 @@ export function ScheduleManager({
       danceScores.filter((d) => d.episode_id === episodeId).map((d) => d.couple_id)
     );
     if (scoredCoupleIds.size > 0) return scoredCoupleIds.size;
-    const draftCoupleIds = new Set((draftsByEpisode[episodeId]?.dances ?? []).map((d) => d.coupleId));
+    const draftCoupleIds = new Set(draftSummariesByEpisode[episodeId]?.draftedCoupleIds ?? []);
     return draftCoupleIds.size;
   }
 
@@ -451,7 +451,7 @@ export function ScheduleManager({
     // episode.
     const status = deriveResultsStatus(
       { results_published_at: e.results_published_at },
-      e.results_published_at ? false : !!draftsByEpisode[e.id]?.hasDraft
+      e.results_published_at ? false : !!draftSummariesByEpisode[e.id]?.hasDraft
     );
     const count = coupleCount(e.id);
     const Row = readOnly ? "div" : "button";

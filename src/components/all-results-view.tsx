@@ -14,7 +14,7 @@ import {
   RESULTS_STATUS_BADGE_LABEL,
   type EpisodeResultsStatus,
 } from "@/lib/results-status";
-import type { DraftState } from "@/lib/results-draft";
+import type { DraftSummary } from "@/lib/results-view-data";
 import { formatPoints } from "@/lib/format-points";
 import { isUnscheduledPlaceholderRow } from "@/lib/episode-participants";
 import { formatEpisodeCasual, formatEpisodeCasualWithTheme, formatEpisodeLabel } from "@/lib/format-week";
@@ -70,7 +70,7 @@ export function AllResultsView({
   coupleDisplayNames,
   judges,
   danceStyles,
-  draftsByEpisode,
+  draftSummariesByEpisode,
   publishedByNames,
   onNavigateToEpisode,
   seasonNumber,
@@ -96,7 +96,7 @@ export function AllResultsView({
   coupleDisplayNames: Record<string, CoupleNameParts>;
   judges: Named[];
   danceStyles: Named[];
-  draftsByEpisode: Record<string, DraftState>;
+  draftSummariesByEpisode: Record<string, DraftSummary>;
   publishedByNames: Record<string, string>;
   onNavigateToEpisode: (episodeId: string) => void;
   seasonNumber: number | null;
@@ -213,7 +213,7 @@ export function AllResultsView({
       ...e,
       resultsStatus: deriveResultsStatus(
         { results_published_at: e.results_published_at },
-        e.results_published_at ? false : !!draftsByEpisode[e.id]?.hasDraft
+        e.results_published_at ? false : !!draftSummariesByEpisode[e.id]?.hasDraft
       ),
     }))
     .filter((e) => e.resultsStatus !== "not_started");
@@ -256,7 +256,7 @@ export function AllResultsView({
   }) {
     const results = episodeResultsRows(ep);
     const roundTypeNames = episodeRoundTypeNames(ep.id);
-    const coupleCount = results.length > 0 ? results.length : (draftsByEpisode[ep.id]?.entries.length ?? 0);
+    const coupleCount = results.length > 0 ? results.length : (draftSummariesByEpisode[ep.id]?.entryCount ?? 0);
     const publishedByName = ep.results_published_by ? publishedByNames[ep.results_published_by] : null;
 
     return (
@@ -370,7 +370,7 @@ export function AllResultsView({
               const locked = spoilerFreeMode && status === "published" && !allowedWeekIds.has(week.id);
               const coupleCount = weekEpisodes.reduce((sum, ep) => {
                 const published = visibleEpisodeResults.filter((r) => r.episode_id === ep.id).length;
-                return sum + (published > 0 ? published : (draftsByEpisode[ep.id]?.entries.length ?? 0));
+                return sum + (published > 0 ? published : (draftSummariesByEpisode[ep.id]?.entryCount ?? 0));
               }, 0);
               return (
                 <AccordionItem key={week.id} value={week.id}>
