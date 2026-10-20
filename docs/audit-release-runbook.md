@@ -6,7 +6,9 @@ The small pre-show patch is SEC-3/BE-2 only. All remaining changes need the
 database migrations below and should ship after E07, outside live scoring.
 Do not deploy the complete remediation branch before its migrations.
 
-For Supabase **mirrorball-madness** (`wssbwgtsejamlbvfofvu`):
+First rehearse the migration and application together on staging with disposable
+data, including the checks in step 6. A local build/PGlite pass is not staging
+validation. For production Supabase **mirrorball-madness** (`wssbwgtsejamlbvfofvu`):
 
 1. Take a private database backup and verify its archive listing. Inspect pending
    correction drafts; close Enter Results tabs during migration and reopen them

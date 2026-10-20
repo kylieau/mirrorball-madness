@@ -4,7 +4,8 @@
 
 Kylie approved the recommendations after `682afc7` (“let's go with all your
 recommendations”). This supersedes the older wait-for-selection instructions
-below. Work is on `audit-remediation-20261020`, locally only.
+below. Continue on `audit-remediation-20261020`; its broader commits are local.
+Only the independent spoiler patch is on remote main.
 
 - `ce6fc3d` isolates SEC-3/BE-2: viewer draft summaries and fail-closed spoiler
   preferences. Also available as local branch `audit-spoiler-protection`.
@@ -29,6 +30,48 @@ below. Work is on `audit-remediation-20261020`, locally only.
   Remote: `https://github.com/kylieau/mirrorball-madness.git`.
 - Broader remediation `4d17bee` remains local on `audit-remediation-20261020`;
   do not push/deploy it before the coordinated database release.
+
+## Claude continuation — start here
+
+Latest owner request: sync this handoff so work can continue in Claude. The
+previous “sure” authorized **only** `ce6fc3d` to main; that push is complete.
+It did not authorize pushing the broader branch before its release prerequisites.
+`0112fd5` records that push; this documentation sync follows it. Remote main was
+rechecked during this sync and remains exactly `ce6fc3d`.
+
+1. Read `CLAUDE.md`, `docs/audit-remediation.md` and
+   `docs/audit-release-runbook.md`. The audit reports describe the old reviewed
+   revision; reconcile them with the implemented fixes before raising old claims.
+2. Verify Vercel deployed `ce6fc3d`. A successful git push is the only deployment
+   evidence so far. Check Scores/Schedule HTML/RSC payloads and fail-closed
+   preference behavior using controlled fixtures/accounts; physical iOS is separate.
+3. Arrange a private database backup, archive verification and a restore rehearsal
+   on a separate project. No DB connection URL/client is available here. The
+   service-role API is not a replacement for a complete backup. No backup exists
+   from this session; no recurring job was created.
+4. Rehearse the broad release on staging with disposable data first. Confirm no
+   live scoring is in progress before any production migration. SQL order:
+   `apply-audit-security.sql` → `apply-audit-deadlines.sql` →
+   `apply-audit-settings.sql` → `apply-audit-prediction-provenance.sql` (all under
+   `supabase/`). Use the owner's Dashboard workflow. Regenerate Supabase types,
+   compare the prepared contracts, then coordinate the matching app deployment.
+   Do not deploy `4d17bee` or this branch against the old production schema.
+5. Explicitly approve global results contributors after rollout. Old pending
+   co-manager codes become invalid; new ones expire in seven days. Accepted
+   co-managers persist. Verify contributor/admin permissions, invite privacy and
+   redemption, settings conflicts, picks/reload, correction and reveal/undo.
+6. SMTP remains absent; keep `AUTH_EMAIL_ENABLED=false` and existing autoconfirm
+   unchanged. Configure/verify delivery and templates before enabling confirmation,
+   recovery or email changes. No emails or identity resets were sent.
+7. Ask the owner to confirm DATA-8 historical backfill intent separately. No
+   historical pick deletion or standings recompute is part of this release.
+
+All 14 Chromium component checks passed with zero page errors. Temporary browser
+fixture/screenshots: `/tmp/dwts-remediation-browser-1hzs68r6`. Full isolated build:
+`/tmp/dwts-full-remediation-build-rm1hphvf`; small-patch build:
+`/tmp/dwts-spoiler-build-rp3u66oe`. These are local evidence, not deployed services;
+no review servers remain running. Avoid running heavy checks alongside other
+Claude sessions. Preserve the unrelated files listed below; do not use `git add -A`.
 
 ## Verification and outstanding checks
 
