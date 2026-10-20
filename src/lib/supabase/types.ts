@@ -1297,11 +1297,10 @@ export type Database = {
           entered_by: string | null
           entered_via: string | null
           entry_reason: string | null
-          pick_made_at: string | null
-
           id: string
           league_id: string
           manager_id: string
+          pick_made_at: string | null
           predicted_eliminated_couple_id: string | null
           predicted_eliminated_couple_id_2: string | null
           predicted_top_scorer_couple_id: string | null
@@ -1312,11 +1311,10 @@ export type Database = {
           entered_by?: string | null
           entered_via?: string | null
           entry_reason?: string | null
-          pick_made_at?: string | null
-
           id?: string
           league_id: string
           manager_id: string
+          pick_made_at?: string | null
           predicted_eliminated_couple_id?: string | null
           predicted_eliminated_couple_id_2?: string | null
           predicted_top_scorer_couple_id?: string | null
@@ -1327,11 +1325,10 @@ export type Database = {
           entered_by?: string | null
           entered_via?: string | null
           entry_reason?: string | null
-          pick_made_at?: string | null
-
           id?: string
           league_id?: string
           manager_id?: string
+          pick_made_at?: string | null
           predicted_eliminated_couple_id?: string | null
           predicted_eliminated_couple_id_2?: string | null
           predicted_top_scorer_couple_id?: string | null
@@ -1339,6 +1336,13 @@ export type Database = {
           week_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "predictions_entered_by_fkey"
+            columns: ["entered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "predictions_league_id_fkey"
             columns: ["league_id"]
@@ -2201,9 +2205,13 @@ export type Database = {
           p_week_id: string
         }
         Returns: {
+          entered_by: string | null
+          entered_via: string | null
+          entry_reason: string | null
           id: string
           league_id: string
           manager_id: string
+          pick_made_at: string | null
           predicted_eliminated_couple_id: string | null
           predicted_eliminated_couple_id_2: string | null
           predicted_top_scorer_couple_id: string | null

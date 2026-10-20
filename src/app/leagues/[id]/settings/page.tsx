@@ -6,12 +6,15 @@ import { LeagueMembersSection } from "@/components/league-members-section";
 import { LeagueInfoSection } from "@/components/league-info-section";
 import { LeagueModulesForm } from "@/components/league-modules-form";
 import type { GrandFinaleLateUnlockInput, LateMisser } from "@/components/grand-finale-late-unlock";
+import type { CurtainCallBackfillInput } from "@/components/curtain-call-backfill";
 import { LeaveLeagueButton } from "@/components/leave-league-button";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { findOwnMembership } from "@/lib/acting-manager";
 import { resolvedCoupleCount } from "@/lib/grand-finale-late";
 import { formatManagerName } from "@/lib/manager-display";
+import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
+import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
 import { XIcon } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
@@ -85,6 +88,9 @@ export default async function LeagueSettingsPage({
     displayName: m.profiles?.display_name ?? "Unknown",
     coManagerDisplayName: m.co_manager?.display_name ?? null,
   }));
+  const curtainCallBackfill = isSuperAdmin
+    ? await loadCurtainCallBackfill(createAdminClient(), id, memberRows)
+    : null;
 
   return (
     <div
@@ -154,6 +160,7 @@ export default async function LeagueSettingsPage({
           totalCouples={season.totalCouples}
           exitHref={closeHref}
           lateUnlock={buildLateUnlock(grandFinaleLocked, memberRows, lateGrandFinale, isCommissioner || isSuperAdmin, viewerMembership.user_id)}
+          curtainCallBackfill={curtainCallBackfill}
         />
       </div>
     </div>
@@ -317,6 +324,7 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
     displayName: m.profiles?.display_name ?? "Unknown",
     coManagerDisplayName: m.co_manager?.display_name ?? null,
   }));
+  const curtainCallBackfill = await loadCurtainCallBackfill(admin, leagueId, memberRows);
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8">
@@ -356,8 +364,67 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
           totalCouples={season.totalCouples}
           exitHref={closeHref}
           lateUnlock={buildLateUnlock(grandFinaleLocked, memberRows, late, true)}
+          curtainCallBackfill={curtainCallBackfill}
         />
       </div>
     </div>
   );
+}
+
+// Caller has verified profiles.is_super_admin. Reads with the service role so
+// the form can show every manager's current pick, even before the lock, and a
+// backfill doesn't silently overwrite one. The season comes from the table, not
+// active_season_id(), which the service role isn't granted.
+async function loadCurtainCallBackfill(
+  admin: SupabaseClient<Database>,
+  leagueId: string,
+  members: { userId: string; displayName: string; coManagerDisplayName: string | null }[]
+): Promise<CurtainCallBackfillInput> {
+  const { data: season } = await admin.from("seasons").select("id").eq("is_active", true).maybeSingle();
+  const seasonId = season?.id ?? null;
+  const [{ data: weekRows }, { data: episodeRows }, { data: coupleRows }, { data: pickRows }] = await Promise.all([
+    admin
+      .from("competition_weeks")
+      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
+      .eq("season_id", seasonId ?? "")
+      .order("week_number"),
+    admin
+      .from("episodes")
+      .select("id, episode_number, week_id, airs_at, theme, status")
+      .eq("season_id", seasonId ?? ""),
+    admin
+      .from("couples")
+      .select("id, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)")
+      .eq("season_id", seasonId ?? ""),
+    admin
+      .from("predictions")
+      .select(
+        "manager_id, week_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id, entered_via"
+      )
+      .eq("league_id", leagueId),
+  ]);
+  const weeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
+  const displayNames = buildCoupleDisplayNames(
+    (coupleRows ?? []).map((c) => ({ id: c.id, celebrity_name: c.celebrity?.name ?? "Unknown", pro_name: c.pro?.name ?? "Unknown" }))
+  );
+  return {
+    managers: members.map((member) => ({ userId: member.userId, displayName: formatManagerName(member) })),
+    weeks: weeks.map((week) => ({
+      id: week.id,
+      label: formatEpisodeCasualWithTheme(week.week_number, week.theme),
+      isDouble: week.is_double_elimination_week,
+    })),
+    defaultWeekId: (weeks.find((week) => week.status !== "completed") ?? weeks.at(-1))?.id ?? null,
+    couples: [...displayNames.entries()]
+      .map(([id, parts]) => ({ id, name: formatCoupleName(parts) }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    picks: (pickRows ?? []).map((row) => ({
+      managerId: row.manager_id,
+      weekId: row.week_id,
+      eliminated: row.predicted_eliminated_couple_id,
+      eliminated2: row.predicted_eliminated_couple_id_2,
+      topScorer: row.predicted_top_scorer_couple_id,
+      backfilled: row.entered_via === "admin_backfill",
+    })),
+  };
 }

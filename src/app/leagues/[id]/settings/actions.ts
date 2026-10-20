@@ -134,6 +134,38 @@ export async function closeGrandFinaleLate(leagueId: string, managerId: string):
   return { error: null };
 }
 
+export async function backfillCurtainCallPick(
+  leagueId: string,
+  pick: {
+    managerId: string;
+    weekId: string;
+    eliminated: string | null;
+    eliminated2: string | null;
+    topScorer: string | null;
+    pickMadeAt: string;
+    reason: string;
+  }
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  // The RPC is the authority: site admins only, a reason and a pick time in
+  // the past required, couples from the week's season.
+  const { error } = await supabase.rpc("admin_backfill_prediction", {
+    p_league_id: leagueId,
+    p_week_id: pick.weekId,
+    p_manager_id: pick.managerId,
+    // Generated RPC args are typed non-null, but SQL takes null for an empty slot.
+    p_elimination: pick.eliminated as string,
+    p_elimination_2: pick.eliminated2 as string,
+    p_top_scorer: pick.topScorer as string,
+    p_pick_made_at: pick.pickMadeAt,
+    p_reason: pick.reason,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/leagues/${leagueId}`, "layout");
+  return { error: null };
+}
+
 export async function demoteMember(
   leagueId: string,
   userId: string
