@@ -22,6 +22,7 @@ create table profiles (
   display_name text not null,
   avatar_url text,
   is_super_admin boolean not null default false, -- global results-entry admin
+  can_propose_results boolean not null default false,
   created_at timestamptz not null default now(),
   -- Account deletion is request-and-review, not instant: a manager's
   -- historical roster_slots/predictions/weekly_manager_scores rows are
@@ -146,6 +147,7 @@ create table league_members (
   -- and shares it; join_as_co_manager redeems it and clears the code.
   co_manager_id uuid references profiles(id),
   co_manager_invite_code text,
+  co_manager_invite_expires_at timestamptz,
   joined_at timestamptz not null default now(),
   unique (league_id, user_id),
   unique (league_id, draft_position),
@@ -285,11 +287,14 @@ create table scoring_settings (
   -- Settings until this flips true, so scoring categories are a required
   -- creation step rather than silent defaults nobody looked at.
   scoring_configured boolean not null default false,
+  revision bigint not null default 0,
 
   -- Grandfathers in leagues that existed before scoring-settings locking
   -- shipped — set true for all of them by the live migration, default false
   -- (i.e. lock applies normally) for every league created afterward.
   locking_exempt boolean not null default false,
+  grand_finale_deadline_at timestamptz,
+  grand_finale_deadline_season_id uuid references seasons(id),
 
   constraint at_least_one_category_enabled check (
     judges_score_category_enabled or eliminations_category_enabled or bonus_picks_category_enabled
@@ -608,7 +613,11 @@ create table predictions (
   constraint predictions_distinct_eliminated_picks check (
     predicted_eliminated_couple_id_2 is null
     or predicted_eliminated_couple_id_2 <> predicted_eliminated_couple_id
-  )
+  ),
+  entered_by uuid references profiles(id),
+  entered_via text,
+  entry_reason text,
+  pick_made_at timestamptz
 );
 
 -- ============================================================
@@ -977,7 +986,7 @@ $$;
 -- create_league's league-wide invite_code), shares it out-of-band, and the
 -- recipient redeems it. remove_league_member needs no change of its own — it
 -- deletes the whole row, which already detaches both people in one shot.
-create function public.generate_co_manager_invite_code(p_league_id uuid)
+create or replace function public.generate_co_manager_invite_code(p_league_id uuid)
 returns text
 language plpgsql
 security definer set search_path = ''
@@ -1010,7 +1019,7 @@ begin
     );
   end loop;
 
-  update public.league_members set co_manager_invite_code = v_code where id = v_row.id;
+  update public.league_members set co_manager_invite_code = v_code, co_manager_invite_expires_at = now() + interval '7 days' where id = v_row.id;
 
   return v_code;
 end;
@@ -1019,7 +1028,7 @@ $$;
 revoke execute on function public.generate_co_manager_invite_code(uuid) from public;
 grant execute on function public.generate_co_manager_invite_code(uuid) to authenticated;
 
-create function public.join_as_co_manager(p_code text)
+create or replace function public.join_as_co_manager(p_code text)
 returns public.leagues
 language plpgsql
 security definer set search_path = ''
@@ -1030,6 +1039,7 @@ declare
 begin
   select * into v_row from public.league_members
   where co_manager_invite_code = trim(upper(p_code))
+    and co_manager_invite_expires_at > now()
   for update;
 
   if not found then
@@ -1059,7 +1069,7 @@ begin
   end if;
 
   update public.league_members
-  set co_manager_id = auth.uid(), co_manager_invite_code = null
+  set co_manager_id = auth.uid(), co_manager_invite_code = null, co_manager_invite_expires_at = null
   where id = v_row.id;
 
   return v_league;
@@ -1074,7 +1084,7 @@ grant execute on function public.join_as_co_manager(text) to authenticated;
 -- invited" with no context. authenticated-only (this schema never grants
 -- anon anything), keyed only by the code — same trust boundary
 -- join_as_co_manager already uses, caller doesn't need to be a member yet.
-create function public.get_co_manager_invite_info(p_code text)
+create or replace function public.get_co_manager_invite_info(p_code text)
 returns table(league_name text, primary_display_name text)
 language sql
 security definer
@@ -1086,6 +1096,7 @@ as $$
   join public.leagues l on l.id = lm.league_id
   join public.profiles p on p.id = lm.user_id
   where lm.co_manager_invite_code = trim(upper(p_code))
+    and lm.co_manager_invite_expires_at > now()
   limit 1;
 $$;
 
@@ -1292,7 +1303,7 @@ grant execute on function public.rename_league(uuid, text) to authenticated;
 grant execute on function public.delete_league(uuid) to authenticated;
 
 grant select on public.leagues to authenticated;
-grant select on public.league_members to authenticated;
+grant select (id, league_id, user_id, role, draft_position, draft_autopilot, co_manager_id, joined_at) on public.league_members to authenticated;
 
 -- A league_members policy can't query league_members directly — Postgres treats
 -- any self-reference in a table's own RLS policy as recursion and refuses it,
@@ -2425,7 +2436,9 @@ create table draft_episode_overrides (
   guest_judge_name text,
   judges_save_available boolean not null default false,
   updated_at timestamptz not null default now(),
-  updated_by uuid references profiles(id) on delete set null
+  updated_by uuid references profiles(id) on delete set null,
+  correction_token uuid,
+  correction_base_published_at timestamptz
 );
 
 create table draft_dance_scores (
@@ -2746,18 +2759,20 @@ grant execute on function public.effective_hard_deadline_week(uuid) to authentic
 -- scoring_settings.bonus_picks_deadline column). Returns null when that
 -- week's episode isn't scheduled yet (e.g. right after league creation,
 -- before Week 1 exists), which callers treat as "still locked."
-create function public.effective_grand_finale_deadline(p_league_id uuid)
+create or replace function public.effective_grand_finale_deadline(p_league_id uuid)
 returns timestamptz
 language sql
 security definer
 set search_path = ''
 stable
 as $$
-  select min(e.airs_at)
+  select coalesce(
+    (select grand_finale_deadline_at from public.scoring_settings where league_id=p_league_id and grand_finale_deadline_season_id=public.active_season_id()),
+    (select min(e.airs_at)
   from public.episodes e
   join public.competition_weeks w on w.id = e.week_id
   where w.season_id = public.active_season_id()
-    and w.week_number = public.effective_hard_deadline_week(p_league_id);
+    and w.week_number = public.effective_hard_deadline_week(p_league_id)));
 $$;
 
 revoke execute on function public.effective_grand_finale_deadline(uuid) from public;
@@ -2778,7 +2793,7 @@ using (
   )
 );
 
-create function public.submit_prediction(
+create or replace function public.submit_prediction(
   p_league_id uuid,
   p_week_id uuid,
   p_predicted_eliminated_couple_id uuid,
@@ -2835,18 +2850,18 @@ begin
   insert into public.predictions (
     league_id, manager_id, week_id,
     predicted_eliminated_couple_id, predicted_eliminated_couple_id_2,
-    predicted_top_scorer_couple_id
+    predicted_top_scorer_couple_id, entered_by, entered_via, pick_made_at
   )
   values (
     p_league_id, v_acting_manager, p_week_id,
     p_predicted_eliminated_couple_id, p_predicted_eliminated_couple_id_2,
-    p_predicted_top_scorer_couple_id
+    p_predicted_top_scorer_couple_id, auth.uid(), 'app', now()
   )
   on conflict (league_id, manager_id, week_id) do update set
     predicted_eliminated_couple_id = excluded.predicted_eliminated_couple_id,
     predicted_eliminated_couple_id_2 = excluded.predicted_eliminated_couple_id_2,
     predicted_top_scorer_couple_id = excluded.predicted_top_scorer_couple_id,
-    submitted_at = now()
+    submitted_at = now(), entered_by = auth.uid(), entered_via = 'app', entry_reason = null, pick_made_at = now()
   returning * into v_prediction;
 
   return v_prediction;
@@ -2889,7 +2904,7 @@ using (
 -- cannot open their own window; the button lives on League Settings. Upserts
 -- on an existing, unsubmitted row so a commissioner can edit the percent
 -- before the manager uses it; a submitted entry is permanent.
-create function public.unlock_grand_finale_late(
+create or replace function public.unlock_grand_finale_late(
   p_league_id uuid,
   p_manager_id uuid,
   p_late_factor numeric,
@@ -2925,6 +2940,8 @@ begin
   ) then
     raise exception 'That person is not a manager in this league';
   end if;
+
+  if p_manager_id = public.resolve_acting_league_member(p_league_id) then raise exception 'You cannot allow a late entry for your own team'; end if;
 
   v_deadline := public.effective_grand_finale_deadline(p_league_id);
   if v_deadline is null or now() < v_deadline then
@@ -3010,7 +3027,7 @@ $$;
 revoke execute on function public.close_grand_finale_late(uuid, uuid) from public;
 grant execute on function public.close_grand_finale_late(uuid, uuid) to authenticated;
 
-create function public.submit_grand_finale_prediction(p_league_id uuid, p_couple_ids uuid[])
+create or replace function public.submit_grand_finale_prediction(p_league_id uuid, p_couple_ids uuid[])
 returns setof public.grand_finale_predictions
 language plpgsql
 security definer set search_path = ''
@@ -3057,6 +3074,11 @@ begin
       raise exception 'A locked Grand Finale bracket can''t be edited';
     end if;
 
+    if exists (select 1 from public.competition_weeks w where w.season_id=public.active_season_id()
+      and exists(select 1 from public.episodes e where e.week_id=w.id and e.airs_at <= now())
+      and exists(select 1 from public.episodes e where e.week_id=w.id and e.results_published_at is null)) then
+      raise exception 'Wait until the current competition week is published before submitting a late bracket';
+    end if;
     v_late_open := true;
   end if;
 
@@ -3132,18 +3154,32 @@ using (public.is_league_member(league_id));
 -- Internal-only: does the actual roster swap + bookkeeping once a claim is
 -- decided. No permission check of its own — every caller below has already
 -- verified the caller is allowed to decide this claim before calling it.
-create function public.finalize_waiver_claim(p_claim_id uuid)
+create or replace function public.finalize_waiver_claim(p_claim_id uuid)
 returns public.waiver_claims
 language plpgsql
 security definer set search_path = ''
 as $$
 declare
   v_claim public.waiver_claims;
+  v_league_id uuid;
+  v_start_week int;
 begin
+  select league_id into v_league_id from public.waiver_claims where id=p_claim_id;
+  perform 1 from public.leagues where id=v_league_id for update;
   select * into v_claim from public.waiver_claims where id = p_claim_id for update;
   if not found then
     raise exception 'Recast not found';
   end if;
+
+  if v_claim.status <> 'pending' then raise exception 'This recast has already been resolved'; end if;
+  if not exists(select 1 from public.couples where id=v_claim.couple_id and season_id=public.active_season_id() and status='active')
+    or exists(select 1 from public.roster_slots where league_id=v_claim.league_id and couple_id=v_claim.couple_id and end_week is null) then raise exception 'That couple is no longer available'; end if;
+  if not exists(select 1 from public.roster_slots rs join public.couples c on c.id=rs.couple_id
+    where rs.league_id=v_claim.league_id and rs.manager_id=v_claim.manager_id and rs.slot_number=v_claim.slot_number and rs.end_week is null and c.status in ('eliminated','withdrawn')) then raise exception 'That slot is no longer open for a recast'; end if;
+  select min(w.week_number) into v_start_week from public.competition_weeks w where w.season_id=public.active_season_id()
+    and (select min(e.airs_at) from public.episodes e where e.week_id=w.id)>now();
+  if v_start_week is null then raise exception 'No upcoming competition week is scheduled'; end if;
+  update public.waiver_claims set week_number=v_start_week-1 where id=p_claim_id returning * into v_claim;
 
   update public.roster_slots
   set end_week = v_claim.week_number
@@ -3178,7 +3214,7 @@ $$;
 
 revoke execute on function public.finalize_waiver_claim(uuid) from public, authenticated;
 
-create function public.submit_waiver_claim(
+create or replace function public.submit_waiver_claim(
   p_league_id uuid,
   p_slot_number int,
   p_couple_id uuid
@@ -3240,18 +3276,9 @@ begin
     raise exception 'That couple is already on a roster in this league';
   end if;
 
-  v_current_week := coalesce((
-    select max(w.week_number)
-    from public.competition_weeks w
-    where w.season_id = public.active_season_id()
-      and not exists (
-        select 1 from public.episodes e
-        where e.week_id = w.id and e.status <> 'completed'
-      )
-      and exists (
-        select 1 from public.episodes e where e.week_id = w.id
-      )
-  ), 0);
+  select min(w.week_number)-1 into v_current_week from public.competition_weeks w
+  where w.season_id=public.active_season_id() and (select min(e.airs_at) from public.episodes e where e.week_id=w.id)>now();
+  if v_current_week is null then raise exception 'No upcoming competition week is scheduled'; end if;
 
   insert into public.waiver_claims (league_id, couple_id, manager_id, slot_number, week_number, status)
   values (p_league_id, p_couple_id, v_acting_manager, p_slot_number, v_current_week, 'pending')
@@ -3321,15 +3348,18 @@ $$;
 revoke execute on function public.process_reverse_standings_waivers(uuid) from public;
 grant execute on function public.process_reverse_standings_waivers(uuid) to authenticated;
 
-create function public.approve_waiver_claim(p_claim_id uuid)
+create or replace function public.approve_waiver_claim(p_claim_id uuid)
 returns public.waiver_claims
 language plpgsql
 security definer set search_path = ''
 as $$
 declare
   v_claim public.waiver_claims;
+  v_league_id uuid;
 begin
-  select * into v_claim from public.waiver_claims where id = p_claim_id;
+  select league_id into v_league_id from public.waiver_claims where id=p_claim_id;
+  perform 1 from public.leagues where id=v_league_id for update;
+  select * into v_claim from public.waiver_claims where id = p_claim_id for update;
   if not found then
     raise exception 'Recast not found';
   end if;
@@ -3346,15 +3376,18 @@ begin
 end;
 $$;
 
-create function public.reject_waiver_claim(p_claim_id uuid)
+create or replace function public.reject_waiver_claim(p_claim_id uuid)
 returns public.waiver_claims
 language plpgsql
 security definer set search_path = ''
 as $$
 declare
   v_claim public.waiver_claims;
+  v_league_id uuid;
 begin
-  select * into v_claim from public.waiver_claims where id = p_claim_id;
+  select league_id into v_league_id from public.waiver_claims where id=p_claim_id;
+  perform 1 from public.leagues where id=v_league_id for update;
+  select * into v_claim from public.waiver_claims where id = p_claim_id for update;
   if not found then
     raise exception 'Recast not found';
   end if;
@@ -3362,6 +3395,8 @@ begin
   if not public.is_league_commissioner(v_claim.league_id) then
     raise exception 'Only the commissioner can reject recasts';
   end if;
+
+  if v_claim.status <> 'pending' then raise exception 'This recast has already been resolved'; end if;
 
   update public.waiver_claims
   set status = 'rejected', resolved_at = now()
@@ -3550,7 +3585,8 @@ grant execute on function public.visible_draft_dance_scores() to authenticated;
 create or replace function public.episode_publication_snapshot(p_episode_id uuid)
 returns jsonb language sql stable security invoker set search_path = ''
 as $$
-  select jsonb_build_object(
+  select payload || jsonb_build_object('_revision', md5(payload::text))
+  from (select jsonb_build_object(
     'season', (select to_jsonb(s) from public.seasons s where is_active limit 1),
     'episodes', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.episodes where season_id = (select id from public.seasons where is_active limit 1)) r),
     'weeks', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.competition_weeks where season_id = (select id from public.seasons where is_active limit 1)) r),
@@ -3561,8 +3597,9 @@ as $$
     'leagues', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.leagues) r),
     'settings', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.scoring_settings) r),
     'rosters', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.roster_slots) r),
-    'predictions', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.predictions) r),
+    'predictions', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.predictions where week_id = (select week_id from public.episodes where id = p_episode_id)) r),
     'lateUnlocks', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.grand_finale_late_unlocks) r),
+    'weeklyScores', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.weekly_manager_scores where week_id = (select week_id from public.episodes where id = p_episode_id)) r),
     'grandFinalePredictions', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.grand_finale_predictions) r),
     'draftOverrides', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.draft_episode_overrides where episode_id = p_episode_id) r),
     'draftDances', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.draft_dance_scores where episode_id = p_episode_id) r),
@@ -3570,7 +3607,7 @@ as $$
     'draftResults', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.draft_episode_results where episode_id = p_episode_id) r),
     'draftJeopardy', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.draft_episode_in_jeopardy_couples where episode_id = p_episode_id) r),
     'draftMoments', (select coalesce(jsonb_agg(to_jsonb(r) order by to_jsonb(r)::text), '[]'::jsonb) from (select * from public.draft_episode_custom_moments where episode_id = p_episode_id) r)
-  );
+  ) as payload) snapshot;
 $$;
 
 create or replace function public.commit_episode_publication(
@@ -3591,6 +3628,7 @@ begin
   -- Hold these only for the commit, never while TypeScript calculates scores.
   -- Other result saves, settings edits and picks must finish before we compare
   -- the snapshot; they cannot race the write once the comparison succeeds.
+  perform 1 from public.episodes where id=p_episode_id for update;
   lock table public.seasons, public.episodes, public.competition_weeks,
     public.couples, public.dance_scores, public.judge_scores,
     public.episode_results, public.episode_in_jeopardy_couples,
@@ -3606,11 +3644,19 @@ begin
   if not exists (select 1 from public.profiles where id = p_published_by and is_super_admin) then
     raise exception 'Not authorized to publish results';
   end if;
-  if p_snapshot is null or p_snapshot is distinct from public.episode_publication_snapshot(p_episode_id) then
+  if p_snapshot is null or p_snapshot->>'_revision' is null or p_snapshot->>'_revision' is distinct from public.episode_publication_snapshot(p_episode_id)->>'_revision' then
     raise exception 'Results or scoring inputs changed. Refresh and try again.';
   end if;
   select * into strict v_episode from public.episodes where id = p_episode_id;
   select * into strict v_override from public.draft_episode_overrides where episode_id = p_episode_id;
+  if v_episode.results_published_at is not null and (
+    exists (select 1 from public.episode_results live where live.episode_id = p_episode_id
+      and not exists (select 1 from public.draft_episode_results draft where draft.episode_id = p_episode_id and draft.couple_id = live.couple_id))
+    or exists (select 1 from public.dance_scores live where live.episode_id = p_episode_id
+      and not exists (select 1 from public.draft_dance_scores draft where draft.episode_id = p_episode_id and draft.couple_id = live.couple_id)
+      and not exists (select 1 from public.draft_episode_results draft where draft.episode_id = p_episode_id and draft.couple_id = live.couple_id and draft.outcome = 'bye'))
+  ) then raise exception 'Incomplete correction draft. Reload the complete published episode before correcting it.'; end if;
+
   if not exists (select 1 from public.draft_episode_results where episode_id = p_episode_id) then
     raise exception 'No results to publish for this episode';
   end if;
@@ -3683,3 +3729,459 @@ revoke all on function public.episode_publication_snapshot(uuid) from public, an
 revoke all on function public.commit_episode_publication(uuid, uuid, jsonb, jsonb) from public, anon, authenticated;
 grant execute on function public.episode_publication_snapshot(uuid) to service_role;
 grant execute on function public.commit_episode_publication(uuid, uuid, jsonb, jsonb) to service_role;
+
+-- Audit security and transactional draft lifecycle.
+create or replace function public.my_co_manager_invite_code(p_league_id uuid)
+returns text language sql stable security definer set search_path = '' as $$
+  select co_manager_invite_code from public.league_members
+  where league_id = p_league_id and user_id = auth.uid() and co_manager_invite_expires_at > now();
+$$;
+revoke all on function public.my_co_manager_invite_code(uuid) from public, anon;
+grant execute on function public.my_co_manager_invite_code(uuid) to authenticated;
+
+create or replace function public.set_results_contributor(p_user_id uuid, p_enabled boolean)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_super_admin) then
+    raise exception 'Only a site admin can manage results contributors';
+  end if;
+  update public.profiles set can_propose_results = p_enabled where id = p_user_id;
+  if not found then raise exception 'Account not found'; end if;
+end;
+$$;
+revoke all on function public.set_results_contributor(uuid, boolean) from public, anon;
+grant execute on function public.set_results_contributor(uuid, boolean) to authenticated;
+
+create or replace function public.validate_fantasy_settings_numbers()
+returns trigger language plpgsql set search_path = '' as $$
+declare pair record; n numeric;
+begin
+  for pair in select key, value from jsonb_each(to_jsonb(new))
+    where key <> 'revision' and (jsonb_typeof(value) = 'number' or value::text in ('"NaN"', '"Infinity"', '"-Infinity"')) loop
+    n := (pair.value #>> '{}')::numeric;
+    if n::text in ('NaN', 'Infinity', '-Infinity') or abs(n) > 1000000 or scale(n) > 6 then
+      raise exception 'Invalid numeric setting: %. Use a finite value up to 1,000,000 with at most six decimal places.', pair.key;
+    end if;
+    if pair.key like '%weight' and n < 0 then raise exception 'Category weights cannot be negative'; end if;
+  end loop;
+  if tg_table_name = 'leagues' then
+    if new.pick_time_limit_seconds < 10 or new.pick_time_limit_seconds > 86400 then
+      raise exception 'Pick time limit must be between 10 seconds and one day';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists validate_league_numbers on public.leagues;
+drop trigger if exists a_validate_league_numbers on public.leagues;
+create trigger a_validate_league_numbers before insert or update on public.leagues for each row execute function public.validate_fantasy_settings_numbers();
+drop trigger if exists validate_scoring_numbers on public.scoring_settings;
+drop trigger if exists a_validate_scoring_numbers on public.scoring_settings;
+create trigger a_validate_scoring_numbers before insert or update on public.scoring_settings for each row execute function public.validate_fantasy_settings_numbers();
+
+create or replace function public.save_episode_draft(p_input jsonb)
+returns void language plpgsql security invoker set search_path = '' as $$
+declare
+  ep public.episodes; actor public.profiles; entry jsonb; dance jsonb; js jsonb;
+  couple uuid; draft_id uuid; live record; total numeric; count_scores int;
+  token uuid; base timestamptz;
+begin
+  select * into strict actor from public.profiles where id = (p_input->>'updatedBy')::uuid;
+  if not (actor.is_super_admin or actor.can_propose_results) then raise exception 'Not authorized to enter results'; end if;
+  select * into strict ep from public.episodes where id = (p_input->>'episodeId')::uuid for update;
+  select correction_token, correction_base_published_at into token, base from public.draft_episode_overrides where episode_id = ep.id;
+  if ep.results_published_at is not null then
+    if not actor.is_super_admin then raise exception 'Only a site admin can correct published results'; end if;
+    if token is null or token is distinct from (p_input->>'correctionToken')::uuid or base is distinct from ep.results_published_at then
+      raise exception 'This episode was published. Reload it to begin an explicit correction.';
+    end if;
+  elsif p_input->>'correctionToken' is not null then raise exception 'The correction session changed. Reload this episode.';
+  end if;
+  insert into public.draft_episode_overrides(episode_id, guest_judge_name, judges_save_available, updated_at, updated_by)
+  values (ep.id, p_input->>'guestJudgeName', coalesce((p_input->>'judgesSaveAvailable')::boolean, false), now(), actor.id)
+  on conflict (episode_id) do update set guest_judge_name = excluded.guest_judge_name, judges_save_available = excluded.judges_save_available, updated_at = excluded.updated_at, updated_by = excluded.updated_by;
+  for entry in select * from jsonb_array_elements(p_input->'entries') loop
+    couple := (entry->>'coupleId')::uuid;
+    if not exists(select 1 from public.couples where id = couple and season_id = ep.season_id) then raise exception 'Couple is not in this season'; end if;
+    delete from public.draft_dance_scores where episode_id = ep.id and couple_id = couple;
+    if ep.results_published_at is null and exists(select 1 from public.dance_scores where episode_id = ep.id and couple_id = couple) then
+      for live in select * from public.dance_scores where episode_id = ep.id and couple_id = couple loop
+        insert into public.draft_dance_scores(episode_id,couple_id,dance_style_id,song_title,total_score,scaled_score)
+        values(ep.id,couple,live.dance_style_id,live.song_title,live.total_score,live.scaled_score) returning id into draft_id;
+        insert into public.draft_judge_scores(draft_dance_score_id,judge_id,score)
+        select draft_id,judge_id,score from public.judge_scores where dance_score_id = live.id;
+      end loop;
+    else
+      for dance in select * from jsonb_array_elements(entry->'dances') loop
+        total := 0; count_scores := 0;
+        for js in select * from jsonb_array_elements(dance->'judgeScores') loop
+          if (js->>'score')::numeric not between 0 and 10 then raise exception 'Judge scores must be between 0 and 10'; end if;
+          total := total + (js->>'score')::numeric; count_scores := count_scores + 1;
+        end loop;
+        insert into public.draft_dance_scores(episode_id,couple_id,dance_style_id,song_title,total_score,scaled_score)
+        values(ep.id,couple,(dance->>'danceStyleId')::uuid,dance->>'songTitle',total,case when count_scores = 0 then 0 else total / count_scores * 3 end) returning id into draft_id;
+        insert into public.draft_judge_scores(draft_dance_score_id,judge_id,score)
+        select draft_id,(j->>'judgeId')::uuid,(j->>'score')::numeric from jsonb_array_elements(dance->'judgeScores') j;
+      end loop;
+    end if;
+    insert into public.draft_episode_results(episode_id,couple_id,outcome,saved_by_judges,had_immunity,bonus_points,bonus_note)
+    values(ep.id,couple,entry->>'outcome',coalesce((entry->>'savedByJudges')::boolean,false),coalesce((entry->>'hadImmunity')::boolean,false),coalesce((entry->>'bonusPoints')::numeric,0),entry->>'bonusNote')
+    on conflict(episode_id,couple_id) do update set outcome=excluded.outcome,saved_by_judges=excluded.saved_by_judges,had_immunity=excluded.had_immunity,bonus_points=excluded.bonus_points,bonus_note=excluded.bonus_note;
+    delete from public.draft_episode_in_jeopardy_couples where episode_id = ep.id and couple_id = couple;
+    if entry->>'outcome' = 'safe' and (p_input->'inJeopardyCoupleIds') ? couple::text then
+      insert into public.draft_episode_in_jeopardy_couples(episode_id,couple_id) values(ep.id,couple);
+    end if;
+  end loop;
+end;
+$$;
+revoke all on function public.save_episode_draft(jsonb) from public, anon, authenticated;
+grant execute on function public.save_episode_draft(jsonb) to service_role;
+
+create or replace function public.seed_episode_correction(p_episode_id uuid, p_started_by uuid)
+returns uuid language plpgsql security invoker set search_path = '' as $$
+declare ep public.episodes; live record; draft_id uuid; token uuid;
+begin
+  if not exists(select 1 from public.profiles where id = p_started_by and is_super_admin) then raise exception 'Only a site admin can begin a correction'; end if;
+  select * into strict ep from public.episodes where id = p_episode_id for update;
+  if ep.results_published_at is null then raise exception 'Only published episodes can be corrected'; end if;
+  select correction_token into token from public.draft_episode_overrides where episode_id = ep.id and correction_base_published_at = ep.results_published_at;
+  if token is not null then return token; end if;
+  delete from public.draft_episode_overrides where episode_id = ep.id;
+  delete from public.draft_dance_scores where episode_id = ep.id;
+  delete from public.draft_episode_results where episode_id = ep.id;
+  delete from public.draft_episode_in_jeopardy_couples where episode_id = ep.id;
+  delete from public.draft_episode_custom_moments where episode_id = ep.id;
+  delete from public.draft_couple_releases where episode_id = ep.id;
+  token := gen_random_uuid();
+  insert into public.draft_episode_overrides(episode_id,guest_judge_name,judges_save_available,updated_by,correction_token,correction_base_published_at)
+  values(ep.id,ep.guest_judge_name,ep.judges_save_available,p_started_by,token,ep.results_published_at);
+  for live in select * from public.dance_scores where episode_id = ep.id loop
+    insert into public.draft_dance_scores(episode_id,couple_id,dance_style_id,song_title,total_score,scaled_score)
+    values(ep.id,live.couple_id,live.dance_style_id,live.song_title,live.total_score,live.scaled_score) returning id into draft_id;
+    insert into public.draft_judge_scores(draft_dance_score_id,judge_id,score) select draft_id,judge_id,score from public.judge_scores where dance_score_id = live.id;
+  end loop;
+  insert into public.draft_episode_results(episode_id,couple_id,outcome,saved_by_judges,had_immunity,bonus_points,bonus_note)
+  select episode_id,couple_id,outcome,saved_by_judges,had_immunity,bonus_points,bonus_note from public.episode_results where episode_id = ep.id;
+  insert into public.draft_episode_in_jeopardy_couples(episode_id,couple_id) select episode_id,couple_id from public.episode_in_jeopardy_couples where episode_id = ep.id;
+  insert into public.draft_episode_custom_moments(episode_id,couple_id,label) select episode_id,couple_id,label from public.episode_custom_moments where episode_id = ep.id;
+  return token;
+end;
+$$;
+revoke all on function public.seed_episode_correction(uuid,uuid) from public, anon, authenticated;
+grant execute on function public.seed_episode_correction(uuid,uuid) to service_role;
+
+alter table public.profiles enable row level security;
+alter table public.seasons enable row level security;
+alter table public.leagues enable row level security;
+alter table public.league_members enable row level security;
+alter table public.scoring_settings enable row level security;
+alter table public.dance_card_calibration enable row level security;
+alter table public.people enable row level security;
+alter table public.couples enable row level security;
+alter table public.draft_picks enable row level security;
+alter table public.draft_queues enable row level security;
+alter table public.roster_slots enable row level security;
+alter table public.waiver_claims enable row level security;
+alter table public.competition_weeks enable row level security;
+alter table public.episodes enable row level security;
+alter table public.dance_styles enable row level security;
+alter table public.round_types enable row level security;
+alter table public.dance_scores enable row level security;
+alter table public.judge_scores enable row level security;
+alter table public.episode_results enable row level security;
+alter table public.predictions enable row level security;
+alter table public.grand_finale_predictions enable row level security;
+alter table public.grand_finale_late_unlocks enable row level security;
+alter table public.weekly_manager_scores enable row level security;
+alter table public.draft_episode_overrides enable row level security;
+alter table public.draft_dance_scores enable row level security;
+alter table public.draft_judge_scores enable row level security;
+alter table public.draft_couple_releases enable row level security;
+alter table public.draft_episode_results enable row level security;
+alter table public.draft_episode_in_jeopardy_couples enable row level security;
+alter table public.draft_episode_custom_moments enable row level security;
+alter table public.episode_custom_moments enable row level security;
+alter table public.episode_participants enable row level security;
+alter table public.episode_round_types enable row level security;
+alter table public.episode_guest_judges enable row level security;
+alter table public.episode_in_jeopardy_couples enable row level security;
+alter table public.spoiler_watch_progress enable row level security;
+
+create or replace function public.commit_episode_reveal(
+  p_episode_id uuid,p_couple_id uuid,p_actor_id uuid,p_snapshot jsonb,p_plan jsonb,p_undo boolean
+) returns void language plpgsql security invoker set search_path = '' set lock_timeout = '5s' as $$
+declare ep public.episodes; dance record; live_id uuid;
+begin
+  -- Same lock order as final publication prevents an undo from crossing its commit.
+  perform 1 from public.episodes where id=p_episode_id for update;
+  lock table public.seasons, public.episodes, public.competition_weeks,
+    public.couples, public.dance_scores, public.judge_scores,
+    public.episode_results, public.episode_in_jeopardy_couples,
+    public.leagues, public.scoring_settings, public.roster_slots,
+    public.predictions, public.grand_finale_late_unlocks,
+    public.grand_finale_predictions, public.draft_episode_overrides,
+    public.draft_dance_scores, public.draft_judge_scores,
+    public.draft_episode_results, public.draft_episode_in_jeopardy_couples,
+    public.draft_episode_custom_moments, public.episode_participants,
+    public.episode_custom_moments, public.draft_couple_releases,
+    public.weekly_manager_scores in share row exclusive mode;
+  if not exists(select 1 from public.profiles where id=p_actor_id and is_super_admin) then raise exception 'Not authorized to publish scores'; end if;
+  select * into strict ep from public.episodes where id=p_episode_id;
+  if ep.results_published_at is not null then raise exception 'This episode is already published'; end if;
+  if p_snapshot->>'_revision' is null or p_snapshot->>'_revision' is distinct from public.episode_publication_snapshot(ep.id)->>'_revision' then
+    raise exception 'Results or scoring inputs changed. Refresh and try again.';
+  end if;
+  if p_undo then
+    delete from public.dance_scores where episode_id=ep.id and couple_id=p_couple_id;
+  else
+    if exists(select 1 from public.dance_scores where episode_id=ep.id and couple_id=p_couple_id) then raise exception 'This couple is already posted'; end if;
+    if not exists(select 1 from public.draft_dance_scores where episode_id=ep.id and couple_id=p_couple_id) then raise exception 'No saved scores for this couple'; end if;
+    for dance in select * from public.draft_dance_scores where episode_id=ep.id and couple_id=p_couple_id loop
+      if not exists(select 1 from public.draft_judge_scores where draft_dance_score_id=dance.id) then raise exception 'Complete the judge scores before posting'; end if;
+      insert into public.dance_scores(episode_id,couple_id,dance_style_id,song_title,total_score,scaled_score)
+      select ep.id,p_couple_id,dance.dance_style_id,dance.song_title,sum(score),avg(score)*3
+      from public.draft_judge_scores where draft_dance_score_id=dance.id returning id into live_id;
+      insert into public.judge_scores(dance_score_id,judge_id,score)
+      select live_id,judge_id,score from public.draft_judge_scores where draft_dance_score_id=dance.id;
+    end loop;
+  end if;
+  if ep.week_id is not null then
+    if exists(select 1 from jsonb_array_elements(p_plan->'weeklyScores') r where (r->>'week_id')::uuid is distinct from ep.week_id) then raise exception 'Invalid score week'; end if;
+    delete from public.weekly_manager_scores where week_id=ep.week_id;
+    insert into public.weekly_manager_scores(league_id,manager_id,week_id,roster_points,prediction_points,grand_finale_points,total_points)
+    select league_id,manager_id,week_id,roster_points,prediction_points,grand_finale_points,total_points
+    from jsonb_to_recordset(p_plan->'weeklyScores') as r(league_id uuid,manager_id uuid,week_id uuid,roster_points numeric,prediction_points numeric,grand_finale_points numeric,total_points numeric);
+  end if;
+end;
+$$;
+revoke all on function public.commit_episode_reveal(uuid,uuid,uuid,jsonb,jsonb,boolean) from public,anon,authenticated;
+grant execute on function public.commit_episode_reveal(uuid,uuid,uuid,jsonb,jsonb,boolean) to service_role;
+
+create or replace function public.replace_weekly_scores(p_episode_id uuid,p_revision text,p_rows jsonb)
+returns void language plpgsql security invoker set search_path = '' set lock_timeout = '5s' as $$
+declare ep public.episodes;
+begin
+  perform 1 from public.episodes where id=p_episode_id for update;
+  lock table public.seasons, public.episodes, public.competition_weeks,
+    public.couples, public.dance_scores, public.judge_scores,
+    public.episode_results, public.episode_in_jeopardy_couples,
+    public.leagues, public.scoring_settings, public.roster_slots,
+    public.predictions, public.grand_finale_late_unlocks,
+    public.grand_finale_predictions, public.draft_episode_overrides,
+    public.draft_dance_scores, public.draft_judge_scores,
+    public.draft_episode_results, public.draft_episode_in_jeopardy_couples,
+    public.draft_episode_custom_moments, public.episode_participants,
+    public.episode_custom_moments, public.draft_couple_releases,
+    public.weekly_manager_scores in share row exclusive mode;
+  select * into strict ep from public.episodes where id=p_episode_id;
+  if p_revision is null or p_revision is distinct from public.episode_publication_snapshot(ep.id)->>'_revision' then raise exception 'Results or scoring inputs changed. Refresh and try again.'; end if;
+  if ep.week_id is null then raise exception 'Episode has no competition week'; end if;
+  if exists(select 1 from public.episodes where week_id=ep.week_id and results_published_at is null) then raise exception 'Wait until the whole week is published before recomputing'; end if;
+  if exists(select 1 from jsonb_array_elements(p_rows) r where (r->>'week_id')::uuid is distinct from ep.week_id) then raise exception 'Invalid score week'; end if;
+  delete from public.weekly_manager_scores where week_id=ep.week_id;
+  insert into public.weekly_manager_scores(league_id,manager_id,week_id,roster_points,prediction_points,grand_finale_points,total_points)
+  select league_id,manager_id,week_id,roster_points,prediction_points,grand_finale_points,total_points
+  from jsonb_to_recordset(p_rows) as r(league_id uuid,manager_id uuid,week_id uuid,roster_points numeric,prediction_points numeric,grand_finale_points numeric,total_points numeric);
+end;
+$$;
+revoke all on function public.replace_weekly_scores(uuid,text,jsonb) from public,anon,authenticated;
+grant execute on function public.replace_weekly_scores(uuid,text,jsonb) to service_role;
+
+DO $$ declare t text; begin
+  foreach t in array array['judge_scores','draft_judge_scores'] loop
+    if not exists(select 1 from pg_catalog.pg_constraint where conname=t||'_score_range') then
+      execute format('alter table public.%I add constraint %I check(score between 0 and 10) not valid',t,t||'_score_range');
+    end if;
+  end loop;
+end $$;
+
+-- Preserve established deadlines and serialize roster claim decisions.
+create or replace function public.capture_expired_finale_deadlines(p_league_id uuid default null)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  update public.scoring_settings ss set grand_finale_deadline_at = public.effective_grand_finale_deadline(ss.league_id), grand_finale_deadline_season_id = public.active_season_id()
+  where (p_league_id is null or ss.league_id = p_league_id)
+    and (ss.grand_finale_deadline_at is null or ss.grand_finale_deadline_season_id is distinct from public.active_season_id())
+    and public.effective_grand_finale_deadline(ss.league_id) <= now();
+end;
+$$;
+revoke all on function public.capture_expired_finale_deadlines(uuid) from public,anon,authenticated;
+
+create or replace function public.preserve_finale_deadline()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare deadline timestamptz;
+begin
+  if tg_table_name = 'scoring_settings' then
+    -- Internal capture writes only these private fields and must not recurse.
+    if (new.grand_finale_deadline_at,new.grand_finale_deadline_season_id) is distinct from (old.grand_finale_deadline_at,old.grand_finale_deadline_season_id) then return new; end if;
+    deadline := public.effective_grand_finale_deadline(old.league_id);
+    if deadline <= now() then new.grand_finale_deadline_at := deadline; new.grand_finale_deadline_season_id := public.active_season_id(); end if;
+  elsif tg_table_name = 'leagues' then
+    perform public.capture_expired_finale_deadlines(old.id);
+  else
+    -- Capture the old schedule before an edit can move an expired deadline.
+    perform public.capture_expired_finale_deadlines(null);
+  end if;
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end;
+$$;
+revoke all on function public.preserve_finale_deadline() from public,anon,authenticated;
+drop trigger if exists preserve_finale_settings on public.scoring_settings;
+create trigger preserve_finale_settings before update on public.scoring_settings for each row execute function public.preserve_finale_deadline();
+drop trigger if exists preserve_finale_league on public.leagues;
+create trigger preserve_finale_league before update on public.leagues for each row execute function public.preserve_finale_deadline();
+drop trigger if exists preserve_finale_schedule on public.episodes;
+create trigger preserve_finale_schedule before update or delete on public.episodes for each row execute function public.preserve_finale_deadline();
+drop trigger if exists preserve_finale_weeks on public.competition_weeks;
+create trigger preserve_finale_weeks before update or delete on public.competition_weeks for each row execute function public.preserve_finale_deadline();
+
+create or replace function public.guard_curtain_call_lock_edit()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare w record; old_lock timestamptz; new_lock timestamptz; at_time timestamptz;
+begin
+  if (new.prediction_lock_coast,new.prediction_lock_hours_before_air) is not distinct from (old.prediction_lock_coast,old.prediction_lock_hours_before_air) then return new; end if;
+  for w in select cw.id,min(e.airs_at) as airs_at,(array_agg(e.duration_minutes order by e.airs_at))[1] as duration_minutes
+    from public.competition_weeks cw join public.episodes e on e.week_id=cw.id
+    where cw.season_id=public.active_season_id() group by cw.id having bool_or(e.results_published_at is null) loop
+    old_lock := public.prediction_lock_at(old.id,w.id);
+    at_time := case when new.prediction_lock_coast='west' then ((w.airs_at at time zone 'America/New_York')::date + time '20:00') at time zone 'America/Los_Angeles' else w.airs_at end;
+    new_lock := least(at_time-new.prediction_lock_hours_before_air*interval '1 hour',at_time+w.duration_minutes*interval '1 minute');
+    if old_lock <= now() or new_lock <= now() then raise exception 'This week is already locked. Change pick timing after its results are published.'; end if;
+  end loop;
+  return new;
+end;
+$$;
+revoke all on function public.guard_curtain_call_lock_edit() from public,anon,authenticated;
+drop trigger if exists guard_curtain_call_lock_edit on public.leagues;
+create trigger guard_curtain_call_lock_edit before update on public.leagues for each row execute function public.guard_curtain_call_lock_edit();
+
+create or replace function public.bump_scoring_revision()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if (to_jsonb(new) - array['revision','grand_finale_deadline_at','grand_finale_deadline_season_id']) is distinct from (to_jsonb(old) - array['revision','grand_finale_deadline_at','grand_finale_deadline_season_id']) then new.revision := old.revision + 1; end if;
+  return new;
+end;
+$$;
+drop trigger if exists z_bump_scoring_revision on public.scoring_settings;
+create trigger z_bump_scoring_revision before update on public.scoring_settings for each row execute function public.bump_scoring_revision();
+
+create or replace function public.update_scoring_categories_checked(p_league_id uuid,p_expected_revision bigint,p_values jsonb)
+returns public.scoring_settings language plpgsql security definer set search_path = '' as $$
+declare v_current public.scoring_settings; v_values public.scoring_settings;
+begin
+  if not public.is_league_commissioner(p_league_id) then raise exception 'Only the commissioner can update scoring settings'; end if;
+  select * into strict v_current from public.scoring_settings where league_id=p_league_id for update;
+  if p_expected_revision is null or v_current.revision <> p_expected_revision then raise exception 'These settings changed in another tab. Reload before saving.'; end if;
+  v_values := jsonb_populate_record(null::public.scoring_settings,p_values);
+  return public.update_scoring_categories(
+    p_league_id,
+    v_values.judges_score_category_enabled,
+    v_values.eliminations_category_enabled,
+    v_values.bonus_picks_category_enabled,
+    v_values.judges_score_category_weight,
+    v_values.eliminations_category_weight,
+    v_values.bonus_picks_category_weight,
+    v_values.judges_score_starts_week,
+    v_values.bonus_picks_scoring_method,
+    v_values.bonus_picks_distance_penalty,
+    v_values.bonus_picks_tier_size,
+    v_values.judges_score_multiplier,
+    v_values.survival_points,
+    v_values.first_place_points,
+    v_values.second_place_points,
+    v_values.third_place_points,
+    v_values.elimination_prediction_points,
+    v_values.top_scorer_prediction_points,
+    v_values.bonus_picks_points_per_correct,
+    v_values.fourth_place_points,
+    v_values.fifth_place_points,
+    v_values.bonus_picks_tier_pay_style,
+    v_values.curtain_call_near_miss_enabled);
+end;
+$$;
+revoke all on function public.update_scoring_categories_checked(uuid,bigint,jsonb) from public,anon;
+grant execute on function public.update_scoring_categories_checked(uuid,bigint,jsonb) to authenticated;
+
+revoke execute on function public.update_scoring_categories(uuid,boolean,boolean,boolean,numeric,numeric,numeric,int,text,numeric,int,numeric,numeric,numeric,numeric,numeric,numeric,numeric,numeric,numeric,numeric,text,boolean) from authenticated;
+
+create or replace function public.admin_backfill_prediction(
+  p_league_id uuid,p_week_id uuid,p_manager_id uuid,p_elimination uuid,p_elimination_2 uuid,p_top_scorer uuid,p_pick_made_at timestamptz,p_reason text
+) returns public.predictions language plpgsql security definer set search_path = '' as $$
+declare result public.predictions; week public.competition_weeks; couple uuid;
+begin
+  if not exists(select 1 from public.profiles where id=auth.uid() and is_super_admin) then raise exception 'Only a site admin can record a backfill'; end if;
+  if p_reason is null or length(btrim(p_reason)) < 5 or p_pick_made_at is null or p_pick_made_at > now() then raise exception 'Record when the pick was made and why it is being backfilled'; end if;
+  if not exists(select 1 from public.league_members where league_id=p_league_id and user_id=p_manager_id) then raise exception 'Manager is not in this league'; end if;
+  select * into strict week from public.competition_weeks where id=p_week_id;
+  foreach couple in array array[p_elimination,p_elimination_2,p_top_scorer] loop
+    if couple is not null and not exists(select 1 from public.couples where id=couple and season_id=week.season_id) then raise exception 'Couple is not in this season'; end if;
+  end loop;
+  if (not week.is_double_elimination_week and p_elimination_2 is not null)
+    or (week.is_double_elimination_week and ((p_elimination is null) <> (p_elimination_2 is null)))
+    or (p_elimination is not null and p_elimination=p_elimination_2) then raise exception 'Invalid elimination selections for this week'; end if;
+  insert into public.predictions(league_id,manager_id,week_id,predicted_eliminated_couple_id,predicted_eliminated_couple_id_2,predicted_top_scorer_couple_id,submitted_at,entered_by,entered_via,entry_reason,pick_made_at)
+  values(p_league_id,p_manager_id,p_week_id,p_elimination,p_elimination_2,p_top_scorer,now(),auth.uid(),'admin_backfill',btrim(p_reason),p_pick_made_at)
+  on conflict(league_id,manager_id,week_id) do update set predicted_eliminated_couple_id=excluded.predicted_eliminated_couple_id,predicted_eliminated_couple_id_2=excluded.predicted_eliminated_couple_id_2,predicted_top_scorer_couple_id=excluded.predicted_top_scorer_couple_id,submitted_at=excluded.submitted_at,entered_by=excluded.entered_by,entered_via=excluded.entered_via,entry_reason=excluded.entry_reason,pick_made_at=excluded.pick_made_at
+  returning * into result;
+  return result;
+end;
+$$;
+revoke all on function public.admin_backfill_prediction(uuid,uuid,uuid,uuid,uuid,uuid,timestamptz,text) from public,anon;
+grant execute on function public.admin_backfill_prediction(uuid,uuid,uuid,uuid,uuid,uuid,timestamptz,text) to authenticated;
+
+create or replace function public.assert_episode_draft_actor(p_episode_id uuid,p_actor_id uuid)
+returns void language plpgsql security invoker set search_path = '' as $$
+declare ep public.episodes; actor public.profiles;
+begin
+  select * into strict actor from public.profiles where id=p_actor_id;
+  if not (actor.is_super_admin or actor.can_propose_results) then raise exception 'Not authorized to enter results'; end if;
+  select * into strict ep from public.episodes where id=p_episode_id for update;
+  if ep.results_published_at is not null then
+    if not actor.is_super_admin then raise exception 'Only a site admin can correct published results'; end if;
+    if not exists(select 1 from public.draft_episode_overrides where episode_id=ep.id and correction_token is not null and correction_base_published_at=ep.results_published_at) then raise exception 'Reload this episode to begin a correction'; end if;
+  end if;
+end;
+$$;
+revoke all on function public.assert_episode_draft_actor(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.assert_episode_draft_actor(uuid,uuid) to service_role;
+
+create or replace function public.mutate_draft_moment(p_episode_id uuid,p_actor_id uuid,p_moment_id uuid,p_couple_id uuid,p_label text,p_remove boolean)
+returns uuid language plpgsql security invoker set search_path = '' as $$
+declare result uuid;
+begin
+  perform public.assert_episode_draft_actor(p_episode_id,p_actor_id);
+  if p_remove then
+    delete from public.draft_episode_custom_moments where id=p_moment_id and episode_id=p_episode_id returning id into result;
+    if result is null then raise exception 'That event is no longer in this episode'; end if;
+  else
+    if p_label is null or length(btrim(p_label))=0 then raise exception 'Event label is required'; end if;
+    if p_couple_id is not null and not exists(select 1 from public.couples c join public.episodes e on e.season_id=c.season_id where c.id=p_couple_id and e.id=p_episode_id) then raise exception 'Couple is not in this season'; end if;
+    insert into public.draft_episode_custom_moments(episode_id,couple_id,label,created_by) values(p_episode_id,p_couple_id,btrim(p_label),p_actor_id) returning id into result;
+  end if;
+  insert into public.draft_episode_overrides(episode_id,updated_by,guest_judge_name,judges_save_available)
+  select id,p_actor_id,guest_judge_name,judges_save_available from public.episodes where id=p_episode_id
+  on conflict(episode_id) do update set updated_at=now(),updated_by=p_actor_id;
+  return result;
+end;
+$$;
+revoke all on function public.mutate_draft_moment(uuid,uuid,uuid,uuid,text,boolean) from public,anon,authenticated;
+grant execute on function public.mutate_draft_moment(uuid,uuid,uuid,uuid,text,boolean) to service_role;
+
+create or replace function public.set_draft_couple_release(p_episode_id uuid,p_couple_id uuid,p_actor_id uuid,p_release boolean)
+returns void language plpgsql security invoker set search_path = '' as $$
+begin
+  perform public.assert_episode_draft_actor(p_episode_id,p_actor_id);
+  if exists(select 1 from public.episodes where id=p_episode_id and results_published_at is not null) then raise exception 'This episode is already published'; end if;
+  if p_release then
+    if exists(select 1 from public.dance_scores where episode_id=p_episode_id and couple_id=p_couple_id) then raise exception 'This couple is already live'; end if;
+    if not exists(select 1 from public.draft_dance_scores where episode_id=p_episode_id and couple_id=p_couple_id)
+      or exists(select 1 from public.draft_dance_scores d where d.episode_id=p_episode_id and d.couple_id=p_couple_id and not exists(select 1 from public.draft_judge_scores where draft_dance_score_id=d.id)) then raise exception 'Complete the saved judge scores before releasing'; end if;
+    insert into public.draft_couple_releases(episode_id,couple_id,released_by) values(p_episode_id,p_couple_id,p_actor_id)
+    on conflict(episode_id,couple_id) do update set released_at=now(),released_by=p_actor_id;
+  else delete from public.draft_couple_releases where episode_id=p_episode_id and couple_id=p_couple_id;
+  end if;
+end;
+$$;
+revoke all on function public.set_draft_couple_release(uuid,uuid,uuid,boolean) from public,anon,authenticated;
+grant execute on function public.set_draft_couple_release(uuid,uuid,uuid,boolean) to service_role;

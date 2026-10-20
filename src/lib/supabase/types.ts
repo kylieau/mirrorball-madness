@@ -473,6 +473,8 @@ export type Database = {
       }
       draft_episode_overrides: {
         Row: {
+          correction_base_published_at: string | null
+          correction_token: string | null
           episode_id: string
           guest_judge_name: string | null
           judges_save_available: boolean
@@ -480,6 +482,8 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          correction_base_published_at?: string | null
+          correction_token?: string | null
           episode_id: string
           guest_judge_name?: string | null
           judges_save_available?: boolean
@@ -487,6 +491,8 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          correction_base_published_at?: string | null
+          correction_token?: string | null
           episode_id?: string
           guest_judge_name?: string | null
           judges_save_available?: boolean
@@ -1135,6 +1141,7 @@ export type Database = {
       }
       league_members: {
         Row: {
+          co_manager_invite_expires_at: string | null
           co_manager_id: string | null
           co_manager_invite_code: string | null
           draft_autopilot: boolean
@@ -1146,6 +1153,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          co_manager_invite_expires_at?: string | null
           co_manager_id?: string | null
           co_manager_invite_code?: string | null
           draft_autopilot?: boolean
@@ -1157,6 +1165,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          co_manager_invite_expires_at?: string | null
           co_manager_id?: string | null
           co_manager_invite_code?: string | null
           draft_autopilot?: boolean
@@ -1285,6 +1294,11 @@ export type Database = {
       }
       predictions: {
         Row: {
+          entered_by: string | null
+          entered_via: string | null
+          entry_reason: string | null
+          pick_made_at: string | null
+
           id: string
           league_id: string
           manager_id: string
@@ -1295,6 +1309,11 @@ export type Database = {
           week_id: string
         }
         Insert: {
+          entered_by?: string | null
+          entered_via?: string | null
+          entry_reason?: string | null
+          pick_made_at?: string | null
+
           id?: string
           league_id: string
           manager_id: string
@@ -1305,6 +1324,11 @@ export type Database = {
           week_id: string
         }
         Update: {
+          entered_by?: string | null
+          entered_via?: string | null
+          entry_reason?: string | null
+          pick_made_at?: string | null
+
           id?: string
           league_id?: string
           manager_id?: string
@@ -1361,6 +1385,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          can_propose_results: boolean
           avatar_url: string | null
           created_at: string
           deletion_requested_at: string | null
@@ -1370,6 +1395,7 @@ export type Database = {
           spoiler_free_mode: boolean
         }
         Insert: {
+          can_propose_results?: boolean
           avatar_url?: string | null
           created_at?: string
           deletion_requested_at?: string | null
@@ -1379,6 +1405,7 @@ export type Database = {
           spoiler_free_mode?: boolean
         }
         Update: {
+          can_propose_results?: boolean
           avatar_url?: string | null
           created_at?: string
           deletion_requested_at?: string | null
@@ -1464,6 +1491,9 @@ export type Database = {
       }
       scoring_settings: {
         Row: {
+          revision: number
+          grand_finale_deadline_at: string | null
+          grand_finale_deadline_season_id: string | null
           bonus_picks_category_enabled: boolean
           bonus_picks_category_weight: number
           bonus_picks_distance_penalty: number | null
@@ -1492,6 +1522,9 @@ export type Database = {
           top_scorer_prediction_points: number
         }
         Insert: {
+          revision?: number
+          grand_finale_deadline_at?: string | null
+          grand_finale_deadline_season_id?: string | null
           bonus_picks_category_enabled?: boolean
           bonus_picks_category_weight?: number
           bonus_picks_distance_penalty?: number | null
@@ -1520,6 +1553,9 @@ export type Database = {
           top_scorer_prediction_points?: number
         }
         Update: {
+          revision?: number
+          grand_finale_deadline_at?: string | null
+          grand_finale_deadline_season_id?: string | null
           bonus_picks_category_enabled?: boolean
           bonus_picks_category_weight?: number
           bonus_picks_distance_penalty?: number | null
@@ -1753,6 +1789,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      mutate_draft_moment: { Args: { p_episode_id: string; p_actor_id: string; p_moment_id: string | null; p_couple_id: string | null; p_label: string | null; p_remove: boolean }; Returns: string }
+      set_draft_couple_release: { Args: { p_episode_id: string; p_couple_id: string; p_actor_id: string; p_release: boolean }; Returns: undefined }
+      admin_backfill_prediction: { Args: { p_league_id: string; p_week_id: string; p_manager_id: string; p_elimination: string | null; p_elimination_2: string | null; p_top_scorer: string | null; p_pick_made_at: string; p_reason: string }; Returns: Database["public"]["Tables"]["predictions"]["Row"] }
+      update_scoring_categories_checked: { Args: { p_league_id: string; p_expected_revision: number; p_values: Json }; Returns: Database["public"]["Tables"]["scoring_settings"]["Row"] }
+      commit_episode_reveal: { Args: { p_episode_id: string; p_couple_id: string; p_actor_id: string; p_snapshot: Json; p_plan: Json; p_undo: boolean }; Returns: undefined }
+      replace_weekly_scores: { Args: { p_episode_id: string; p_revision: string; p_rows: Json }; Returns: undefined }
+      save_episode_draft: { Args: { p_input: Json }; Returns: undefined }
+      seed_episode_correction: { Args: { p_episode_id: string; p_started_by: string }; Returns: string }
+      my_co_manager_invite_code: { Args: { p_league_id: string }; Returns: string | null }
+      set_results_contributor: { Args: { p_user_id: string; p_enabled: boolean }; Returns: undefined }
+
       active_season_id: { Args: never; Returns: string }
       approve_waiver_claim: {
         Args: { p_claim_id: string }

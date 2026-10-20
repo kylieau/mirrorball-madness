@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { ResultsForm } from "@/components/results-form";
 import { TopBar } from "@/components/top-bar";
-import { userIsAnyLeagueCommissioner } from "@/lib/results";
+import { userCanProposeResults } from "@/lib/results";
 import { loadResultsPageData } from "@/lib/results-page-data";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
@@ -32,7 +32,7 @@ export default async function EnterResultsPage({
 
   const accountSettingsData = await getAccountSettingsData(supabase, user.id);
   const canPropose =
-    accountSettingsData.isSuperAdmin || (await userIsAnyLeagueCommissioner(createAdminClient(), user.id));
+    accountSettingsData.isSuperAdmin || (await userCanProposeResults(createAdminClient(), user.id));
   if (!canPropose) {
     redirect("/admin/results");
   }
@@ -64,12 +64,12 @@ export default async function EnterResultsPage({
         allCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(data.allCouples))}
         judges={data.judges}
         danceStyles={data.danceStyles}
-        episodes={data.episodes}
+        episodes={data.episodes.filter((row) => accountSettingsData.isSuperAdmin || !row.results_published_at)}
         weeks={data.weeks}
         draftsByEpisode={data.draftsByEpisode}
         revealedByEpisode={data.revealedByEpisode}
         releasedCoupleIdsByEpisode={data.releasedCoupleIdsByEpisode}
-        forceSelectEpisodeId={episode ?? null}
+        forceSelectEpisodeId={data.episodes.some((row) => row.id === episode && (accountSettingsData.isSuperAdmin || !row.results_published_at)) ? episode : null}
         participantsByEpisode={data.participantsByEpisode}
         guestJudgesByEpisode={data.guestJudgesByEpisode}
       />

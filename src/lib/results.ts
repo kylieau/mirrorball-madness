@@ -1,3 +1,5 @@
+import type { PublicationSnapshot } from "./episode-publication";
+import type { Json } from "./supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { buildWeeklyScoreRows } from "@/lib/weekly-score-rows";
@@ -6,21 +8,14 @@ import { sortJudgesForDisplay } from "@/lib/couple-display";
 import { resolveGuestJudgeIds } from "@/lib/admin-people";
 import type { ScoringJudge } from "@/lib/scoring-judges";
 
-// The "propose" tier: a commissioner of any league can draft results, while
-// only is_super_admin can publish them. Not league-scoped like
-// is_league_commissioner — results entry is cross-league — but it matches the
-// same identity parity, so a co-manager of a commissioner's team qualifies too.
-export async function userIsAnyLeagueCommissioner(
-  admin: SupabaseClient<Database>,
-  userId: string
+// Global results entry is an explicit site-admin grant, independent of league creation.
+export async function userCanProposeResults(
+  admin: SupabaseClient<Database>, userId: string
 ): Promise<boolean> {
-  const { data } = await admin
-    .from("league_members")
-    .select("id")
-    .eq("role", "commissioner")
-    .or(`user_id.eq.${userId},co_manager_id.eq.${userId}`)
-    .limit(1);
-  return (data ?? []).length > 0;
+  const { data, error } = await admin.from("profiles")
+    .select("is_super_admin, can_propose_results").eq("id", userId).single();
+  if (error) throw new Error("Could not verify results-entry access.");
+  return !!data && (data.is_super_admin || data.can_propose_results);
 }
 
 // The three small managed lists: scoring judges, dance styles (with category),
@@ -214,89 +209,27 @@ export async function applyEpisodeSchedule(
   return { error: null };
 }
 
-export async function recomputeWeekForReveal(
-  admin: SupabaseClient<Database>,
-  episodeId: string
-): Promise<string | null> {
-  const { seasonId, error: seasonErr } = await getActiveSeasonId(admin);
-  if (seasonErr || !seasonId) return seasonErr;
-
-  const { data: episode, error: episodeErr } = await admin
-    .from("episodes")
-    .select("id, week_id")
-    .eq("id", episodeId)
-    .single();
-  if (episodeErr) return episodeErr.message;
-  if (!episode.week_id) return null;
-
-  const [{ data: week, error: weekErr }, { data: weekEpisodes, error: weekEpisodesErr }] = await Promise.all([
-    admin
-      .from("competition_weeks")
-      .select("id, week_number, is_double_elimination_week")
-      .eq("id", episode.week_id)
-      .single(),
-    admin.from("episodes").select("id").eq("week_id", episode.week_id),
-  ]);
-  if (weekErr) return weekErr.message;
-  if (weekEpisodesErr) return weekEpisodesErr.message;
-
-  return recomputeWeekScores(
-    admin,
-    seasonId,
-    week,
-    (weekEpisodes ?? []).map((row) => row.id),
-    [],
-    episode.id,
-    { reveal: true }
-  );
-}
-
-// Exported for retroactive recomputes from a script (a scoring-logic change
-// applied to already-published weeks); in-app callers are below.
+// Only fully published weeks may be recomputed; installation is atomic.
 export async function recomputeWeekScores(
-  admin: SupabaseClient<Database>,
-  seasonId: string,
-  week: {
-    id: string;
-    week_number: number;
-    is_double_elimination_week: boolean;
-  },
-  episodeIds: string[],
-  thisEpisodeOutcomeRows: { couple_id: string; outcome: string; bonus_points: number }[],
-  thisEpisodeId: string,
-  // Reveal mode: this episode's dance scores are posted but its outcomes are
-  // not, so only judges points move. Curtain Call and Grand Finale wait for
-  // the final publish.
-  { reveal = false }: { reveal?: boolean } = {}
+  admin: SupabaseClient<Database>, seasonId: string,
+  week: { id: string; week_number: number; is_double_elimination_week: boolean },
+  episodeIds: string[], thisEpisodeOutcomeRows: { couple_id: string; outcome: string; bonus_points: number }[],
+  thisEpisodeId: string
 ): Promise<string | null> {
-  const reads = await Promise.all([
-    admin.from("dance_scores").select("couple_id, total_score, scaled_score").in("episode_id", episodeIds),
-    admin.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
-    admin.from("couples").select("id, status, elimination_week").eq("season_id", seasonId),
-    admin.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", episodeIds),
-    admin.from("leagues").select("id"),
-    admin.from("scoring_settings").select("*"),
-    admin.from("roster_slots").select("league_id, manager_id, couple_id, start_week, end_week"),
-    admin.from("predictions").select("*").eq("week_id", week.id),
-    admin.from("grand_finale_late_unlocks").select("*"),
-    admin.from("grand_finale_predictions").select("*"),
-  ]);
-  for (const read of reads) if (read.error) return read.error.message;
-  const [dances, outcomes, couples, jeopardy, leagues, settings, rosters, predictions, lateUnlocks, grandFinalePredictions] = reads;
+  const { data, error } = await admin.rpc("episode_publication_snapshot", { p_episode_id: thisEpisodeId });
+  if (error) return error.message;
+  const snapshot = data as unknown as PublicationSnapshot;
+  if (snapshot.season?.id !== seasonId) return "The active season changed. Please try again.";
+  const ids = new Set(episodeIds);
   const rows = buildWeeklyScoreRows({
-    dances: dances.data ?? [], outcomes: outcomes.data ?? [], couples: couples.data ?? [],
-    jeopardy: jeopardy.data ?? [], leagues: leagues.data ?? [], settings: settings.data ?? [],
-    rosters: rosters.data ?? [], predictions: predictions.data ?? [],
-    lateUnlocks: lateUnlocks.data ?? [], grandFinalePredictions: grandFinalePredictions.data ?? [],
-  }, week, thisEpisodeId, thisEpisodeOutcomeRows, { reveal });
-  for (const league of leagues.data ?? []) {
-    const { error: deleteErr } = await admin.from("weekly_manager_scores").delete().eq("league_id", league.id).eq("week_id", week.id);
-    if (deleteErr) return deleteErr.message;
-    const leagueRows = rows.filter((r) => r.league_id === league.id);
-    if (leagueRows.length > 0) {
-      const { error } = await admin.from("weekly_manager_scores").insert(leagueRows);
-      if (error) return error.message;
-    }
-  }
-  return null;
+    episodes: snapshot.episodes,
+    dances: snapshot.dances.filter((row) => ids.has(row.episode_id)),
+    outcomes: snapshot.outcomes.filter((row) => ids.has(row.episode_id)),
+    jeopardy: snapshot.jeopardy.filter((row) => ids.has(row.episode_id)),
+    couples: snapshot.couples, leagues: snapshot.leagues, settings: snapshot.settings,
+    rosters: snapshot.rosters, predictions: snapshot.predictions,
+    lateUnlocks: snapshot.lateUnlocks, grandFinalePredictions: snapshot.grandFinalePredictions,
+  }, week, thisEpisodeId, thisEpisodeOutcomeRows);
+  const result = await admin.rpc("replace_weekly_scores", { p_episode_id: thisEpisodeId, p_revision: snapshot._revision!, p_rows: rows as unknown as Json });
+  return result.error?.message ?? null;
 }

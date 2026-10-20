@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   applyEpisodeSchedule,
-  userIsAnyLeagueCommissioner,
+  userCanProposeResults,
   type ScheduleEpisodeInput,
 } from "@/lib/results";
 import {
@@ -41,15 +41,14 @@ async function currentUser(): Promise<{ userId: string; isSuperAdmin: boolean } 
   return { userId: user.id, isSuperAdmin: profile?.is_super_admin ?? false };
 }
 
-// Propose tier: drafting results changes nothing live until Publish, so any
-// league's commissioner can do it. Publish itself stays admin-only below.
+// Trusted contributors can draft/release results; publication stays admin-only.
 async function requireProposeAccess(): Promise<{ error: string | null; userId: string }> {
   const user = await currentUser();
   if (!user) return { error: "Not authenticated", userId: "" };
   if (user.isSuperAdmin) return { error: null, userId: user.userId };
 
-  const isCommissioner = await userIsAnyLeagueCommissioner(createAdminClient(), user.userId);
-  if (!isCommissioner) return { error: "Not authorized", userId: "" };
+  const canPropose = await userCanProposeResults(createAdminClient(), user.userId);
+  if (!canPropose) return { error: "Not authorized", userId: "" };
   return { error: null, userId: user.userId };
 }
 
@@ -91,7 +90,7 @@ export async function addEpisodeCustomMoment(input: {
   episodeId: string;
   coupleId: string | null;
   label: string;
-}): Promise<{ error: string | null }> {
+}): Promise<{ error: string | null; id?: string }> {
   const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
@@ -100,20 +99,16 @@ export async function addEpisodeCustomMoment(input: {
   return result;
 }
 
-export async function removeEpisodeCustomMoment(momentId: string): Promise<{ error: string | null }> {
+export async function removeEpisodeCustomMoment(episodeId: string, momentId: string): Promise<{ error: string | null }> {
   const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
-  const result = await removeDraftCustomMoment(createAdminClient(), momentId);
+  const result = await removeDraftCustomMoment(createAdminClient(), episodeId, momentId, access.userId);
   if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
-// Propose tier, not admin-only: any commissioner can release/withdraw one
-// couple's draft at a time, since they're the ones live at the ET broadcast
-// entering scores. draft_couple_releases is season-wide (not scoped to their
-// own league) -- a deliberate tradeoff so no one has to wait on a site admin
-// to unlock a couple's dance for Spoiler-Free fans.
+// Trusted contributors can release a couple globally; official publication stays admin-only.
 export async function releaseDraftCoupleAction(episodeId: string, coupleId: string): Promise<{ error: string | null }> {
   const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
@@ -127,7 +122,7 @@ export async function withdrawDraftCoupleAction(episodeId: string, coupleId: str
   const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
-  const result = await withdrawDraftCouple(createAdminClient(), episodeId, coupleId);
+  const result = await withdrawDraftCouple(createAdminClient(), episodeId, coupleId, access.userId);
   if (!result.error) revalidatePath("/", "layout");
   return result;
 }
@@ -151,7 +146,7 @@ export async function revealCoupleScores(input: {
   const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
-  const result = await revealCouple(createAdminClient(), input);
+  const result = await revealCouple(createAdminClient(), input, access.userId);
   if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
@@ -163,13 +158,13 @@ export async function undoCoupleReveal(input: {
   const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
-  const result = await undoReveal(createAdminClient(), input);
+  const result = await undoReveal(createAdminClient(), input, access.userId);
   if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
 export async function startEpisodeCorrection(episodeId: string): Promise<{ error: string | null }> {
-  const access = await requireProposeAccess();
+  const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
   const result = await startCorrection(createAdminClient(), episodeId, access.userId);

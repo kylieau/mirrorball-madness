@@ -1,9 +1,9 @@
-import { summarizeDrafts } from "@/lib/results-view-data";
+import { summarizeDrafts, visibleResultsData } from "@/lib/results-view-data";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ResultsScreen } from "@/components/results-screen";
-import { userIsAnyLeagueCommissioner } from "@/lib/results";
+import { userCanProposeResults } from "@/lib/results";
 import { loadResultsPageData } from "@/lib/results-page-data";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
@@ -36,7 +36,7 @@ export default async function AdminResultsPage({
   // decides whether "Continue in Enter Results" shows; actions.ts re-checks.
   const canPropose =
     accountSettingsData.isSuperAdmin ||
-    (await userIsAnyLeagueCommissioner(createAdminClient(), user.id));
+    (await userCanProposeResults(createAdminClient(), user.id));
 
   const data = await loadResultsPageData(supabase, createAdminClient());
 
@@ -57,6 +57,13 @@ export default async function AdminResultsPage({
     completedWeeksDesc
   );
 
+  const visibleWeekIds = new Set(cutoff.allowedEpisodeIds);
+  // An explicit live opt-in also covers a partially published multi-night week.
+  for (const week of groupedWeeks) {
+    if (week.week_number <= (cutoff.lastWatchedWeek ?? 0)) visibleWeekIds.add(week.id);
+  }
+  const visible = visibleResultsData(data, visibleWeekIds);
+
   return (
     <ResultsScreen
       accountSettingsData={accountSettingsData}
@@ -68,18 +75,18 @@ export default async function AdminResultsPage({
       danceStyles={data.danceStyles}
       episodes={data.episodes}
       weeks={data.weeks}
-      danceScores={data.danceScores}
-      judgeScores={data.judgeScores}
-      episodeResults={data.episodeResults}
+      danceScores={visible.danceScores}
+      judgeScores={visible.judgeScores}
+      episodeResults={visible.episodeResults}
       draftSummariesByEpisode={summarizeDrafts(data.draftsByEpisode)}
       publishedByNames={data.publishedByNames}
       season={data.season}
       participantsByEpisode={data.participantsByEpisode}
       roundTypes={data.roundTypes}
       roundTypesByEpisode={data.roundTypesByEpisode}
-      inJeopardyByEpisode={data.inJeopardyByEpisode}
+      inJeopardyByEpisode={visible.inJeopardyByEpisode}
       spoilerFreeMode={accountSettingsData.spoilerFreeMode}
-      allowedWeekIds={[...cutoff.allowedEpisodeIds]}
+      allowedWeekIds={[...visibleWeekIds]}
     />
   );
 }

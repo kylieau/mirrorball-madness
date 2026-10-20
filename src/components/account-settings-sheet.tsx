@@ -52,6 +52,7 @@ export function AccountSettingsSheet({
   spoilerFreeMode,
   leagues,
   canProposeResults,
+  emailChangesEnabled = false,
   email,
 }: AccountSettingsData & { email: string }) {
   // League settings' Back/✕ returns to wherever this sheet was opened from.
@@ -129,7 +130,7 @@ export function AccountSettingsSheet({
                 <DialogHeader>
                   <DialogTitle>Account &amp; Data</DialogTitle>
                 </DialogHeader>
-                <AccountDataForm email={email} deletionRequestedAt={deletionRequestedAt} />
+                <AccountDataForm email={email} deletionRequestedAt={deletionRequestedAt} emailChangesEnabled={emailChangesEnabled} />
               </DialogContent>
             </Dialog>
           </SettingsSection>

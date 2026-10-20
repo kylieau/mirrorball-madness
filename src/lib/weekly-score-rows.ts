@@ -24,6 +24,7 @@ export type WeeklyScoreRow = Pick<
   | "total_points"
 >;
 export type WeekScoringData = {
+  episodes?: Pick<Row<"episodes">, "id" | "episode_number">[];
   dances: Pick<Row<"dance_scores">, "couple_id" | "total_score" | "scaled_score">[];
   outcomes: Pick<Row<"episode_results">, "episode_id" | "couple_id" | "outcome" | "bonus_points">[];
   couples: Pick<Row<"couples">, "id" | "status" | "elimination_week">[];
@@ -57,22 +58,26 @@ export function buildWeeklyScoreRows(
     scaledScore: Number(row.scaled_score),
   }));
   const otherOutcomes = (allOutcomes ?? []).filter((row) => row.episode_id !== thisEpisodeId);
-  const rawOutcomeRows = [
+  const orderedOutcomeRows = [
     ...otherOutcomes.map((row) => ({
+      episodeId: row.episode_id,
       coupleId: row.couple_id,
       outcome: row.outcome as Outcome,
       bonusPoints: Number(row.bonus_points),
     })),
     ...thisEpisodeOutcomeRows.map((row) => ({
+      episodeId: thisEpisodeId,
       coupleId: row.couple_id,
       outcome: row.outcome as Outcome,
       bonusPoints: row.bonus_points,
     })),
-  ];
+  ].sort((a, b) => (data.episodes?.find((episode) => episode.id === a.episodeId)?.episode_number ?? 0) -
+    (data.episodes?.find((episode) => episode.id === b.episodeId)?.episode_number ?? 0));
+  const rawOutcomeRows = orderedOutcomeRows.map(({ coupleId, outcome, bonusPoints }) => ({ coupleId, outcome, bonusPoints }));
 
-  const newlyResolvedCoupleIds = thisEpisodeOutcomeRows
+  const newlyResolvedCoupleIds = [...new Set(rawOutcomeRows
     .filter((r) => RESOLVING_OUTCOMES.has(r.outcome as Outcome))
-    .map((r) => r.couple_id);
+    .map((row) => row.coupleId))];
 
   // Fetched unconditionally (not just on a resolving week) because
   // couplesRemaining/totalCouples now feed Curtain Call's couples-remaining

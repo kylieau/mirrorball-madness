@@ -18,7 +18,8 @@ export function useDebouncedSave(delayMs = 500) {
       setSaveState("saving");
       window.clearTimeout(timeout.current);
       timeout.current = window.setTimeout(async () => {
-        setSaveState((await save()) ? "saved" : "idle");
+        try { setSaveState((await save()) ? "saved" : "idle"); }
+        catch { setSaveState("idle"); }
       }, delayMs);
     },
     [delayMs]

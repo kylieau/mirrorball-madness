@@ -53,28 +53,40 @@ export function LiveScoresSheet({
   const markEnabled = coast !== "east";
 
   async function handleChoice(action: () => Promise<{ error: string | null }>) {
-    setError(null);
-    setPending(true);
-    const result = await action();
-    setPending(false);
-    if (result.error) {
-      setError(result.error);
-      return;
+    try {
+      setError(null);
+      setPending(true);
+      const result = await action();
+      setPending(false);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      onOpenChange(false);
+      router.refresh();
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setPending(false);
     }
-    onOpenChange(false);
-    router.refresh();
   }
 
   async function handleSpoilerFree(checked: boolean) {
-    setSpoilerFree(checked);
-    setTogglePending(true);
-    const result = await setSpoilerFreeMode(checked);
-    if (result.error) {
-      setSpoilerFree(!checked);
-    } else {
-      router.refresh();
+    try {
+      setSpoilerFree(checked);
+      setTogglePending(true);
+      const result = await setSpoilerFreeMode(checked);
+      if (result.error) {
+        setSpoilerFree(!checked);
+      } else {
+        router.refresh();
+      }
+      setTogglePending(false);
+    } catch {
+      setSpoilerFree(!checked);setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setTogglePending(false);
     }
-    setTogglePending(false);
   }
 
   return (

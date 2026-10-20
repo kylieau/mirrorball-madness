@@ -37,7 +37,7 @@ export default async function AccountPage({
 
       <Card>
         <CardContent className="pt-6">
-          <AccountDataForm email={user.email ?? ""} deletionRequestedAt={profile?.deletion_requested_at ?? null} />
+          <AccountDataForm emailChangesEnabled={process.env.AUTH_EMAIL_ENABLED === "true"} email={user.email ?? ""} deletionRequestedAt={profile?.deletion_requested_at ?? null} />
         </CardContent>
       </Card>
     </div>

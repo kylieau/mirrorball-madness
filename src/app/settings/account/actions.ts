@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function updateEmail(email: string): Promise<{ error: string | null }> {
+  if (process.env.AUTH_EMAIL_ENABLED !== "true") return { error: "Email changes are temporarily unavailable." };
   const supabase = await createClient();
   const trimmed = email.trim();
   if (!trimmed) {
@@ -22,8 +23,8 @@ export async function updatePassword(
 ): Promise<{ error: string | null }> {
   const supabase = await createClient();
 
-  if (!password || password.length < 6) {
-    return { error: "Password must be at least 6 characters" };
+  if (!password || password.length < 8) {
+    return { error: "Password must be at least 8 characters" };
   }
   if (password !== confirmPassword) {
     return { error: "Passwords don't match" };

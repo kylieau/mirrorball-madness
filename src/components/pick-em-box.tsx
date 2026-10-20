@@ -83,6 +83,7 @@ export function PickEmBox({
   totalCouples,
   eliminationPredictionPoints,
   topScorerPredictionPoints,
+  categoryWeight = 1,
   nearMissEnabled = true,
   coupleDisplayNames,
   existingPrediction,
@@ -101,6 +102,7 @@ export function PickEmBox({
   totalCouples: number;
   eliminationPredictionPoints: number;
   topScorerPredictionPoints: number;
+  categoryWeight?: number;
   nearMissEnabled?: boolean;
   coupleDisplayNames: Record<string, CoupleNameParts>;
   existingPrediction: {
@@ -123,6 +125,7 @@ export function PickEmBox({
   const [topScorerId, setTopScorerId] = useState(
     existingPrediction?.predicted_top_scorer_couple_id ?? ""
   );
+  const [savedPick, setSavedPick] = useState(existingPrediction);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Starts in read-only "here's what you picked" mode whenever a pick
@@ -173,21 +176,39 @@ export function PickEmBox({
     setError(null);
     setOtherResults([]);
     setSubmitting(true);
-    const results = await submitPredictionToLeagues(
-      [leagueId, ...alsoSaveTo],
-      episode.id,
-      eliminatedId || null,
-      isDoubleElimination ? eliminatedId2 || null : null,
-      topScorerId || null
-    );
-    const own = results.find((r) => r.leagueId === leagueId);
-    if (own?.error) setError(own.error);
-    else setEditing(false);
-    setOtherResults(results.filter((r) => r.leagueId !== leagueId));
-    setSubmitting(false);
+    try {
+      const results = await submitPredictionToLeagues(
+        [leagueId, ...alsoSaveTo], episode.id,
+        eliminatedId || null, isDoubleElimination ? eliminatedId2 || null : null, topScorerId || null
+      );
+      const own = results.find((result) => result.leagueId === leagueId);
+      if (!own || own.error) setError(own?.error ?? "Could not confirm your save. Please try again.");
+      else {
+        setSavedPick({
+          predicted_eliminated_couple_id: eliminatedId || null,
+          predicted_eliminated_couple_id_2: isDoubleElimination ? eliminatedId2 || null : null,
+          predicted_top_scorer_couple_id: topScorerId || null,
+        });
+        setEditing(false);
+      }
+      setOtherResults(results.filter((result) => result.leagueId !== leagueId));
+    } catch {
+      setError("Could not confirm your save. Your choices are still here; please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  const hasSavedPick = !!eliminatedId || !!eliminatedId2 || !!topScorerId;
+  function cancelEditing() {
+    setEliminatedId(savedPick?.predicted_eliminated_couple_id ?? "");
+    setEliminatedId2(savedPick?.predicted_eliminated_couple_id_2 ?? "");
+    setTopScorerId(savedPick?.predicted_top_scorer_couple_id ?? "");
+    setFilledFrom(null);
+    setError(null);
+    setEditing(false);
+  }
+
+  const hasSavedPick = !!savedPick && Object.values(savedPick).some(Boolean);
   const lockLine = isLocked
     ? "Predictions are locked for this week."
     : lockAt && formattedLockAt
@@ -220,6 +241,7 @@ export function PickEmBox({
   return (
     <div className="flex flex-col gap-4">
         {lockLine && <p className="text-sm text-muted-foreground">{lockLine}</p>}
+        {categoryWeight !== 1 && !isLocked && <p className="text-xs text-muted-foreground">Previews show module points before your league’s × {categoryWeight} weight.</p>}
         {isDoubleElimination && !isLocked && (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-text">
             ⚡ Double Elimination — two couples go home tonight, call &apos;em both.
@@ -289,7 +311,7 @@ export function PickEmBox({
                   {submitting ? "Saving…" : "Save Prediction"}
                 </Button>
                 {hasSavedPick && (
-                  <Button variant="outline" onClick={() => setEditing(false)} disabled={submitting}>
+                  <Button variant="outline" onClick={cancelEditing} disabled={submitting}>
                     Cancel
                   </Button>
                 )}
@@ -312,12 +334,12 @@ export function PickEmBox({
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Eliminated</span>
                   <span className="font-medium">
-                    {eliminatedId && eliminatedId2 ? (
+                    {savedPick?.predicted_eliminated_couple_id && savedPick?.predicted_eliminated_couple_id_2 ? (
                       <>
-                        {nameFor(eliminatedId)} & {nameFor(eliminatedId2)}
+                        {nameFor(savedPick?.predicted_eliminated_couple_id)} & {nameFor(savedPick?.predicted_eliminated_couple_id_2)}
                       </>
-                    ) : eliminatedId ? (
-                      nameFor(eliminatedId)
+                    ) : savedPick?.predicted_eliminated_couple_id ? (
+                      nameFor(savedPick?.predicted_eliminated_couple_id)
                     ) : (
                       "No Pick"
                     )}
@@ -325,7 +347,7 @@ export function PickEmBox({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Top Scorer</span>
-                  <span className="font-medium">{topScorerId ? nameFor(topScorerId) : "No Pick"}</span>
+                  <span className="font-medium">{savedPick?.predicted_top_scorer_couple_id ? nameFor(savedPick?.predicted_top_scorer_couple_id) : "No Pick"}</span>
                 </div>
               </div>
             </div>
@@ -337,12 +359,12 @@ export function PickEmBox({
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Eliminated</span>
               <span className="font-medium">
-                {eliminatedId && eliminatedId2 ? (
+                {savedPick?.predicted_eliminated_couple_id && savedPick?.predicted_eliminated_couple_id_2 ? (
                   <>
-                    {nameFor(eliminatedId)} & {nameFor(eliminatedId2)}
+                    {nameFor(savedPick?.predicted_eliminated_couple_id)} & {nameFor(savedPick?.predicted_eliminated_couple_id_2)}
                   </>
-                ) : eliminatedId ? (
-                  nameFor(eliminatedId)
+                ) : savedPick?.predicted_eliminated_couple_id ? (
+                  nameFor(savedPick?.predicted_eliminated_couple_id)
                 ) : (
                   "No Pick"
                 )}
@@ -350,7 +372,7 @@ export function PickEmBox({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Top Scorer</span>
-              <span className="font-medium">{topScorerId ? nameFor(topScorerId) : "No Pick"}</span>
+              <span className="font-medium">{savedPick?.predicted_top_scorer_couple_id ? nameFor(savedPick?.predicted_top_scorer_couple_id) : "No Pick"}</span>
             </div>
           </div>
         )}

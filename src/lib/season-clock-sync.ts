@@ -1,3 +1,4 @@
+import type { Json } from "./supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { shouldShowAnchorSyncControl } from "@/lib/season-clock";
@@ -8,7 +9,7 @@ import { shouldShowAnchorSyncControl } from "@/lib/season-clock";
 export async function syncSeasonClockAnchor(
   supabase: SupabaseClient<Database>,
   leagueId: string
-): Promise<{ error: string | null; anchorWeek: number | null }> {
+): Promise<{ error: string | null; anchorWeek: number | null; revision?: number }> {
   const { data: lockWeek, error: lockError } = await supabase.rpc("effective_hard_deadline_week", {
     p_league_id: leagueId,
   });
@@ -30,7 +31,7 @@ export async function syncSeasonClockAnchor(
     return { error: null, anchorWeek: settings.judges_score_starts_week };
   }
 
-  const { error } = await supabase.rpc("update_scoring_categories", {
+  const values = {
     p_league_id: leagueId,
     p_judges_score_category_enabled: settings.judges_score_category_enabled,
     p_eliminations_category_enabled: settings.eliminations_category_enabled,
@@ -54,7 +55,11 @@ export async function syncSeasonClockAnchor(
     p_bonus_picks_points_per_correct: settings.bonus_picks_points_per_correct,
     p_bonus_picks_tier_pay_style: settings.bonus_picks_tier_pay_style,
     p_curtain_call_near_miss_enabled: settings.curtain_call_near_miss_enabled,
+  };
+  const { data, error } = await supabase.rpc("update_scoring_categories_checked", {
+    p_league_id: leagueId, p_expected_revision: settings.revision,
+    p_values: Object.fromEntries(Object.entries(values).filter(([key]) => key !== "p_league_id").map(([key,value]) => [key.slice(2),value])) as Json,
   });
   if (error) return { error: error.message, anchorWeek: null };
-  return { error: null, anchorWeek: lockWeek };
+  return { error: null, anchorWeek: lockWeek, revision: data?.revision };
 }

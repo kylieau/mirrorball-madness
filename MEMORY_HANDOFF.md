@@ -1,4 +1,51 @@
-# Session Handoff
+# Session Handoff — remediation, 2026-10-20
+
+## Current state and authorization
+
+Kylie approved the recommendations after `682afc7` (“let's go with all your
+recommendations”). This supersedes the older wait-for-selection instructions
+below. Work is on `audit-remediation-20261020`, locally only.
+
+- `ce6fc3d` isolates SEC-3/BE-2: viewer draft summaries and fail-closed spoiler
+  preferences. Also available as local branch `audit-spoiler-protection`.
+- Broader changes implement transactional draft/correction/reveal writes,
+  explicit results contributors, invitation privacy/expiry, deadline preservation,
+  settings concurrency, prediction provenance, multi-night scoring fixes,
+  prediction cancellation/retry, editor navigation, auth continuation and recovery.
+- See `docs/audit-remediation.md` for coverage/limits and
+  `docs/audit-release-runbook.md` for activation. Four SQL files are prepared;
+  **none applied live**. Deploy the broad changes only after their migrations,
+  outside E07 live scoring. Regenerate the prepared Supabase types afterward.
+- Auth redirect allow-list hardening was applied and verified. Custom SMTP is
+  absent; owner answered “idk”. Email sends/changes remain gated off.
+- No historical picks, standings, or correction drafts were modified live.
+  Backfill provenance still requires owner confirmation. Never run recompute
+  as part of this rollout. West-coast policy and scoring exemptions remain.
+- No DB URL/password or pg_dump: backup tooling and restore procedure prepared,
+  but no backup, restore rehearsal or scheduled job completed.
+- A push of only `ce6fc3d` to `origin/main` was rejected by automatic approval
+  review because it may deploy production. **No push or deployment occurred.**
+  Exact push approval remains pending. Remote is
+  `https://github.com/kylieau/mirrorball-madness.git`; main remains `682afc7`.
+
+## Verification and outstanding checks
+
+App lint (excluding pre-existing `.codex-private` tool backups), TypeScript and
+642 tests across 59 files passed. Both SEC-3/BE-2 and the full remediation
+production builds passed in isolated worktrees with synthetic credentials and
+one worker. Chromium component coverage and its limits are recorded in
+`docs/audit-remediation.md`.
+Browser checks use mocked actions and synthetic data: they do not establish
+live SMTP, Realtime, native iOS, cross-device sync or a staging migration.
+No real users were contacted or created. Production activation requires the
+runbook's backup, staging smoke checks and explicit contributor approvals.
+
+Unrelated devcontainer, .gitignore, iOS project and one-off query SQL edits
+listed in the prior handoff remain untouched and unstaged.
+
+---
+
+# Previous session record (historical; superseded where noted)
 
 ## 1. Current State
 **The full read-only audit is done, committed and pushed. Nothing from it has been fixed: Kylie decides first.** Branch `main`, in sync with `origin/main` after this sync commit.

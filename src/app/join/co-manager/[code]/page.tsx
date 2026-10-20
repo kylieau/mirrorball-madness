@@ -20,9 +20,9 @@ export default async function JoinAsCoManagerPage({
 
   // Only shown once signed in — this schema never grants anon anything, so a
   // signed-out visitor sees the generic copy below until they sign up/in.
-  const { data: inviteInfo } = user
+  const { data: inviteInfo, error: inviteError } = user
     ? await supabase.rpc("get_co_manager_invite_info", { p_code: inviteCode }).maybeSingle()
-    : { data: null };
+    : { data: null, error: null };
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6 px-4 py-24">
@@ -47,7 +47,9 @@ export default async function JoinAsCoManagerPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {user ? (
+          {user && (inviteError || !inviteInfo) ? (
+            <p role="alert" className="text-sm text-danger-text">{inviteError ? "Could not check this invitation. Reload and try again." : "This invitation is invalid or expired. Ask the team manager for a new link."}</p>
+          ) : user ? (
             <form action={joinAsCoManager}>
               <input type="hidden" name="inviteCode" value={inviteCode} />
               <Button type="submit" className="w-full">

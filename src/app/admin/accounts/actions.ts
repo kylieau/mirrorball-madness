@@ -37,3 +37,12 @@ export async function clearPendingAccountDeletion(
   }
   return result;
 }
+
+export async function setResultsContributor(userId: string, enabled: boolean): Promise<{ error: string | null }> {
+  const access = await requireSuperAdmin();
+  if (access.error) return access;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_results_contributor", { p_user_id: userId, p_enabled: enabled });
+  if (!error) revalidatePath("/", "layout");
+  return { error: error?.message ?? null };
+}

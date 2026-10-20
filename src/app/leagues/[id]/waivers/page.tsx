@@ -202,7 +202,7 @@ export default async function WaiversPage({
       pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
       availableCouples={availableCouples}
       coupleDisplayNames={Object.fromEntries(displayNames)}
-      claims={(claims ?? []).map((c) => ({
+      claims={(claims ?? []).filter((claim) => cutoffWeek !== null && claim.week_number <= cutoffWeek).map((c) => ({
         id: c.id,
         managerName: c.profiles?.display_name ?? "Unknown",
         coupleName: c.couples

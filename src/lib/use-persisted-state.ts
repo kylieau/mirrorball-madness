@@ -1,40 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { APP } from "@/config/app";
 
-// First use of localStorage in this repo — a per-viewer UI convenience
-// (collapse/expand state), never data anyone else needs to see. SSR-safe:
-// both the server render and the client's first paint use defaultValue, and
-// an effect adopts whatever's stored after mount (same hydration-safety
-// convention as useFormattedDeadline for viewer-timezone formatting). The
-// third element flips once the stored value has been adopted, for callers that
-// must not act on the default (e.g. auto-opening a sheet).
-// Keys are prefixed with the app slug so they can't collide with anything else
-// stored on the same origin (e.g. a dev server or another app on localhost).
-export function usePersistedState<T>(name: string, defaultValue: T): [T, (v: T) => void, boolean] {
+// A keyed value never borrows another key's state or writes it into storage.
+// SSR and the first browser render both use the supplied default.
+export function usePersistedState<T>(name: string, defaultValue: T): [T, (value: T) => void, boolean] {
   const key = `${APP.slug}:${name}`;
-  const [value, setValue] = useState(defaultValue);
-  const [hydrated, setHydrated] = useState(false);
-
+  const fallback = useRef(defaultValue);
+  fallback.current = defaultValue;
+  const [stored, setStored] = useState<{ key: string | null; value: T }>({ key: null, value: defaultValue });
   useEffect(() => {
+    let value = fallback.current;
     try {
       const raw = localStorage.getItem(key);
-      if (raw !== null) setValue(JSON.parse(raw) as T);
+      if (raw !== null) value = JSON.parse(raw) as T;
     } catch {
-      // ignore malformed/unavailable storage
+      // Unavailable or malformed storage uses this key's default.
     }
-    setHydrated(true);
+    setStored({ key, value });
   }, [key]);
-
-  useEffect(() => {
-    if (!hydrated) return;
+  const setValue = useCallback((value: T) => {
+    setStored({ key, value });
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {
-      // ignore quota/unavailable storage
+      // UI state remains usable without persistent storage.
     }
-  }, [key, value, hydrated]);
-
-  return [value, setValue, hydrated];
+  }, [key]);
+  return [stored.key === key ? stored.value : defaultValue, setValue, stored.key === key];
 }

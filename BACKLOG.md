@@ -2,45 +2,40 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
-## Open decisions from the full audit — 2026-10-20
+## Audit remediation — 2026-10-20
 
-Reports: `docs/audit-summary.md` (ranked) plus `docs/security-audit.md`, `docs/data-integrity-audit.md`, `docs/backend-audit.md`, `docs/operations-audit.md` and `docs/frontend-audit.md`, committed in `150630f`. Nothing has been fixed yet. Kylie said not to fix anything until she has decided.
+The owner approved the recommended fixes after `682afc7`. Local implementation
+and evidence: `docs/audit-remediation.md`. Release prerequisites and remaining
+manual checks: `docs/audit-release-runbook.md`. This replaces the previous
+wait-for-selection list; it does not mean every audit finding was implemented.
 
-**Waiting on Kylie:**
-- **The GitHub repo `kylieau/mirrorball-madness` is public**, so the reports, with their working reproductions, are public too. Make it private? This is her call; don't change repo settings without her.
-- **Before E07 (Tue 20 Oct, 8 PM ET), these are hers to do, no deploy needed:**
-  - Remove `https://*.vercel.app/auth/callback` and the dead `dwts-fantasy-app-six` / `dwts-fantasy-app-kylie8` hosts from the Supabase redirect allow-list (SEC-1).
-  - Take a manual DB dump (OPS-4: Free plan, no backups).
-  - Close, or knowingly keep, the two open late Grand Finale unlocks (DATA-2): a submit after the East broadcast and before publish gets paid.
-  - Don't change Air Time, Pick 'Em Lock or the Anchor Week mid-week (SEC-4, DATA-3).
-- **Deploy before the show?** Offered as one small deploy, not started without a yes:
-  - SEC-3: Scores and Schedule ship full drafts to any signed-in user.
-  - BE-2: Spoiler-Free fails open on a failed profile read.
-- **Confirm the post-lock Curtain Call rows (DATA-8)** were intended backfills: manager d40ab813 weeks 2–3 in all four leagues, and 665d63d3 week 3 in 8afa3b4f.
-- **Settled-decision conflicts, hers to rule on:**
-  - SEC-20/BE-25: propose tier is self-service through `create_league`.
-  - BE-26: a stale correction draft is installed wholesale.
-  - SEC-21/DATA-17/BE-27: the West lock stays open after East shows the elimination.
-  - FE-27: the Couples Leaderboard owner can reveal an unwatched recast.
-- **Order of fixes after E07:** the summary's "Soon after" list: SEC-2, DATA-1, SEC-4/DATA-3, FE-1, OPS-3 (needs SMTP), BE-3, FE-3, backups.
-- **Review gate:** `/codex:setup --enable-review-gate` isn't installed here. A Claude Code hook (for example lint/tests on Stop) was offered; she hasn't picked one.
+Still outstanding:
+- Approve the independent spoiler patch `ce6fc3d` push to main. Nothing pushed.
+- Take and restore-test a private backup; provide a DB URL and PostgreSQL client
+  on a trusted machine and schedule recurring backups.
+- Outside live scoring, stage/review the four prepared SQL scripts, regenerate
+  types, deploy the broad remediation and approve global results contributors.
+- Configure custom SMTP before enabling confirmation/recovery/email changes.
+  No emails sent. Existing account ownership needs factual review, not resets.
+- Confirm intended historical backfills (DATA-8); no deletion/recompute authorized.
+- Review public repository visibility and install a review gate if desired;
+  neither repository visibility nor personal tooling settings changed here.
+- Physical iOS, live Realtime, cross-device auth and staging migration smoke tests.
+- West-coast policy, current scoring exemptions and historical corrections remain
+  intentional; broader ownership-history UX questions remain deferred.
 
 ## UX audit follow-ups — 2026-10-18
 
 Full findings and fix status: `docs/ux-audit.md` (Status section at the top). Shipped and deployed through `d4f20d0`.
 
 **Still open:**
-- **Forgot password (A1):** blocked on email delivery. The project has no custom SMTP: the built-in mailer allows 2 emails/hour, only to team addresses (checked via the Management API auth config, 2026-10-17). Before building, Kylie connects an SMTP provider (e.g. Resend) in the Supabase dashboard.
-  - Build it as `resetPasswordForEmail` plus a `token_hash` + `verifyOtp` confirm route.
-  - The recovery email template needs `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`. The `?code=` callback only works if the same browser requests the reset and opens the link, which fails for iOS-app or Gmail in-app-browser resets.
-  - Test with `admin.generateLink({ type: "recovery" })`.
-- **Keep typed values after a failed sign-in/sign-up (rest of A2):** switch `signIn`/`signUp` to `useActionState` returning errors instead of redirecting to `?error=`. Ship it as its own deploy after the E07 live night, and test with throwaway accounts:
-  - wrong password keeps the email;
-  - success lands on Home;
-  - duplicate-email sign-up shows its error;
-  - `?next=/join/CODE` still lands on the join page.
-
-  Google/native/callback errors still use `?error=`.
+- **Email recovery/ownership (A1):** confirmation-aware signup, token-hash recovery,
+  disabled email-change UI and retained auth form values are implemented locally.
+  Delivery remains disabled without custom SMTP. Use the audit release runbook's
+  templates and controlled-account checks before activation.
+- **Auth retry/continuation (A2):** local controlled forms retain email/name and
+  invitation continuation after errors; browser checks use mocked actions.
+  Google/native callbacks still require live-account and physical-device checks.
 - **Phone checks:**
   - Enter Results' per-couple row now uses standard-size buttons. Only a super admin sees Publish, so Kylie should look at it.
   - The auto-opened Scores Are Going Live sheet shows a focus ring on the title's ⓘ (headless only?).

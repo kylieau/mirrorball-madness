@@ -4,46 +4,31 @@ import { useEffect, useRef } from "react";
 import { makeAutoDraftPick } from "@/app/leagues/[id]/draft/actions";
 import { autoPickTrigger, isBenignAutoPickError } from "@/lib/draft";
 
-const AUTOPILOT_CHAIN_DELAY_MS = 1000;
-
-export function useAutoDraftPick({
-  leagueId,
-  draftStatus,
-  clockExpired,
-  onTheClockAutopilot,
-  onError,
-}: {
-  leagueId: string;
-  draftStatus: string;
-  clockExpired: boolean;
-  onTheClockAutopilot: boolean;
-  onError?: (message: string) => void;
+export function useAutoDraftPick({ leagueId, draftStatus, clockExpired, onTheClockAutopilot, turnKey, onError }: {
+  leagueId: string; draftStatus: string; clockExpired: boolean; onTheClockAutopilot: boolean;
+  turnKey: string | null; onError?: (message: string) => void;
 }) {
-  const inFlight = useRef(false);
+  const inFlight = useRef<Promise<void> | null>(null);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
-
   useEffect(() => {
-    const trigger = autoPickTrigger({
-      draftStatus,
-      clockExpired,
-      onTheClockAutopilot,
-    });
-    if (!trigger || inFlight.current) return;
-
-    // One visible pick per trigger. Autopilot chains get a beat so the log
-    // doesn't drain in a blur; timeout never chains — the next clock starts fresh.
-    const delay = trigger === "autopilot" ? AUTOPILOT_CHAIN_DELAY_MS : 0;
-    const timeoutId = window.setTimeout(() => {
-      inFlight.current = true;
-      void makeAutoDraftPick(leagueId).then(({ error }) => {
-        inFlight.current = false;
-        if (error && !isBenignAutoPickError(error)) {
-          onErrorRef.current?.(error);
-        }
-      });
-    }, delay);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [leagueId, draftStatus, clockExpired, onTheClockAutopilot]);
+    const trigger = autoPickTrigger({ draftStatus, clockExpired, onTheClockAutopilot });
+    if (!trigger) return;
+    let canceled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // A new turn can arrive before the previous request finishes. Wait for it
+    // rather than silently dropping that turn's autopilot trigger.
+    void (async () => {
+      await inFlight.current;
+      if (canceled) return;
+      timer = setTimeout(() => {
+        const request = makeAutoDraftPick(leagueId).then(({ error }) => {
+          if (error && !isBenignAutoPickError(error)) onErrorRef.current?.(error);
+        }).catch(() => onErrorRef.current?.("Could not confirm the automatic pick. Please refresh and try again."))
+          .finally(() => { if (inFlight.current === request) inFlight.current = null; });
+        inFlight.current = request;
+      }, trigger === "autopilot" ? 1000 : 0);
+    })();
+    return () => { canceled = true; clearTimeout(timer); };
+  }, [leagueId, draftStatus, clockExpired, onTheClockAutopilot, turnKey]);
 }

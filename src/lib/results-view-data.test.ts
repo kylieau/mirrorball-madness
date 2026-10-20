@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarizeDrafts } from "./results-view-data";
+import { summarizeDrafts, visibleResultsData } from "./results-view-data";
 import type { DraftState } from "./results-draft";
 
 describe("viewer result payloads", () => {
@@ -14,5 +14,18 @@ describe("viewer result payloads", () => {
     expect(JSON.stringify(summarizeDrafts({ episode: draft }))).not.toMatch(/Secret|eliminated|judgeScores|Unreleased/);
   });
 
-
+  it("removes hidden outcomes, scores, judge rows and jeopardy while retaining exhibitions", () => {
+    const data = {
+      episodes: [{ id: "seen", week_id: "w1" }, { id: "hidden", week_id: "w2" }, { id: "exhibition", week_id: null }],
+      danceScores: ["seen", "hidden", "exhibition"].map((id) => ({ id, episode_id: id })),
+      judgeScores: ["seen", "hidden", "exhibition"].map((id) => ({ dance_score_id: id })),
+      episodeResults: ["seen", "hidden"].map((id) => ({ episode_id: id })),
+      inJeopardyByEpisode: { seen: ["a"], hidden: ["b"] },
+    } as unknown as Parameters<typeof visibleResultsData>[0];
+    const result = visibleResultsData(data, new Set(["w1"]));
+    expect(result.danceScores.map((row) => row.id)).toEqual(["seen", "exhibition"]);
+    expect(result.judgeScores.map((row) => row.dance_score_id)).toEqual(["seen", "exhibition"]);
+    expect(result.episodeResults.map((row) => row.episode_id)).toEqual(["seen"]);
+    expect(result.inJeopardyByEpisode).toEqual({ seen: ["a"] });
+  });
 });

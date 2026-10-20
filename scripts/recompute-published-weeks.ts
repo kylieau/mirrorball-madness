@@ -8,7 +8,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../src/lib/supabase/types";
 import { recomputeWeekScores } from "../src/lib/results";
-import { RESOLVING_OUTCOMES, type Outcome } from "../src/lib/scoring";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -78,11 +77,7 @@ async function main() {
       .in("episode_id", episodeIds);
     if (outcomesErr) throw new Error(outcomesErr.message);
 
-    // Mirror a re-publish: the episode whose rows carry the week's resolving
-    // outcomes is "this" episode, so Grand Finale credits recompute exactly as
-    // the real publish computed them. Fall back to the week's last episode.
-    const resolvingEpisodeId = (outcomeRows ?? []).find((r) => RESOLVING_OUTCOMES.has(r.outcome as Outcome))?.episode_id;
-    const thisEpisodeId = resolvingEpisodeId ?? episodeIds[episodeIds.length - 1];
+    const thisEpisodeId = episodeIds[episodeIds.length - 1];
     const thisEpisodeOutcomeRows = (outcomeRows ?? [])
       .filter((r) => r.episode_id === thisEpisodeId)
       .map((r) => ({ couple_id: r.couple_id, outcome: r.outcome, bonus_points: Number(r.bonus_points) }));

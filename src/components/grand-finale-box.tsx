@@ -57,6 +57,7 @@ export function GrandFinaleBox({
   otherLeagues,
   scoring,
   leagueGrandFinale,
+  categoryWeight = 1,
 }: {
   leagueId: string;
   couples: GrandFinaleCouple[];
@@ -70,7 +71,10 @@ export function GrandFinaleBox({
   otherLeagues: GrandFinaleDestination[];
   scoring: GrandFinaleScoring;
   leagueGrandFinale: LeagueGrandFinalePrediction[];
+  categoryWeight?: number;
 }) {
+  const previewNote = (categoryWeight !== 1 || (lateEntry?.factor ?? 1) !== 1) ?
+    <p className="text-xs text-muted-foreground">Point labels show module points before the league’s × {categoryWeight} weight{lateEntry ? ` and your × ${lateEntry.factor} late-entry adjustment` : ""}.</p> : null;
   const alphabeticalCouples = [...couples].sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
   const totalCouples = couples.length;
 
@@ -108,6 +112,12 @@ export function GrandFinaleBox({
     return coupleNameNode(
       coupleDisplayNames[coupleId] ?? { celebrity: c?.celebrity_name ?? "Unknown", pro: c?.pro_name ?? "Unknown" }
     );
+  }
+
+  function nameTextFor(coupleId: string) {
+    const couple = coupleById.get(coupleId);
+    const parts = coupleDisplayNames[coupleId] ?? { celebrity: couple?.celebrity_name ?? "Unknown", pro: couple?.pro_name ?? "Unknown" };
+    return `${parts.celebrity} & ${parts.pro}`;
   }
 
   // Only offer a league whose ranking fits this season's cast, so a pre-fill
@@ -153,15 +163,20 @@ export function GrandFinaleBox({
     setError(null);
     setOtherResults([]);
     setSubmitting(true);
-    const results = await submitGrandFinalePredictionToLeagues([leagueId, ...alsoSaveTo], order);
-    const own = results.find((r) => r.leagueId === leagueId);
-    if (own?.error) setError(own.error);
-    else {
-      setReviewing(true);
-      if (lateEntry && !isLocked) setSubmittedLate(true);
+    try {
+      const results = await submitGrandFinalePredictionToLeagues([leagueId, ...alsoSaveTo], order);
+      const own = results.find((result) => result.leagueId === leagueId);
+      if (!own || own.error) setError(own?.error ?? "Could not confirm your save. Please try again.");
+      else {
+        setReviewing(true);
+        if (lateEntry && !isLocked) setSubmittedLate(true);
+      }
+      setOtherResults(results.filter((result) => result.leagueId !== leagueId));
+    } catch {
+      setError("Could not confirm your save. Your order is still here; please try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setOtherResults(results.filter((r) => r.leagueId !== leagueId));
-    setSubmitting(false);
   }
 
   // Shared read-only treatment for both "locked" and "saved, still
@@ -197,6 +212,7 @@ export function GrandFinaleBox({
         </CardHeader>
         <CardContent className="flex flex-col gap-1 text-sm">
           {lateEntry && <LateEntryBanner factor={lateEntry.factor} />}
+          {previewNote}
           <OtherLeagueSaveSummary results={otherResults} destinations={otherLeagues} />
           {isCollapsed && !highlightId ? (
             <p className="text-muted-foreground">Nothing left to predict — your bracket&apos;s fully resolved.</p>
@@ -294,6 +310,7 @@ export function GrandFinaleBox({
         <CardContent className="flex flex-col gap-4">
           {lateEntry && <LateEntryBanner factor={lateEntry.factor} />}
           <GrandFinaleScoringExplainer scoring={scoring} totalCouples={totalCouples} />
+          {previewNote}
 
           {order.length === pinnedCount && <UsePicksFrom sources={pickSources} onPick={fillFrom} />}
 
@@ -370,6 +387,7 @@ export function GrandFinaleBox({
       <CardContent className="flex flex-col gap-4">
         {lateEntry && <LateEntryBanner factor={lateEntry.factor} />}
         <GrandFinaleScoringExplainer scoring={scoring} totalCouples={totalCouples} />
+          {previewNote}
         {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         {filledFrom && (
           <p className="text-xs text-muted-foreground">Filled in from {filledFrom} — review, then save.</p>
@@ -402,7 +420,7 @@ export function GrandFinaleBox({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={`Move ${nameFor(coupleId)} up`}
+                    aria-label={`Move ${nameTextFor(coupleId)} up`}
                     disabled={displayIndex === 0 || actualIndex < pinnedCount}
                     onClick={() => moveEntry(actualIndex, 1)}
                   >
@@ -411,7 +429,7 @@ export function GrandFinaleBox({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={`Move ${nameFor(coupleId)} down`}
+                    aria-label={`Move ${nameTextFor(coupleId)} down`}
                     disabled={actualIndex <= pinnedCount}
                     onClick={() => moveEntry(actualIndex, -1)}
                   >

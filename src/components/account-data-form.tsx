@@ -73,7 +73,7 @@ function PasswordForm() {
         <Input
           id="password"
           type="password"
-          minLength={6}
+          minLength={8}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -84,7 +84,7 @@ function PasswordForm() {
         <Input
           id="confirmPassword"
           type="password"
-          minLength={6}
+          minLength={8}
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
@@ -137,15 +137,17 @@ function DangerZone({ deletionRequestedAt }: { deletionRequestedAt: string | nul
 export function AccountDataForm({
   email,
   deletionRequestedAt,
+  emailChangesEnabled = false,
 }: {
   email: string;
   deletionRequestedAt: string | null;
+  emailChangesEnabled?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h3 className="mb-2 text-sm font-semibold">Email</h3>
-        <EmailForm currentEmail={email} />
+        {emailChangesEnabled ? <EmailForm currentEmail={email} /> : <div className="flex flex-col gap-2 text-sm"><p className="break-all">{email}</p><p className="text-muted-foreground">Email changes are temporarily unavailable. You can still sign in with your current email.</p></div>}
       </div>
       <div className="border-t border-border pt-4">
         <h3 className="mb-2 text-sm font-semibold">Password</h3>

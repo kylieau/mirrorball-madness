@@ -1,8 +1,6 @@
+import { AuthForm } from "@/components/auth-form";
+import { authErrorMessage } from "@/lib/auth-form-state";
 import Link from "next/link";
-import { signIn } from "@/app/auth/actions";
-import { SubmitButton } from "@/components/submit-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 
 export default async function LoginPage({
@@ -16,24 +14,14 @@ export default async function LoginPage({
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6 px-4 py-24">
       <h1 className="text-2xl font-semibold tracking-tight">Sign In</h1>
-      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
-      <form action={signIn} className="flex flex-col gap-4">
-        {next && <input type="hidden" name="next" value={next} />}
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" spellCheck={false} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" name="password" type="password" autoComplete="current-password" required />
-        </div>
-        <SubmitButton idleLabel="Sign In" pendingLabel="Signing In…" />
-      </form>
+      {error && <p role="alert" className="text-sm text-danger-text">{authErrorMessage(error)}</p>}
+      <AuthForm mode="sign-in" next={next} />
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <div className="h-px flex-1 bg-border" />
         or
         <div className="h-px flex-1 bg-border" />
       </div>
+      {process.env.AUTH_EMAIL_ENABLED === "true" && <Link href="/forgot-password" className="text-sm underline underline-offset-4">Forgot Password?</Link>}
       <GoogleSignInButton next={next} />
       <p className="text-sm text-muted-foreground">
         Don&apos;t have an account?{" "}

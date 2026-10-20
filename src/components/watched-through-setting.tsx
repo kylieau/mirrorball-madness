@@ -20,19 +20,25 @@ export function WatchedThroughSetting({ progress }: { progress: SpoilerProgress 
   if (lastWatched === 0 && items["0"] == null) items["0"] = progress ? "None" : "…";
 
   async function handleChange(value: string | null) {
-    if (value === null || Number(value) === lastWatched) return;
-    const week = Number(value);
-    setError(null);
-    setPending(true);
-    // The unmark function takes the first unwatched week, so "I last watched N" is N + 1.
-    const result = week > lastWatched ? await markWatchedAndUnlockDrafts(week) : await unmarkEpisodesWatchedFrom(week + 1);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setLastWatched(week);
-      router.refresh();
+    try {
+      if (value === null || Number(value) === lastWatched) return;
+      const week = Number(value);
+      setError(null);
+      setPending(true);
+      // The unmark function takes the first unwatched week, so "I last watched N" is N + 1.
+      const result = week > lastWatched ? await markWatchedAndUnlockDrafts(week) : await unmarkEpisodesWatchedFrom(week + 1);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setLastWatched(week);
+        router.refresh();
+      }
+      setPending(false);
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setPending(false);
     }
-    setPending(false);
   }
 
   return (

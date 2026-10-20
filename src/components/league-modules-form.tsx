@@ -77,6 +77,7 @@ type WaiverClaimMethod = "reverse_standings" | "fcfs" | "manual";
 type DraftType = "snake" | "linear" | "custom";
 
 type ScoringSettings = {
+  revision: number;
   judges_score_category_enabled: boolean;
   eliminations_category_enabled: boolean;
   bonus_picks_category_enabled: boolean;
@@ -203,6 +204,7 @@ export function LeagueModulesForm({
 }) {
   const router = useRouter();
   const browserTimeZone = useBrowserTimeZone();
+  const [settingsRevision, setSettingsRevision] = useState(scoringSettings?.revision ?? 0);
 
   const [judgesEnabled, setJudgesEnabled] = useState(
     scoringSettings?.judges_score_category_enabled ?? true
@@ -447,92 +449,107 @@ export function LeagueModulesForm({
   const showAnchorSync = shouldShowAnchorSyncControl(canEdit, judgesStartsWeek, lockWeek);
 
   async function handleSave(exitAfter = false) {
-    setError(null);
-    setSyncError(null);
-    setSuccess(false);
+    try {
+      setError(null);
+      setSyncError(null);
+      setSuccess(false);
 
-    if (!judgesEnabled && !eliminationsEnabled && !bonusEnabled) {
-      setError("At least one module must stay on.");
-      return;
-    }
+      if (!judgesEnabled && !eliminationsEnabled && !bonusEnabled) {
+        setError("At least one module must stay on.");
+        return;
+      }
 
-    if (judgesEnabled && pickTimeLimitSeconds < 10) {
-      setError("Draft Pick Timer must be at least 10 seconds.");
-      return;
-    }
+      if (judgesEnabled && pickTimeLimitSeconds < 10) {
+        setError("Draft Pick Timer must be at least 10 seconds.");
+        return;
+      }
 
-    if (eliminationsEnabled && predictionLockHours < 0) {
-      setError("Pick 'Em Lock can't be negative.");
-      return;
-    }
+      if (eliminationsEnabled && predictionLockHours < 0) {
+        setError("Pick 'Em Lock can't be negative.");
+        return;
+      }
 
-    setSubmitting(true);
+      setSubmitting(true);
 
-    const scoringInput: ScoringCategoriesInput = {
-      judgesScoreCategoryEnabled: judgesEnabled,
-      eliminationsCategoryEnabled: eliminationsEnabled,
-      bonusPicksCategoryEnabled: bonusEnabled,
-      judgesScoreCategoryWeight: judgesWeight,
-      eliminationsCategoryWeight: eliminationsWeight,
-      bonusPicksCategoryWeight: bonusWeight,
-      judgesScoreStartsWeek: judgesStartsWeek,
-      bonusPicksScoringMethod: bonusEnabled ? bonusMethod : null,
-      bonusPicksDistancePenalty: bonusEnabled && bonusMethod === "distance_based" ? bonusDistancePenalty : null,
-      bonusPicksTierSize: bonusEnabled && bonusMethod === "band_tier" ? bonusTierSize : null,
-      bonusPicksTierPayStyle: bonusTierPayStyle,
-      judgesScoreMultiplier,
-      survivalPoints,
-      firstPlacePoints,
-      secondPlacePoints,
-      thirdPlacePoints,
-      fourthPlacePoints,
-      fifthPlacePoints,
-      eliminationPredictionPoints,
-      topScorerPredictionPoints,
-      bonusPicksPointsPerCorrect,
-      curtainCallNearMissEnabled: nearMissEnabled,
-    };
+      const scoringInput: ScoringCategoriesInput = {
+        expectedRevision: settingsRevision,
+        judgesScoreCategoryEnabled: judgesEnabled,
+        eliminationsCategoryEnabled: eliminationsEnabled,
+        bonusPicksCategoryEnabled: bonusEnabled,
+        judgesScoreCategoryWeight: judgesWeight,
+        eliminationsCategoryWeight: eliminationsWeight,
+        bonusPicksCategoryWeight: bonusWeight,
+        judgesScoreStartsWeek: judgesStartsWeek,
+        bonusPicksScoringMethod: bonusEnabled ? bonusMethod : null,
+        bonusPicksDistancePenalty: bonusEnabled && bonusMethod === "distance_based" ? bonusDistancePenalty : null,
+        bonusPicksTierSize: bonusEnabled && bonusMethod === "band_tier" ? bonusTierSize : null,
+        bonusPicksTierPayStyle: bonusTierPayStyle,
+        judgesScoreMultiplier,
+        survivalPoints,
+        firstPlacePoints,
+        secondPlacePoints,
+        thirdPlacePoints,
+        fourthPlacePoints,
+        fifthPlacePoints,
+        eliminationPredictionPoints,
+        topScorerPredictionPoints,
+        bonusPicksPointsPerCorrect,
+        curtainCallNearMissEnabled: nearMissEnabled,
+      };
 
-    const leagueInput: LeagueSettingsInput = {
-      waiverMode,
-      waiverClaimMethod,
-      pickTimeLimitSeconds,
-      predictionLockHoursBeforeAir,
-      predictionLockCoast,
-      draftType,
-      draftScheduledAt: draftScheduledAt ? airsAtToUtcIso(draftScheduledAt) : null,
-    };
+      const leagueInput: LeagueSettingsInput = {
+        waiverMode,
+        waiverClaimMethod,
+        pickTimeLimitSeconds,
+        predictionLockHoursBeforeAir,
+        predictionLockCoast,
+        draftType,
+        draftScheduledAt: draftScheduledAt ? airsAtToUtcIso(draftScheduledAt) : null,
+      };
 
-    const [scoringResult, leagueResult] = await Promise.all([
-      updateScoringCategories(leagueId, scoringInput),
-      updateLeagueSettings(leagueId, leagueInput),
-    ]);
+      const [scoringResult, leagueResult] = await Promise.all([
+        updateScoringCategories(leagueId, scoringInput),
+        updateLeagueSettings(leagueId, leagueInput),
+      ]);
 
-    const combinedError = scoringResult.error || leagueResult.error;
-    if (combinedError) {
-      setError(combinedError);
-      setSubmitting(false);
-    } else if (exitAfter) {
-      router.push(exitHref);
-    } else {
-      setSuccess(true);
+      if (scoringResult.revision != null) setSettingsRevision(scoringResult.revision);
+      const combinedError = scoringResult.error || leagueResult.error;
+      if (combinedError) {
+        setError(combinedError);
+        setSubmitting(false);
+      } else if (exitAfter) {
+        router.push(exitHref);
+      } else {
+        setSuccess(true);
+        setSubmitting(false);
+      }
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
       setSubmitting(false);
     }
   }
 
   async function handleSyncAnchor() {
-    setError(null);
-    setSyncError(null);
-    setSuccess(false);
-    setSyncingAnchor(true);
-    const result = await syncSeasonClockAnchor(leagueId);
-    if (result.error) {
-      setSyncError(result.error);
-    } else if (result.anchorWeek != null) {
-      setJudgesStartsWeek(result.anchorWeek);
-      router.refresh();
+    try {
+      setError(null);
+      setSyncError(null);
+      setSuccess(false);
+      setSyncingAnchor(true);
+      const result = await syncSeasonClockAnchor(leagueId);
+      if (result.error) {
+        setSyncError(result.error);
+      } else if (result.anchorWeek != null) {
+        setJudgesStartsWeek(result.anchorWeek);
+        if (result.revision != null) setSettingsRevision(result.revision);
+        router.refresh();
+      }
+      setSyncingAnchor(false);
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setSyncingAnchor(false);
     }
-    setSyncingAnchor(false);
   }
 
   const isRequired = !scoringSettings?.scoring_configured;

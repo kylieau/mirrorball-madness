@@ -35,17 +35,18 @@ export default async function LeagueSettingsPage({
     redirect("/login");
   }
 
-  const [{ data: league }, { data: scoringSettings }, { data: members }, { data: profile }] = await Promise.all([
+  const [{ data: league }, { data: scoringSettings }, { data: members }, { data: profile }, { data: ownInviteCode }] = await Promise.all([
     supabase.from("leagues").select("*").eq("id", id).single(),
     supabase.from("scoring_settings").select("*").eq("league_id", id).single(),
     supabase
       .from("league_members")
       .select(
-        "user_id, role, co_manager_id, co_manager_invite_code, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
+        "user_id, role, co_manager_id, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
       )
       .eq("league_id", id)
       .order("joined_at"),
     supabase.from("profiles").select("is_super_admin").eq("id", user.id).maybeSingle(),
+    supabase.rpc("my_co_manager_invite_code", { p_league_id: id }),
   ]);
   const isSuperAdmin = profile?.is_super_admin ?? false;
   const closeHref = safeRelativePath(from, `/leagues/${id}/picks`);
@@ -117,7 +118,7 @@ export default async function LeagueSettingsPage({
               // Only the primary who owns this row ever sees its pending
               // invite code — anyone else in the league can already read
               // the row via RLS, but the code isn't theirs to use or leak.
-              inviteCode: m.user_id === user.id ? m.co_manager_invite_code : null,
+              inviteCode: m.user_id === user.id ? ownInviteCode : null,
             };
           })}
           canEdit={isCommissioner}
@@ -152,7 +153,7 @@ export default async function LeagueSettingsPage({
           scoringLocked={scoringLocked}
           totalCouples={season.totalCouples}
           exitHref={closeHref}
-          lateUnlock={buildLateUnlock(grandFinaleLocked, memberRows, lateGrandFinale, isCommissioner || isSuperAdmin)}
+          lateUnlock={buildLateUnlock(grandFinaleLocked, memberRows, lateGrandFinale, isCommissioner || isSuperAdmin, viewerMembership.user_id)}
         />
       </div>
     </div>
@@ -174,7 +175,8 @@ function buildLateUnlock(
   grandFinaleLocked: boolean,
   members: { userId: string; displayName: string; coManagerDisplayName: string | null }[],
   late: LateGrandFinale | null,
-  canUnlock: boolean
+  canUnlock: boolean,
+  viewerTeamId?: string
 ): GrandFinaleLateUnlockInput | null {
   if (!grandFinaleLocked || !late) return null;
   return {
@@ -186,7 +188,7 @@ function buildLateUnlock(
     ),
     canUnlock,
     resolvedCount: late.resolvedCount,
-    missers: lateMissers(members, late),
+    missers: lateMissers(members, late).filter((member) => member.userId !== viewerTeamId),
   };
 }
 

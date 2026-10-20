@@ -316,6 +316,7 @@ export function DraftRoom({
 
   useAutoDraftPick({
     leagueId: league.id,
+    turnKey: league.current_turn_started_at,
     draftStatus: league.draft_status,
     clockExpired,
     onTheClockAutopilot,
@@ -450,76 +451,106 @@ export function DraftRoom({
   }
 
   async function handleStartDraft() {
-    setError(null);
-    const { absent } = partitionPresence(members, presentIds);
-    if (
-      absent.length > 0 &&
-      !window.confirm(
-        `${absent.length} of ${members.length} managers aren't in the room yet. They'll auto-pick at random when their clock runs out. Start anyway?`
-      )
-    ) {
-      return;
+    try {
+      setError(null);
+      const { absent } = partitionPresence(members, presentIds);
+      if (
+        absent.length > 0 &&
+        !window.confirm(
+          `${absent.length} of ${members.length} managers aren't in the room yet. They'll auto-pick at random when their clock runs out. Start anyway?`
+        )
+      ) {
+        return;
+      }
+      orderSave.cancel();
+      const { error: orderError } = await setDraftOrder(league.id, draftOrder);
+      if (orderError) {
+        setError(orderError);
+        return;
+      }
+      const { error } = await startDraft(league.id);
+      if (error) setError(error);
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+
     }
-    orderSave.cancel();
-    const { error: orderError } = await setDraftOrder(league.id, draftOrder);
-    if (orderError) {
-      setError(orderError);
-      return;
-    }
-    const { error } = await startDraft(league.id);
-    if (error) setError(error);
   }
 
   async function handlePick(coupleId: string) {
-    setError(null);
-    setPendingCoupleId(coupleId);
-    const { error } = await makeDraftPick(league.id, coupleId);
-    setPendingCoupleId(null);
-    setConfirmCoupleId(null);
-    if (error) {
-      setError(error);
-      return;
+    try {
+      setError(null);
+      setPendingCoupleId(coupleId);
+      const { error } = await makeDraftPick(league.id, coupleId);
+      setPendingCoupleId(null);
+      setConfirmCoupleId(null);
+      if (error) {
+        setError(error);
+        return;
+      }
+      setJustDrafted(coupleId);
+      await refreshDraftState();
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setPendingCoupleId(null); setConfirmCoupleId(null);
     }
-    setJustDrafted(coupleId);
-    await refreshDraftState();
   }
 
   async function handleAutopilot(enabled: boolean) {
-    setError(null);
-    setAutopilotPending(true);
-    const { error } = await setDraftAutopilot(league.id, enabled);
-    if (error) {
-      setError(error);
-    } else {
-      setMembers((prev) => prev.map((m) => (m.user_id === myTeamId ? { ...m, draft_autopilot: enabled } : m)));
+    try {
+      setError(null);
+      setAutopilotPending(true);
+      const { error } = await setDraftAutopilot(league.id, enabled);
+      if (error) {
+        setError(error);
+      } else {
+        setMembers((prev) => prev.map((m) => (m.user_id === myTeamId ? { ...m, draft_autopilot: enabled } : m)));
+      }
+      setAutopilotPending(false);
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setAutopilotPending(false);
     }
-    setAutopilotPending(false);
   }
 
   async function handleMemberAutopilot(userId: string, enabled: boolean) {
-    setError(null);
-    setMemberAutopilotPendingId(userId);
-    const { error } = await setMemberDraftAutopilot(league.id, userId, enabled);
-    if (error) {
-      setError(error);
-    } else {
-      setMembers((prev) =>
-        prev.map((m) => (m.user_id === userId ? { ...m, draft_autopilot: enabled } : m))
-      );
+    try {
+      setError(null);
+      setMemberAutopilotPendingId(userId);
+      const { error } = await setMemberDraftAutopilot(league.id, userId, enabled);
+      if (error) {
+        setError(error);
+      } else {
+        setMembers((prev) =>
+          prev.map((m) => (m.user_id === userId ? { ...m, draft_autopilot: enabled } : m))
+        );
+      }
+      setMemberAutopilotPendingId(null);
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setMemberAutopilotPendingId(null);
     }
-    setMemberAutopilotPendingId(null);
   }
 
   async function handleUndoLastPick() {
-    setError(null);
-    setUndoPending(true);
-    const { error } = await undoLastPick(league.id);
-    if (error) {
-      setError(error);
-    } else {
-      setPicks((prev) => prev.slice(0, -1));
+    try {
+      setError(null);
+      setUndoPending(true);
+      const { error } = await undoLastPick(league.id);
+      if (error) {
+        setError(error);
+      } else {
+        await refreshDraftState();
+      }
+      setUndoPending(false);
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setUndoPending(false);
     }
-    setUndoPending(false);
   }
 
   const draftQueueCard = (

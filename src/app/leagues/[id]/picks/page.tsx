@@ -595,6 +595,7 @@ export default async function LeaguePicksPage({
             >
               {curtainCallMode === "picks" && upcomingEpisode ? (
                 <PickEmBox
+                  key={`${id}:${upcomingEpisode.id}:${isLocked}`}
                   leagueId={id}
                   episode={upcomingEpisode}
                   lockAt={lockAt}
@@ -606,6 +607,7 @@ export default async function LeaguePicksPage({
                   topScorerPredictionPoints={
                     scoringSettings?.top_scorer_prediction_points ?? TOP_SCORER_PREDICTION_POINTS_DEFAULT
                   }
+                  categoryWeight={scoringSettings?.eliminations_category_weight ?? 1}
                   nearMissEnabled={scoringSettings?.curtain_call_near_miss_enabled !== false}
                   coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
                   existingPrediction={ownPrediction}
@@ -723,6 +725,7 @@ export default async function LeaguePicksPage({
               isLocked={grandFinaleLocked && !ownLateEntry?.open}
               lateEntry={ownLateEntry ? { factor: ownLateEntry.factor } : null}
               otherLeagues={otherLeaguePicks.grandFinale}
+              categoryWeight={scoringSettings?.bonus_picks_category_weight ?? 1}
               scoring={grandFinaleScoring}
               leagueGrandFinale={leagueGrandFinale}
             />

@@ -168,6 +168,8 @@ export function AllResultsView({
   // never appear for that couple; withdrawals and other real events still do.
   const visibleEpisodeResults = episodeResults.filter(
     (r) =>
+      (!spoilerFreeMode || !episodes.find((episode) => episode.id === r.episode_id)?.week_id ||
+        allowedWeekIds.has(episodes.find((episode) => episode.id === r.episode_id)!.week_id!)) &&
       !isUnscheduledPlaceholderRow({
         participantCoupleIds: participantsByEpisode[r.episode_id],
         coupleId: r.couple_id,
@@ -367,7 +369,7 @@ export function AllResultsView({
           <Accordion>
             {weekGroups.map(({ week, episodes: weekEpisodes }) => {
               const status = groupStatus(weekEpisodes);
-              const locked = spoilerFreeMode && status === "published" && !allowedWeekIds.has(week.id);
+              const locked = spoilerFreeMode && !allowedWeekIds.has(week.id);
               const coupleCount = weekEpisodes.reduce((sum, ep) => {
                 const published = visibleEpisodeResults.filter((r) => r.episode_id === ep.id).length;
                 return sum + (published > 0 ? published : (draftSummariesByEpisode[ep.id]?.entryCount ?? 0));

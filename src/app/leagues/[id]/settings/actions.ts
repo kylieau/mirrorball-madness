@@ -1,5 +1,7 @@
 "use server";
 
+import type { Json } from "@/lib/supabase/types";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -186,6 +188,7 @@ export async function updateLeagueSettings(
 }
 
 export type ScoringCategoriesInput = {
+  expectedRevision: number;
   judgesScoreCategoryEnabled: boolean;
   eliminationsCategoryEnabled: boolean;
   bonusPicksCategoryEnabled: boolean;
@@ -213,10 +216,10 @@ export type ScoringCategoriesInput = {
 export async function updateScoringCategories(
   leagueId: string,
   input: ScoringCategoriesInput
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; revision?: number }> {
   const supabase = await createClient();
 
-  const { error } = await supabase.rpc("update_scoring_categories", {
+  const values = {
     p_league_id: leagueId,
     p_judges_score_category_enabled: input.judgesScoreCategoryEnabled,
     p_eliminations_category_enabled: input.eliminationsCategoryEnabled,
@@ -242,18 +245,22 @@ export async function updateScoringCategories(
     p_bonus_picks_points_per_correct: input.bonusPicksPointsPerCorrect,
     p_bonus_picks_tier_pay_style: input.bonusPicksTierPayStyle,
     p_curtain_call_near_miss_enabled: input.curtainCallNearMissEnabled,
+  };
+  const { data, error } = await supabase.rpc("update_scoring_categories_checked", {
+    p_league_id: leagueId, p_expected_revision: input.expectedRevision,
+    p_values: Object.fromEntries(Object.entries(values).filter(([key]) => key !== "p_league_id").map(([key, value]) => [key.slice(2), value])) as Json,
   });
 
   if (error) return { error: error.message };
 
   revalidatePath(`/leagues/${leagueId}`, "layout");
   revalidatePath("/", "page");
-  return { error: null };
+  return { error: null, revision: data?.revision };
 }
 
 export async function syncSeasonClockAnchor(
   leagueId: string
-): Promise<{ error: string | null; anchorWeek: number | null }> {
+): Promise<{ error: string | null; anchorWeek: number | null; revision?: number }> {
   const supabase = await createClient();
   const result = await writeSeasonClockAnchor(supabase, leagueId);
   if (!result.error) {

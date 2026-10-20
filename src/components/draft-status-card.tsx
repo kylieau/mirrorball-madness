@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { autoPickTrigger, getPickAssignment, secondsRemainingOnClock } from "@/lib/draft";
@@ -33,6 +35,18 @@ export function DraftStatusCard({
   pickTimeLimitSeconds: number;
   onTheClockAutopilot: boolean;
 }) {
+  const router = useRouter();
+  useEffect(() => {
+    if (draftStatus !== "in_progress") return;
+    const supabase = createClient();
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = () => { clearTimeout(timer); timer = setTimeout(() => router.refresh(), 150); };
+    const channel = supabase.channel(`draft-status:${leagueId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "draft_picks", filter: `league_id=eq.${leagueId}` }, refresh)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "leagues", filter: `id=eq.${leagueId}` }, refresh)
+      .subscribe((status) => { if (status === "SUBSCRIBED") refresh(); });
+    return () => { clearTimeout(timer); void supabase.removeChannel(channel); };
+  }, [leagueId, draftStatus, router]);
   const formattedScheduledAt = useFormattedDeadline(scheduledAt);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -50,6 +64,7 @@ export function DraftStatusCard({
 
   useAutoDraftPick({
     leagueId,
+    turnKey: currentTurnStartedAt,
     draftStatus,
     clockExpired,
     onTheClockAutopilot,

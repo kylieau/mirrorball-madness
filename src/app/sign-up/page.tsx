@@ -1,8 +1,6 @@
+import { AuthForm } from "@/components/auth-form";
+import { authErrorMessage } from "@/lib/auth-form-state";
 import Link from "next/link";
-import { signUp } from "@/app/auth/actions";
-import { SubmitButton } from "@/components/submit-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 
 export default async function SignUpPage({
@@ -16,30 +14,8 @@ export default async function SignUpPage({
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6 px-4 py-24">
       <h1 className="text-2xl font-semibold tracking-tight">Create an Account</h1>
-      {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
-      <form action={signUp} className="flex flex-col gap-4">
-        {next && <input type="hidden" name="next" value={next} />}
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="displayName">Display Name</Label>
-          <Input id="displayName" name="displayName" autoComplete="nickname" required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" spellCheck={false} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            minLength={6}
-            required
-          />
-        </div>
-        <SubmitButton idleLabel="Sign Up" pendingLabel="Creating Account…" />
-      </form>
+      {error && <p role="alert" className="text-sm text-danger-text">{authErrorMessage(error)}</p>}
+      <AuthForm mode="sign-up" next={next} />
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <div className="h-px flex-1 bg-border" />
         or

@@ -161,16 +161,13 @@ function InviteCoManagerButton({ leagueId, member }: { leagueId: string; member:
   const [generating, setGenerating] = useState(false);
 
   async function handleGenerate() {
-    setError(null);
-    setGenerating(true);
-    const result = await generateCoManagerInviteCode(leagueId);
-    setGenerating(false);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setCode(result.code);
-      router.refresh();
-    }
+    setError(null); setGenerating(true);
+    try {
+      const result = await generateCoManagerInviteCode(leagueId);
+      if (result.error) setError(result.error);
+      else { setCode(result.code); router.refresh(); }
+    } catch { setError("Could not generate the invitation. Please try again."); }
+    finally { setGenerating(false); }
   }
 
   return (
@@ -181,22 +178,15 @@ function InviteCoManagerButton({ leagueId, member }: { leagueId: string; member:
           <DialogTitle>Invite a co-manager</DialogTitle>
           <DialogDescription>
             Share this link with whoever&apos;ll run this team with you — full parity, same
-            roster, same picks, same standings.
+            roster, same picks, same standings. Invitations expire after seven days.
+            Generating a new link replaces the previous one.
           </DialogDescription>
         </DialogHeader>
         {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
-        {code ? (
-          <CopyInviteLinkButton
-            inviteCode={code}
-            basePath="/join/co-manager"
-            label="Copy Co-Manager Invite Link"
-            size="default"
-          />
-        ) : (
-          <Button onClick={handleGenerate} disabled={generating}>
-            {generating ? "Generating…" : "Generate Invite Link"}
-          </Button>
-        )}
+        {code && !generating && <CopyInviteLinkButton inviteCode={code} basePath="/join/co-manager" label="Copy Co-Manager Invite Link" size="default" />}
+        <Button variant={code ? "outline" : "default"} onClick={handleGenerate} disabled={generating}>
+          {generating ? "Generating…" : code ? "Generate New Invite Link" : "Generate Invite Link"}
+        </Button>
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Close</DialogClose>
         </DialogFooter>

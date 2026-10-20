@@ -11,6 +11,8 @@ import { unpostedCoupleIds } from "./reveal-state";
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 export type PublicationSnapshot = {
+  _revision?: string;
+  weeklyScores?: WeeklyScoreRow[];
   season: Row<"seasons"> | null;
   episodes: Row<"episodes">[];
   weeks: Row<"competition_weeks">[];
@@ -146,6 +148,7 @@ export function buildPublicationPlan(
   const weeklyScores = buildWeeklyScoreRows(
     {
       dances,
+      episodes: snapshot.episodes,
       couples,
       outcomes: snapshot.outcomes.filter((r) => weekEpisodes.has(r.episode_id)),
       jeopardy: [

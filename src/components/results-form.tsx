@@ -216,7 +216,7 @@ export function ResultsForm({
   participantsByEpisode,
   guestJudgesByEpisode,
 }: {
-  // Commissioners draft results; only is_super_admin publishes them.
+  // Trusted contributors draft results; only site admins publish or correct.
   // Server-side requireAdminAccess is the real gate — this just avoids
   // showing a button that would 403.
   canPublish: boolean;
@@ -393,7 +393,7 @@ export function ResultsForm({
     if (wasSelfTriggered) return;
     const draft = draftsByEpisode[selectedEpisode.id];
 
-    if (selectedEpisode.results_published_at != null && !draft?.hasDraft) {
+    if (canPublish && selectedEpisode.results_published_at != null && !draft?.hasDraft) {
       if (seedingEpisodeId.current !== selectedEpisode.id) {
         seedingEpisodeId.current = selectedEpisode.id;
         setSeedingCorrection(true);
@@ -470,6 +470,7 @@ export function ResultsForm({
     const dirtyCouples = episodeCouples.filter((c) => ids.includes(c.id));
     return {
       episodeId: selectedEpisode!.id,
+      correctionToken: draftsByEpisode[selectedEpisode!.id]?.correctionToken ?? null,
       // Caption column is no longer editable here (it never drove scores or
       // display). Pass through any stored value so a draft save doesn't wipe it.
       guestJudgeName: draftsByEpisode[selectedEpisode!.id]?.guestJudgeName ?? null,
@@ -484,7 +485,7 @@ export function ResultsForm({
               danceStyleId: d.danceStyleId,
               songTitle: d.songTitle.trim() || null,
               judgeScores: Object.entries(d.scores)
-                .filter(([, v]) => v !== "")
+                .filter(([, v]) => v.trim() !== "")
                 .map(([judgeId, v]) => ({ judgeId, score: Number(v) })),
             })),
           outcome: row.outcome,
@@ -526,35 +527,47 @@ export function ResultsForm({
   }
 
   async function handlePublishCouple(coupleId: string) {
-    if (!selectedEpisode) return;
-    setError(null);
-    setRevealBusy(true);
-    // Flush first so the server reads exactly what's on screen.
-    const saveResult = await flushDraft();
-    if (saveResult.error) {
+    try {
+      if (!selectedEpisode) return;
+      setError(null);
+      setRevealBusy(true);
+      // Flush first so the server reads exactly what's on screen.
+      const saveResult = await flushDraft();
+      if (saveResult.error) {
+        setRevealBusy(false);
+        return;
+      }
+      const result = await revealCoupleScores({ episodeId: selectedEpisode.id, coupleId });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+      }
       setRevealBusy(false);
-      return;
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setRevealBusy(false);
     }
-    const result = await revealCoupleScores({ episodeId: selectedEpisode.id, coupleId });
-    if (result.error) {
-      setError(result.error);
-    } else {
-      router.refresh();
-    }
-    setRevealBusy(false);
   }
 
   async function handleUndoReveal(coupleId: string) {
-    if (!selectedEpisode) return;
-    setError(null);
-    setRevealBusy(true);
-    const result = await undoCoupleReveal({ episodeId: selectedEpisode.id, coupleId });
-    if (result.error) {
-      setError(result.error);
-    } else {
-      router.refresh();
+    try {
+      if (!selectedEpisode) return;
+      setError(null);
+      setRevealBusy(true);
+      const result = await undoCoupleReveal({ episodeId: selectedEpisode.id, coupleId });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+      }
+      setRevealBusy(false);
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setRevealBusy(false);
     }
-    setRevealBusy(false);
   }
 
   function handleFinishWeek() {
@@ -566,63 +579,81 @@ export function ResultsForm({
   }
 
   async function handleReleaseDraftCouple(coupleId: string) {
-    if (!selectedEpisode) return;
-    setError(null);
-    setReleasing(true);
-    // Flush first so the release reads exactly what's on screen for this couple.
-    const saveResult = await flushDraft();
-    if (saveResult.error) {
+    try {
+      if (!selectedEpisode) return;
+      setError(null);
+      setReleasing(true);
+      // Flush first so the release reads exactly what's on screen for this couple.
+      const saveResult = await flushDraft();
+      if (saveResult.error) {
+        setReleasing(false);
+        return;
+      }
+      const result = await releaseDraftCoupleAction(selectedEpisode.id, coupleId);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setReleasedCoupleIds((prev) => new Set(prev).add(coupleId));
+        router.refresh();
+      }
       setReleasing(false);
-      return;
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setReleasing(false);
     }
-    const result = await releaseDraftCoupleAction(selectedEpisode.id, coupleId);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setReleasedCoupleIds((prev) => new Set(prev).add(coupleId));
-      router.refresh();
-    }
-    setReleasing(false);
   }
 
   async function handleWithdrawDraftCouple(coupleId: string) {
-    if (!selectedEpisode) return;
-    setError(null);
-    setReleasing(true);
-    const result = await withdrawDraftCoupleAction(selectedEpisode.id, coupleId);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setReleasedCoupleIds((prev) => {
-        const next = new Set(prev);
-        next.delete(coupleId);
-        return next;
-      });
-      router.refresh();
+    try {
+      if (!selectedEpisode) return;
+      setError(null);
+      setReleasing(true);
+      const result = await withdrawDraftCoupleAction(selectedEpisode.id, coupleId);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setReleasedCoupleIds((prev) => {
+          const next = new Set(prev);
+          next.delete(coupleId);
+          return next;
+        });
+        router.refresh();
+      }
+      setReleasing(false);
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setReleasing(false);
     }
-    setReleasing(false);
   }
 
   async function handlePublish() {
-    if (!selectedEpisode) return;
-    setError(null);
-    setPublishing(true);
-    // Flush any pending edits first so Publish never publishes stale data.
-    const saveResult = await flushDraft();
-    if (saveResult.error) {
+    try {
+      if (!selectedEpisode) return;
+      setError(null);
+      setPublishing(true);
+      // Flush any pending edits first so Publish never publishes stale data.
+      const saveResult = await flushDraft();
+      if (saveResult.error) {
+        setPublishing(false);
+        return;
+      }
+      const publishResult = await publishEpisodeResults(selectedEpisode.id);
+      if (publishResult.error) {
+        setError(publishResult.error);
+      } else {
+        setHasDraft(false);
+        setReleasedCoupleIds(new Set());
+        setJustPublished(true);
+        router.refresh();
+      }
       setPublishing(false);
-      return;
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setPublishing(false);
     }
-    const publishResult = await publishEpisodeResults(selectedEpisode.id);
-    if (publishResult.error) {
-      setError(publishResult.error);
-    } else {
-      setHasDraft(false);
-      setReleasedCoupleIds(new Set());
-      setJustPublished(true);
-      router.refresh();
-    }
-    setPublishing(false);
   }
 
   // scheduleAutosave() runs synchronously right after the setRows() call
@@ -643,10 +674,43 @@ export function ResultsForm({
   }
 
   useEffect(() => {
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    const queue = draftSaveQueue.current;
+    let navigating = false;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (queue.dirtyIds().length === 0) return;
+      event.preventDefault();
+      event.returnValue = "";
     };
-  }, []);
+    const followLink = async (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = (event.target as Element).closest("a[href]") as HTMLAnchorElement | null;
+      if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin || (url.pathname === window.location.pathname && url.search === window.location.search)) return;
+      if (queue.dirtyIds().length === 0) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (navigating) return;
+      navigating = true;
+      try {
+        const result = await flushDraftRef.current();
+        if (!result.error) router.push(url.pathname + url.search + url.hash);
+      } finally {
+        navigating = false;
+      }
+    };
+    const onClick = (event: MouseEvent) => { void followLink(event); };
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("click", onClick, true);
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+      // Internal links await the save above. Other unmounts still attempt to
+      // drain edits; abrupt browser termination cannot guarantee delivery.
+      if (queue.dirtyIds().length > 0) void flushDraftRef.current();
+    };
+  }, [router]);
 
   function updateRow(coupleId: string, patch: Partial<CoupleRow>) {
     setRows((prev) => ({ ...prev, [coupleId]: { ...(prev[coupleId] ?? emptyRow()), ...patch } }));
@@ -680,35 +744,48 @@ export function ResultsForm({
   }
 
   async function handleAddCustomMoment() {
-    if (!selectedEpisode || !customMomentLabel.trim()) return;
-    setAddingCustomMoment(true);
-    const result = await addEpisodeCustomMoment({
-      episodeId: selectedEpisode.id,
-      coupleId: customMomentCoupleId || null,
-      label: customMomentLabel.trim(),
-    });
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setCustomMoments((prev) => [
-        ...prev,
-        { id: `local-${Date.now()}`, coupleId: customMomentCoupleId || null, label: customMomentLabel.trim() },
-      ]);
-      setCustomMomentLabel("");
-      setCustomMomentCoupleId("");
+    try {
+      if (!selectedEpisode || !customMomentLabel.trim()) return;
+      setAddingCustomMoment(true);
+      const result = await addEpisodeCustomMoment({
+        episodeId: selectedEpisode.id,
+        coupleId: customMomentCoupleId || null,
+        label: customMomentLabel.trim(),
+      });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setCustomMoments((prev) => [
+          ...prev,
+          { id: result.id!, coupleId: customMomentCoupleId || null, label: customMomentLabel.trim() },
+        ]);
+        setCustomMomentLabel("");
+        setCustomMomentCoupleId("");
+      }
+      setAddingCustomMoment(false);
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setAddingCustomMoment(false);
     }
-    setAddingCustomMoment(false);
   }
 
   async function handleRemoveCustomMoment(momentId: string) {
-    setCustomMoments((prev) => prev.filter((m) => m.id !== momentId));
-    await removeEpisodeCustomMoment(momentId);
+    try {
+      const result = await removeEpisodeCustomMoment(selectedEpisode!.id, momentId);
+      if (result.error) setError(result.error);
+      else setCustomMoments((prev) => prev.filter((m) => m.id !== momentId));
+    } catch {
+      setError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+
+    }
   }
 
   const judgeDisplayNames = buildPeopleDisplayNames(judges);
   function judgesForDance(dance: RowDance) {
     const scoredIds = Object.entries(dance.scores)
-      .filter(([, v]) => v !== "")
+      .filter(([, v]) => v.trim() !== "")
       .map(([id]) => id);
     return judgesForScoreInputs(judges, scoredIds, guestJudgesByEpisode[selectedEpisodeId] ?? []);
   }
@@ -781,7 +858,7 @@ export function ResultsForm({
     // Once officially published, every couple's draft is already fully
     // editable underneath (see the correction-seed effect) -- this just
     // narrows which one the UI lets you touch, read-only by default.
-    const correctionLocked = published && !unlockedForCorrectionCoupleIds.has(c.id);
+    const correctionLocked = published && (!canPublish || !unlockedForCorrectionCoupleIds.has(c.id));
     const locked = published ? correctionLocked : revealState === "posted";
     const postedAtIso = revealedAtByCouple[c.id];
     const undoLeft = nowMs !== null && postedAtIso ? undoSecondsLeft(postedAtIso, nowMs) : 0;
@@ -910,7 +987,7 @@ export function ResultsForm({
           </div>
         )}
 
-        {published && (
+        {published && canPublish && (
           <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
             {correctionLocked ? (
               <Button

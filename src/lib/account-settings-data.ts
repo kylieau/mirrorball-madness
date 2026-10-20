@@ -6,13 +6,12 @@ export type AccountSettingsLeague = { id: string; name: string; isCommissioner: 
 
 export type AccountSettingsData = {
   displayName: string;
+  emailChangesEnabled?: boolean;
   isSuperAdmin: boolean;
   deletionRequestedAt: string | null;
   spoilerFreeMode: boolean;
   leagues: AccountSettingsLeague[];
-  // The propose tier: can this viewer draft episode results? Derived from the
-  // leagues above rather than a second query — commissioner of any one of them
-  // is enough. Viewing results needs no flag at all; it's open to everyone.
+  // Global results contributors are explicitly approved by a site admin.
   canProposeResults: boolean;
 };
 
@@ -29,7 +28,7 @@ export async function getAccountSettingsData(
   const [{ data, error }, memberships] = await Promise.all([
     supabase
       .from("profiles")
-      .select("display_name, is_super_admin, deletion_requested_at, spoiler_free_mode")
+      .select("display_name, is_super_admin, deletion_requested_at, spoiler_free_mode, can_propose_results")
       .eq("id", userId)
       .single(),
     loadViewerMemberships(supabase, userId),
@@ -44,11 +43,12 @@ export async function getAccountSettingsData(
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return {
+    emailChangesEnabled: process.env.AUTH_EMAIL_ENABLED === "true",
     displayName: data?.display_name ?? "?",
     isSuperAdmin,
     deletionRequestedAt: data?.deletion_requested_at ?? null,
     spoilerFreeMode: data?.spoiler_free_mode ?? false,
     leagues,
-    canProposeResults: isSuperAdmin || leagues.some((league) => league.isCommissioner),
+    canProposeResults: isSuperAdmin || data.can_propose_results === true,
   };
 }

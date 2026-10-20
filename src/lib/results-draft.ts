@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { inJeopardyIdsToPersist, scaledJudgesScore, type Outcome } from "@/lib/scoring";
-import { loadRevealedDances } from "@/lib/results-reveal";
+import type { Outcome } from "./scoring";
+import type { Json } from "./supabase/types";
 
 export type DraftJudgeScoreInput = { judgeId: string; score: number };
 
@@ -28,6 +28,7 @@ export type SaveDraftResultsInput = {
   entries: DraftEntryInput[];
   inJeopardyCoupleIds: string[];
   updatedBy: string;
+  correctionToken?: string | null;
 };
 
 export type DraftDanceState = {
@@ -50,6 +51,7 @@ export type DraftEntryState = {
 export type DraftCustomMoment = { id: string; coupleId: string | null; label: string };
 
 export type DraftState = {
+  correctionToken?: string | null;
   hasDraft: boolean;
   guestJudgeName: string | null;
   judgesSaveAvailable: boolean;
@@ -71,133 +73,22 @@ const EMPTY_DRAFT_STATE: DraftState = {
   inJeopardyCoupleIds: [],
 };
 
-// Scope to edited couples instead of replacing the whole episode list: a concurrent
-// save from someone else touching other couples must not clobber theirs.
-async function replaceInJeopardyForCouples(
-  admin: SupabaseClient<Database>,
-  episodeId: string,
-  coupleIds: string[],
-  inJeopardyCoupleIds: string[]
-): Promise<string | null> {
-  if (coupleIds.length === 0) return null;
-  const { error: deleteError } = await admin
-    .from("draft_episode_in_jeopardy_couples")
-    .delete()
-    .eq("episode_id", episodeId)
-    .in("couple_id", coupleIds);
-  if (deleteError) return deleteError.message;
-  const toInsert = inJeopardyCoupleIds.filter((id) => coupleIds.includes(id));
-  if (toInsert.length === 0) return null;
-  const { error } = await admin
-    .from("draft_episode_in_jeopardy_couples")
-    .insert(toInsert.map((coupleId) => ({ episode_id: episodeId, couple_id: coupleId })));
-  return error?.message ?? null;
-}
-
-// Autosave path — cheap and draft-only. Does NOT touch couples.status or
-// recompute standings; publication commits them through the atomic RPC. Scoped to only the couples in input.entries -- the
-// caller (buildDraftInput/flushDraft in results-form.tsx) sends only the
-// couples actually edited since the last save, never the whole roster, so
-// two commissioners entering different couples' scores at the same time
-// can't silently wipe each other's rows the way a whole-episode
-// delete-then-reinsert would. Same-couple simultaneous edits still resolve
-// last-write-wins, a much narrower collision.
+// The database locks the episode and replaces only edited couples in one transaction.
 export async function saveDraftResults(
-  admin: SupabaseClient<Database>,
-  input: SaveDraftResultsInput
+  admin: SupabaseClient<Database>, input: SaveDraftResultsInput
 ): Promise<{ error: string | null }> {
-  const { error: overrideErr } = await admin.from("draft_episode_overrides").upsert(
-    {
-      episode_id: input.episodeId,
-      guest_judge_name: input.guestJudgeName,
-      judges_save_available: input.judgesSaveAvailable,
-      updated_at: new Date().toISOString(),
-      updated_by: input.updatedBy,
-    },
-    { onConflict: "episode_id" }
-  );
-  if (overrideErr) return { error: overrideErr.message };
-
-  if (input.entries.length === 0) return { error: null };
-  const coupleIds = input.entries.map((e) => e.coupleId);
-
-  // Couples already revealed keep the scores viewers can see; the draft only
-  // mirrors them until the episode is published.
-  const revealedDances = await loadRevealedDances(admin, input.episodeId);
-  const entries = input.entries.map((entry) =>
-    revealedDances.has(entry.coupleId) ? { ...entry, dances: revealedDances.get(entry.coupleId)! } : entry
-  );
-
-  // draft_judge_scores cascades from draft_dance_scores, so clearing
-  // draft_dance_scores is enough — same as the live tables. Scoped to
-  // coupleIds, not the whole episode.
-  await admin.from("draft_dance_scores").delete().eq("episode_id", input.episodeId).in("couple_id", coupleIds);
-  await admin.from("draft_episode_results").delete().eq("episode_id", input.episodeId).in("couple_id", coupleIds);
-
-  // Inserted one dance at a time (not a bulk insert) so each row's real id
-  // is known before inserting its judge_scores — same reasoning as
-  // atomic publication.
-  for (const entry of entries) {
-    for (const dance of entry.dances) {
-      const totalScore = dance.judgeScores.reduce((sum, js) => sum + js.score, 0);
-      const { data: danceRow, error: danceErr } = await admin
-        .from("draft_dance_scores")
-        .insert({
-          episode_id: input.episodeId,
-          couple_id: entry.coupleId,
-          dance_style_id: dance.danceStyleId,
-          song_title: dance.songTitle,
-          total_score: totalScore,
-          scaled_score: scaledJudgesScore(dance.judgeScores.map((js) => js.score)),
-        })
-        .select()
-        .single();
-      if (danceErr) return { error: danceErr.message };
-
-      if (dance.judgeScores.length > 0) {
-        const { error: judgeErr } = await admin.from("draft_judge_scores").insert(
-          dance.judgeScores.map((js) => ({
-            draft_dance_score_id: danceRow.id,
-            judge_id: js.judgeId,
-            score: js.score,
-          }))
-        );
-        if (judgeErr) return { error: judgeErr.message };
-      }
-    }
-  }
-
-  const resultRows = entries.map((e) => ({
-    episode_id: input.episodeId,
-    couple_id: e.coupleId,
-    outcome: e.outcome,
-    saved_by_judges: e.savedByJudges,
-    had_immunity: e.hadImmunity,
-    bonus_points: e.bonusPoints,
-    bonus_note: e.bonusNote,
-  }));
-  if (resultRows.length > 0) {
-    const { error } = await admin.from("draft_episode_results").insert(resultRows);
-    if (error) return { error: error.message };
-  }
-
-  // A commissioner saving another couple must not lose their jeopardy flag.
-  const jeopardyErr = await replaceInJeopardyForCouples(
-    admin,
-    input.episodeId,
-    coupleIds,
-    inJeopardyIdsToPersist(input.inJeopardyCoupleIds, entries)
-  );
-  if (jeopardyErr) return { error: jeopardyErr };
-
-  return { error: null };
+  if (input.entries.some((entry) => entry.dances.some((dance) => dance.judgeScores.some(
+    ({ score }) => !Number.isFinite(score) || score < 0 || score > 10
+  )))) return { error: "Judge scores must be between 0 and 10." };
+  const { error } = await admin.rpc("save_episode_draft", { p_input: input as unknown as Json });
+  return { error: error?.message ?? null };
 }
 
 export async function loadDraftForEpisode(
   admin: SupabaseClient<Database>,
   episodeId: string
 ): Promise<DraftState> {
-  const [{ data: override }, { data: draftDances }, { data: draftResults }, { data: customMoments }, { data: jeopardy }] =
+  const reads =
     await Promise.all([
       admin.from("draft_episode_overrides").select("*").eq("episode_id", episodeId).maybeSingle(),
       admin
@@ -209,10 +100,14 @@ export async function loadDraftForEpisode(
       admin.from("draft_episode_in_jeopardy_couples").select("couple_id").eq("episode_id", episodeId),
     ]);
 
+  const failed = reads.find((result) => result.error);
+  if (failed?.error) throw new Error("Could not load the complete episode draft. Please try again.");
+  const [{ data: override }, { data: draftDances }, { data: draftResults }, { data: customMoments }, { data: jeopardy }] = reads;
   if (!override) return EMPTY_DRAFT_STATE;
 
   return {
     hasDraft: true,
+    correctionToken: override.correction_token,
     guestJudgeName: override.guest_judge_name,
     judgesSaveAvailable: override.judges_save_available,
     updatedAt: override.updated_at,
@@ -236,27 +131,13 @@ export async function loadDraftForEpisode(
   };
 }
 
-export async function addDraftCustomMoment(
-  admin: SupabaseClient<Database>,
-  input: { episodeId: string; coupleId: string | null; label: string; createdBy: string }
-): Promise<{ error: string | null }> {
-  const trimmed = input.label.trim();
-  if (!trimmed) return { error: "Event label is required" };
-
-  const { error } = await admin.from("draft_episode_custom_moments").insert({
-    episode_id: input.episodeId,
-    couple_id: input.coupleId,
-    label: trimmed,
-    created_by: input.createdBy,
-  });
-  return { error: error?.message ?? null };
+export async function addDraftCustomMoment(admin: SupabaseClient<Database>, input: { episodeId: string; coupleId: string | null; label: string; createdBy: string }): Promise<{ error: string | null; id?: string }> {
+  const { data, error } = await admin.rpc("mutate_draft_moment", { p_episode_id: input.episodeId, p_actor_id: input.createdBy, p_moment_id: null, p_couple_id: input.coupleId, p_label: input.label, p_remove: false });
+  return { error: error?.message ?? null, id: data ?? undefined };
 }
 
-export async function removeDraftCustomMoment(
-  admin: SupabaseClient<Database>,
-  momentId: string
-): Promise<{ error: string | null }> {
-  const { error } = await admin.from("draft_episode_custom_moments").delete().eq("id", momentId);
+export async function removeDraftCustomMoment(admin: SupabaseClient<Database>, episodeId: string, momentId: string, actorId: string): Promise<{ error: string | null }> {
+  const { error } = await admin.rpc("mutate_draft_moment", { p_episode_id: episodeId, p_actor_id: actorId, p_moment_id: momentId, p_couple_id: null, p_label: null, p_remove: true });
   return { error: error?.message ?? null };
 }
 
@@ -285,156 +166,20 @@ export async function applySeasonSettings(
   return { error: error?.message ?? null };
 }
 
-async function deleteAllDraftRows(admin: SupabaseClient<Database>, episodeId: string): Promise<void> {
-  // draft_judge_scores cascades from draft_dance_scores, so clearing that
-  // is enough for those two.
-  await admin.from("draft_episode_overrides").delete().eq("episode_id", episodeId);
-  await admin.from("draft_dance_scores").delete().eq("episode_id", episodeId);
-  await admin.from("draft_episode_results").delete().eq("episode_id", episodeId);
-  await admin.from("draft_episode_custom_moments").delete().eq("episode_id", episodeId);
-  await admin.from("draft_episode_in_jeopardy_couples").delete().eq("episode_id", episodeId);
-  await admin.from("draft_couple_releases").delete().eq("episode_id", episodeId);
-}
-
-// Releases one couple's drafted dance for fans who marked the week watched.
-// Does not copy dances into the live tables or recompute weekly_manager_scores
-// — those stay official-publish / per-couple reveal. Per couple, not the
-// whole night: this couple just needs its own scored dance first.
-export async function releaseDraftCouple(
-  admin: SupabaseClient<Database>,
-  episodeId: string,
-  coupleId: string,
-  releasedBy: string
-): Promise<{ error: string | null }> {
-  const { data: episode, error: episodeErr } = await admin
-    .from("episodes")
-    .select("id, results_published_at")
-    .eq("id", episodeId)
-    .single();
-  if (episodeErr || !episode) return { error: episodeErr?.message ?? "Episode not found" };
-  if (episode.results_published_at) return { error: "This night is already published" };
-
-  const { data: dances, error: dancesErr } = await admin
-    .from("draft_dance_scores")
-    .select("id, draft_judge_scores(judge_id)")
-    .eq("episode_id", episodeId)
-    .eq("couple_id", coupleId);
-  if (dancesErr) return { error: dancesErr.message };
-  const hasScoredDance = (dances ?? []).some((d) => (d.draft_judge_scores ?? []).length > 0);
-  if (!hasScoredDance) return { error: "Draft a scored dance for this couple before releasing it" };
-
-  const { error } = await admin
-    .from("draft_couple_releases")
-    .upsert({ episode_id: episodeId, couple_id: coupleId, released_at: new Date().toISOString(), released_by: releasedBy });
+export async function releaseDraftCouple(admin: SupabaseClient<Database>, episodeId: string, coupleId: string, actorId: string): Promise<{ error: string | null }> {
+  const { error } = await admin.rpc("set_draft_couple_release", { p_episode_id: episodeId, p_couple_id: coupleId, p_actor_id: actorId, p_release: true });
   return { error: error?.message ?? null };
 }
 
-export async function withdrawDraftCouple(
-  admin: SupabaseClient<Database>,
-  episodeId: string,
-  coupleId: string
-): Promise<{ error: string | null }> {
-  const { error } = await admin
-    .from("draft_couple_releases")
-    .delete()
-    .eq("episode_id", episodeId)
-    .eq("couple_id", coupleId);
+export async function withdrawDraftCouple(admin: SupabaseClient<Database>, episodeId: string, coupleId: string, actorId: string): Promise<{ error: string | null }> {
+  const { error } = await admin.rpc("set_draft_couple_release", { p_episode_id: episodeId, p_couple_id: coupleId, p_actor_id: actorId, p_release: false });
   return { error: error?.message ?? null };
 }
 
-// Unconditionally overwrites the draft tables with copies of the live
-// data for this episode — the caller confirms first ("this discards any
-// unsaved draft edits for this week"), since overwriting an in-progress
-// unpublished draft is the one surprising case.
+// Idempotent, admin-only seeding preserves an existing correction session.
 export async function startCorrection(
-  admin: SupabaseClient<Database>,
-  episodeId: string,
-  startedBy: string
+  admin: SupabaseClient<Database>, episodeId: string, startedBy: string
 ): Promise<{ error: string | null }> {
-  const [
-    { data: episode, error: episodeErr },
-    { data: liveDances },
-    { data: liveResults },
-    { data: liveMoments },
-    { data: liveJeopardy },
-  ] = await Promise.all([
-    admin.from("episodes").select("guest_judge_name, judges_save_available").eq("id", episodeId).single(),
-    admin
-      .from("dance_scores")
-      .select("couple_id, dance_style_id, song_title, total_score, scaled_score, judge_scores(judge_id, score)")
-      .eq("episode_id", episodeId),
-    admin.from("episode_results").select("*").eq("episode_id", episodeId),
-    admin.from("episode_custom_moments").select("couple_id, label").eq("episode_id", episodeId),
-    admin.from("episode_in_jeopardy_couples").select("couple_id").eq("episode_id", episodeId),
-  ]);
-  if (episodeErr || !episode) return { error: episodeErr?.message ?? "Episode not found" };
-
-  await deleteAllDraftRows(admin, episodeId);
-
-  const { error: overrideErr } = await admin.from("draft_episode_overrides").insert({
-    episode_id: episodeId,
-    guest_judge_name: episode.guest_judge_name,
-    judges_save_available: episode.judges_save_available,
-    updated_by: startedBy,
-  });
-  if (overrideErr) return { error: overrideErr.message };
-
-  for (const d of liveDances ?? []) {
-    const { data: draftDance, error: danceErr } = await admin
-      .from("draft_dance_scores")
-      .insert({
-        episode_id: episodeId,
-        couple_id: d.couple_id,
-        dance_style_id: d.dance_style_id,
-        song_title: d.song_title,
-        total_score: d.total_score,
-        scaled_score: d.scaled_score,
-      })
-      .select()
-      .single();
-    if (danceErr) return { error: danceErr.message };
-
-    const judgeScores = d.judge_scores ?? [];
-    if (judgeScores.length > 0) {
-      const { error: judgeErr } = await admin.from("draft_judge_scores").insert(
-        judgeScores.map((js) => ({
-          draft_dance_score_id: draftDance.id,
-          judge_id: js.judge_id,
-          score: js.score,
-        }))
-      );
-      if (judgeErr) return { error: judgeErr.message };
-    }
-  }
-
-  if ((liveResults ?? []).length > 0) {
-    const { error: resultsErr } = await admin.from("draft_episode_results").insert(
-      liveResults!.map((r) => ({
-        episode_id: episodeId,
-        couple_id: r.couple_id,
-        outcome: r.outcome,
-        saved_by_judges: r.saved_by_judges,
-        had_immunity: r.had_immunity,
-        bonus_points: r.bonus_points,
-        bonus_note: r.bonus_note,
-      }))
-    );
-    if (resultsErr) return { error: resultsErr.message };
-  }
-
-  if ((liveJeopardy ?? []).length > 0) {
-    const { error: jeopardyErr } = await admin.from("draft_episode_in_jeopardy_couples").insert(
-      liveJeopardy!.map((row) => ({ episode_id: episodeId, couple_id: row.couple_id }))
-    );
-    if (jeopardyErr) return { error: jeopardyErr.message };
-  }
-
-  if ((liveMoments ?? []).length > 0) {
-    const { error: momentsErr } = await admin.from("draft_episode_custom_moments").insert(
-      liveMoments!.map((m) => ({ episode_id: episodeId, couple_id: m.couple_id, label: m.label }))
-    );
-    if (momentsErr) return { error: momentsErr.message };
-  }
-
-  return { error: null };
+  const { error } = await admin.rpc("seed_episode_correction", { p_episode_id: episodeId, p_started_by: startedBy });
+  return { error: error?.message ?? null };
 }
