@@ -1,11 +1,34 @@
 # Session Handoff — remediation, 2026-10-20
 
+## Latest (Claude, 2026-10-20 evening): read this first
+
+- **Remote `main` is `c6d73e4`**: the spoiler patch `ce6fc3d` plus guest browsing.
+  Both are deployed and verified in production (details in BACKLOG "Audit
+  remediation").
+- **Guest browsing** (`c6d73e4`, approved by Kylie to release before E07):
+  - Signed-out visitors see Home and every published week on Results.
+  - `/picks` and `/standings` show a sign-in card.
+  - The anon grants are live (`supabase/apply-guest-browsing.sql`, run by Kylie).
+  - See CLAUDE.md "Guest browsing".
+- **This branch has `main` merged in** (`e4f1764`).
+  - Only `schema.sql` conflicted, and both sections were kept.
+  - Merged branch: tsc, `eslint src`, 643 tests and a production build pass.
+  - The runbook says the guest grants are already live and need a post-deploy
+    signed-out check.
+  - The branch is still local only; don't push it before its migrations.
+- **E07 draft prefilled live:** 10 dances and songs, no scores
+  (`supabase/queries/prefill-s35-e07-dances.sql`, untracked like E06's).
+- **Open:**
+  - Kylie's phone check of guest browsing.
+  - The two open late Grand Finale unlocks are hers to close or keep.
+  - The local `main` branch is stale (behind origin); harmless.
+
 ## Current state and authorization
 
 Kylie approved the recommendations after `682afc7` (“let's go with all your
 recommendations”). This supersedes the older wait-for-selection instructions
 below. Continue on `audit-remediation-20261020`; its broader commits are local.
-Only the independent spoiler patch is on remote main.
+Remote main has only the spoiler patch and guest browsing (see Latest).
 
 - `ce6fc3d` isolates SEC-3/BE-2: viewer draft summaries and fail-closed spoiler
   preferences. Also available as local branch `audit-spoiler-protection`.
@@ -26,7 +49,7 @@ Only the independent spoiler patch is on remote main.
   but no backup, restore rehearsal or scheduled job completed.
 - Kylie explicitly approved pushing only `ce6fc3d` after the initial automatic
   approval rejection. Push succeeded; remote `origin/main` was verified at
-  `ce6fc3d2195fe03466c6875850573be8ffbbab1a`. Production deployment is unverified.
+  `ce6fc3d2195fe03466c6875850573be8ffbbab1a`. Production deployment since verified (see Latest).
   Remote: `https://github.com/kylieau/mirrorball-madness.git`.
 - Broader remediation `4d17bee` remains local on `audit-remediation-20261020`;
   do not push/deploy it before the coordinated database release.

@@ -6,6 +6,12 @@ The small pre-show patch is SEC-3/BE-2 only. All remaining changes need the
 database migrations below and should ship after E07, outside live scoring.
 Do not deploy the complete remediation branch before its migrations.
 
+Guest browsing (`c6d73e4`) shipped separately before E07 and is merged into this
+branch. Its grants (`supabase/apply-guest-browsing.sql`) are already applied live
+and are in `schema.sql`, so they are not part of the steps below. After deploying
+this branch, also confirm a signed-out visitor still sees Home and Results, and
+that `/picks` and `/standings` show the sign-in card.
+
 First rehearse the migration and application together on staging with disposable
 data, including the checks in step 6. A local build/PGlite pass is not staging
 validation. For production Supabase **mirrorball-madness** (`wssbwgtsejamlbvfofvu`):

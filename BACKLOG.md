@@ -10,8 +10,14 @@ manual checks: `docs/audit-release-runbook.md`. This replaces the previous
 wait-for-selection list; it does not mean every audit finding was implemented.
 
 Still outstanding:
-- Independent spoiler patch `ce6fc3d` pushed to main with explicit owner approval;
-  remote verified. Production deployment still needs confirmation.
+- Independent spoiler patch `ce6fc3d`: deployed and verified in production
+  2026-10-20 (a throwaway account's Scores/Schedule payloads carry only draft
+  summaries, with E07's drafted songs absent). The fail-closed profile read was
+  covered only by unit tests; it can't be triggered on demand.
+- Guest browsing `c6d73e4` (signed-out Home/Results, `/picks` and `/standings`
+  sign-in cards): live and verified in production 2026-10-20. The anon grants
+  (`apply-guest-browsing.sql`) are applied live. Merged into this branch in
+  `e4f1764`. Kylie still needs to check it on her phone signed out.
 - Take and restore-test a private backup; provide a DB URL and PostgreSQL client
   on a trusted machine and schedule recurring backups.
 - Outside live scoring, stage/review the four prepared SQL scripts, regenerate
