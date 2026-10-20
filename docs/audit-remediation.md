@@ -44,10 +44,10 @@ backup tooling without representing an API data export as a complete database ba
 
 `ce6fc3d` is the migration-free SEC-3/BE-2 patch, independently built and retained
 on local branch `audit-spoiler-protection`. The broader local branch is
-`audit-remediation-20261020`. Neither has been pushed or deployed. An attempted
-push of only the small patch was rejected by automatic approval review because
-main may trigger production deployment; exact push approval remains pending.
-`origin/main` was `682afc7` when checked.
+`audit-remediation-20261020` (`4d17bee`), which remains local. After explicit owner
+approval, only `ce6fc3d` was pushed to `origin/main`; the remote commit was verified.
+An earlier automatic approval rejection was resolved by that explicit approval.
+Production deployment has not been verified. No broader remediation was pushed.
 
 The one completed live change is SEC-1: the redirect allow-list now contains only
 localhost, the two existing production Vercel hosts and the native callback.

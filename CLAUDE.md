@@ -27,12 +27,12 @@ Fantasy sports app for Dancing with the Stars. Next.js 15 (App Router), TypeScri
 ## Audit remediation release status — 2026-10-20
 
 The owner approved the recommended fixes after handoff `682afc7`. The current
-branch prepares them locally; it is not deployed. `docs/audit-release-runbook.md`
+branch prepares the broader changes locally; their deployment is pending. `docs/audit-release-runbook.md`
 is the release order: backup, four `apply-audit-*.sql` scripts in the Dashboard,
 regenerate types, then coordinated app deployment outside live scoring. The
 checked-in types include prepared contracts, not a new live introspection.
-The independent spoiler patch `ce6fc3d` needs no database migration. Nothing has
-been pushed by this remediation session. Auth redirect allow-list hardening is
+The independent spoiler patch `ce6fc3d` needs no database migration and was pushed
+to origin/main with explicit owner approval; deployment is not yet verified. Auth redirect allow-list hardening is
 already applied and verified; custom SMTP is absent, so `AUTH_EMAIL_ENABLED`
 stays false. No historical picks or standings were changed or recomputed.
 

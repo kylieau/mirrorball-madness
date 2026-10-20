@@ -10,7 +10,8 @@ manual checks: `docs/audit-release-runbook.md`. This replaces the previous
 wait-for-selection list; it does not mean every audit finding was implemented.
 
 Still outstanding:
-- Approve the independent spoiler patch `ce6fc3d` push to main. Nothing pushed.
+- Independent spoiler patch `ce6fc3d` pushed to main with explicit owner approval;
+  remote verified. Production deployment still needs confirmation.
 - Take and restore-test a private backup; provide a DB URL and PostgreSQL client
   on a trusted machine and schedule recurring backups.
 - Outside live scoring, stage/review the four prepared SQL scripts, regenerate

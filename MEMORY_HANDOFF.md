@@ -23,10 +23,12 @@ below. Work is on `audit-remediation-20261020`, locally only.
   as part of this rollout. West-coast policy and scoring exemptions remain.
 - No DB URL/password or pg_dump: backup tooling and restore procedure prepared,
   but no backup, restore rehearsal or scheduled job completed.
-- A push of only `ce6fc3d` to `origin/main` was rejected by automatic approval
-  review because it may deploy production. **No push or deployment occurred.**
-  Exact push approval remains pending. Remote is
-  `https://github.com/kylieau/mirrorball-madness.git`; main remains `682afc7`.
+- Kylie explicitly approved pushing only `ce6fc3d` after the initial automatic
+  approval rejection. Push succeeded; remote `origin/main` was verified at
+  `ce6fc3d2195fe03466c6875850573be8ffbbab1a`. Production deployment is unverified.
+  Remote: `https://github.com/kylieau/mirrorball-madness.git`.
+- Broader remediation `4d17bee` remains local on `audit-remediation-20261020`;
+  do not push/deploy it before the coordinated database release.
 
 ## Verification and outstanding checks
 
