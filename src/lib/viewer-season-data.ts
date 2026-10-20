@@ -27,7 +27,7 @@ export const loadSpoilerProgress = cache(async (supabase: Client, userId: string
   return { lastWatchedWeek: data?.last_watched_week ?? 0, draftUnlockedWeek: data?.draft_unlocked_week ?? 0 };
 });
 
-const loadSeasonSchedule = cache(async (supabase: Client, seasonId: string) => {
+export const loadSeasonSchedule = cache(async (supabase: Client, seasonId: string) => {
   const [{ data: weekRows }, { data: episodeRows }] = await Promise.all([
     supabase
       .from("competition_weeks")

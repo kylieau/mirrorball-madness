@@ -2,16 +2,16 @@ import Link from "next/link";
 import { getAuthUser } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 
-// Logged-out chrome only (login, sign-up). Authenticated
-// routes each render their own header (in-league topbar, or a back-nav
-// elsewhere) — see design/mockups.html, which has no persistent global chrome.
+// Logged-out chrome: login, sign-up, and the guest Home, Results, Picks and
+// Standings, where it stays pinned like the signed-in fan tabs' top bar.
+// Authenticated routes each render their own header.
 export async function SiteHeader() {
   const user = await getAuthUser();
 
   if (user) return null;
 
   return (
-    <header className="border-b border-border pt-[env(safe-area-inset-top)]">
+    <header className="sticky top-0 z-30 border-b border-border bg-background pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex min-h-14 max-w-5xl items-center justify-between px-4 py-2">
         <Link href="/" className="text-sm font-semibold tracking-tight">
           Mirrorball Madness

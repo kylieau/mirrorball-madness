@@ -65,7 +65,9 @@ export function FanBottomNav({
   leagueId,
 }: {
   active: FanTab;
-  leagueId: string;
+  // Null for guests and viewers with no league: Picks and Standings then go
+  // to /picks and /standings, which prompt sign-in or forward to a league.
+  leagueId: string | null;
 }) {
   return (
     <BottomNav>
@@ -73,13 +75,13 @@ export function FanBottomNav({
         <FanTabItem href="/" active={active === "home"} icon={HomeIcon} label="Home" />
         <FanTabItem href="/this-week" active={active === "results"} icon={ListChecksIcon} label="Results" />
         <FanTabItem
-          href={`/leagues/${leagueId}/picks`}
+          href={leagueId ? `/leagues/${leagueId}/picks` : "/picks"}
           active={active === "picks"}
           icon={PencilLineIcon}
           label="Picks"
         />
         <FanTabItem
-          href={`/leagues/${leagueId}/standings`}
+          href={leagueId ? `/leagues/${leagueId}/standings` : "/standings"}
           active={active === "standings"}
           icon={TrophyIcon}
           label="Standings"

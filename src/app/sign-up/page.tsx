@@ -15,6 +15,9 @@ export default async function SignUpPage({
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6 px-4 py-24">
+      <Link href="/" className="-mb-2 text-sm text-muted-foreground">
+        ‹ Back to Home
+      </Link>
       <h1 className="text-2xl font-semibold tracking-tight">Create an Account</h1>
       {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
       <form action={signUp} className="flex flex-col gap-4">

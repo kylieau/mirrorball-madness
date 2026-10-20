@@ -15,6 +15,9 @@ export default async function LoginPage({
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6 px-4 py-24">
+      <Link href="/" className="-mb-2 text-sm text-muted-foreground">
+        ‹ Back to Home
+      </Link>
       <h1 className="text-2xl font-semibold tracking-tight">Sign In</h1>
       {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
       <form action={signIn} className="flex flex-col gap-4">
