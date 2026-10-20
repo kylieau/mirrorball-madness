@@ -61,6 +61,7 @@ import {
   GrandFinaleLateUnlock,
   type GrandFinaleLateUnlockInput,
 } from "@/components/grand-finale-late-unlock";
+import { CurtainCallBackfill, type CurtainCallBackfillInput } from "@/components/curtain-call-backfill";
 import {
   airsAtForWeek,
   explainGrandFinaleDeadline,
@@ -174,6 +175,7 @@ export function LeagueModulesForm({
   totalCouples,
   exitHref,
   lateUnlock,
+  curtainCallBackfill,
 }: {
   leagueId: string;
   league: League;
@@ -200,6 +202,8 @@ export function LeagueModulesForm({
   // Where "Save & exit" lands (the page the settings were opened from).
   exitHref: string;
   lateUnlock: GrandFinaleLateUnlockInput | null;
+  // Site admins only; null for everyone else.
+  curtainCallBackfill: CurtainCallBackfillInput | null;
 }) {
   const router = useRouter();
   const browserTimeZone = useBrowserTimeZone();
@@ -539,6 +543,10 @@ export function LeagueModulesForm({
   const lateUnlockNode =
     bonusEnabled && lateUnlock ? <GrandFinaleLateUnlock leagueId={leagueId} {...lateUnlock} /> : null;
   const finaleLocked = Boolean(lateUnlock?.grandFinaleLocked);
+  const curtainCallBackfillNode =
+    eliminationsEnabled && curtainCallBackfill ? (
+      <CurtainCallBackfill leagueId={leagueId} {...curtainCallBackfill} />
+    ) : null;
 
   if (!canEdit) {
     return (
@@ -584,6 +592,7 @@ export function LeagueModulesForm({
             icon={scoringModule("curtainCall").icon}
             weight={eliminationsWeight}
             detailsHint="Elim picks · In Jeopardy"
+            footer={curtainCallBackfillNode}
           >
             <div className="flex flex-col">
               <SettingRow label="Elimination Prediction Points" value={formatPoints(eliminationPredictionPoints)} />
@@ -795,6 +804,7 @@ export function LeagueModulesForm({
           onWeightChange={editWeight(setEliminationsWeight)}
           weightDisabled={scoringLocked}
           detailsHint="Elim picks · In Jeopardy"
+          footer={curtainCallBackfillNode}
         >
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

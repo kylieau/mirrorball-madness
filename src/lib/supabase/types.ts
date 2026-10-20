@@ -1285,9 +1285,13 @@ export type Database = {
       }
       predictions: {
         Row: {
+          entered_by: string | null
+          entered_via: string | null
+          entry_reason: string | null
           id: string
           league_id: string
           manager_id: string
+          pick_made_at: string | null
           predicted_eliminated_couple_id: string | null
           predicted_eliminated_couple_id_2: string | null
           predicted_top_scorer_couple_id: string | null
@@ -1295,9 +1299,13 @@ export type Database = {
           week_id: string
         }
         Insert: {
+          entered_by?: string | null
+          entered_via?: string | null
+          entry_reason?: string | null
           id?: string
           league_id: string
           manager_id: string
+          pick_made_at?: string | null
           predicted_eliminated_couple_id?: string | null
           predicted_eliminated_couple_id_2?: string | null
           predicted_top_scorer_couple_id?: string | null
@@ -1305,9 +1313,13 @@ export type Database = {
           week_id: string
         }
         Update: {
+          entered_by?: string | null
+          entered_via?: string | null
+          entry_reason?: string | null
           id?: string
           league_id?: string
           manager_id?: string
+          pick_made_at?: string | null
           predicted_eliminated_couple_id?: string | null
           predicted_eliminated_couple_id_2?: string | null
           predicted_top_scorer_couple_id?: string | null
@@ -1315,6 +1327,13 @@ export type Database = {
           week_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "predictions_entered_by_fkey"
+            columns: ["entered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "predictions_league_id_fkey"
             columns: ["league_id"]
@@ -1754,6 +1773,38 @@ export type Database = {
     }
     Functions: {
       active_season_id: { Args: never; Returns: string }
+      admin_backfill_prediction: {
+        Args: {
+          p_elimination: string
+          p_elimination_2: string
+          p_league_id: string
+          p_manager_id: string
+          p_pick_made_at: string
+          p_reason: string
+          p_top_scorer: string
+          p_week_id: string
+        }
+        Returns: {
+          entered_by: string | null
+          entered_via: string | null
+          entry_reason: string | null
+          id: string
+          league_id: string
+          manager_id: string
+          pick_made_at: string | null
+          predicted_eliminated_couple_id: string | null
+          predicted_eliminated_couple_id_2: string | null
+          predicted_top_scorer_couple_id: string | null
+          submitted_at: string
+          week_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "predictions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_waiver_claim: {
         Args: { p_claim_id: string }
         Returns: {
@@ -2154,9 +2205,13 @@ export type Database = {
           p_week_id: string
         }
         Returns: {
+          entered_by: string | null
+          entered_via: string | null
+          entry_reason: string | null
           id: string
           league_id: string
           manager_id: string
+          pick_made_at: string | null
           predicted_eliminated_couple_id: string | null
           predicted_eliminated_couple_id_2: string | null
           predicted_top_scorer_couple_id: string | null
