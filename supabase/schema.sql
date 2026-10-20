@@ -3736,6 +3736,7 @@ begin
   if p_reason is null or length(btrim(p_reason)) < 5 or p_pick_made_at is null or p_pick_made_at > now() then raise exception 'Record when the pick was made and why it is being backfilled'; end if;
   if not exists(select 1 from public.league_members where league_id=p_league_id and user_id=p_manager_id) then raise exception 'Manager is not in this league'; end if;
   select * into strict week from public.competition_weeks where id=p_week_id;
+  if p_pick_made_at >= public.prediction_lock_at(p_league_id,p_week_id) then raise exception 'That pick was made after this week''s lock, so it can''t be recorded'; end if;
   foreach couple in array array[p_elimination,p_elimination_2,p_top_scorer] loop
     if couple is not null and not exists(select 1 from public.couples where id=couple and season_id=week.season_id) then raise exception 'Couple is not in this season'; end if;
   end loop;
