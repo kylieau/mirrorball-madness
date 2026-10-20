@@ -35,7 +35,10 @@ it("admin_backfill_prediction records a site admin's backfill with provenance", 
       on conflict (id) do nothing;
     update public.profiles set is_super_admin = true where id = '${admin}';
     insert into public.seasons(id, name, is_active) values ('${season}', 'S', true);
-    insert into public.competition_weeks(id, season_id, week_number) values ('${week}', '${season}', 1);
+    insert into public.competition_weeks(id, season_id, week_number) values ('${week}', '${season}', 1), ('${id(12)}', '${season}', 2);
+    insert into public.episodes(id, season_id, episode_number, week_id, airs_at) values
+      ('${id(13)}', '${season}', 1, '${week}', now() + interval '1 day'),
+      ('${id(14)}', '${season}', 2, '${id(12)}', now() - interval '2 days');
     insert into public.people(id, name, role) values ('${id(9)}', 'A', 'celebrity'), ('${id(10)}', 'B', 'celebrity'), ('${id(11)}', 'P', 'pro');
     insert into public.couples(id, season_id, celebrity_id, pro_id) values
       ('${coupleA}', '${season}', '${id(9)}', '${id(11)}'), ('${coupleB}', '${season}', '${id(10)}', '${id(11)}');
@@ -58,6 +61,12 @@ it("admin_backfill_prediction records a site admin's backfill with provenance", 
   await expect(backfill(admin, "Texted me their pick", "now() + interval '1 hour'")).rejects.toThrow(
     /why it is being backfilled/
   );
+  await db.exec("reset role");
+
+  await expect(
+    db.exec(`set test.uid = '${admin}'; set role authenticated;
+      select public.admin_backfill_prediction('${league}', '${id(12)}', '${manager}', '${coupleA}', null, null, now() - interval '1 hour', 'Texted me after the show');`)
+  ).rejects.toThrow(/after this week's lock/);
   await db.exec("reset role");
 
   await backfill(admin, "  Texted me their pick  ");
