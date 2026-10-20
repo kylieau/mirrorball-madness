@@ -3751,3 +3751,8 @@ end;
 $$;
 revoke all on function public.admin_backfill_prediction(uuid,uuid,uuid,uuid,uuid,uuid,timestamptz,text) from public,anon;
 grant execute on function public.admin_backfill_prediction(uuid,uuid,uuid,uuid,uuid,uuid,timestamptz,text) to authenticated;
+
+-- Site-admin League Settings for a league they are not in reads with the service role.
+grant execute on function public.active_season_id() to service_role;
+grant execute on function public.effective_hard_deadline_week(uuid) to service_role;
+grant execute on function public.effective_grand_finale_deadline(uuid) to service_role;
