@@ -1,37 +1,39 @@
-# Session Handoff
+# Session Handoff — 2026-10-20 (evening, just before E07)
 
 ## 1. Current State
-**The full read-only audit is done, committed and pushed. Nothing from it has been fixed: Kylie decides first.** Branch `main`, in sync with `origin/main` after this sync commit.
 
-**Commits this session:**
-- **`d1acace`: UX audit polish S2, N2, N4.**
-  - `PageSkeleton` loading states for League Settings, draft, waivers, Settings, Notifications and Manage Leagues. Manage Leagues moved to `src/app/leagues/(manage)/`.
-  - Admin deliberately has no skeleton.
-  - The fan tab bar is a `Main` nav landmark with `aria-current` and sits after the content on Picks and Standings.
-  - Reduced-motion CSS.
-- **`150630f`:** `docs/audit-summary.md` plus five area reports (security, data integrity, backend, operations, frontend): 113 verified findings, 2 dropped.
+**Two lines of work. Keep them apart.**
 
-**Verified for `d1acace`:**
-- Production builds of HEAD (baseline worktree) and the polish.
-- Fan tabs and Manage Leagues pixel-identical at 360/390px. The only difference was Standings' random empty-league tagline.
-- DOM checks for the landmark and `aria-current`.
-- Under Reduce Motion, sheets and the accordion open and close fully.
-- Under throttled network, the League Settings skeleton shows.
-- `eslint src` and 612 tests pass. One run had memory-pressure timeouts; the rerun was clean.
+**A. Live on production: remote `main` at `e2ca87f`. Each item is deployed and verified on `dwts-fantasy-mirrorball-madness.vercel.app`.**
+- **`ce6fc3d` spoiler patch:**
+  - Scores and Schedule send only draft summaries, verified with a throwaway account.
+  - Spoiler-Free fails closed on a profile read error. That half is unit-tested only.
+- **`c6d73e4` guest browsing:**
+  - Signed-out visitors see Home and every published week on Results.
+  - `/picks` and `/standings` show a sign-in card.
+  - `apply-guest-browsing.sql` is applied live.
+- **`352e386` Curtain Call admin backfill:**
+  - League Settings → Curtain Call → Record a Pick, site admins only.
+  - `apply-curtain-call-backfill.sql` is applied live: the four provenance columns and `admin_backfill_prediction`.
+  - The types are regenerated.
+- **`e2ca87f` service-role grants:**
+  - EXECUTE on `active_season_id` and both deadline functions, so non-member site-admin League Settings works.
+  - `apply-service-role-season-grants.sql` is applied live.
+- **Also live, outside git:**
+  - The E07 draft prefill: 10 dances and songs, no scores (`supabase/queries/prefill-s35-e07-dances.sql`, untracked like E06's).
+  - The auth redirect allow-list hardening, done by an earlier session.
 
-**Not verified:**
-- The Vercel deploy of `d1acace`/`150630f`. `gh` isn't authenticated in the container, so check the dashboard.
-- The phone checks: gear skeleton, Reduce Motion.
+**B. Not deployed: local branch `audit-remediation-20261020` at `2fc0c31`.**
+- It holds the broad audit fixes (`4d17bee`), with `main` merged in three times. The last merge brought in `e2ca87f`.
+- On the merged branch, tsc, `eslint src` and 644 tests pass, and the production build succeeded at `e4f1764`.
+- It has no upstream. **Don't push or deploy it** until its four migrations go in per `docs/audit-release-runbook.md`, which exists only on this branch. That means backup, staging rehearsal, and outside live scoring.
+- This handoff and BACKLOG are copied to `main` as a docs-only commit so other devices see current state. `docs/audit-remediation.md` and the runbook stay branch-only.
 
-**The audit:**
-- The workflow hit the session limit four times. It finished by carrying finished results forward inside the script (`audit-cached.js` in the session scratchpad).
-- I wrote `audit-summary.md` myself after the summary agent was cut off. The findings are verifier-checked; the ranking is mine.
-- Every live throwaway account and league was confirmed deleted.
-
-Next live night: **E07 (Week 6), Tue Oct 20, 8 PM ET** (2026-10-21 00:00 UTC).
+**Next live night:** E07 (Week 6), Tue Oct 20, 8 PM ET (00:00 UTC).
 
 ## 2. Changes Made
-Everything from this session is committed and pushed. This sync touches only `MEMORY_HANDOFF.md` and `BACKLOG.md`, where I added "Open decisions from the full audit — 2026-10-20" at the top.
+
+All of today's work is committed. This sync touches only `MEMORY_HANDOFF.md` and `BACKLOG.md`, on the branch and copied to `main`.
 
 **Not ours; leave unstaged:**
 - `.devcontainer/devcontainer.json`
@@ -39,60 +41,52 @@ Everything from this session is committed and pushed. This sync touches only `ME
 - `.devcontainer/devcontainer-lock.json`
 - `.gitignore`
 - `ios/App/App.xcodeproj/project.pbxproj`
-- `supabase/queries/prefill-s35-e06-dances.sql`
-- `supabase/queries/add-bryan-s35-w05-curtain-call.sql`
+- `supabase/queries/*.sql` (E06/E07 prefills, Bryan's W05 pick)
+
+**Leftover worktrees from another session** (`/tmp/dwts-full-remediation-build-*`, `/tmp/dwts-spoiler-build-*`): harmless.
 
 ## 3. Key Decisions
-- **The GitHub repo `kylieau/mirrorball-madness` is public** (checked with an unauthenticated API call, which returned 200). Anything pushed is world-readable, the audit reports included. Making it private is Kylie's call; don't change repo settings.
-- **Don't fix audit findings until Kylie picks.** The tonight-relevant code fixes (SEC-3 draft leak, BE-2 Spoiler-Free fail-open) were offered as one separate deploy and are awaiting a yes.
-- **Admin has no `loading.tsx` on purpose.** Enter Results' unmount cancels a pending 1.5s autosave instead of flushing it (`results-form.tsx`), so an instant skeleton would drop edits. Fix that after E07 (BACKLOG), then admin can get `PageSkeleton`.
-- **The current fan tab stays a `<span aria-current="page">`, not a link,** so tapping it doesn't reload the page or drop `?week=`. The code review flagged that it isn't Tab-focusable; accepted.
-- **Reduced motion uses near-zero durations, not `animation: none`,** because Base UI waits for sheet and dialog exit animations before unmounting.
-- **A `loading.tsx` covers every route below it.** Pages with child routes get a route group (`(fan)`, `leagues/(manage)`). Never add `leagues/loading.tsx` or `leagues/[id]/loading.tsx`: they would replace the Picks/Standings skeleton. Recorded in CLAUDE.md.
-- **Workflow lessons:**
-  - Resume caches only the unchanged prefix of agent starts, and parallel pipelines reorder them. Carry finished results forward explicitly instead.
-  - A failed verifier must stop its area, not count as "refuted".
-  - The workflow size guideline is now `medium` in `~/.claude/settings.json` (Kylie's choice; it was briefly `large`).
-- **QA method:**
-  - Build in a `git worktree` of HEAD with `node_modules` symlinked for the baseline, alongside the working tree, and serve them on ports 3001 and 3000.
-  - Throttle with CDP to observe skeletons.
-  - Never run `pkill -f "next start"`: it kills the shell running it. Use `kill $(pgrep -f "^next-server")`.
-  - Builds need about 1.5 GB free and can't run alongside a heavy workflow.
-- **Unchanged from before:**
-  - Look A is the one fixed look.
-  - Settings "I last watched" stays unlocked mid-East.
-  - Button hit areas live in the primitive.
-  - Error text is `text-danger-text` with `role="alert"`.
-  - The invite-preview tradeoff is accepted.
-  - Forgot password is blocked on SMTP; the auth `useActionState` rewrite comes after E07 as its own deploy.
-  - Live-data safety: no faked releases or `dance_scores`, and never select a week on Enter Results as a scratch user.
-  - Supabase `mirrorball-madness` (`wssbwgtsejamlbvfofvu`) vs `fan-friction`.
-  - Attribution: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-  - No cross-request caching; partial credit is 25/10 only; guest-judge scaling.
-  - Ad-hoc scripts run from the project root with `NODE_OPTIONS=--experimental-websocket`.
-  - git: `pull --rebase --autostash`, stage by name, edit `BACKLOG.md` with Edit; the handoff skills are account-level.
+- **Kylie approved all audit recommendations.** Ship them only through the runbook's coordinated release.
+- **Releasing before E07 (her call):**
+  - the spoiler patch, guest browsing, the Curtain Call backfill and the grants;
+  - each built from `main` on its own worktree branch;
+  - each verified on production;
+  - then `main` merged into the remediation branch.
+- **Grand Finale late unlocks have no deadline.** Settled in CLAUDE.md, with the curtain-to-publish gap knowingly accepted.
+  - **Open:** the branch's `apply-audit-deadlines.sql` pauses late submits between air and publish. Kylie decides whether to keep that before release (BACKLOG).
+- **Guest browsing scope:** published weeks only; no live reveal, drafts or league data. Picks and Standings placeholders lead with Sign In. Guests reuse the signed-out `SiteHeader`, pinned.
+- **Curtain Call:**
+  - no late-unlock window;
+  - site-admin backfill with provenance is the only way in after the lock;
+  - a backfill for a published week changes points only on the next publish.
+- **When merging `main` into the branch:**
+  - keep the branch's single `admin_backfill_prediction` definition in `schema.sql`;
+  - keep the branch's hand-written `types.ts` entry;
+  - don't take main's duplicate copies.
+- **Live safety:**
+  - throwaway accounts only, deleted in `finally`, confirmed with `find-audit-users`;
+  - never fake releases or live `dance_scores`;
+  - never select a week on Enter Results as a scratch user.
+- **Never `pkill -f` a pattern that appears in your own command line.** It kills the shell; that happened twice today. Use `kill $(pgrep -f "^next-server")`.
+- **Builds:** run one production build at a time (memory). Use a git worktree of `origin/main` with `node_modules` symlinked for main-based work.
+- **Unchanged:**
+  - SMTP is absent and `AUTH_EMAIL_ENABLED=false`;
+  - no recompute or historical pick deletion;
+  - stage by name;
+  - attribution `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`;
+  - the workflow size guideline is `medium`.
 
 ## 4. Backlog & Next Steps
-**Waiting on Kylie:** see BACKLOG "Open decisions from the full audit — 2026-10-20":
-- whether to make the repo private;
-- her pre-show steps: auth allow-list cleanup, DB dump, the two open late Grand Finale unlocks;
-- whether to deploy SEC-3 + BE-2 before the show;
-- the DATA-8 backfill confirmation;
-- rulings on the settled-decision conflicts;
-- the order of audit fixes;
-- whether she wants a review-gate hook.
+All deferred items are in BACKLOG, under "Audit remediation — 2026-10-20" at the top. The main ones:
+- **Kylie:**
+  - the phone check of guest browsing, signed out;
+  - whether to keep or remove the branch's late Grand Finale air-to-publish pause;
+  - confirm the DATA-8 backfills;
+  - whether to make the public repo private (the audit reports are public);
+  - SMTP;
+  - a backup with a DB URL and `pg_dump`.
+- **E07 tonight:** re-check Home, Results, Picks, Standings and the switcher with a released draft and a live-revealed couple; Score History `Jdg 36→27`; guest pages after publish.
+- **Suggested next:** a Codex review of `c6d73e4` (most important: it opens data to `anon`), `352e386` and `e2ca87f`. Act on findings after E07 unless they're critical.
+- **After E07:** the coordinated audit release per the runbook.
 
-**E07 live night:**
-- re-check Home, Results, Picks, Standings and the switcher with a released draft and a live-revealed couple;
-- Score History `Jdg 36→27`;
-- the per-couple row and the ⓘ focus ring on her phone;
-- the new skeleton and Reduce Motion checks.
-
-**After E07** (BACKLOG):
-- the Enter Results autosave-on-unmount fix;
-- the auth `useActionState` rewrite;
-- audit fixes in the order she picks;
-- forgot password once SMTP is connected;
-- the remaining UX audit items: A5, V3, V4, T2, T3, N1, C3.
-
-Next command: none pending (waiting on Kylie's decisions).
+Next command: none pending (Codex review is Kylie's to start).
