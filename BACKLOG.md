@@ -2,6 +2,29 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Open decisions from the full audit — 2026-10-20
+
+Reports: `docs/audit-summary.md` (ranked) plus `docs/security-audit.md`, `docs/data-integrity-audit.md`, `docs/backend-audit.md`, `docs/operations-audit.md` and `docs/frontend-audit.md`, committed in `150630f`. Nothing has been fixed yet. Kylie said not to fix anything until she has decided.
+
+**Waiting on Kylie:**
+- **The GitHub repo `kylieau/mirrorball-madness` is public**, so the reports, with their working reproductions, are public too. Make it private? This is her call; don't change repo settings without her.
+- **Before E07 (Tue 20 Oct, 8 PM ET), these are hers to do, no deploy needed:**
+  - Remove `https://*.vercel.app/auth/callback` and the dead `dwts-fantasy-app-six` / `dwts-fantasy-app-kylie8` hosts from the Supabase redirect allow-list (SEC-1).
+  - Take a manual DB dump (OPS-4: Free plan, no backups).
+  - Close, or knowingly keep, the two open late Grand Finale unlocks (DATA-2): a submit after the East broadcast and before publish gets paid.
+  - Don't change Air Time, Pick 'Em Lock or the Anchor Week mid-week (SEC-4, DATA-3).
+- **Deploy before the show?** Offered as one small deploy, not started without a yes:
+  - SEC-3: Scores and Schedule ship full drafts to any signed-in user.
+  - BE-2: Spoiler-Free fails open on a failed profile read.
+- **Confirm the post-lock Curtain Call rows (DATA-8)** were intended backfills: manager d40ab813 weeks 2–3 in all four leagues, and 665d63d3 week 3 in 8afa3b4f.
+- **Settled-decision conflicts, hers to rule on:**
+  - SEC-20/BE-25: propose tier is self-service through `create_league`.
+  - BE-26: a stale correction draft is installed wholesale.
+  - SEC-21/DATA-17/BE-27: the West lock stays open after East shows the elimination.
+  - FE-27: the Couples Leaderboard owner can reveal an unwatched recast.
+- **Order of fixes after E07:** the summary's "Soon after" list: SEC-2, DATA-1, SEC-4/DATA-3, FE-1, OPS-3 (needs SMTP), BE-3, FE-3, backups.
+- **Review gate:** `/codex:setup --enable-review-gate` isn't installed here. A Claude Code hook (for example lint/tests on Stop) was offered; she hasn't picked one.
+
 ## UX audit follow-ups — 2026-10-18
 
 Full findings and fix status: `docs/ux-audit.md` (Status section at the top). Shipped and deployed through `d4f20d0`.
