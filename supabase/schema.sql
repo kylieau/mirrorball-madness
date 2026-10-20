@@ -4222,3 +4222,8 @@ create policy "guests see published in jeopardy only"
     select 1 from public.episodes e
     where e.id = episode_in_jeopardy_couples.episode_id and e.results_published_at is not null
   ));
+
+-- Site-admin League Settings for a league they are not in reads with the service role.
+grant execute on function public.active_season_id() to service_role;
+grant execute on function public.effective_hard_deadline_week(uuid) to service_role;
+grant execute on function public.effective_grand_finale_deadline(uuid) to service_role;
