@@ -2,15 +2,23 @@
 
 ## Latest (Claude, 2026-10-20 evening): read this first
 
-- **Remote `main` is `c6d73e4`**: the spoiler patch `ce6fc3d` plus guest browsing.
-  Both are deployed and verified in production (details in BACKLOG "Audit
-  remediation").
+- **Remote `main` is `352e386`**: the spoiler patch `ce6fc3d`, guest browsing
+  `c6d73e4` and the Curtain Call admin backfill `352e386`. All three are deployed
+  and verified in production (details in BACKLOG "Audit remediation").
+- **Curtain Call admin backfill**:
+  - League Settings → Curtain Call → Record a Pick, site admins only.
+  - The additive SQL (`supabase/apply-curtain-call-backfill.sql`) is live and
+    the types are regenerated.
+  - `main` was merged into this branch again in `e5ffef5`. The branch's
+    hand-written type entry and its schema position for the function were kept.
+- **Settled 2026-10-20:** Grand Finale late unlocks have no deadline (CLAUDE.md).
+  The branch's air-to-publish pause is waiting on Kylie (BACKLOG).
 - **Guest browsing** (`c6d73e4`, approved by Kylie to release before E07):
   - Signed-out visitors see Home and every published week on Results.
   - `/picks` and `/standings` show a sign-in card.
   - The anon grants are live (`supabase/apply-guest-browsing.sql`, run by Kylie).
   - See CLAUDE.md "Guest browsing".
-- **This branch has `main` merged in** (`e4f1764`).
+- **This branch has `main` merged in** (`e4f1764`, then `e5ffef5`).
   - Only `schema.sql` conflicted, and both sections were kept.
   - Merged branch: tsc, `eslint src`, 643 tests and a production build pass.
   - The runbook says the guest grants are already live and need a post-deploy

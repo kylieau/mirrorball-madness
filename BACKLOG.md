@@ -18,6 +18,24 @@ Still outstanding:
   sign-in cards): live and verified in production 2026-10-20. The anon grants
   (`apply-guest-browsing.sql`) are applied live. Merged into this branch in
   `e4f1764`. Kylie still needs to check it on her phone signed out.
+- Curtain Call admin backfill `352e386` (League Settings → Curtain Call → Record
+  a Pick, site admins only): live and verified in production 2026-10-20. Its
+  additive SQL (`apply-curtain-call-backfill.sql`: the four provenance columns and
+  `admin_backfill_prediction`) is applied live. `submit_prediction` still leaves
+  provenance null until `apply-audit-prediction-provenance.sql` runs. Merged into
+  this branch in `e5ffef5`.
+- **Kylie to decide:** `apply-audit-deadlines.sql` pauses late Grand Finale
+  submits between a week's air time and its publish. That isn't a deadline, but it
+  closes the aired-but-unpublished gap she explicitly accepted on 2026-10-20 (CLAUDE.md
+  Settled Decisions). Keep the pause or remove it before the release.
+- **Bug:** League Settings for a site admin who isn't a member of the league
+  (`SuperAdminManagers` in `settings/page.tsx`) reads with the service role, which
+  has no EXECUTE on `active_season_id`, `effective_grand_finale_deadline` or
+  `effective_hard_deadline_week`. So that view gets no season or deadline, and
+  Grand Finale's "Missed the lock" never appears there, despite CLAUDE.md saying a
+  super admin can unlock in any league. The member path is fine, and the Curtain
+  Call form reads the season directly. Fix: grant EXECUTE on those functions to
+  `service_role`, or read the season and deadline without them.
 - Take and restore-test a private backup; provide a DB URL and PostgreSQL client
   on a trusted machine and schedule recurring backups.
 - Outside live scoring, stage/review the four prepared SQL scripts, regenerate
