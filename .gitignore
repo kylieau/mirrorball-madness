@@ -63,3 +63,6 @@ ios/DerivedData/
 
 # QA screenshot pass (scripts/qa-screenshots)
 scripts/qa-screenshots/.qa-state.json
+
+# Private Codex state, backups, credentials and SSH material
+/.codex-private/
