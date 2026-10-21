@@ -24,10 +24,9 @@ Still outstanding:
   `admin_backfill_prediction`) is applied live. `submit_prediction` still leaves
   provenance null until `apply-audit-prediction-provenance.sql` runs. Merged into
   this branch in `e5ffef5`.
-- **Kylie to decide:** `apply-audit-deadlines.sql` pauses late Grand Finale
-  submits between a week's air time and its publish. That isn't a deadline, but it
-  closes the aired-but-unpublished gap she explicitly accepted on 2026-10-20 (CLAUDE.md
-  Settled Decisions). Keep the pause or remove it before the release.
+- Decided 2026-10-21: keep `apply-audit-deadlines.sql`'s pause on late Grand
+  Finale submits between a week's air time and its publish (CLAUDE.md Settled
+  Decisions). It ships with the coordinated release; nothing to change.
 - Fixed 2026-10-20 (`e2ca87f`, grants applied live by Kylie): League Settings for a
   site admin who isn't in the league now reads the season and deadlines
   (`apply-service-role-season-grants.sql`). Verified on production with a throwaway

@@ -107,7 +107,7 @@ stays false. No historical picks or standings were changed or recomputed.
 
 Deliberate omissions and naming calls. Code can't record an absence, so these come back as "improvements" otherwise — don't re-propose them.
 
-- **Grand Finale late unlocks have no deadline** (Kylie, 2026-10-20). An open late entry can be submitted any time; the penalty is that couples already resolved when it's submitted never pay. Kylie accepted the known gap: a couple eliminated on air but not yet published still counts as unresolved, so a late submit between the curtain and publish can be paid for that night's elimination (audit DATA-2/SEC-7/BE-9). Don't add a deadline.
+- **Grand Finale late unlocks have no deadline** (Kylie, 2026-10-20). An open late entry can be submitted any time; the penalty is that couples already resolved when it's submitted never pay. A couple eliminated on air but not yet published still counts as unresolved, so `apply-audit-deadlines.sql` refuses a late submit while any week has aired and is unpublished (Kylie kept this pause, 2026-10-21; audit DATA-2/SEC-7/BE-9). Until that script is applied live, a late submit between the curtain and publish can still be paid for that night's elimination. The pause is not a deadline; don't add one.
 
 - **Dance Card is not copyable across leagues** (drafts are per-league); only Curtain Call and Grand Finale are.
 - **No light/dark toggle** — one fixed look by choice. No theme redesign is planned either. `globals.css` pins Tailwind's `dark:` variant to always apply (`@custom-variant dark`) and sets `color-scheme: dark`, so the phone's own appearance setting changes nothing.
