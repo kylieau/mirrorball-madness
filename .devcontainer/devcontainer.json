@@ -4,7 +4,7 @@
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends chromium fonts-noto-color-emoji && npm install -g @anthropic-ai/claude-code",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends chromium fonts-noto-color-emoji && npm install -g @anthropic-ai/claude-code && claude plugin marketplace add openai/codex-plugin-cc && claude plugin install codex@openai-codex",
   "remoteUser": "node",
   "forwardPorts": [3000],
   "portsAttributes": {
