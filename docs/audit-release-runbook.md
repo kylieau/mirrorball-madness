@@ -101,3 +101,58 @@ After configuring and verifying a sender with the chosen SMTP provider:
 - Browser termination can interrupt requests. Editor links await a dirty save;
   closing/reloading prompts when edits remain. Abrupt termination still requires
   a reload check against the acknowledged server state.
+
+## First live night after the release (E08)
+
+E08 (Week 7, Horror Movie Night, single elimination, its week's only episode)
+airs Tue Oct 27, 8 PM ET (`2026-10-28 00:00 UTC`). This is the first real
+publish, reveal and undo on the released code. Observe them; never stage them
+with fake scores.
+
+State checked 2026-10-22 with the service role:
+- No Results Contributors are approved. Only the site admin can enter E08 scores.
+- Two Grand Finale late entries are still open and unsubmitted: Jonathan Au in
+  #supportSWEKylie (80%) and arielle in Carrie Ann's Biggest Fans (100%). Their
+  submits are refused from the curtain until E08 publishes. The six couples
+  already out never pay them, whenever they submit.
+- Published episodes 1 and 3–7 still have correction drafts (the six tagged by
+  the release). Publishing E08 doesn't touch them.
+
+Before the curtain:
+1. Approve contributors in production → Admin → Accounts → Results Contributors.
+2. Tell the two late-entry managers to submit before 8 PM ET Tuesday, or close
+   their entries in League Settings → Grand Finale → Missed the lock.
+3. On a laptop, open production `/admin/results/enter?episode=` for E08 in one
+   tab only. Check there are 10 couples, each with one dance row, and that the
+   judges are the standing panel (E08 has no guest judges).
+
+During the East broadcast (per couple, as it airs):
+4. Enter the scores, wait for "Draft saved", then **Save as Draft Score**. On a
+   second, non-admin account (a phone is fine), Stay Updated on the Scores Are
+   Going Live prompt, which only appears once a couple is released. Confirm the
+   amber Draft scores strip and that couple's draft points on Home, Results,
+   Picks, Standings and the league switcher.
+   Withdraw once and confirm it disappears for that viewer.
+5. Tap **Publish** on one couple, then **Undo** inside 30 seconds. Confirm its
+   points vanish from Standings. Publish it again, let the timer run out, then
+   **Un-Post** and Publish once more. Check every page from step 4 with a mix of
+   released and live-revealed couples.
+6. A Spoiler-Free viewer who hasn't chosen Stay Updated or Mark Watched must see
+   neither draft nor live points.
+
+After the West broadcast (after 10 PM PT):
+7. Post every couple, tick outcomes in **Finish Week**, and finish the week.
+   Confirm that Results shows the elimination, Standings has Week 7 totals,
+   no draft strip remains and the Home banner reads Scores Are In.
+8. Ask Claude to verify with the service role: no `draft_*` rows or releases left
+   for E08, one `weekly_manager_scores` row per team per league for Week 7,
+   `results_published_at` set and the eliminated couple's status updated.
+
+If something goes wrong:
+- "Results or scoring inputs changed. Refresh and try again." means the snapshot
+  moved (another tab or contributor saved). Reload and publish again. Nothing
+  was written.
+- "Post every couple before publishing results": a couple with a drafted dance
+  is still unposted. Publish it first.
+- Any other publish error rolls back in full. Don't retry blindly. Note the
+  message and stop, since the live data is unchanged.
