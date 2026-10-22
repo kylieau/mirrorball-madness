@@ -100,7 +100,6 @@ export function CreateJoinLeagueDialogs({
               <Input
                 id="inviteCode"
                 name="inviteCode"
-                maxLength={6}
                 autoComplete="off"
                 autoCapitalize="characters"
                 spellCheck={false}

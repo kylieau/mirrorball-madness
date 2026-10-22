@@ -24,11 +24,21 @@ export async function createLeague(formData: FormData) {
   redirect(`/leagues/${data.id}/picks?justCreated=1`);
 }
 
+function inviteCode(formData: FormData) {
+  return (formData.get("inviteCode") as string).trim();
+}
+
+// With one league there's no switcher, so this is the only place a new
+// member sees the league's name.
+function welcomePath(league: { id: string; name: string }) {
+  return `/leagues/${league.id}/picks?message=${encodeURIComponent(`Welcome to ${league.name}!`)}`;
+}
+
 export async function joinLeague(formData: FormData) {
   const supabase = await createClient();
 
   const { data, error } = await supabase.rpc("join_league", {
-    p_invite_code: formData.get("inviteCode") as string,
+    p_invite_code: inviteCode(formData),
   });
 
   if (error) {
@@ -38,7 +48,7 @@ export async function joinLeague(formData: FormData) {
   revalidatePath("/leagues", "layout");
   revalidatePath("/", "page");
   revalidatePath("/this-week");
-  redirect(`/leagues/${data.id}/picks`);
+  redirect(welcomePath(data));
 }
 
 // One "Join with Code" entry point for both code types — a league invite
@@ -50,7 +60,7 @@ export async function joinLeague(formData: FormData) {
 // with "not found" too.
 export async function joinWithCode(formData: FormData) {
   const supabase = await createClient();
-  const code = formData.get("inviteCode") as string;
+  const code = inviteCode(formData);
 
   const { data, error } = await supabase.rpc("join_league", { p_invite_code: code });
 
@@ -58,7 +68,7 @@ export async function joinWithCode(formData: FormData) {
     revalidatePath("/leagues", "layout");
     revalidatePath("/", "page");
     revalidatePath("/this-week");
-    redirect(`/leagues/${data.id}/picks`);
+    redirect(welcomePath(data));
   }
 
   if (error.message !== "Invite code not found") {
@@ -76,14 +86,14 @@ export async function joinWithCode(formData: FormData) {
   revalidatePath("/leagues", "layout");
   revalidatePath("/", "page");
   revalidatePath("/this-week");
-  redirect(`/leagues/${coManagerLeague.id}/picks`);
+  redirect(welcomePath(coManagerLeague));
 }
 
 export async function joinAsCoManager(formData: FormData) {
   const supabase = await createClient();
 
   const { data, error } = await supabase.rpc("join_as_co_manager", {
-    p_code: formData.get("inviteCode") as string,
+    p_code: inviteCode(formData),
   });
 
   if (error) {
@@ -93,7 +103,7 @@ export async function joinAsCoManager(formData: FormData) {
   revalidatePath("/leagues", "layout");
   revalidatePath("/", "page");
   revalidatePath("/this-week");
-  redirect(`/leagues/${data.id}/picks`);
+  redirect(welcomePath(data));
 }
 
 export async function leaveLeague(leagueId: string): Promise<{ error: string | null }> {

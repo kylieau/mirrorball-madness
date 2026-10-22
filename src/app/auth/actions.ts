@@ -33,12 +33,14 @@ export async function signIn(_previous: AuthFormState, formData: FormData): Prom
 export async function signUp(_previous: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const supabase = await createClient();
   const origin = (await headers()).get("origin");
+  const displayName = (formData.get("displayName") as string).trim();
+  if (!displayName) return { error: "Display name is required." };
 
   const { data, error } = await supabase.auth.signUp({
     email: formData.get("email") as string,
     password: formData.get("password") as string,
     options: {
-      data: { display_name: formData.get("displayName") as string },
+      data: { display_name: displayName },
       emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(resolveNextPath(formData))}`,
     },
   }).catch(() => ({ data: { session: null }, error: { message: "Network request failed" } }));
