@@ -1,84 +1,79 @@
-# Session Handoff — 2026-10-21 (after E07)
+# Session Handoff — 2026-10-22 (audit release shipped)
 
 ## 1. Current State
 
-**Two lines of work. Keep them apart.**
+**The audit remediation is released and verified on production** (`dwts-fantasy-mirrorball-madness.vercel.app`).
+- **Database:** all four `apply-audit-*.sql` scripts are applied live.
+  - First, a combined dry run in one transaction, rolled back, against production. The rollback was verified.
+  - Then the real run. Verified with the service role: the new columns exist, `update_scoring_categories_checked` is in place, and all 6 correction drafts are tagged.
+- **App:** remote `main` was fast-forwarded to `997de1a` (Kylie approved the deploy explicitly), and Vercel deployed it.
+- **Verified with throwaway accounts** (QA seed league, torn down; 0 leftover users):
+  - League Settings loads;
+  - revision-checked settings saves work, a stale revision is refused, and a member can't save;
+  - members can't read invite codes, and the owner code and invite preview work;
+  - a co-manager join works with the seven-day expiry;
+  - a Curtain Call pick saves with `entered_via=app` and `pick_made_at`;
+  - a non-admin can't make themselves a results contributor;
+  - guest pages are unchanged.
+- **Not yet observed:** a real publish, reveal and undo. That's E08, Tue Oct 27, 8 PM ET (2026-10-28 00:00 UTC).
+- **Backup:** `~/Backups/mirrorball-before-audit.dump` on Kylie's Mac (Postgres 17.6, pg_dump 18.6). Not restore-tested.
+- **No staging rehearsal.** Kylie has no free Supabase project slot.
 
-**A. Live on production: remote `main` at `5029676`.** Everything below is deployed and verified on `dwts-fantasy-mirrorball-madness.vercel.app`.
-- **`ce6fc3d` spoiler patch:**
-  - Scores and Schedule send only draft summaries.
-  - Spoiler-Free fails closed on a profile read error. That half is unit-tested only.
-- **`c6d73e4` guest browsing:**
-  - `apply-guest-browsing.sql` is applied live.
-  - Codex adversarial review: approve, no material findings.
-  - Re-checked 2026-10-21 after E07 was published, signed out:
-    - Home shows That's a Wrap, Play Along and E07 activity.
-    - Results shows Week 6 — Dedication Night.
-    - `/picks` and `/standings` show their sign-in cards.
-    - No page errors.
-  - Anon database probe: published scores and results only. Draft tables, `visible_draft_dance_scores`, and all league, profile, prediction and standings tables are denied.
-- **`352e386` + `5029676` Curtain Call admin backfill:**
-  - Record a Pick refuses a pick time at or after the lock (from the Codex review).
-  - Both SQL files are applied live.
-- **`e2ca87f` service-role grants:** applied live. Codex review found no issues.
-- **E07 (Week 6) was published at 2026-10-21 05:01 UTC.** The planned mid-broadcast re-check with a released draft and a live-revealed couple was missed, because the reviews were still running. Redo it on E08, Tue Oct 27, 8 PM ET (2026-10-28 00:00 UTC).
+**Branch `audit-remediation-20261020`** (no upstream) is two commits ahead of `origin/main`, **neither pushed**:
+- `5b46846`: regenerated `types.ts` from the live project. Generated RPC args are non-null, so the two `mutate_draft_moment` calls in `results-draft.ts` cast their nulls, like the backfill action. tsc, eslint, 644 tests and the build pass.
+- `223dba6`: CLAUDE.md release status, plus BACKLOG.
 
-**B. Not deployed: local branch `audit-remediation-20261020` at the handoff commit, on top of `5035146`.**
-- Contents:
-  - the broad audit fixes (`4d17bee`);
-  - `main` merged in through `9f6887b`;
-  - this session's commits: `640d899` (devcontainer reinstalls the Codex Claude Code plugin), `08f547e` (ignore `/.codex-private/`) and `5035146` (docs for the late Grand Finale pause decision).
-- No upstream, never pushed. **Don't push or deploy it** until its four migrations go in per `docs/audit-release-runbook.md`, which exists only on this branch.
-- The release is ready to start, but every remaining step needs Kylie (see section 4).
-- Pre-release check done: open correction drafts exist for E1 and E3–E7. All match live data exactly, so they're leftovers from viewing published weeks, not pending edits. `apply-audit-security.sql` tags and keeps them.
+Pushing them to `main` deploys, so wait for Kylie's yes (asked, not yet answered). This handoff commit sits on top of them.
 
 ## 2. Changes Made
 
-All work is committed. This session's files: `.devcontainer/devcontainer.json` (`postCreateCommand` line only, staged via the index), `.gitignore`, `CLAUDE.md`, `BACKLOG.md`, `MEMORY_HANDOFF.md`.
+This session's commits:
+- `640d899`: devcontainer reinstalls the Codex plugin.
+- `08f547e`: ignore `/.codex-private/`.
+- `5035146`: keep the late Grand Finale pause.
+- `997de1a`: handoff.
+- `5b46846`: types.
+- `223dba6`: release docs.
+- This handoff.
 
 **Not ours; leave unstaged:**
-- `.devcontainer/devcontainer.json`: Kylie's machine-only Codex SSH setup. Its mounts read gitignored `.codex-private/`, so a fresh clone wouldn't start. It also sets `seccomp=unconfined`. Recommended: never commit it as is.
+- `.devcontainer/devcontainer.json`: Kylie's machine-only Codex SSH setup. It mounts gitignored `.codex-private/` and sets `seccomp=unconfined`. Don't commit it as is.
 - `.devcontainer/Dockerfile.codex`, `.devcontainer/devcontainer-lock.json`, `.agents/`, `AGENTS.md`
 - `ios/App/App.xcodeproj/project.pbxproj`
-- `supabase/queries/*.sql` (E06/E07 prefills, Bryan's W05 pick)
+- `supabase/queries/*.sql`
 
-**Tooling:** the Codex plugin (`codex@openai-codex` 1.0.6) is installed at user scope. `/codex:review` is user-only and reviews branches. To review a single commit, Claude runs `node <plugin>/scripts/codex-companion.mjs review|adversarial-review --wait --base <sha>^ --scope branch` in a scratch worktree of that commit.
+**Scratch files** (session scratchpad, disposable): `staging-structure.sql`, `audit-dry-run.sql`, `types-live.ts`.
 
 ## 3. Key Decisions
-- **The late Grand Finale air-to-publish pause stays** (Kylie, 2026-10-21). `apply-audit-deadlines.sql` refuses a late submit while any week has aired and is unpublished. It's not a deadline, and there's still no deadline. Recorded in CLAUDE.md Settled Decisions.
-- **Kylie approved all audit recommendations.** Ship them only through the runbook's coordinated release, outside live scoring.
-- **When merging `main` into the branch:** keep the branch's single `admin_backfill_prediction` and its hand-written `types.ts` entry; don't take main's duplicates.
-- **Live safety:**
-  - throwaway accounts only, deleted in `finally`;
+- **The late Grand Finale air-to-publish pause stays** (Kylie, 2026-10-21). It's now live. Still no deadline (CLAUDE.md Settled Decisions).
+- **Rehearse SQL with a rolled-back transaction.** When there's no staging project, run a combined script (inner `begin`/`commit` stripped, wrapped in `begin; … rollback;`) in the production SQL Editor, then verify the rollback. This is better than PGlite alone, because it runs against real data.
+- **A database release has an old-app gap.** Between the SQL and the deploy, the old app runs against the new database. In this release the gap broke League Settings: the `co_manager_invite_code` column grant and the revoke of the legacy settings RPC. Before running SQL, check `origin/main`'s reads and RPCs against each revoke, then have the build ready and push immediately after.
+- **Deploy approval:** the auto-mode classifier blocks pushes to `main` (production deploy) without the user's explicit yes in that turn.
+- **Kylie's instructions must say where:** which machine, app, Dashboard project or menu (memory `feedback-say-where-to-run`).
+- **Secrets:** Kylie pasted the database password once. It's been reset. Never ask for the DB URL or password, only for command output.
+- **Live safety** (unchanged):
+  - throwaway accounts only, torn down in `finally`;
   - never fake releases or live `dance_scores`;
-  - never select a week on Enter Results as a scratch user;
   - production publish checks observe a real night.
-- **Never `pkill -f` a pattern that appears in your own command line.** Use `kill $(pgrep -f "^next-server")`.
 - **Tooling:**
-  - Ad-hoc Supabase scripts run inline from the project root (`node --input-type=module -e`), since a scratchpad file can't resolve `node_modules`.
-  - Run one production build at a time.
-- **Unchanged:**
-  - SMTP is absent and `AUTH_EMAIL_ENABLED=false`;
-  - no recompute or historical pick deletion;
-  - stage by name;
-  - attribution `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+  - Run ad-hoc Supabase/PGlite scripts from the project root as `node --input-type=module - <<'EOF'`.
+  - Run one production build at a time. A `next/font` "reading '1'" build failure was a transient Google Fonts fetch: retry it.
+  - Run tests as `npx vitest run src`, which avoids `.codex-private/`.
+  - Never `pkill -f` your own pattern.
+  - Stage by name.
+  - Attribution: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ## 4. Backlog & Next Steps
 Deferred items are in BACKLOG under "Audit remediation — 2026-10-20".
 
-**The audit release (runbook) needs Kylie first:**
-1. Staging rehearsal of the migration and app together, on a disposable Supabase project. Decide whether to stand one up.
-2. A private backup on a trusted machine with `SUPABASE_DB_URL` and `pg_dump`: `node --env-file=.env.local scripts/backup-database.mjs <path>`, then `pg_restore --list`.
-3. Apply in the Dashboard: `apply-audit-security.sql`, `apply-audit-deadlines.sql`, `apply-audit-settings.sql`, `apply-audit-prediction-provenance.sql`. Then regenerate types, deploy, and approve Results Contributors.
+**Kylie:**
+- yes or no on pushing `5b46846`/`223dba6` (and this handoff) to `main`;
+- approve Results Contributors at `/admin/accounts` before E08;
+- reissue her `#supportSWEKylie` co-manager code if wanted;
+- DATA-8 backfills, repo visibility, SMTP, recurring backups and a restore test.
 
-Claude can verify after each SQL step with the service-role key.
+**E08 (Oct 27):**
+- observe publish, live reveal and undo;
+- re-check Home, Results, Picks, Standings and the switcher with a released draft and a live-revealed couple (missed on E07).
 
-**Other open items for Kylie:**
-- phone check of guest browsing, signed out;
-- DATA-8 backfills;
-- repo visibility;
-- SMTP.
-
-**E08:** the live re-check of Home, Results, Picks, Standings and the switcher, with a released draft and a live-revealed couple.
-
-Next command: none pending (waiting on Kylie's staging/backup decision).
+Next command, once Kylie approves: `git push origin audit-remediation-20261020:main`
