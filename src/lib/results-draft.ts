@@ -132,12 +132,14 @@ export async function loadDraftForEpisode(
 }
 
 export async function addDraftCustomMoment(admin: SupabaseClient<Database>, input: { episodeId: string; coupleId: string | null; label: string; createdBy: string }): Promise<{ error: string | null; id?: string }> {
-  const { data, error } = await admin.rpc("mutate_draft_moment", { p_episode_id: input.episodeId, p_actor_id: input.createdBy, p_moment_id: null, p_couple_id: input.coupleId, p_label: input.label, p_remove: false });
+  // Generated RPC args are typed non-null, but SQL takes null for an unused argument.
+  const { data, error } = await admin.rpc("mutate_draft_moment", { p_episode_id: input.episodeId, p_actor_id: input.createdBy, p_moment_id: null as unknown as string, p_couple_id: input.coupleId as string, p_label: input.label, p_remove: false });
   return { error: error?.message ?? null, id: data ?? undefined };
 }
 
 export async function removeDraftCustomMoment(admin: SupabaseClient<Database>, episodeId: string, momentId: string, actorId: string): Promise<{ error: string | null }> {
-  const { error } = await admin.rpc("mutate_draft_moment", { p_episode_id: episodeId, p_actor_id: actorId, p_moment_id: momentId, p_couple_id: null, p_label: null, p_remove: true });
+  // Generated RPC args are typed non-null, but SQL takes null for an unused argument.
+  const { error } = await admin.rpc("mutate_draft_moment", { p_episode_id: episodeId, p_actor_id: actorId, p_moment_id: momentId, p_couple_id: null as unknown as string, p_label: null as unknown as string, p_remove: true });
   return { error: error?.message ?? null };
 }
 

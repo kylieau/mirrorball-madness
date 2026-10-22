@@ -1141,9 +1141,9 @@ export type Database = {
       }
       league_members: {
         Row: {
-          co_manager_invite_expires_at: string | null
           co_manager_id: string | null
           co_manager_invite_code: string | null
+          co_manager_invite_expires_at: string | null
           draft_autopilot: boolean
           draft_position: number | null
           id: string
@@ -1153,9 +1153,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          co_manager_invite_expires_at?: string | null
           co_manager_id?: string | null
           co_manager_invite_code?: string | null
+          co_manager_invite_expires_at?: string | null
           draft_autopilot?: boolean
           draft_position?: number | null
           id?: string
@@ -1165,9 +1165,9 @@ export type Database = {
           user_id: string
         }
         Update: {
-          co_manager_invite_expires_at?: string | null
           co_manager_id?: string | null
           co_manager_invite_code?: string | null
+          co_manager_invite_expires_at?: string | null
           draft_autopilot?: boolean
           draft_position?: number | null
           id?: string
@@ -1389,8 +1389,8 @@ export type Database = {
       }
       profiles: {
         Row: {
-          can_propose_results: boolean
           avatar_url: string | null
+          can_propose_results: boolean
           created_at: string
           deletion_requested_at: string | null
           display_name: string
@@ -1399,8 +1399,8 @@ export type Database = {
           spoiler_free_mode: boolean
         }
         Insert: {
-          can_propose_results?: boolean
           avatar_url?: string | null
+          can_propose_results?: boolean
           created_at?: string
           deletion_requested_at?: string | null
           display_name: string
@@ -1409,8 +1409,8 @@ export type Database = {
           spoiler_free_mode?: boolean
         }
         Update: {
-          can_propose_results?: boolean
           avatar_url?: string | null
+          can_propose_results?: boolean
           created_at?: string
           deletion_requested_at?: string | null
           display_name?: string
@@ -1495,9 +1495,6 @@ export type Database = {
       }
       scoring_settings: {
         Row: {
-          revision: number
-          grand_finale_deadline_at: string | null
-          grand_finale_deadline_season_id: string | null
           bonus_picks_category_enabled: boolean
           bonus_picks_category_weight: number
           bonus_picks_distance_penalty: number | null
@@ -1512,6 +1509,8 @@ export type Database = {
           fifth_place_points: number
           first_place_points: number
           fourth_place_points: number
+          grand_finale_deadline_at: string | null
+          grand_finale_deadline_season_id: string | null
           judges_score_category_enabled: boolean
           judges_score_category_weight: number
           judges_score_multiplier: number
@@ -1519,6 +1518,7 @@ export type Database = {
           judges_score_starts_week: number
           league_id: string
           locking_exempt: boolean
+          revision: number
           scoring_configured: boolean
           second_place_points: number
           survival_points: number
@@ -1526,9 +1526,6 @@ export type Database = {
           top_scorer_prediction_points: number
         }
         Insert: {
-          revision?: number
-          grand_finale_deadline_at?: string | null
-          grand_finale_deadline_season_id?: string | null
           bonus_picks_category_enabled?: boolean
           bonus_picks_category_weight?: number
           bonus_picks_distance_penalty?: number | null
@@ -1543,6 +1540,8 @@ export type Database = {
           fifth_place_points?: number
           first_place_points?: number
           fourth_place_points?: number
+          grand_finale_deadline_at?: string | null
+          grand_finale_deadline_season_id?: string | null
           judges_score_category_enabled?: boolean
           judges_score_category_weight?: number
           judges_score_multiplier?: number
@@ -1550,6 +1549,7 @@ export type Database = {
           judges_score_starts_week?: number
           league_id: string
           locking_exempt?: boolean
+          revision?: number
           scoring_configured?: boolean
           second_place_points?: number
           survival_points?: number
@@ -1557,9 +1557,6 @@ export type Database = {
           top_scorer_prediction_points?: number
         }
         Update: {
-          revision?: number
-          grand_finale_deadline_at?: string | null
-          grand_finale_deadline_season_id?: string | null
           bonus_picks_category_enabled?: boolean
           bonus_picks_category_weight?: number
           bonus_picks_distance_penalty?: number | null
@@ -1574,6 +1571,8 @@ export type Database = {
           fifth_place_points?: number
           first_place_points?: number
           fourth_place_points?: number
+          grand_finale_deadline_at?: string | null
+          grand_finale_deadline_season_id?: string | null
           judges_score_category_enabled?: boolean
           judges_score_category_weight?: number
           judges_score_multiplier?: number
@@ -1581,6 +1580,7 @@ export type Database = {
           judges_score_starts_week?: number
           league_id?: string
           locking_exempt?: boolean
+          revision?: number
           scoring_configured?: boolean
           second_place_points?: number
           survival_points?: number
@@ -1588,6 +1588,13 @@ export type Database = {
           top_scorer_prediction_points?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "scoring_settings_grand_finale_deadline_season_id_fkey"
+            columns: ["grand_finale_deadline_season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "scoring_settings_league_id_fkey"
             columns: ["league_id"]
@@ -1793,18 +1800,39 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      mutate_draft_moment: { Args: { p_episode_id: string; p_actor_id: string; p_moment_id: string | null; p_couple_id: string | null; p_label: string | null; p_remove: boolean }; Returns: string }
-      set_draft_couple_release: { Args: { p_episode_id: string; p_couple_id: string; p_actor_id: string; p_release: boolean }; Returns: undefined }
-      admin_backfill_prediction: { Args: { p_league_id: string; p_week_id: string; p_manager_id: string; p_elimination: string | null; p_elimination_2: string | null; p_top_scorer: string | null; p_pick_made_at: string; p_reason: string }; Returns: Database["public"]["Tables"]["predictions"]["Row"] }
-      update_scoring_categories_checked: { Args: { p_league_id: string; p_expected_revision: number; p_values: Json }; Returns: Database["public"]["Tables"]["scoring_settings"]["Row"] }
-      commit_episode_reveal: { Args: { p_episode_id: string; p_couple_id: string; p_actor_id: string; p_snapshot: Json; p_plan: Json; p_undo: boolean }; Returns: undefined }
-      replace_weekly_scores: { Args: { p_episode_id: string; p_revision: string; p_rows: Json }; Returns: undefined }
-      save_episode_draft: { Args: { p_input: Json }; Returns: undefined }
-      seed_episode_correction: { Args: { p_episode_id: string; p_started_by: string }; Returns: string }
-      my_co_manager_invite_code: { Args: { p_league_id: string }; Returns: string | null }
-      set_results_contributor: { Args: { p_user_id: string; p_enabled: boolean }; Returns: undefined }
-
       active_season_id: { Args: never; Returns: string }
+      admin_backfill_prediction: {
+        Args: {
+          p_elimination: string
+          p_elimination_2: string
+          p_league_id: string
+          p_manager_id: string
+          p_pick_made_at: string
+          p_reason: string
+          p_top_scorer: string
+          p_week_id: string
+        }
+        Returns: {
+          entered_by: string | null
+          entered_via: string | null
+          entry_reason: string | null
+          id: string
+          league_id: string
+          manager_id: string
+          pick_made_at: string | null
+          predicted_eliminated_couple_id: string | null
+          predicted_eliminated_couple_id_2: string | null
+          predicted_top_scorer_couple_id: string | null
+          submitted_at: string
+          week_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "predictions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_waiver_claim: {
         Args: { p_claim_id: string }
         Returns: {
@@ -1826,7 +1854,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      assert_episode_draft_actor: {
+        Args: { p_actor_id: string; p_episode_id: string }
+        Returns: undefined
+      }
       cancel_account_deletion: { Args: never; Returns: undefined }
+      capture_expired_finale_deadlines: {
+        Args: { p_league_id?: string }
+        Returns: undefined
+      }
       close_grand_finale_late: {
         Args: { p_league_id: string; p_manager_id: string }
         Returns: undefined
@@ -1837,6 +1873,17 @@ export type Database = {
           p_plan: Json
           p_published_by: string
           p_snapshot: Json
+        }
+        Returns: undefined
+      }
+      commit_episode_reveal: {
+        Args: {
+          p_actor_id: string
+          p_couple_id: string
+          p_episode_id: string
+          p_plan: Json
+          p_snapshot: Json
+          p_undo: boolean
         }
         Returns: undefined
       }
@@ -2033,6 +2080,21 @@ export type Database = {
         Args: { p_week_number: number }
         Returns: undefined
       }
+      mutate_draft_moment: {
+        Args: {
+          p_actor_id: string
+          p_couple_id: string
+          p_episode_id: string
+          p_label: string
+          p_moment_id: string
+          p_remove: boolean
+        }
+        Returns: string
+      }
+      my_co_manager_invite_code: {
+        Args: { p_league_id: string }
+        Returns: string
+      }
       prediction_lock_at: {
         Args: { p_league_id: string; p_week_id: string }
         Returns: string
@@ -2126,10 +2188,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      replace_weekly_scores: {
+        Args: { p_episode_id: string; p_revision: string; p_rows: Json }
+        Returns: undefined
+      }
       request_account_deletion: { Args: never; Returns: undefined }
       reset_draft: { Args: { p_league_id: string }; Returns: undefined }
       resolve_acting_league_member: {
         Args: { p_league_id: string }
+        Returns: string
+      }
+      save_episode_draft: { Args: { p_input: Json }; Returns: undefined }
+      seed_episode_correction: {
+        Args: { p_episode_id: string; p_started_by: string }
         Returns: string
       }
       set_custom_draft_order: {
@@ -2139,6 +2210,15 @@ export type Database = {
       set_draft_autopilot: {
         Args: { p_enabled: boolean; p_league_id: string }
         Returns: boolean
+      }
+      set_draft_couple_release: {
+        Args: {
+          p_actor_id: string
+          p_couple_id: string
+          p_episode_id: string
+          p_release: boolean
+        }
+        Returns: undefined
       }
       set_draft_order: {
         Args: { p_league_id: string; p_ordered_user_ids: string[] }
@@ -2151,6 +2231,10 @@ export type Database = {
       set_member_draft_autopilot: {
         Args: { p_enabled: boolean; p_league_id: string; p_user_id: string }
         Returns: boolean
+      }
+      set_results_contributor: {
+        Args: { p_enabled: boolean; p_user_id: string }
+        Returns: undefined
       }
       start_draft: {
         Args: { p_league_id: string }
@@ -2345,6 +2429,8 @@ export type Database = {
           fifth_place_points: number
           first_place_points: number
           fourth_place_points: number
+          grand_finale_deadline_at: string | null
+          grand_finale_deadline_season_id: string | null
           judges_score_category_enabled: boolean
           judges_score_category_weight: number
           judges_score_multiplier: number
@@ -2352,6 +2438,51 @@ export type Database = {
           judges_score_starts_week: number
           league_id: string
           locking_exempt: boolean
+          revision: number
+          scoring_configured: boolean
+          second_place_points: number
+          survival_points: number
+          third_place_points: number
+          top_scorer_prediction_points: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "scoring_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_scoring_categories_checked: {
+        Args: {
+          p_expected_revision: number
+          p_league_id: string
+          p_values: Json
+        }
+        Returns: {
+          bonus_picks_category_enabled: boolean
+          bonus_picks_category_weight: number
+          bonus_picks_distance_penalty: number | null
+          bonus_picks_points_per_correct: number
+          bonus_picks_scoring_method: string | null
+          bonus_picks_tier_pay_style: string
+          bonus_picks_tier_size: number | null
+          curtain_call_near_miss_enabled: boolean
+          elimination_prediction_points: number
+          eliminations_category_enabled: boolean
+          eliminations_category_weight: number
+          fifth_place_points: number
+          first_place_points: number
+          fourth_place_points: number
+          grand_finale_deadline_at: string | null
+          grand_finale_deadline_season_id: string | null
+          judges_score_category_enabled: boolean
+          judges_score_category_weight: number
+          judges_score_multiplier: number
+          judges_score_multiplier_customized: boolean
+          judges_score_starts_week: number
+          league_id: string
+          locking_exempt: boolean
+          revision: number
           scoring_configured: boolean
           second_place_points: number
           survival_points: number
