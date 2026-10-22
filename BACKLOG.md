@@ -31,10 +31,17 @@ Still outstanding:
   site admin who isn't in the league now reads the season and deadlines
   (`apply-service-role-season-grants.sql`). Verified on production with a throwaway
   site admin in #supportSWEKylie: Missed the lock and Record a Pick both appear.
-- Take and restore-test a private backup; provide a DB URL and PostgreSQL client
-  on a trusted machine and schedule recurring backups.
-- Outside live scoring, stage/review the four prepared SQL scripts, regenerate
-  types, deploy the broad remediation and approve global results contributors.
+- Released 2026-10-22: the four audit scripts are live, the app is deployed from
+  `997de1a` and types are regenerated (see CLAUDE.md). Still open from it:
+  - Kylie approves Results Contributors at `/admin/accounts` before E08 (Oct 27);
+    leagues no longer grant score-entry access.
+  - Observe E08's publish, live reveal and undo; also redo the missed E07
+    re-check of Home/Results/Picks/Standings/switcher with a released draft and a
+    live-revealed couple.
+- Backups: a private pre-release dump exists on Kylie's Mac
+  (`~/Backups/mirrorball-before-audit.dump`, Postgres 17.6, pg_dump 18.6). It has
+  not been restore-tested (no spare Supabase project), and recurring backups
+  aren't scheduled.
 - Configure custom SMTP before enabling confirmation/recovery/email changes.
   No emails sent. Existing account ownership needs factual review, not resets.
 - Confirm intended historical backfills (DATA-8); no deletion/recompute authorized.

@@ -24,17 +24,17 @@ Fantasy sports app for Dancing with the Stars. Next.js 15 (App Router), TypeScri
 - **Test changes before finishing.** Run `npm run build`, `npm run lint`, and `npm test` (if the change touches pure logic). Exercise the actual feature path in a browser for user-facing changes — passing type checks/tests is not the same as verifying the feature works.
 - **Keep this file and other docs in sync** with what the app actually does.
 
-## Audit remediation release status — 2026-10-20
+## Audit remediation release status — 2026-10-22
 
-The owner approved the recommended fixes after handoff `682afc7`. The current
-branch prepares the broader changes locally; their deployment is pending. `docs/audit-release-runbook.md`
-is the release order: backup, four `apply-audit-*.sql` scripts in the Dashboard,
-regenerate types, then coordinated app deployment outside live scoring. The
-checked-in types include prepared contracts, not a new live introspection.
-The independent spoiler patch `ce6fc3d` needs no database migration and was pushed
-to origin/main with explicit owner approval; deployment is not yet verified. Auth redirect allow-list hardening is
-already applied and verified; custom SMTP is absent, so `AUTH_EMAIL_ENABLED`
-stays false. No historical picks or standings were changed or recomputed.
+Released 2026-10-22 per `docs/audit-release-runbook.md`: private backup taken,
+the four `apply-audit-*.sql` scripts dry-run in one rolled-back transaction and
+then applied live, the app deployed from `main` (`997de1a`), and types regenerated
+from the live project. Production was verified with throwaway accounts (League
+Settings, revision-checked settings saves, invite privacy, picks with provenance,
+contributor self-grant refused) and signed out. No staging project was used (no
+free project slot). Still to observe on a real night: publish, reveal and undo.
+Custom SMTP is absent, so `AUTH_EMAIL_ENABLED` stays false. No historical picks or
+standings were changed or recomputed.
 
 ## Architecture & Conventions
 
