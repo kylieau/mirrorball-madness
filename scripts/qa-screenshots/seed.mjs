@@ -6,10 +6,16 @@
 //
 //   NODE_OPTIONS=--experimental-websocket node --env-file=.env.local scripts/qa-screenshots/seed.mjs up
 //   NODE_OPTIONS=--experimental-websocket node --env-file=.env.local scripts/qa-screenshots/seed.mjs down
+//   NODE_OPTIONS=--experimental-websocket node --env-file=.env.local scripts/qa-screenshots/seed.mjs sweep
 //
-// `up` writes .qa-state.json (gitignored) next to this file; `down` reads it,
-// deletes the league through delete_league and removes the auth users.
-import { readFile, writeFile, rm } from "node:fs/promises";
+// `up` writes .qa-state.json (gitignored) next to this file and refuses to run
+// while one exists. `down` deletes that league through delete_league, then
+// sweeps: every account on the QA domain (including ones a browser pass signed
+// up through the real form) is deleted with any league only QA accounts belong
+// to. The state file is kept unless the sweep finishes clean, and a league with
+// a real member stops the sweep, so a rerun of `down` retries what's left.
+// `sweep` runs the same sweep with no state file needed.
+import { readFile, writeFile, rm, access } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
@@ -21,6 +27,7 @@ if (!url || !anonKey || !serviceKey) throw new Error("Missing Supabase env (run 
 
 const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 
+const QA_EMAIL_DOMAIN = "mirrorball-test.local";
 const LEAGUE_NAME = "Carrie Ann's Unbelievably Long Ballroom Dynasty Supercalifragilisticexpialidocious";
 const PEOPLE = [
   { key: "viewer", displayName: "Alexandria Ocasio-Whittaker-Ribeiro" },
@@ -43,10 +50,13 @@ async function rpc(client, fn, args) {
 }
 
 async function up() {
+  if (await access(STATE_FILE).then(() => true, () => false)) {
+    throw new Error("A scratch league is already up; run `down` first.");
+  }
   const password = `Qa-${randomUUID()}`;
   const users = {};
   for (const person of PEOPLE) {
-    const email = `qa-${person.key}-${randomUUID().slice(0, 8)}@mirrorball-test.local`;
+    const email = `qa-${person.key}-${randomUUID().slice(0, 8)}@${QA_EMAIL_DOMAIN}`;
     const { data, error } = await admin.auth.admin.createUser({
       email,
       password,
@@ -55,8 +65,8 @@ async function up() {
     });
     if (error) throw error;
     users[person.key] = { id: data.user.id, email, password, displayName: person.displayName };
+    await writeFile(STATE_FILE, JSON.stringify({ users, password }, null, 2));
   }
-  await writeFile(STATE_FILE, JSON.stringify({ users, password }, null, 2));
 
   const viewer = await signIn(users.viewer.email, password);
   const league = await rpc(viewer, "create_league", { p_name: LEAGUE_NAME });
@@ -126,16 +136,59 @@ async function up() {
   console.log(`League ${league.id} ready. Viewer: ${users.viewer.email}`);
 }
 
+async function qaUsers() {
+  const users = [];
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    users.push(...data.users);
+    if (data.users.length < 1000) break;
+  }
+  return users.filter((u) => u.email?.endsWith(`@${QA_EMAIL_DOMAIN}`));
+}
+
+async function sweep() {
+  const users = await qaUsers();
+  const ids = new Set(users.map((u) => u.id));
+  const { data: memberships, error } = await admin.from("league_members").select("league_id, user_id, co_manager_id");
+  if (error) throw error;
+  const leagueIds = new Set(
+    memberships.filter((m) => ids.has(m.user_id) || ids.has(m.co_manager_id)).map((m) => m.league_id),
+  );
+  let failures = 0;
+  for (const leagueId of leagueIds) {
+    const members = memberships.filter((m) => m.league_id === leagueId);
+    if (members.some((m) => !ids.has(m.user_id) || (m.co_manager_id && !ids.has(m.co_manager_id)))) {
+      console.error(`League ${leagueId} has a non-QA member; leaving it and its QA accounts alone.`);
+      failures++;
+      continue;
+    }
+    const { error: deleteError } = await admin.from("leagues").delete().eq("id", leagueId);
+    if (deleteError) {
+      console.error(`delete league ${leagueId}: ${deleteError.message}`);
+      failures++;
+    }
+  }
+  for (const user of users) {
+    const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
+    if (deleteError) {
+      console.error(`deleteUser ${user.email}: ${deleteError.message}`);
+      failures++;
+    }
+  }
+  const left = (await qaUsers()).length;
+  console.log(`Swept ${users.length - left} QA account(s); ${left} left.`);
+  return failures === 0 && left === 0;
+}
+
 async function down() {
   const state = JSON.parse(await readFile(STATE_FILE, "utf8"));
   if (state.leagueId) {
     const viewer = await signIn(state.users.viewer.email, state.password);
     await rpc(viewer, "delete_league", { p_league_id: state.leagueId });
+    await writeFile(STATE_FILE, JSON.stringify({ ...state, leagueId: undefined }, null, 2));
   }
-  for (const user of Object.values(state.users)) {
-    const { error } = await admin.auth.admin.deleteUser(user.id);
-    if (error) console.error(`deleteUser ${user.email}: ${error.message}`);
-  }
+  if (!(await sweep())) throw new Error("Sweep incomplete; .qa-state.json kept. Fix the errors above and rerun `down`.");
   await rm(STATE_FILE);
   console.log("Scratch league and users removed.");
 }
@@ -143,4 +196,6 @@ async function down() {
 const command = process.argv[2];
 if (command === "up") await up();
 else if (command === "down") await down();
-else throw new Error("Usage: seed.mjs up|down");
+else if (command === "sweep") {
+  if (!(await sweep())) process.exitCode = 1;
+} else throw new Error("Usage: seed.mjs up|down|sweep");
