@@ -178,9 +178,12 @@ export default async function LeaguePicksPage({
       ])
     : null;
 
-  const [{ data: grandFinaleDeadlineData }, { data: computedLockAt }] = await Promise.all([
+  const [{ data: grandFinaleDeadlineData }, { data: anchorWeekData }, { data: computedLockAt }] = await Promise.all([
     grandFinaleOn
       ? supabase.rpc("effective_grand_finale_deadline", { p_league_id: id })
+      : Promise.resolve({ data: null }),
+    grandFinaleOn
+      ? supabase.rpc("effective_hard_deadline_week", { p_league_id: id })
       : Promise.resolve({ data: null }),
     curtainCallWeekId
       ? supabase.rpc("prediction_lock_at", { p_league_id: id, p_week_id: curtainCallWeekId })
@@ -197,7 +200,9 @@ export default async function LeaguePicksPage({
     tierSize: scoringSettings?.bonus_picks_tier_size ?? null,
     tierPayStyle:
       (scoringSettings?.bonus_picks_tier_pay_style as TierPayStyle | null) ?? GRAND_FINALE_DEFAULT_TIER_PAY_STYLE,
-    scoringStartsWeek: scoringSettings?.judges_score_starts_week ?? 1,
+    // Before a draft completes, the stored anchor is stale: the draft will
+    // freeze it forward to the next unaired week, so price couples on that.
+    scoringStartsWeek: anchorWeekData ?? scoringSettings?.judges_score_starts_week ?? 1,
   };
   // Section labels (🔮 Curtain Call / 🪩 Dance Card / 🏆 Grand Finale) only
   // earn their keep once there's more than one module on the page to tell

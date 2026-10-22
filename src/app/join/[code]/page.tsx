@@ -46,6 +46,9 @@ export default async function JoinLeaguePage({
 
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6 px-4 py-24">
+      <Link href="/" className="-mb-2 text-sm text-muted-foreground">
+        ‹ Back to Home
+      </Link>
       <Card>
         <CardHeader>
           <CardTitle className="wrap-anywhere">Join {preview.league_name}</CardTitle>

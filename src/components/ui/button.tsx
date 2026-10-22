@@ -52,6 +52,10 @@ function Button({
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      // Every non-native Button here renders a Link; Base UI would announce
+      // it as role="button" (and ignores an undefined override), so restate
+      // the link's own role.
+      {...(props.nativeButton === false && { role: "link" })}
       {...props}
     />
   )

@@ -6,23 +6,13 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 Three journeys at 375px against production data (`seed.mjs` QA-domain accounts,
 swept afterwards): mobile creator on a throttled connection, invite-link newcomer,
-breaker. Fixed in that pass: blank display names at sign-up, invite codes with
-surrounding spaces (the box's 6-character limit cut them off), and no confirmation
-or league name after joining (now `?message=Welcome to {league}!`). Not fixed:
-- Grand Finale in a new mid-season league, before its draft completes: each
-  already-eliminated couple pre-placed in the bracket shows "+8.33 pts", but the
-  draft moves the Anchor Week past those weeks, so they pay nothing. With Dance
-  Card off, the anchor never moves, so check whether they actually pay in that case.
-- With one league, Picks and Standings never show the league's name (the
-  switcher, which carries it, only appears with two or more leagues).
-- Guest Home banner says "See where you landed" to someone with no league.
-- League card "Need Home & High picks" doesn't match the Picks wording ("Who
-  goes home?" / "Who scores highest?").
-- "Set up draft" (Picks, Dance Card) isn't Title Case.
-- Create a League checkboxes use the browser's default blue, not the app's gold.
-- `Button` rendered as a `Link` exposes `role="button"` (e.g. Home's Create
-  Account), so screen readers announce a link as a button.
-- Signed-in `/join/[code]` has no header or way back.
+breaker. Everything it found is fixed except:
+- Kept as is: the league card's "Need Home & High picks". Home/High are the
+  card's established Curtain Call labels (locked Home design), echoing "Who goes
+  home?" / "Who scores highest?".
+- Known, not changed: a mid-season league with Dance Card off keeps Anchor Week 1,
+  so every manager's pre-placed Grand Finale couples really pay. It's the same for
+  every manager, so standings aren't skewed; the commissioner can move the anchor.
 - Slow-network timing (production build, ~400 kbps, 400 ms latency): Home shows
   content at 2.7s and finishes loading at 7.3s; later steps take 1–2.5s. No action.
 

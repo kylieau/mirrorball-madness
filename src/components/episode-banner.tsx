@@ -68,7 +68,7 @@ function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
     case "results_soon":
       return { chip: "Curtain Closed", title: "Results Soon", sub: "Tallying the scores", live: false };
     case "results_in":
-      return { chip: "That's a Wrap", title: "Scores Are In", sub: "See where you landed", live: false };
+      return { chip: "That's a Wrap", title: "Scores Are In", sub: "See where everyone landed", live: false };
   }
 }
 

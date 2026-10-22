@@ -122,6 +122,8 @@
     @apply text-foreground;
     background: var(--desk);
     -webkit-tap-highlight-color: transparent;
+    /* Native checkboxes and radios are gold, not the browser's blue. */
+    accent-color: var(--primary);
   }
   html {
     @apply font-sans;

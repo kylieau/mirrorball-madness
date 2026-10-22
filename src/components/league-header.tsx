@@ -66,13 +66,17 @@ export function LeagueHeader({
 
   const pageHeader = (
     <PageHeader title={title}>
-      {switcherLeagues.length > 1 && (
+      {switcherLeagues.length > 1 ? (
         <LeagueSwitcher
           currentLeagueId={leagueId}
           leagues={switcherLeagues}
           currentStanding={switcherCurrent}
           tab={tab}
         />
+      ) : (
+        <p className="truncate text-sm font-medium text-muted-foreground">
+          {switcherLeagues.find((l) => l.id === leagueId)?.name}
+        </p>
       )}
     </PageHeader>
   );

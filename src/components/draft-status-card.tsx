@@ -97,7 +97,7 @@ export function DraftStatusCard({
             variant={isCommissioner ? "default" : "outline"}
             size="sm"
           >
-            {isCommissioner ? "Set up draft" : "View draft order & set auto-picks"}
+            {isCommissioner ? "Set Up Draft" : "View Draft Order & Set Auto-Picks"}
           </Button>
         </CardContent>
       </Card>
