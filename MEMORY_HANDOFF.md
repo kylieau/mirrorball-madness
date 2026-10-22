@@ -64,7 +64,7 @@ This session's commits:
 Deferred items are in BACKLOG under "Audit remediation — 2026-10-20".
 
 **Kylie, this week** (she'll do these later in the week):
-- approve Results Contributors at `/admin/accounts` (none yet);
+- approve any further Results Contributors at `/admin/accounts` (balla is approved, verified 2026-10-22);
 - get Jonathan Au and arielle to submit their open Grand Finale late entries before 8 PM ET Oct 27, or close them;
 - optionally, reissue her `#supportSWEKylie` co-manager code;
 - later: DATA-8 backfills, repo visibility, SMTP, recurring backups and a restore test.

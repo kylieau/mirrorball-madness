@@ -34,7 +34,7 @@ Still outstanding:
 - Released 2026-10-22: the four audit scripts are live, the app is deployed from
   `997de1a` and types are regenerated (see CLAUDE.md). Still open from it:
   - Kylie approves Results Contributors at `/admin/accounts` before E08 (Oct 27);
-    leagues no longer grant score-entry access. As of 2026-10-22 none are approved.
+    leagues no longer grant score-entry access. As of 2026-10-22 balla is approved.
   - Before E08's curtain, get the two open Grand Finale late entries (Jonathan Au,
     #supportSWEKylie, 80%; arielle, Carrie Ann's Biggest Fans, 100%) submitted or
     closed. The air-to-publish pause refuses their submits until E08 publishes.

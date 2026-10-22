@@ -110,7 +110,7 @@ publish, reveal and undo on the released code. Observe them; never stage them
 with fake scores.
 
 State checked 2026-10-22 with the service role:
-- No Results Contributors are approved. Only the site admin can enter E08 scores.
+- One Results Contributor is approved (balla), besides the site admin.
 - Two Grand Finale late entries are still open and unsubmitted: Jonathan Au in
   #supportSWEKylie (80%) and arielle in Carrie Ann's Biggest Fans (100%). Their
   submits are refused from the curtain until E08 publishes. The six couples
