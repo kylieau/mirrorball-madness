@@ -19,11 +19,7 @@
 - **Backup:** `~/Backups/mirrorball-before-audit.dump` on Kylie's Mac (Postgres 17.6, pg_dump 18.6). Not restore-tested.
 - **No staging rehearsal.** Kylie has no free Supabase project slot.
 
-**Branch `audit-remediation-20261020`** (no upstream) is two commits ahead of `origin/main`, **neither pushed**:
-- `5b46846`: regenerated `types.ts` from the live project. Generated RPC args are non-null, so the two `mutate_draft_moment` calls in `results-draft.ts` cast their nulls, like the backfill action. tsc, eslint, 644 tests and the build pass.
-- `223dba6`: CLAUDE.md release status, plus BACKLOG.
-
-Pushing them to `main` deploys, so wait for Kylie's yes (asked, not yet answered). This handoff commit sits on top of them.
+**Repo:** this checkout is on `main`, tracking `origin/main`, and everything is pushed. That includes `5b46846` (regenerated `types.ts`; the two `mutate_draft_moment` calls cast their null args, like the backfill action) and `223dba6` (CLAUDE.md release status plus BACKLOG), which Kylie approved. The `audit-remediation-20261020` branch has nothing that isn't on `main`. It's kept as a record; delete it whenever.
 
 ## 2. Changes Made
 
@@ -35,6 +31,8 @@ This session's commits:
 - `5b46846`: types.
 - `223dba6`: release docs.
 - This handoff.
+
+All of them are on `main`.
 
 **Not ours; leave unstaged:**
 - `.devcontainer/devcontainer.json`: Kylie's machine-only Codex SSH setup. It mounts gitignored `.codex-private/` and sets `seccomp=unconfined`. Don't commit it as is.
@@ -67,7 +65,6 @@ This session's commits:
 Deferred items are in BACKLOG under "Audit remediation — 2026-10-20".
 
 **Kylie:**
-- yes or no on pushing `5b46846`/`223dba6` (and this handoff) to `main`;
 - approve Results Contributors at `/admin/accounts` before E08;
 - reissue her `#supportSWEKylie` co-manager code if wanted;
 - DATA-8 backfills, repo visibility, SMTP, recurring backups and a restore test.
@@ -76,4 +73,4 @@ Deferred items are in BACKLOG under "Audit remediation — 2026-10-20".
 - observe publish, live reveal and undo;
 - re-check Home, Results, Picks, Standings and the switcher with a released draft and a live-revealed couple (missed on E07).
 
-Next command, once Kylie approves: `git push origin audit-remediation-20261020:main`
+Next command: none pending. Next work is E08 night.
