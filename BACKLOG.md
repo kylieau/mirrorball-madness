@@ -34,8 +34,12 @@ Still outstanding:
 - Released 2026-10-22: the four audit scripts are live, the app is deployed from
   `997de1a` and types are regenerated (see CLAUDE.md). Still open from it:
   - Kylie approves Results Contributors at `/admin/accounts` before E08 (Oct 27);
-    leagues no longer grant score-entry access.
-  - Observe E08's publish, live reveal and undo; also redo the missed E07
+    leagues no longer grant score-entry access. As of 2026-10-22 none are approved.
+  - Before E08's curtain, get the two open Grand Finale late entries (Jonathan Au,
+    #supportSWEKylie, 80%; arielle, Carrie Ann's Biggest Fans, 100%) submitted or
+    closed. The air-to-publish pause refuses their submits until E08 publishes.
+  - Observe E08's publish, live reveal and undo (checklist: `docs/audit-release-runbook.md`
+    → First live night after the release); also redo the missed E07
     re-check of Home/Results/Picks/Standings/switcher with a released draft and a
     live-revealed couple.
 - Backups: a private pre-release dump exists on Kylie's Mac
