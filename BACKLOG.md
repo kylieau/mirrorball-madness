@@ -2,6 +2,17 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## E08 night follow-ups — 2026-10-27
+
+- `docs/audit-release-runbook.md` says E08 has no guest judges; Shirley Ballas
+  judged it. Fix that line (needs a push).
+- League Settings' "Lock Week N Picks Now?" dialog (`pickLockFlip` `lock_now`)
+  is unit-tested but not seen in a browser. Check it on a league whose current
+  week is still open.
+- Home's picks-due check (`league-home-summary.ts`) ignores the second
+  elimination slot, so a manager with one saved pick looks caught up after a
+  week is flagged double. Kylie handled it by messaging managers; not changed.
+
 ## First-user QA pass — 2026-10-22
 
 Three journeys at 375px against production data (`seed.mjs` QA-domain accounts,
