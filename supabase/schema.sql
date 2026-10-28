@@ -4036,26 +4036,6 @@ create trigger preserve_finale_schedule before update or delete on public.episod
 drop trigger if exists preserve_finale_weeks on public.competition_weeks;
 create trigger preserve_finale_weeks before update or delete on public.competition_weeks for each row execute function public.preserve_finale_deadline();
 
-create or replace function public.guard_curtain_call_lock_edit()
-returns trigger language plpgsql security definer set search_path = '' as $$
-declare w record; old_lock timestamptz; new_lock timestamptz; at_time timestamptz;
-begin
-  if (new.prediction_lock_coast,new.prediction_lock_hours_before_air) is not distinct from (old.prediction_lock_coast,old.prediction_lock_hours_before_air) then return new; end if;
-  for w in select cw.id,min(e.airs_at) as airs_at,(array_agg(e.duration_minutes order by e.airs_at))[1] as duration_minutes
-    from public.competition_weeks cw join public.episodes e on e.week_id=cw.id
-    where cw.season_id=public.active_season_id() group by cw.id having bool_or(e.results_published_at is null) loop
-    old_lock := public.prediction_lock_at(old.id,w.id);
-    at_time := case when new.prediction_lock_coast='west' then ((w.airs_at at time zone 'America/New_York')::date + time '20:00') at time zone 'America/Los_Angeles' else w.airs_at end;
-    new_lock := least(at_time-new.prediction_lock_hours_before_air*interval '1 hour',at_time+w.duration_minutes*interval '1 minute');
-    if old_lock <= now() or new_lock <= now() then raise exception 'This week is already locked. Change pick timing after its results are published.'; end if;
-  end loop;
-  return new;
-end;
-$$;
-revoke all on function public.guard_curtain_call_lock_edit() from public,anon,authenticated;
-drop trigger if exists guard_curtain_call_lock_edit on public.leagues;
-create trigger guard_curtain_call_lock_edit before update on public.leagues for each row execute function public.guard_curtain_call_lock_edit();
-
 create or replace function public.bump_scoring_revision()
 returns trigger language plpgsql set search_path = '' as $$
 begin

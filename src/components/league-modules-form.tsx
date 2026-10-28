@@ -1,7 +1,7 @@
 "use client";
 
 import { formatPoints } from "@/lib/format-points";
-import { curtainCallLockAt, describePickLockOffset, type PickLockCoast } from "@/lib/curtain-call-lock";
+import { curtainCallLockAt, describePickLockOffset, pickLockFlip, type PickLockCoast, type PickLockFlip, type PickTiming } from "@/lib/curtain-call-lock";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -300,6 +300,11 @@ export function LeagueModulesForm({
   );
   const predictionLockHoursBeforeAir =
     predictionLockDirection === "after" ? -predictionLockHours : predictionLockHours;
+  const [savedPickTiming, setSavedPickTiming] = useState<PickTiming>({
+    coast: (league.prediction_lock_coast as PickLockCoast) ?? "east",
+    hoursBeforeAir: league.prediction_lock_hours_before_air,
+  });
+  const [confirmLockFlip, setConfirmLockFlip] = useState<{ flip: PickLockFlip; exitAfter: boolean } | null>(null);
   const nextLockAt = nextCurtainCallNight
     ? curtainCallLockAt({
         firstAirsAt: nextCurtainCallNight.airsAt,
@@ -452,7 +457,7 @@ export function LeagueModulesForm({
   });
   const showAnchorSync = shouldShowAnchorSyncControl(canEdit, judgesStartsWeek, lockWeek);
 
-  async function handleSave(exitAfter = false) {
+  async function handleSave(exitAfter = false, lockFlipConfirmed = false) {
     try {
       setError(null);
       setSyncError(null);
@@ -470,6 +475,21 @@ export function LeagueModulesForm({
 
       if (eliminationsEnabled && predictionLockHours < 0) {
         setError("Pick 'Em Lock can't be negative.");
+        return;
+      }
+
+      const pickTiming: PickTiming = { coast: predictionLockCoast, hoursBeforeAir: predictionLockHoursBeforeAir };
+      const flip =
+        !lockFlipConfirmed && eliminationsEnabled && nextCurtainCallNight
+          ? pickLockFlip(
+              { firstAirsAt: nextCurtainCallNight.airsAt, durationMinutes: nextCurtainCallNight.durationMinutes },
+              savedPickTiming,
+              pickTiming,
+              Date.now()
+            )
+          : null;
+      if (flip) {
+        setConfirmLockFlip({ flip, exitAfter });
         return;
       }
 
@@ -518,6 +538,7 @@ export function LeagueModulesForm({
 
       if (scoringResult.revision != null) setSettingsRevision(scoringResult.revision);
       const combinedError = scoringResult.error || leagueResult.error;
+      if (!leagueResult.error) setSavedPickTiming(pickTiming);
       if (combinedError) {
         setError(combinedError);
         setSubmitting(false);
@@ -784,6 +805,45 @@ export function LeagueModulesForm({
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={confirmLockFlip !== null} onOpenChange={(open) => !open && setConfirmLockFlip(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmLockFlip?.flip === "lock_now" ? "Lock" : "Reopen"} Week {nextCurtainCallNight?.weekNumber} Picks
+              {confirmLockFlip?.flip === "lock_now" ? " Now" : ""}?
+            </DialogTitle>
+            <DialogDescription>
+              {confirmLockFlip?.flip === "lock_now" ? (
+                <>
+                  This week&apos;s Curtain Call picks are still open. Saving this timing locks them right away, so
+                  managers who haven&apos;t picked yet can&apos;t, and everyone&apos;s picks become visible to the league.
+                </>
+              ) : (
+                <>
+                  This week&apos;s Curtain Call picks have already locked. Saving this timing reopens them
+                  {formattedNextLockAt ? ` until ${formattedNextLockAt}` : ""}, so managers can make or change picks
+                  after the show has started and after everyone&apos;s picks were visible.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmLockFlip(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const exitAfter = confirmLockFlip?.exitAfter ?? false;
+                setConfirmLockFlip(null);
+                handleSave(exitAfter, true);
+              }}
+            >
+              {confirmLockFlip?.flip === "lock_now" ? "Lock Picks Now" : "Reopen Picks"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={confirmResetNeutral} onOpenChange={setConfirmResetNeutral}>
         <DialogContent>

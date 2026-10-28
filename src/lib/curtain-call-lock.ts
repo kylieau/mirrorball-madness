@@ -27,6 +27,25 @@ export function curtainCallLockAt({
   return new Date(Math.min(lock, showEnd));
 }
 
+export type PickTiming = { coast: PickLockCoast; hoursBeforeAir: number };
+
+export type PickLockFlip = "reopen" | "lock_now";
+
+// The server lets a commissioner move a lock either way at any time, so
+// League Settings asks them to confirm before a timing change reopens a
+// locked week or locks an open one on the spot.
+export function pickLockFlip(
+  night: { firstAirsAt: string; durationMinutes: number },
+  saved: PickTiming,
+  next: PickTiming,
+  now: number
+): PickLockFlip | null {
+  const wasLocked = curtainCallLockAt({ ...night, ...saved }).getTime() <= now;
+  const willLock = curtainCallLockAt({ ...night, ...next }).getTime() <= now;
+  if (wasLocked === willLock) return null;
+  return wasLocked ? "reopen" : "lock_now";
+}
+
 // "2h before the curtain", "At the curtain", "30m after the curtain".
 export function describePickLockOffset(hoursBeforeAir: number): string {
   const minutes = Math.round(Math.abs(hoursBeforeAir) * 60);

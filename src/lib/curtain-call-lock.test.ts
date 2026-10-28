@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { curtainCallLockAt, describePickLockOffset } from "./curtain-call-lock";
+import { curtainCallLockAt, describePickLockOffset, pickLockFlip } from "./curtain-call-lock";
 
 // Tue 2026-10-06, 8pm EDT = 00:00Z Oct 7; the West feed is 8pm PDT = 03:00Z.
 const OCT_EAST = "2026-10-07T00:00:00Z";
@@ -42,5 +42,26 @@ describe("describePickLockOffset", () => {
     expect(describePickLockOffset(2)).toBe("2h before the curtain");
     expect(describePickLockOffset(1.5)).toBe("1h 30m before the curtain");
     expect(describePickLockOffset(-0.5)).toBe("30m after the curtain");
+  });
+});
+
+describe("pickLockFlip", () => {
+  const night = { firstAirsAt: OCT_EAST, durationMinutes: 120 };
+  const east = { coast: "east" as const, hoursBeforeAir: 0 };
+  const duringEastShow = Date.parse("2026-10-07T01:00:00Z");
+  const afternoon = Date.parse("2026-10-06T20:00:00Z");
+
+  it("flags a change that moves a passed lock into the future", () => {
+    expect(pickLockFlip(night, east, { coast: "west", hoursBeforeAir: 0 }, duringEastShow)).toBe("reopen");
+    expect(pickLockFlip(night, east, { coast: "east", hoursBeforeAir: -1.5 }, duringEastShow)).toBe("reopen");
+  });
+
+  it("flags a change that moves an open lock into the past", () => {
+    expect(pickLockFlip(night, east, { coast: "east", hoursBeforeAir: 6 }, afternoon)).toBe("lock_now");
+  });
+
+  it("stays quiet when the week stays locked or stays open", () => {
+    expect(pickLockFlip(night, east, { coast: "east", hoursBeforeAir: -0.5 }, duringEastShow)).toBeNull();
+    expect(pickLockFlip(night, east, { coast: "west", hoursBeforeAir: 0 }, afternoon)).toBeNull();
   });
 });

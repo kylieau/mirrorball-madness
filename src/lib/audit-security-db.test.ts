@@ -32,6 +32,7 @@ describe("audit security and draft lifecycle in PostgreSQL",()=>{
     const deadlines=readFileSync("supabase/apply-audit-deadlines.sql","utf8");await db.exec(deadlines);await db.exec(deadlines);
     const settings=readFileSync("supabase/apply-audit-settings.sql","utf8");await db.exec(settings);await db.exec(settings);
     const provenance=readFileSync("supabase/apply-audit-prediction-provenance.sql","utf8");await db.exec(provenance);await db.exec(provenance);
+    const lockGuard=readFileSync("supabase/apply-drop-curtain-call-lock-guard.sql","utf8");await db.exec(lockGuard);await db.exec(lockGuard);
   },30000);
   afterAll(async()=>{await db?.close();});
   beforeEach(async()=>{
@@ -120,10 +121,10 @@ describe("audit security and draft lifecycle in PostgreSQL",()=>{
     await db.exec(`reset role;update public.episodes set results_published_at=now(),status='completed' where id='${episode}';`);
     await asUser(manager);expect((await db.query("select * from public.submit_grand_finale_prediction($1,$2)",[league,cast])).rows).toHaveLength(2);
   });
-  it("does not let a lock edit reveal picks early or reopen an already-locked week",async()=>{
-    await expect(db.query("update public.leagues set prediction_lock_hours_before_air=100 where id=$1",[league])).rejects.toThrow(/already locked/);
+  it("lets a commissioner reopen an already-locked week",async()=>{
     await db.exec(`update public.episodes set airs_at=now()-interval '1 hour' where id='${episode}';`);
-    await expect(db.query("update public.leagues set prediction_lock_coast='west' where id=$1",[league])).rejects.toThrow(/already locked/);
+    await asUser(admin);await db.query("select public.update_league_settings($1,'locked',null,60,-1.5,'east','snake',null)",[league]);
+    await asUser(manager);await db.query("select public.submit_prediction($1,$2,$3,null,null)",[league,week,cast[0]]);
   });
 
   it("installs reveals atomically and rejects a stale second post",async()=>{
