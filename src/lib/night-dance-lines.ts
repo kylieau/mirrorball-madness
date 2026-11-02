@@ -7,6 +7,9 @@ export type NightDance = {
   song: string | null;
   totalScore: number;
   scaledScore: number;
+  // The team whose score this row is (entity model); absent or null for the
+  // couple's own dance and before the migration is applied.
+  teamId?: string | null;
 };
 
 export const TEAM_DANCE_ROUND_TYPE = "Team Dance";
@@ -34,7 +37,14 @@ function trimNumber(n: number): string {
   return String(Math.round(n * 100) / 100);
 }
 
-function styleLabel(dance: NightDance, team: boolean): string {
+// A row tagged with its team reads "Team Dance · Slaytopia" (or "Team Dance"
+// when the name is not readable, e.g. a guest before the episode publishes);
+// an untagged Freestyle on a Team Dance night keeps the older "(Team)" hint.
+function styleLabel(dance: NightDance, team: boolean, teamNames: ReadonlyMap<string, string>): string {
+  if (dance.teamId) {
+    const name = teamNames.get(dance.teamId);
+    return name ? `Team Dance · ${name}` : "Team Dance";
+  }
   return `${dance.style}${team ? " (Team)" : ""}`;
 }
 
@@ -45,7 +55,11 @@ function styleLabel(dance: NightDance, team: boolean): string {
 // "Freestyle (Team) 36", "Night 64/80" — so the card total reads as one
 // night, not a list of unrelated numbers. When a row's panel can't be
 // recovered (no marks stored), the night line shows the total only.
-export function coupleDanceLines(dances: NightDance[], teamDanceEpisodes: ReadonlySet<string>): string[] {
+export function coupleDanceLines(
+  dances: NightDance[],
+  teamDanceEpisodes: ReadonlySet<string>,
+  teamNames: ReadonlyMap<string, string> = new Map()
+): string[] {
   const byEpisode = new Map<string, NightDance[]>();
   for (const dance of dances) byEpisode.set(dance.episodeId, [...(byEpisode.get(dance.episodeId) ?? []), dance]);
 
@@ -55,13 +69,14 @@ export function coupleDanceLines(dances: NightDance[], teamDanceEpisodes: Readon
     if (night.length < 2) {
       for (const dance of night) {
         const song = dance.song?.trim();
-        lines.push(song ? `${styleLabel(dance, isTeamDance(dance.style, team))} · ${song}` : styleLabel(dance, isTeamDance(dance.style, team)));
+        const label = styleLabel(dance, isTeamDance(dance.style, team), teamNames);
+        lines.push(song ? `${label} · ${song}` : label);
       }
       continue;
     }
     for (const dance of night) {
       const song = dance.song?.trim();
-      const scored = `${styleLabel(dance, isTeamDance(dance.style, team))} ${trimNumber(dance.totalScore)}`;
+      const scored = `${styleLabel(dance, isTeamDance(dance.style, team), teamNames)} ${trimNumber(dance.totalScore)}`;
       lines.push(song ? `${scored} · ${song}` : scored);
     }
     const [collapsed] = collapseToNights(night);

@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import type { ScoringJudge } from "@/lib/scoring-judges";
-import type { ApplyTeamDanceResult } from "@/lib/episode-teams";
 import {
   parseTeamMarks,
   sameTeamMarks,
@@ -26,6 +25,14 @@ export type TeamEntryView = {
   applied: { marks: TeamMark[] | null; mismatch: boolean };
   // Each member's own (non-team) marks so far, for the posted-member warning.
   individualTotals: Record<string, number>;
+};
+
+// What the inferred fallback's apply reports back to the entry.
+export type ApplyTeamDanceResult = {
+  applied: string[];
+  posted: string[];
+  skipped: { coupleId: string; reason: "withdrawn" | "bye" | "eliminated" | "not_performing" }[];
+  collisions: { coupleId: string; teamRows: number; otherDances: number }[];
 };
 
 export type ApplyOutcome = { error: string | null; result?: ApplyTeamDanceResult };
@@ -104,8 +111,8 @@ export function TeamEntry({
   guestJudgeIds: ReadonlySet<string>;
   coupleName: (coupleId: string) => ReactNode;
   canOverride: boolean;
-  // Saved teams (supabase/apply-team-dances.sql) can be edited by name; an
-  // inferred team is edited by changing the couples' own second slots.
+  // An inferred team is edited by changing the couples' own second slots;
+  // the entity model's saved teams use TeamEntityEntry instead.
   canSetup: boolean;
   inputsDisabled: boolean;
   busy: boolean;

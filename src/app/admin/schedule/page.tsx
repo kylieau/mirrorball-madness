@@ -42,7 +42,7 @@ export default async function SchedulePage() {
         judges={data.judges}
         guestJudgesByEpisode={data.guestJudgesByEpisode}
         danceStyles={data.danceStyles}
-        teamsAvailable={data.teamsAvailable}
+        teamsAvailable={data.teamsMode === "entity"}
         teamsByEpisode={data.teamsByEpisode}
       />
     </div>

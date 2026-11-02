@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   saveEpisodeDraft,
@@ -12,21 +12,27 @@ import {
   releaseDraftCoupleAction,
   startEpisodeCorrection,
   withdrawDraftCoupleAction,
-  applyTeamDanceAction,
-  overridePostedTeamMemberAction,
   saveEpisodeTeamsAction,
+  saveTeamMarksAction,
+  revealTeamScores,
+  undoTeamScores,
 } from "@/app/admin/results/actions";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TeamEntry, type ApplyOutcome, type TeamEntryView } from "@/components/team-entry";
+import { TeamEntityEntry, type TeamEntityView } from "@/components/team-entity-entry";
+import type { TeamsMode } from "@/lib/episode-teams";
 import { TeamEditor, teamDraftsFromTeams, teamDraftsToSetup, type TeamDraft } from "@/components/team-editor";
 import {
   appliedTeamMarks,
   buildNightSummary,
+  eligibleTeamMembers,
   inferTeamsFromRows,
   isTeamDanceRow,
   isTeamStyleName,
   teamApplyPlan,
+  teamMarksTotal,
   validateTeamSetup,
+  TEAM_DANCE_JUDGE_COUNT,
   type EpisodeTeam,
   type TeamMark,
 } from "@/lib/team-dances";
@@ -267,8 +273,10 @@ export function ResultsForm({
   participantsByEpisode,
   guestJudgesByEpisode,
   roundTypesByEpisode,
-  teamsAvailable,
+  teamsMode,
   teamsByEpisode,
+  teamMarksByTeam,
+  teamLiveByTeam,
   revealedDancesByEpisode,
 }: {
   // Trusted contributors draft results; only site admins publish or correct.
@@ -292,10 +300,13 @@ export function ResultsForm({
   participantsByEpisode: Record<string, string[]>;
   guestJudgesByEpisode: Record<string, string[]>;
   roundTypesByEpisode: Record<string, string[]>;
-  // False until supabase/apply-team-dances.sql is applied: the Team Dances
-  // card stays hidden and a note points to manual second-slot entry.
-  teamsAvailable: boolean;
+  // "entity" once supabase/apply-team-dance-entity.sql is applied: teams are
+  // saved rows with marks of their own and post separately. "inferred" until
+  // then: teams are read off the couples' slot-2 rows (the fallback).
+  teamsMode: TeamsMode;
   teamsByEpisode: Record<string, EpisodeTeam[]>;
+  teamMarksByTeam: Record<string, TeamMark[]>;
+  teamLiveByTeam: Record<string, { total: number; coupleIds: string[] }>;
   revealedDancesByEpisode: Record<string, Record<string, { danceStyleId: string; songTitle: string | null; totalScore: number }[]>>;
 }) {
   const weekById = new Map(weeks.map((week) => [week.id, week]));
@@ -356,12 +367,11 @@ export function ResultsForm({
     .map((id) => couplesById.get(id) ?? activeCouples.find((c) => c.id === id))
     .filter((c): c is Couple => !!c);
 
+  const entity = teamsMode === "entity";
+  const teamsAvailable = entity;
   const persistedTeams = selectedEpisode ? (teamsByEpisode[selectedEpisode.id] ?? []) : [];
-  // Saved teams hold one slot per member for the team dance; inferred teams
-  // are read off rows that already exist, so hydration only needs these.
-  const persistedTeamByCouple = new Map<string, EpisodeTeam>(
-    persistedTeams.flatMap((team) => team.memberCoupleIds.map((coupleId) => [coupleId, team] as const))
-  );
+  // Team rows never live in a draft, so hydration holds no slot for them.
+  const persistedTeamByCouple = new Map<string, EpisodeTeam>();
   const teamDanceTicked = (roundTypesByEpisode[selectedEpisode?.id ?? ""] ?? []).includes("Team Dance");
   // Ticking Team Dance under Round Types on Schedule is what brings the card
   // out; saved teams keep it out even if the tick is later removed.
@@ -403,7 +413,7 @@ export function ResultsForm({
   // second slot shares a Freestyle and a song -- what the live draft already
   // holds -- so the card works before the migration is applied.
   const inferredTeams =
-    persistedTeams.length === 0 && teamDanceTicked && selectedEpisode
+    !entity && persistedTeams.length === 0 && teamDanceTicked && selectedEpisode
       ? inferTeamsFromRows(
           selectedEpisode.id,
           episodeCouples.map((c) => ({ coupleId: c.id, dances: (rows[c.id] ?? emptyRow()).dances.filter((d) => d.danceStyleId) })),
@@ -559,12 +569,13 @@ export function ResultsForm({
   const eliminatedCount = episodeCouples.filter((c) => (rows[c.id] ?? emptyRow()).outcome === "eliminated").length;
   const requiredEliminations = selectedWeek?.is_double_elimination_week ? 2 : 1;
 
+  const postedTeamCount = persistedTeams.filter((t) => t.postedAt != null).length;
   useEffect(() => {
-    if (revealedCoupleIds.size === 0) return;
+    if (revealedCoupleIds.size === 0 && postedTeamCount === 0) return;
     setNowMs(Date.now());
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [revealedCoupleIds.size]);
+  }, [revealedCoupleIds.size, postedTeamCount]);
 
   // Only the couples actually edited since the last save -- see
   // draftSaveQueue's comment. A stale coupleId (removed from the entry list
@@ -673,11 +684,9 @@ export function ResultsForm({
     });
   }
 
-  // Saved teams merge server-side through apply_team_dance (the members' own
-  // dances are flushed first so the RPC sees them). Inferred teams, or any
-  // team before the migration is applied, write the marks into each eligible
-  // member's existing team row here and ride the ordinary draft save, so the
-  // card works with no database change.
+  // Inferred fallback (migration not applied): the marks go into each
+  // eligible member's existing team row here and ride the ordinary draft
+  // save, so the entry works with no database change.
   async function handleApplyTeam(teamId: string, marks: TeamMark[]): Promise<ApplyOutcome> {
     if (!selectedEpisode) return { error: "Select a week first." };
     const view = teamViews.find((v) => v.team.id === teamId);
@@ -685,34 +694,20 @@ export function ResultsForm({
     const { team, plan } = view;
     setTeamBusy(true);
     try {
-      if (team.inferred || !teamsAvailable) {
-        const applied = plan.filter((p) => p.state === "will_apply" || p.state === "applied").map((p) => p.coupleId);
-        writeTeamMarksIntoRows(team, marks, applied);
-        for (const coupleId of applied) draftSaveQueue.current.markDirty(coupleId);
-        const saved = await flushDraft();
-        if (saved.error) return { error: saved.error };
-        return {
-          error: null,
-          result: {
-            applied,
-            posted: plan.filter((p) => p.state === "posted_waiting").map((p) => p.coupleId),
-            skipped: plan.filter((p) => p.state === "skipped").map((p) => ({ coupleId: p.coupleId, reason: p.reason ?? "withdrawn" })),
-            collisions: plan.filter((p) => p.state === "collision").map((p) => ({ coupleId: p.coupleId, teamRows: 0, otherDances: p.otherDances })),
-          },
-        };
-      }
+      const applied = plan.filter((p) => p.state === "will_apply" || p.state === "applied").map((p) => p.coupleId);
+      writeTeamMarksIntoRows(team, marks, applied);
+      for (const coupleId of applied) draftSaveQueue.current.markDirty(coupleId);
       const saved = await flushDraft();
       if (saved.error) return { error: saved.error };
-      justSavedEpisodeId.current = selectedEpisode.id;
-      const outcome = await applyTeamDanceAction({ episodeId: selectedEpisode.id, teamId, marks });
-      if (outcome.error) {
-        justSavedEpisodeId.current = null;
-        return outcome;
-      }
-      writeTeamMarksIntoRows(team, marks, outcome.result?.applied ?? []);
-      setDraftSavedAt(new Date().toISOString());
-      setHasDraft(true);
-      return outcome;
+      return {
+        error: null,
+        result: {
+          applied,
+          posted: plan.filter((p) => p.state === "posted_waiting").map((p) => p.coupleId),
+          skipped: plan.filter((p) => p.state === "skipped").map((p) => ({ coupleId: p.coupleId, reason: p.reason ?? "withdrawn" })),
+          collisions: plan.filter((p) => p.state === "collision").map((p) => ({ coupleId: p.coupleId, teamRows: 0, otherDances: p.otherDances })),
+        },
+      };
     } catch {
       return { error: "Could not confirm the update. Please refresh and try again." };
     } finally {
@@ -720,20 +715,14 @@ export function ResultsForm({
     }
   }
 
-  // Un-post, carry the team score into the member's draft, post again. With a
-  // saved team the server action runs all three; otherwise the same three
-  // steps use the existing reveal actions around an ordinary draft save.
+  // Inferred fallback: un-post, carry the team score into the member's
+  // draft, post again, through the existing reveal actions.
   async function handleOverrideTeamMember(teamId: string, coupleId: string, marks: TeamMark[]) {
     if (!selectedEpisode) return { error: "Select a week first." };
     const team = episodeTeams.find((t) => t.id === teamId);
     if (!team) return { error: "That team is no longer on this episode. Refresh and try again." };
     setTeamBusy(true);
     try {
-      if (!team.inferred && teamsAvailable) {
-        const result = await overridePostedTeamMemberAction({ episodeId: selectedEpisode.id, teamId, coupleId, marks });
-        router.refresh();
-        return result;
-      }
       const undone = await undoCoupleReveal({ episodeId: selectedEpisode.id, coupleId });
       if (undone.error) return { error: `Could not un-post this couple: ${undone.error}` };
       writeTeamMarksIntoRows(team, marks, [coupleId]);
@@ -747,6 +736,51 @@ export function ResultsForm({
       router.refresh();
       if (reposted.error) return { error: `Team score saved, but this couple could not be posted again: ${reposted.error}` };
       return { error: null };
+    } catch {
+      return { error: "Could not confirm the update. Please refresh and try again." };
+    } finally {
+      setTeamBusy(false);
+    }
+  }
+
+  // Entity model: marks live on the team and save as they are typed; the
+  // team posts, un-posts or re-posts on its own and the week's judges points
+  // are recomputed each time.
+  async function handleSaveTeamMarks(teamId: string, marks: TeamMark[]) {
+    if (!selectedEpisode) return { error: "Select a week first." };
+    try {
+      const result = await saveTeamMarksAction({ episodeId: selectedEpisode.id, teamId, marks });
+      if (!result.error) {
+        setDraftSavedAt(new Date().toISOString());
+        setHasDraft(true);
+      }
+      return result;
+    } catch {
+      return { error: "Could not confirm the update. Please refresh and try again." };
+    }
+  }
+
+  async function handlePostTeam(teamId: string) {
+    if (!selectedEpisode) return { error: "Select a week first." };
+    setTeamBusy(true);
+    try {
+      const result = await revealTeamScores({ episodeId: selectedEpisode.id, teamId });
+      if (!result.error) router.refresh();
+      return result;
+    } catch {
+      return { error: "Could not confirm the update. Please refresh and try again." };
+    } finally {
+      setTeamBusy(false);
+    }
+  }
+
+  async function handleUndoTeam(teamId: string) {
+    if (!selectedEpisode) return { error: "Select a week first." };
+    setTeamBusy(true);
+    try {
+      const result = await undoTeamScores({ episodeId: selectedEpisode.id, teamId });
+      if (!result.error) router.refresh();
+      return result;
     } catch {
       return { error: "Could not confirm the update. Please refresh and try again." };
     } finally {
@@ -779,11 +813,6 @@ export function ResultsForm({
         return;
       }
       setTeamsSheetOpen(false);
-      if (result.result?.posted.length) {
-        setError(
-          `Team changes reached ${result.result.posted.length} posted ${result.result.posted.length === 1 ? "couple's draft" : "couples' drafts"}. Un-Post and Publish them again so their live scores match.`
-        );
-      }
       router.refresh();
     } catch {
       setTeamsError("Could not confirm the update. Please refresh and try again.");
@@ -798,7 +827,7 @@ export function ResultsForm({
       // Posting a team member before their team is scored means the team
       // score can only reach them through an un-post. Ask first (frame 07).
       const team = teamByCouple.get(coupleId);
-      if (team && !opts.force && !teamMarksComplete((rows[coupleId]?.dances ?? []).find((d) => isTeamDanceRow(team, d)) ?? null)) {
+      if (!entity && team && !opts.force && !teamMarksComplete((rows[coupleId]?.dances ?? []).find((d) => isTeamDanceRow(team, d)) ?? null)) {
         setConfirmPublishTeamMember(coupleId);
         return;
       }
@@ -1135,18 +1164,55 @@ export function ResultsForm({
       ),
     };
   });
+  // Entity model: the team's marks live on the team, eligibility comes from
+  // the same rules the RPCs use, and "posted" is the team's own state.
+  const teamEntityViews: TeamEntityView[] = entity
+    ? persistedTeams.map((team) => {
+        const { eligible, skipped } = eligibleTeamMembers(
+          team,
+          team.memberCoupleIds.map((coupleId) => {
+            const couple = couplesById.get(coupleId);
+            return {
+              coupleId,
+              status: couple?.status ?? "active",
+              eliminationWeek: couple?.elimination_week ?? null,
+              outcome: (rows[coupleId] ?? emptyRow()).outcome,
+            };
+          }),
+          { weekNumber: selectedWeek?.week_number ?? null, participantIds: participantsByEpisode[selectedEpisode?.id ?? ""] ?? [] }
+        );
+        const saved = teamMarksByTeam[team.id] ?? [];
+        return {
+          team,
+          styleName: danceStyleItems[team.danceStyleId] ?? "Freestyle",
+          marks: nightJudgeIds.flatMap((id) => saved.filter((m) => m.judgeId === id)),
+          eligible,
+          skipped,
+          live: team.postedAt ? (teamLiveByTeam[team.id] ?? { total: 0, coupleIds: [] }) : null,
+        };
+      })
+    : [];
+  const teamEntityByCouple = new Map<string, TeamEntityView>(
+    teamEntityViews.flatMap((view) => view.team.memberCoupleIds.map((coupleId) => [coupleId, view] as const))
+  );
+  // A team with members but fewer than four marks blocks Finish Week (the RPC
+  // refuses too); the button says which.
+  const unscoredTeams = teamEntityViews.filter((v) => v.team.memberCoupleIds.length > 0 && v.marks.length < TEAM_DANCE_JUDGE_COUNT);
   const nightSummary = buildNightSummary(
     scoredCouples.map((c) => {
       const team = teamByCouple.get(c.id);
-      return {
-        coupleId: c.id,
-        dances: (rows[c.id] ?? emptyRow()).dances
-          .filter((d) => d.danceStyleId)
-          .map((d) => ({
-            marks: Object.values(d.scores).filter((v) => v.trim() !== "").map(Number).filter(Number.isFinite),
-            teamName: team && isTeamDanceRow(team, d) ? team.name : null,
-          })),
-      };
+      const entityTeam = teamEntityByCouple.get(c.id);
+      const own = (rows[c.id] ?? emptyRow()).dances
+        .filter((d) => d.danceStyleId)
+        .map((d) => ({
+          marks: Object.values(d.scores).filter((v) => v.trim() !== "").map(Number).filter(Number.isFinite),
+          teamName: !entity && team && isTeamDanceRow(team, d) ? team.name : null,
+        }));
+      const teamDance =
+        entityTeam && entityTeam.eligible.includes(c.id) && entityTeam.marks.length === TEAM_DANCE_JUDGE_COUNT
+          ? [{ marks: entityTeam.marks.map((m) => m.score), teamName: entityTeam.team.name }]
+          : [];
+      return { coupleId: c.id, dances: [...own, ...teamDance] };
     })
   );
   const nightTagLabel = { top: "Top Scorer", within1: "Within 1", within2: "Within 2" } as const;
@@ -1156,6 +1222,58 @@ export function ResultsForm({
   // rest of the team. Before the team is scored the row shows as waiting.
   function teamMarksComplete(dance: RowDance | null): boolean {
     return !!dance && nightJudgeIds.every((id) => (dance.scores[id] ?? "").trim() !== "");
+  }
+
+  // Entity model: the member's team dance is the team's own score, shown on
+  // their card as a read-only line with the night it makes.
+  function renderTeamEntityLine(view: TeamEntityView, row: CoupleRow, coupleId: string) {
+    const { team } = view;
+    const skip = view.skipped.find((s) => s.coupleId === coupleId);
+    const complete = view.marks.length === TEAM_DANCE_JUDGE_COUNT;
+    const teamTotal = complete ? teamMarksTotal(view.marks) : null;
+    const ownMarks = row.dances.flatMap((d) => (d.danceStyleId ? [Object.values(d.scores).filter((v) => v.trim() !== "").map(Number).filter(Number.isFinite)] : []));
+    const individual = ownMarks.reduce((sum, marks) => sum + marks.reduce((a, b) => a + b, 0), 0);
+    const night =
+      teamTotal != null && !skip
+        ? collapseToNights([
+            ...ownMarks.filter((m) => m.length > 0).map((marks) => ({ episodeId: team.episodeId, coupleId, totalScore: marks.reduce((a, b) => a + b, 0), scaledScore: scaledJudgesScore(marks) })),
+            { episodeId: team.episodeId, coupleId, totalScore: teamTotal, scaledScore: scaledJudgesScore(view.marks.map((m) => m.score)) },
+          ])[0]
+        : null;
+    const carries = view.live?.coupleIds.includes(coupleId) ?? false;
+    return (
+      <div className="mt-1.5 flex flex-col gap-1 rounded-lg border border-dashed border-accent/40 bg-muted/30 p-1.5 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-x-2">
+          <span className="font-medium">Team Dance · {team.name}</span>
+          <button type="button" className="font-semibold text-accent" onClick={() => openTeamEntry(team.id)}>
+            Open team →
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-2">
+          <span className="font-heading">
+            {skip ? <span className="text-amber-text">Skipped · {skip.reason === "bye" ? "Did Not Dance" : skip.reason === "withdrawn" ? "Withdrawn" : skip.reason === "eliminated" ? "Eliminated" : "Not Performing"}</span>
+              : teamTotal != null ? <><span className="font-semibold">{teamTotal}</span><span className="text-muted-foreground">/{nightJudgeIds.length * 10}</span></>
+              : <span className="text-amber-text">Pending</span>}
+          </span>
+          <span className={carries ? "text-emerald-text" : "text-muted-foreground"}>
+            {view.styleName}
+            {team.songTitle ? ` · ${team.songTitle}` : ""}
+            {skip ? "" : carries ? " · Posted" : " · Not posted yet"}
+          </span>
+        </div>
+        {!skip && (
+          <p className="text-muted-foreground">
+            Individual {individual} + Team {teamTotal ?? <span className="text-amber-text">Pending</span>}
+            {night ? (
+              <>
+                {" "}= Night {night.totalScore}/{night.maxScore} → Dance Card{" "}
+                <span className="font-heading text-accent">{formatPoints(night.scaledScore)}</span> of 30
+              </>
+            ) : null}
+          </p>
+        )}
+      </div>
+    );
   }
 
   // "Individual 28 + Team 36 = Night 64/80 → Dance Card 24.00 of 30", with
@@ -1213,14 +1331,15 @@ export function ResultsForm({
   // Teams sit in the same picker as the couples (after them), each scored
   // once through the couple-card layout. They are an entry-screen device
   // only: nothing about them is a couple to scoring, standings or fans.
-  function renderCouplePicker(list: Couple[], selectedId: string, onSelect: (id: string) => void, teams: TeamEntryView[] = []) {
+  type PickerTeam = { team: EpisodeTeam; render: () => ReactNode };
+  function renderCouplePicker(list: Couple[], selectedId: string, onSelect: (id: string) => void, teams: PickerTeam[] = []) {
     const teamValue = (teamId: string) => `${TEAM_PICK_PREFIX}${teamId}`;
     const selectedTeam = selectedId.startsWith(TEAM_PICK_PREFIX)
       ? teams.find((v) => teamValue(v.team.id) === selectedId)
       : undefined;
     const current = selectedTeam ? null : (list.find((c) => c.id === selectedId) ?? list[0] ?? null);
     const value = selectedTeam ? teamValue(selectedTeam.team.id) : (current?.id ?? teamValue(teams[0]?.team.id ?? ""));
-    const teamLabel = (view: TeamEntryView) => (
+    const teamLabel = (view: PickerTeam) => (
       <span>
         <strong>{view.team.name}</strong> <span className="text-muted-foreground">· Team Dance</span>
       </span>
@@ -1257,11 +1376,11 @@ export function ResultsForm({
           </SelectContent>
         </Select>
         {selectedTeam
-          ? renderTeamEntry(selectedTeam)
+          ? selectedTeam.render()
           : current
             ? renderDanceEntry(current)
             : teams[0]
-              ? renderTeamEntry(teams[0])
+              ? teams[0].render()
               : null}
       </>
     );
@@ -1277,6 +1396,35 @@ export function ResultsForm({
       setByCoupleSelectedId(`${TEAM_PICK_PREFIX}${teamId}`);
     }
   }
+
+  function renderTeamEntityEntry(view: TeamEntityView) {
+    return (
+      <TeamEntityEntry
+        key={view.team.id}
+        view={view}
+        judges={nightJudges}
+        judgeNames={judgeDisplayNames}
+        guestJudgeIds={new Set(guestJudgesByEpisode[selectedEpisode?.id ?? ""] ?? [])}
+        coupleName={(coupleId) => {
+          const couple = namedCouple(coupleId);
+          return couple ? <CoupleName {...coupleParts(couple)} /> : "This couple";
+        }}
+        canPost={canPublish && !published}
+        canSetup={canPublish}
+        inputsDisabled={published && !canPublish}
+        busy={teamBusy || savingDraft || revealBusy || publishing || releasing}
+        nowMs={nowMs}
+        onSaveMarks={handleSaveTeamMarks}
+        onPost={handlePostTeam}
+        onUndo={handleUndoTeam}
+        onEditTeams={openTeamsEditor}
+      />
+    );
+  }
+
+  const pickerTeams: PickerTeam[] = entity
+    ? teamEntityViews.map((view) => ({ team: view.team, render: () => renderTeamEntityEntry(view) }))
+    : teamViews.map((view) => ({ team: view.team, render: () => renderTeamEntry(view) }));
 
   function renderTeamEntry(view: TeamEntryView) {
     return (
@@ -1327,7 +1475,7 @@ export function ResultsForm({
         </p>
 
         <fieldset disabled={locked || revealBusy || publishing || releasing} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
-          {row.dances.map((d) => team && isTeamDanceRow(team, d) ? renderTeamDanceRow(team, d) : (
+          {row.dances.map((d) => !entity && team && isTeamDanceRow(team, d) ? renderTeamDanceRow(team, d) : (
             <div key={d.key} className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-1.5">
               <div className="flex flex-wrap items-end gap-1.5">
                 <Select
@@ -1380,9 +1528,10 @@ export function ResultsForm({
               </div>
             </div>
           ))}
-          {team && row.outcome !== "bye" && !row.dances.some((d) => isTeamDanceRow(team, d)) && renderTeamDanceRow(team, null)}
+          {!entity && team && row.outcome !== "bye" && !row.dances.some((d) => isTeamDanceRow(team, d)) && renderTeamDanceRow(team, null)}
         </fieldset>
-        {team && row.outcome !== "bye" && renderNightLine(team, row, c.id)}
+        {!entity && team && row.outcome !== "bye" && renderNightLine(team, row, c.id)}
+        {entity && teamEntityByCouple.get(c.id) && row.outcome !== "bye" && renderTeamEntityLine(teamEntityByCouple.get(c.id)!, row, c.id)}
 
         {!published && (
           <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
@@ -1657,7 +1806,7 @@ export function ResultsForm({
               <div className="flex items-center justify-between gap-2">
                 <CardTitle>Couples &amp; Scores</CardTitle>
                 <div className="flex shrink-0 items-center gap-3">
-                  {isTeamNight && canPublish && teamsAvailable && (
+                  {isTeamNight && canPublish && entity && (
                     <button type="button" className="text-sm font-semibold text-accent" onClick={openTeamsEditor}>
                       {persistedTeams.length === 0 ? "Set Up Teams" : "Edit Teams"}
                     </button>
@@ -1770,9 +1919,9 @@ export function ResultsForm({
                 publishedCouples.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No couples published yet.</p>
                 ) : (
-                  renderCouplePicker(publishedCouples, publishedSelectedId, setPublishedSelectedId, published ? teamViews : [])
+                  renderCouplePicker(publishedCouples, publishedSelectedId, setPublishedSelectedId, published ? pickerTeams : [])
                 )
-              ) : inProgressCouples.length === 0 && (published || teamViews.length === 0) ? (
+              ) : inProgressCouples.length === 0 && (published || pickerTeams.length === 0) ? (
                 <p className="text-sm text-muted-foreground">
                   {episodeCouples.length === 0
                     ? "No couples to check for this episode."
@@ -1782,12 +1931,12 @@ export function ResultsForm({
                 </p>
               ) : (
                 <>
-                  {renderCouplePicker(inProgressCouples, byCoupleSelectedId, setByCoupleSelectedId, published ? [] : teamViews)}
-                  {isTeamNight && teamViews.length === 0 && (
+                  {renderCouplePicker(inProgressCouples, byCoupleSelectedId, setByCoupleSelectedId, published ? [] : pickerTeams)}
+                  {isTeamNight && pickerTeams.length === 0 && (
                     <p className="text-xs text-muted-foreground">
-                      No teams yet. Give each team&apos;s couples the same Freestyle and song in their second slot and the
-                      team appears here as its own entry
-                      {teamsAvailable ? ", or use Set Up Teams" : ""}.
+                      {entity
+                        ? "No teams yet. Use Set Up Teams to add each team's name, song and members; it then appears here as its own entry."
+                        : "No teams yet. Give each team's couples the same Freestyle and song in their second slot and the team appears here as its own entry."}
                     </p>
                   )}
                 </>
@@ -1843,10 +1992,16 @@ export function ResultsForm({
                       <Button
                         className="self-start"
                         onClick={handleFinishWeek}
-                        disabled={savingDraft || publishing || unpostedCount > 0}
+                        disabled={savingDraft || publishing || unpostedCount > 0 || unscoredTeams.length > 0}
                       >
                         {publishing ? "Finishing…" : "Finish Week"}
                       </Button>
+                    )}
+                    {publishPerCouple && unscoredTeams.length > 0 && (
+                      <p className="text-xs text-amber-text">
+                        {unscoredTeams.map((v) => v.team.name).join(" and ")} {unscoredTeams.length === 1 ? "has" : "have"} fewer than
+                        four team marks. Score the team or remove it before finishing the week.
+                      </p>
                     )}
                   </CardContent>
                 </AccordionContent>
