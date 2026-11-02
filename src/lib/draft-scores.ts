@@ -198,7 +198,7 @@ export function draftManagerScoresForNight(
     judges_score_starts_week: number;
   },
   slots: { manager_id: string; couple_id: string | null; start_week: number; end_week: number | null }[],
-  night: { weekNumber: number; dances: { coupleId: string; total: number; scaled: number }[] }
+  night: { weekNumber: number; dances: { episodeId: string; coupleId: string; total: number; scaled: number }[] }
 ): DraftManagerScore[] {
   const rosterSlots = slots.flatMap((slot) => {
     if (!slot.couple_id) return [];
@@ -217,6 +217,7 @@ export function draftManagerScoresForNight(
     judgesCategoryWeight: settings.judges_score_category_weight,
     rosterSlots,
     danceScores: night.dances.map((dance) => ({
+      episodeId: dance.episodeId,
       coupleId: dance.coupleId,
       totalScore: dance.total,
       scaledScore: dance.scaled,
@@ -257,16 +258,19 @@ export function scoresReplacingDraftWeek(
 // Merges rather than replaces: draft.danceScores only ever contains released
 // couples (per-couple, not the whole night), so any other couple's entry for
 // this week -- e.g. one independently live-revealed via per-couple Publish --
-// must stay, not get wiped by a lone released couple's draft dance.
+// must stay, not get wiped by a lone released couple's draft dance. Keyed by
+// night and couple, never couple alone: a two-night week can hold a couple's
+// live rows for one night beside their released draft for the other.
 export function replaceWeekDanceScores<T extends { weekNumber: number; danceScores: DanceScore[] }>(
   weeks: T[],
   draft: { weekNumber: number; danceScores: DanceScore[] } | null
 ): T[] {
   if (!draft) return weeks;
-  const draftCoupleIds = new Set(draft.danceScores.map((d) => d.coupleId));
+  const nightKey = (d: DanceScore) => `${d.episodeId}:${d.coupleId}`;
+  const draftNights = new Set(draft.danceScores.map(nightKey));
   return weeks.map((week) =>
     week.weekNumber === draft.weekNumber
-      ? { ...week, danceScores: [...week.danceScores.filter((d) => !draftCoupleIds.has(d.coupleId)), ...draft.danceScores] }
+      ? { ...week, danceScores: [...week.danceScores.filter((d) => !draftNights.has(nightKey(d))), ...draft.danceScores] }
       : week
   );
 }

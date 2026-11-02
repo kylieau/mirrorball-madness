@@ -63,11 +63,11 @@ const weeks: HistoryWeekData[] = [
     weekNumber: 1,
     isDoubleElimination: false,
     danceScores: [
-      { coupleId: "A", totalScore: 30, scaledScore: 30 },
-      { coupleId: "B", totalScore: 24, scaledScore: 24 },
-      { coupleId: "C", totalScore: 20, scaledScore: 20 },
-      { coupleId: "D", totalScore: 18, scaledScore: 18 },
-      { coupleId: "E", totalScore: 12, scaledScore: 12 },
+      { episodeId: "ep1", coupleId: "A", totalScore: 30, scaledScore: 30 },
+      { episodeId: "ep1", coupleId: "B", totalScore: 24, scaledScore: 24 },
+      { episodeId: "ep1", coupleId: "C", totalScore: 20, scaledScore: 20 },
+      { episodeId: "ep1", coupleId: "D", totalScore: 18, scaledScore: 18 },
+      { episodeId: "ep1", coupleId: "E", totalScore: 12, scaledScore: 12 },
     ],
     outcomes: [
       { coupleId: "A", outcome: "safe", bonusPoints: 0 },
@@ -84,10 +84,10 @@ const weeks: HistoryWeekData[] = [
     weekNumber: 2,
     isDoubleElimination: true,
     danceScores: [
-      { coupleId: "A", totalScore: 38, scaledScore: 28.5 },
-      { coupleId: "B", totalScore: 35, scaledScore: 26.25 },
-      { coupleId: "C", totalScore: 30, scaledScore: 22.5 },
-      { coupleId: "D", totalScore: 22, scaledScore: 16.5 },
+      { episodeId: "ep1", coupleId: "A", totalScore: 38, scaledScore: 28.5 },
+      { episodeId: "ep1", coupleId: "B", totalScore: 35, scaledScore: 26.25 },
+      { episodeId: "ep1", coupleId: "C", totalScore: 30, scaledScore: 22.5 },
+      { episodeId: "ep1", coupleId: "D", totalScore: 22, scaledScore: 16.5 },
     ],
     outcomes: [
       { coupleId: "A", outcome: "safe", bonusPoints: 0 },
@@ -101,8 +101,8 @@ const weeks: HistoryWeekData[] = [
     weekNumber: 3,
     isDoubleElimination: false,
     danceScores: [
-      { coupleId: "A", totalScore: 30, scaledScore: 30 },
-      { coupleId: "B", totalScore: 29, scaledScore: 29 },
+      { episodeId: "ep1", coupleId: "A", totalScore: 30, scaledScore: 30 },
+      { episodeId: "ep1", coupleId: "B", totalScore: 29, scaledScore: 29 },
     ],
     outcomes: [
       { coupleId: "A", outcome: "winner", bonusPoints: 0 },
@@ -429,8 +429,8 @@ describe("a week being revealed", () => {
     weekNumber: 3,
     isDoubleElimination: false,
     danceScores: [
-      { coupleId: "A", totalScore: 30, scaledScore: 30 },
-      { coupleId: "B", totalScore: 29, scaledScore: 29 },
+      { episodeId: "ep1", coupleId: "A", totalScore: 30, scaledScore: 30 },
+      { episodeId: "ep1", coupleId: "B", totalScore: 29, scaledScore: 29 },
     ],
     outcomes: [],
     inJeopardyCoupleIds: [],

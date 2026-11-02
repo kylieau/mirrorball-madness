@@ -25,7 +25,10 @@ export type WeeklyScoreRow = Pick<
 >;
 export type WeekScoringData = {
   episodes?: Pick<Row<"episodes">, "id" | "episode_number">[];
-  dances: Pick<Row<"dance_scores">, "couple_id" | "total_score" | "scaled_score">[];
+  // episode_id must survive every mapping into here: Dance Card collapses a
+  // couple's dances per night (collapseToNights), so a row without its night
+  // would be paid as a separate dance.
+  dances: Pick<Row<"dance_scores">, "episode_id" | "couple_id" | "total_score" | "scaled_score">[];
   outcomes: Pick<Row<"episode_results">, "episode_id" | "couple_id" | "outcome" | "bonus_points">[];
   couples: Pick<Row<"couples">, "id" | "status" | "elimination_week">[];
   jeopardy: Pick<Row<"episode_in_jeopardy_couples">, "couple_id">[];
@@ -53,6 +56,7 @@ export function buildWeeklyScoreRows(
   const allOutcomes = data.outcomes;
   const seasonCouples = data.couples;
   const danceScoreInputs = (allDances ?? []).map((row) => ({
+    episodeId: row.episode_id,
     coupleId: row.couple_id,
     totalScore: Number(row.total_score),
     scaledScore: Number(row.scaled_score),

@@ -50,6 +50,7 @@ export async function loadHomeLeagueData(
         weekId: draftContext.night.weekId,
         weekNumber: draftContext.night.weekNumber,
         dances: draftContext.night.dances.map((dance) => ({
+          episodeId: dance.episodeId,
           coupleId: dance.coupleId,
           totalScore: dance.total,
           scaledScore: dance.scaled,
