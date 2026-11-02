@@ -558,6 +558,20 @@ export function automaticSpecialDanceName(danceType: string, others: Pick<Specia
 
 // Recently used Dance Types and detail labels across the season's entries,
 // newest first, compared without regard to case. Built-ins come first.
+// "Tatyana, Maura, Amber, and Julia" — the picker's member line.
+export function oxfordJoin(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
+export const SKIP_LABEL: Record<SkipReason, string> = {
+  withdrawn: "Withdrawn · Skipped",
+  bye: "Did Not Dance · Skipped",
+  eliminated: "Eliminated · Skipped",
+  not_performing: "Not Performing · Skipped",
+};
+
 export function recentSuggestions(builtIn: readonly string[], used: { value: string; updatedAt: string | null }[]): string[] {
   const seen = new Set(builtIn.map((v) => v.toLowerCase()));
   const result = [...builtIn];

@@ -76,6 +76,7 @@ export default async function EnterResultsPage({
         teamsMode={data.teamsMode}
         teamsByEpisode={data.teamsByEpisode}
         teamMarksByTeam={data.teamMarksByTeam}
+        teamScoresByTeam={data.teamScoresByTeam}
         teamLiveByTeam={data.teamLiveByTeam}
         revealedDancesByEpisode={data.revealedDancesByEpisode}
       />

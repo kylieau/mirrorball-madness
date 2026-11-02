@@ -102,7 +102,7 @@ async function liveRows(coupleId: string) {
   return (await db.query<{ style: string; total: number; scaled: number; max: number | null; team_id: string | null; judges: number }>(
     `select d.dance_style_id as style, d.total_score::float as total, d.scaled_score::float as scaled, d.max_score::float as max, d.team_id,
        (select count(*) from public.judge_scores j where j.dance_score_id = d.id)::int as judges
-     from public.dance_scores d where d.episode_id = $1 and d.couple_id = $2 order by d.team_id nulls first, d.total_score desc`, [episode, coupleId])).rows;
+     from public.dance_scores d where d.episode_id = $1 and d.couple_id = $2 order by d.team_id nulls first, coalesce(d.max_score, 1) desc, d.total_score desc`, [episode, coupleId])).rows;
 }
 async function snapshot(): Promise<PublicationSnapshot> {
   return (await db.query<{ data: PublicationSnapshot }>("select public.episode_publication_snapshot($1) as data", [episode])).rows[0].data;
@@ -385,7 +385,6 @@ describe("special dances in PostgreSQL", () => {
     await savePoints(danceOff, [{ coupleId: amber, points: 4 }]);
     await expect(revealTeam(danceOff, false, stale)).rejects.toThrow(/inputs changed/);
     await revealTeam(danceOff);
-    console.log(JSON.stringify((await db.query("select couple_id, total_score, team_id, created_at from public.dance_scores where episode_id = $1", [episode])).rows));
     expect((await liveRows(amber)).map((r) => r.total)).toEqual([33, 4]);
   });
 
