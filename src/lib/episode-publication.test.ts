@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./supabase/types";
 import { describe, expect, it, vi } from "vitest";
-import { buildPublicationPlan, publishEpisodeAtomically, type PublicationSnapshot } from "./episode-publication";
+import { buildPublicationPlan, isTeamRow, publishEpisodeAtomically, teamScoreRows, type PublicationSnapshot } from "./episode-publication";
 
 describe("buildPublicationPlan", () => {
   // A posted couple with one live dance whose draft may hold a second one.
@@ -42,6 +42,42 @@ describe("buildPublicationPlan", () => {
   it("publishes when the posted couple's draft and live dances agree", () => {
     const same = snapshotWithDraftDances([{ style: "contemporary", song: "Easy as Life", marks: [8, 8, 9, 8] }]);
     expect(buildPublicationPlan(same, "ep").weeklyScores).toEqual([]);
+  });
+
+  function withTeam(base: PublicationSnapshot, marks: number[], extra: Partial<PublicationSnapshot> = {}): PublicationSnapshot {
+    return {
+      ...base,
+      couples: [...base.couples, { id: "julia", season_id: "s", status: "active", elimination_week: null }, { id: "whitney", season_id: "s", status: "withdrawn", elimination_week: 7 }],
+      draftResults: [...base.draftResults, { episode_id: "ep", couple_id: "julia", outcome: "safe" }],
+      teams: [{ id: "t", episode_id: "ep", name: "Slaytopia", song_title: "Zoo", dance_style_id: "freestyle", captain_couple_id: null, host_name: null, sort_order: 1, posted_at: null }],
+      teamMembers: ["amber", "julia", "whitney"].map((couple_id) => ({ team_id: "t", episode_id: "ep", couple_id })),
+      teamMarks: marks.map((score, i) => ({ team_id: "t", judge_id: `j${i}`, score })),
+      participants: [],
+      ...extra,
+    } as unknown as PublicationSnapshot;
+  }
+
+  it("refuses to finish while a team with members has fewer than four marks", () => {
+    const half = withTeam(snapshotWithDraftDances([{ style: "contemporary", song: "Easy as Life", marks: [8, 8, 9, 8] }]), [9, 9, 9]);
+    expect(() => buildPublicationPlan(half, "ep")).toThrow(/Team Slaytopia has 3 of four marks/);
+  });
+
+  it("pays every eligible member the team's marks and skips the withdrawn", () => {
+    const full = withTeam(snapshotWithDraftDances([{ style: "contemporary", song: "Easy as Life", marks: [8, 8, 9, 8] }]), [9, 9, 9, 9]);
+    const rows = teamScoreRows(full, "ep");
+    expect(rows.map((r) => [r.couple_id, r.total_score, r.scaled_score, r.team_id])).toEqual([
+      ["amber", 36, 27, "t"],
+      ["julia", 36, 27, "t"],
+    ]);
+    expect(() => buildPublicationPlan(full, "ep")).not.toThrow();
+  });
+
+  it("does not count a team's live row as the couple being posted", () => {
+    // Amber's only live row is the team's; her own draft must still publish, with no divergence error.
+    const base = snapshotWithDraftDances([{ style: "contemporary", song: "Easy as Life", marks: [8, 8, 9, 8] }]);
+    const teamOnly = withTeam({ ...base, dances: [{ ...base.dances[0], dance_style_id: "freestyle", song_title: "Zoo", total_score: 36, scaled_score: 27, team_id: "t" }] }, [9, 9, 9, 9]);
+    expect(isTeamRow(teamOnly.dances[0])).toBe(true);
+    expect(() => buildPublicationPlan(teamOnly, "ep")).not.toThrow();
   });
 });
 

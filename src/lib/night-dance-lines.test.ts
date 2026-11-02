@@ -39,6 +39,15 @@ describe("coupleDanceLines", () => {
     expect(isTeamDance("Freestyle", false)).toBe(false);
   });
 
+  it("labels a team-tagged row by its team name, or Team Dance when the name is not readable", () => {
+    const team = { ...dance("Freestyle", 36, 27, "Zoo"), teamId: "t1" };
+    expect(coupleDanceLines([dance("Quickstep", 28, 21), team], new Set(), new Map([["t1", "Slaytopia"]])).join(" · ")).toBe(
+      "Quickstep 28 · Team Dance · Slaytopia 36 · Zoo · Night 64/80"
+    );
+    expect(coupleDanceLines([dance("Quickstep", 28, 21), team], new Set()).join(" · ")).toBe("Quickstep 28 · Team Dance 36 · Zoo · Night 64/80");
+    expect(coupleDanceLines([team], new Set(), new Map([["t1", "Slaytopia"]]))).toEqual(["Team Dance · Slaytopia · Zoo"]);
+  });
+
   it("uses each dance's own max on a mixed-panel night and keeps half points", () => {
     expect(coupleDanceLines([dance("Tango", 24, 24), dance("Freestyle", 38.5, 28.875)], teamNight)).toEqual([
       "Tango 24",
