@@ -17,6 +17,7 @@ import { StickyTopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { coupleLeagueNotes } from "@/lib/couple-league-notes";
+import { teamDanceEpisodeIds } from "@/lib/night-dance-lines";
 import { nextPredictedElimination } from "@/lib/grand-finale-pins";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
@@ -137,11 +138,12 @@ export default async function ThisWeekPage({
     { data: inJeopardyRows },
     { data: pastPredictions },
     { data: grandFinaleRows },
+    { data: episodeRoundTypes },
   ] = await Promise.all([
     showResults && selectedEpisodeIds.length > 0
       ? supabase
           .from("dance_scores")
-          .select("id, episode_id, couple_id, dance_style_id, song_title, total_score")
+          .select("id, episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score")
           .in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] }),
     showResults && selectedEpisodeIds.length > 0
@@ -171,6 +173,9 @@ export default async function ThisWeekPage({
           .in("manager_id", myTeamIds)
           .in("league_id", leagueIds)
       : Promise.resolve({ data: [] as { league_id: string; couple_id: string; predicted_position: number }[] }),
+    showResults && selectedEpisodeIds.length > 0
+      ? supabase.from("episode_round_types").select("episode_id, round_types(name)").in("episode_id", selectedEpisodeIds)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const flatCouples = allCouples.map((c) => ({
@@ -326,6 +331,7 @@ export default async function ThisWeekPage({
           leaguesByCouple={leaguesByCouple}
           pendingReveal={pendingReveal}
           scoresOnly={selectedMode === "scores"}
+          teamDanceEpisodeIds={[...teamDanceEpisodeIds(episodeRoundTypes ?? [])]}
         />
       )}
     </div>
