@@ -40,7 +40,7 @@ async function apply(teamId: string, scores: number[], actor = friend, coupleIds
 }
 function entry(coupleId: string, dances: { style: string; song: string; scores: number[] }[], outcome = "safe") {
   return { coupleId, outcome, savedByJudges: false, hadImmunity: false, bonusPoints: 0, bonusNote: null,
-    dances: dances.map((d) => ({ danceStyleId: d.style, songTitle: d.song, judgeScores: marks(d.scores) })) };
+    dances: dances.map((d) => ({ danceStyleId: d.style, songTitle: d.song, judgeScores: d.scores.length ? marks(d.scores) : [] })) };
 }
 async function checkedSave(entries: ReturnType<typeof entry>[], actor = friend, correctionToken: string | null = null) {
   const result = await db.query<{ data: { acknowledged: string[]; skippedPosted: string[] } }>("select public.save_episode_draft_checked($1) as data", [
@@ -187,6 +187,29 @@ describe("team dances in PostgreSQL", () => {
     await expect(apply(team, [9, 9, 9, 9], outsider)).rejects.toThrow(/Not authorized/);
   });
 
+  it("adopts pre-filled scoreless slot-2 rows as the team dance without duplicating them", async () => {
+    // Week 8's live shape: every couple's second slot already holds the team's Freestyle and song, no marks.
+    await checkedSave([
+      entry(amber, [{ style: contemporary, song: "Song 0", scores: [8, 8, 9, 8] }, { style: freestyle, song: "Zoo", scores: [] }]),
+      entry(julia, [{ style: contemporary, song: "Song 1", scores: [9, 8, 9, 8] }, { style: freestyle, song: "zoo ", scores: [] }]),
+    ]);
+    const before = (await db.query<{ id: string }>("select id from public.draft_dance_scores where couple_id = $1 and dance_style_id = $2", [amber, freestyle])).rows[0].id;
+    // A scoreless slot blocks posting until the team is scored (existing reveal rule).
+    await expect(reveal(amber)).rejects.toThrow(/Complete this couple's judge scores/);
+    const [team] = (await saveTeams([slaytopia({ memberCoupleIds: [amber, julia], captainCoupleId: amber, songTitle: "ZOO" })])).teamIds;
+    const result = await apply(team, [9, 9, 9, 9]);
+    expect(result.applied.sort()).toEqual([amber, julia].sort());
+    expect(result.collisions).toEqual([]);
+    for (const couple of [amber, julia]) {
+      const rows = await draftRows(couple);
+      expect(rows).toHaveLength(2);
+      expect(rows.find((r) => r.style === freestyle)).toMatchObject({ song: "ZOO", total: 36, judges: 4 });
+    }
+    expect((await db.query<{ id: string }>("select id from public.draft_dance_scores where couple_id = $1 and dance_style_id = $2", [amber, freestyle])).rows[0].id).toBe(before);
+    await reveal(amber);
+    expect(await liveRows(amber)).toHaveLength(2);
+  });
+
   it("needs exactly four configured judges whose marks all arrive", async () => {
     const [team] = (await saveTeams([slaytopia()])).teamIds;
     await individualDances();
@@ -223,6 +246,13 @@ describe("team dances in PostgreSQL", () => {
     expect(await liveRows(amber)).toHaveLength(1);
     // Her draft survives a later save from the friend too.
     await checkedSave([entry(amber, [{ style: contemporary, song: "Song 2", scores: [8, 8, 9, 8] }])]);
+    expect(await draftRows(amber)).toHaveLength(2);
+    // Finish Week edits for a posted couple still land: the same dances plus an outcome.
+    const finish = await checkedSave([
+      { ...entry(amber, [{ style: contemporary, song: "Song 0", scores: [8, 8, 9, 8] }, { style: freestyle, song: "Zoo", scores: [9, 9, 9, 9] }], "eliminated") },
+    ]);
+    expect(finish).toEqual({ acknowledged: [amber], skippedPosted: [] });
+    expect((await db.query<{ outcome: string }>("select outcome from public.draft_episode_results where couple_id = $1", [amber])).rows[0].outcome).toBe("eliminated");
     expect(await draftRows(amber)).toHaveLength(2);
   });
 

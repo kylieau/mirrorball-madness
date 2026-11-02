@@ -23,10 +23,12 @@ export type TeamDraft = {
 
 export type EditorCouple = { id: string; parts: CoupleNameParts };
 
+// An inferred team has no row yet, so it arrives as a new team named after
+// its song with the members and song already filled in.
 export function teamDraftsFromTeams(teams: EpisodeTeam[]): TeamDraft[] {
   return teams.map((t) => ({
     key: t.id,
-    id: t.id,
+    id: t.inferred ? null : t.id,
     name: t.name,
     songTitle: t.songTitle ?? "",
     songSource: t.songSource ?? "",
@@ -178,6 +180,8 @@ export function TeamEditor({
           </div>
           <p className="-mt-1.5 text-xs text-muted-foreground">
             The host dances with the team but isn&apos;t scored or on a roster.
+            {team.songTitle.trim() === "" &&
+              " Add the song too: it is how a member's team dance is told apart from a Freestyle of their own."}
           </p>
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
