@@ -18,6 +18,7 @@ import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { coupleLeagueNotes } from "@/lib/couple-league-notes";
 import { teamDanceEpisodeIds } from "@/lib/night-dance-lines";
+import { detectTeamEntity, loadTeamNames } from "@/lib/episode-teams";
 import { nextPredictedElimination } from "@/lib/grand-finale-pins";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
@@ -132,6 +133,9 @@ export default async function ThisWeekPage({
     ? { weekNumber: cutoff.pendingRevealEpisode.week_number, theme: cutoff.pendingRevealEpisode.theme }
     : null;
 
+  // team_id is selected only once the team-dance migration is applied, so a
+  // deploy ahead of the SQL can never 400 this page.
+  const teamEntity = showResults && selectedEpisodeIds.length > 0 ? await detectTeamEntity(supabase) : false;
   const [
     { data: danceScores },
     { data: episodeResults },
@@ -139,11 +143,12 @@ export default async function ThisWeekPage({
     { data: pastPredictions },
     { data: grandFinaleRows },
     { data: episodeRoundTypes },
+    teamNamesById,
   ] = await Promise.all([
     showResults && selectedEpisodeIds.length > 0
       ? supabase
           .from("dance_scores")
-          .select("id, episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score")
+          .select(`id, episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score${teamEntity ? ", team_id" : ""}`)
           .in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] }),
     showResults && selectedEpisodeIds.length > 0
@@ -176,6 +181,7 @@ export default async function ThisWeekPage({
     showResults && selectedEpisodeIds.length > 0
       ? supabase.from("episode_round_types").select("episode_id, round_types(name)").in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] }),
+    teamEntity ? loadTeamNames(supabase, selectedEpisodeIds) : Promise.resolve({} as Record<string, string>),
   ]);
 
   const flatCouples = allCouples.map((c) => ({
@@ -324,7 +330,7 @@ export default async function ThisWeekPage({
           }
           episodeResults={episodeResults ?? []}
           inJeopardyCoupleIds={[...new Set((inJeopardyRows ?? []).map((row) => row.couple_id))]}
-          danceScores={danceScores ?? []}
+          danceScores={(danceScores ?? []) as unknown as React.ComponentProps<typeof WeeklyResultsView>["danceScores"]}
           danceStyles={danceStyles ?? []}
           couples={flatCouples}
           coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
@@ -332,6 +338,7 @@ export default async function ThisWeekPage({
           pendingReveal={pendingReveal}
           scoresOnly={selectedMode === "scores"}
           teamDanceEpisodeIds={[...teamDanceEpisodeIds(episodeRoundTypes ?? [])]}
+          teamNamesById={teamNamesById}
         />
       )}
     </div>

@@ -16,6 +16,7 @@ type DanceScore = {
   couple_id: string;
   dance_style_id: string;
   song_title: string | null;
+  team_id?: string | null;
   total_score: number;
   // The 30-point basis; with total_score it recovers the panel size, which
   // is how a multi-dance night's "Night 64/80" knows its max.
@@ -51,6 +52,7 @@ export function WeeklyResultsView({
   inJeopardyCoupleIds,
   scoresOnly = false,
   teamDanceEpisodeIds,
+  teamNamesById,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
@@ -79,9 +81,12 @@ export function WeeklyResultsView({
   // Episodes whose round types include Team Dance: their Freestyle reads as
   // "Freestyle (Team)". Omitted for guests, who can't read round types.
   teamDanceEpisodeIds?: string[];
+  // Team names by id for rows tagged team_id (entity model).
+  teamNamesById?: Record<string, string>;
 }) {
   const inJeopardy = new Set(inJeopardyCoupleIds ?? []);
   const teamDanceEpisodes = new Set(teamDanceEpisodeIds ?? []);
+  const teamNames = new Map(Object.entries(teamNamesById ?? {}));
   const episode = episodes[0];
   // No button here — the SpoilerFreeStrip at the top of the page is the one
   // control for marking a week watched; this card is context only.
@@ -158,8 +163,10 @@ export function WeeklyResultsView({
             song: d.song_title,
             totalScore: Number(d.total_score),
             scaledScore: Number(d.scaled_score),
+            teamId: d.team_id ?? null,
           })),
-          teamDanceEpisodes
+          teamDanceEpisodes,
+          teamNames
         ),
         total: dances.reduce((sum, d) => sum + d.total_score, 0),
       };

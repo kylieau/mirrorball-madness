@@ -213,8 +213,8 @@ export function ScheduleManager({
   judges: Judge[];
   guestJudgesByEpisode: Record<string, string[]>;
   danceStyles: { id: string; name: string }[];
-  // False until supabase/apply-team-dances.sql is applied; the Teams section
-  // then explains instead of offering fields that cannot save.
+  // False until supabase/apply-team-dance-entity.sql is applied; the Teams
+  // section then explains instead of offering fields that cannot save.
   teamsAvailable: boolean;
   teamsByEpisode: Record<string, EpisodeTeam[]>;
 }) {
@@ -783,8 +783,8 @@ export function ScheduleManager({
                 </p>
                 {!teamsAvailable ? (
                   <p className="text-sm text-muted-foreground">
-                    Team setup needs the database update (supabase/apply-team-dances.sql). Until it is applied, type
-                    the team&apos;s marks into each couple&apos;s second dance slot on Enter Results.
+                    Team setup needs the database update (supabase/apply-team-dance-entity.sql). Until it is applied,
+                    Enter Results reads teams from each couple&apos;s second dance slot (Freestyle + the team song).
                   </p>
                 ) : !editingId ? (
                   <p className="text-sm text-muted-foreground">Add the episode to the schedule first, then open it to set up teams.</p>

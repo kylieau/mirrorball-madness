@@ -73,8 +73,10 @@ export default async function EnterResultsPage({
         participantsByEpisode={data.participantsByEpisode}
         guestJudgesByEpisode={data.guestJudgesByEpisode}
         roundTypesByEpisode={data.roundTypesByEpisode}
-        teamsAvailable={data.teamsAvailable}
+        teamsMode={data.teamsMode}
         teamsByEpisode={data.teamsByEpisode}
+        teamMarksByTeam={data.teamMarksByTeam}
+        teamLiveByTeam={data.teamLiveByTeam}
         revealedDancesByEpisode={data.revealedDancesByEpisode}
       />
     </div>
