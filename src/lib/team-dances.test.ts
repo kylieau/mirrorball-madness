@@ -207,12 +207,17 @@ describe("inferTeamsFromRows", () => {
       ],
       styles
     );
-    expect(teams.map((t) => [t.name, t.memberCoupleIds, t.inferred, t.captainCoupleId])).toEqual([
-      ["Zoo", ["tatyana", "maura"], true, null],
-      ["We're All in This Together", ["connor", "ezra"], true, null],
+    expect(teams.map((t) => [t.name, t.songTitle, t.memberCoupleIds, t.inferred, t.captainCoupleId])).toEqual([
+      ["Slaytopia", "Zoo", ["tatyana", "maura"], true, null],
+      ["Wildcats", "We're All in This Together", ["connor", "ezra"], true, null],
     ]);
     expect(teams[0].id).toMatch(/^inferred:/);
     expect(teams[0].danceStyleId).toBe("freestyle");
+  });
+
+  it("names an unknown song's team after the song", () => {
+    const [team] = inferTeamsFromRows("ep", [{ coupleId: "a", dances: [row("freestyle", "Try Everything")] }, { coupleId: "b", dances: [row("freestyle", "Try Everything")] }], styles);
+    expect(team.name).toBe("Try Everything");
   });
 
   it("ignores styles that are not team styles and needs two couples", () => {

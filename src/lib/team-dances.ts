@@ -41,6 +41,20 @@ export function isTeamDanceRow(team: DanceSignature, dance: DanceSignature): boo
 
 export const INFERRED_TEAM_PREFIX = "inferred:";
 
+// Names for teams read off the draft, keyed by songKey(). A saved team
+// (supabase/apply-team-dances.sql) carries its own name; without one this is
+// the only place a name can live, and an unknown song names the team after
+// itself.
+export const KNOWN_TEAM_NAMES_BY_SONG: Record<string, string> = {
+  zoo: "Slaytopia",
+  "we're all in this together": "Wildcats",
+  "we’re all in this together": "Wildcats",
+};
+
+export function inferredTeamName(songTitle: string | null): string {
+  return KNOWN_TEAM_NAMES_BY_SONG[songKey(songTitle)] ?? songTitle?.trim() ?? "Team Dance";
+}
+
 // Teams read off the draft itself: on a Team Dance night, two or more couples
 // whose rows share a Freestyle and the same song are one team. This is what
 // the live Week 8 data already looks like (every couple's second slot holds
@@ -69,7 +83,7 @@ export function inferTeamsFromRows(
     .map(([key, group], index) => ({
       id: `${INFERRED_TEAM_PREFIX}${key}`,
       episodeId,
-      name: group.songTitle ?? "Team Dance",
+      name: inferredTeamName(group.songTitle),
       songTitle: group.songTitle,
       songSource: null,
       danceStyleId: group.danceStyleId,
