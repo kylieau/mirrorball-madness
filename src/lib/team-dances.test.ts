@@ -13,14 +13,21 @@ import {
   isValidMarkMax,
   isValidPoints,
   legacyTeamDefaults,
+  markInputError,
+  markRangeMessage,
+  MARK_MIN,
+  panelAfterDidntJudge,
   parseSpecialPoints,
   parseTeamMarks,
+  specialDancePanelPersistPlan,
   recentSuggestions,
   sameTeamMarks,
   specialDanceComplete,
   specialDanceProgress,
   specialDanceSummary,
   teamApplyPlan,
+  addableSpecialDanceParticipants,
+  eliminatedBeforeWeek,
   validateSpecialDanceSetup,
   type SpecialDance,
   type SpecialDanceSetupInput,
@@ -80,6 +87,30 @@ describe("mark and point ranges", () => {
     expect(isValidMark(8.5, 8)).toBe(false);
     expect(isValidMark(8, 8)).toBe(true);
     expect(isValidMark(-0.5, 10)).toBe(false);
+    expect(isValidMark(0, 10)).toBe(false);
+    expect(isValidMark(MARK_MIN, 10)).toBe(true);
+    expect(isValidMark(0.5, 10)).toBe(false);
+  });
+
+  it("shows a visible range error for 0, off-step, and over-max values", () => {
+    expect(markRangeMessage(10)).toBe("Judge scores must be 1 to 10 in steps of 0.5");
+    expect(markInputError("", 10)).toBeNull();
+    expect(markInputError("8", 10)).toBeNull();
+    expect(markInputError("0", 10)).toBe(markRangeMessage(10));
+    expect(markInputError("10.5", 10)).toBe(markRangeMessage(10));
+    expect(markInputError("11", 10)).toBe(markRangeMessage(10));
+    expect(markInputError("0.25", 10)).toBe(markRangeMessage(10));
+  });
+
+  it("drops a Didn't Judge from the panel and keeps night order", () => {
+    expect(panelAfterDidntJudge(judges, null, "bruno", true)).toEqual(["carrie", "derek", "cynthia"]);
+    expect(panelAfterDidntJudge(judges, ["carrie", "derek", "cynthia"], "bruno", false)).toBeNull();
+    expect(specialDancePanelPersistPlan(
+      [{ judgeId: "carrie", score: 8 }, { judgeId: "bruno", score: 9 }],
+      ["carrie", "derek"],
+      judges
+    )).toEqual({ remainingMarks: [{ judgeId: "carrie", score: 8 }], needsUnlock: true });
+    expect(specialDancePanelPersistPlan([], null, judges)).toEqual({ remainingMarks: [], needsUnlock: false });
   });
 
   it("limits the per-judge max to 1 to 10 in half steps", () => {
@@ -94,7 +125,7 @@ describe("mark and point ranges", () => {
 });
 
 describe("parseTeamMarks", () => {
-  it("is complete only when every judge on the panel holds a mark from 0 to the max", () => {
+  it("is complete only when every judge on the panel holds a mark from 1 to the max", () => {
     expect(parseTeamMarks({ carrie: "9", derek: "9", bruno: "9" }, judges)).toMatchObject({ marks: null, filled: 3, invalidJudgeIds: [] });
     expect(parseTeamMarks({ ...nine, derek: "11" }, judges)).toMatchObject({ marks: null, filled: 4, invalidJudgeIds: ["derek"] });
     expect(parseTeamMarks({ ...nine, derek: "x" }, judges).invalidJudgeIds).toEqual(["derek"]);
@@ -116,6 +147,7 @@ describe("parseTeamMarks", () => {
       { judgeId: "carrie", score: 8 },
       { judgeId: "derek", score: 7.5 },
     ]);
+    expect(parseTeamMarks({ carrie: "0", derek: "8" }, judges.slice(0, 2)).invalidJudgeIds).toEqual(["carrie"]);
   });
 });
 
@@ -447,6 +479,26 @@ describe("inferTeamsFromRows", () => {
     expect(inferTeamsFromRows("ep", [{ coupleId: "a", dances: [row("waltz", "Zoo")] }, { coupleId: "b", dances: [row("waltz", "Zoo")] }], styles)).toEqual([]);
     expect(isTeamStyleName("Team Freestyle")).toBe(true);
     expect(isTeamStyleName("Waltz")).toBe(false);
+  });
+});
+
+describe("eliminatedBeforeWeek", () => {
+  it("filters couples already out before this week and keeps same-week or active ones", () => {
+    expect(eliminatedBeforeWeek({ status: "eliminated", eliminationWeek: 7 }, 8)).toBe(true);
+    expect(eliminatedBeforeWeek({ status: "eliminated", eliminationWeek: 8 }, 8)).toBe(false);
+    expect(eliminatedBeforeWeek({ status: "active", eliminationWeek: null }, 8)).toBe(false);
+    expect(eliminatedBeforeWeek({ status: "withdrawn", eliminationWeek: 7 }, 8)).toBe(false);
+    expect(addableSpecialDanceParticipants(
+      [
+        { id: "a", status: "active", eliminationWeek: null },
+        { id: "b", status: "eliminated", eliminationWeek: 7 },
+        { id: "c", status: "eliminated", eliminationWeek: 8 },
+        { id: "d", status: "withdrawn", eliminationWeek: 7 },
+        { id: "e", status: "active", eliminationWeek: null },
+      ],
+      ["e"],
+      8
+    ).map((p) => p.id)).toEqual(["a", "c", "d"]);
   });
 });
 

@@ -43,6 +43,7 @@ import {
   recentSuggestions,
   specialDanceComplete,
   specialDancePanel,
+  specialDancePanelPersistPlan,
   specialDanceProgress,
   teamApplyPlan,
   teamMarksTotal,
@@ -761,16 +762,12 @@ export function ResultsForm({
 
   // Entity model: marks live on the team and save as they are typed; the
   // team posts, un-posts or re-posts on its own and the week's judges points
-  // are recomputed each time.
+  // are recomputed each time. This is not a couple-week draft: do not flip
+  // hasDraft or call flushDraft.
   async function handleSaveTeamMarks(teamId: string, marks: TeamMark[], markMax?: number) {
     if (!selectedEpisode) return { error: "Select a week first." };
     try {
-      const result = await saveTeamMarksAction({ episodeId: selectedEpisode.id, teamId, marks, markMax });
-      if (!result.error) {
-        setDraftSavedAt(new Date().toISOString());
-        setHasDraft(true);
-      }
-      return result;
+      return await saveTeamMarksAction({ episodeId: selectedEpisode.id, teamId, marks, markMax });
     } catch {
       return { error: "Could not confirm the update. Please refresh and try again." };
     }
@@ -804,11 +801,38 @@ export function ResultsForm({
     }
   }
 
-  async function handleSaveSpecial(setup: SpecialDanceSetupInput) {
+  // Done and Didn't Judge go through save_special_dance only. Done does not
+  // auto-save the week: no flushDraft, no hasDraft. remainingMarks is the
+  // live-SQL unlock for a panel change after marks already exist.
+  async function handleSaveSpecial(setup: SpecialDanceSetupInput, opts?: { remainingMarks?: TeamMark[] }) {
     if (!selectedEpisode) return { error: "Select a week first." };
+    const teamId = setup.id;
+    const existingMarks = teamId ? (teamMarksByTeam[teamId] ?? []) : [];
+    const persist = opts?.remainingMarks
+      ? specialDancePanelPersistPlan(existingMarks, setup.panelJudgeIds, nightJudges.map((j) => j.id))
+      : { remainingMarks: [] as TeamMark[], needsUnlock: false };
     try {
+      if (persist.needsUnlock && teamId) {
+        const cleared = await saveTeamMarksAction({ episodeId: selectedEpisode.id, teamId, marks: [], markMax: setup.markMax });
+        if (cleared.error) return { error: cleared.error };
+      }
       const result = await saveSpecialDanceAction({ episodeId: selectedEpisode.id, dance: setup });
-      if (!result.error && result.result?.id) {
+      if (result.error) {
+        if (persist.needsUnlock && teamId && existingMarks.length > 0) {
+          await saveTeamMarksAction({ episodeId: selectedEpisode.id, teamId, marks: existingMarks, markMax: setup.markMax });
+        }
+        return { error: result.error };
+      }
+      if (persist.needsUnlock && teamId && persist.remainingMarks.length > 0) {
+        const restored = await saveTeamMarksAction({
+          episodeId: selectedEpisode.id,
+          teamId,
+          marks: opts?.remainingMarks ?? persist.remainingMarks,
+          markMax: setup.markMax,
+        });
+        if (restored.error) return { error: restored.error, id: result.result?.id };
+      }
+      if (result.result?.id) {
         setDraftSpecial(null);
         const value = teamPickValue(result.result.id);
         if (published) setPublishedSelectedId(value);
@@ -843,12 +867,7 @@ export function ResultsForm({
   async function handleSaveSpecialPoints(teamId: string, scores: SpecialDanceScore[]) {
     if (!selectedEpisode) return { error: "Select a week first." };
     try {
-      const result = await saveSpecialDancePointsAction({ episodeId: selectedEpisode.id, teamId, scores });
-      if (!result.error) {
-        setDraftSavedAt(new Date().toISOString());
-        setHasDraft(true);
-      }
-      return result;
+      return await saveSpecialDancePointsAction({ episodeId: selectedEpisode.id, teamId, scores });
     } catch {
       return { error: "Could not confirm the update. Please refresh and try again." };
     }
@@ -1607,6 +1626,7 @@ export function ResultsForm({
           const couple = namedCouple(coupleId);
           return couple ? <CoupleName {...coupleParts(couple)} /> : "This couple";
         }}
+        weekNumber={selectedWeek?.week_number ?? null}
         canPost={canPublish && !published}
         canSetup={canPublish}
         inputsDisabled={published && !canPublish}

@@ -213,8 +213,9 @@ describe("saveTeamMarks", () => {
   it("refuses out-of-range marks before any round trip and translates a missing migration", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: null, error: missingTable });
     const { client } = clientWith({}, rpc);
-    expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 11 }] }, "friend")).error).toMatch(/0 to 10 in steps of 0.5/);
-    expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 8.5 }], markMax: 8 }, "friend")).error).toMatch(/0 to 8/);
+    expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 11 }] }, "friend")).error).toMatch(/1 to 10 in steps of 0.5/);
+    expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 0 }] }, "friend")).error).toMatch(/1 to 10/);
+    expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 8.5 }], markMax: 8 }, "friend")).error).toMatch(/1 to 8/);
     expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 7.25 }] }, "friend")).error).toMatch(/steps of 0.5/);
     expect(rpc).not.toHaveBeenCalled();
     expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 9 }] }, "friend")).error).toMatch(/apply-team-dance-entity\.sql/);
