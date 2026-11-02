@@ -144,9 +144,11 @@ describe("atomic episode publication in PostgreSQL", () => {
   });
 
   it("preserves already revealed dance IDs and scores", async () => {
+    // The live row carries the same marks as the draft (publication refuses
+    // otherwise) but a stored scaled_score that recomputing would change.
     const liveId = id(20);
-    await db.exec(`insert into public.dance_scores(id, episode_id, couple_id, dance_style_id, total_score, scaled_score) values ('${liveId}', '${episode}', '${couple}', '${style}', 7, 21);
-      insert into public.judge_scores(dance_score_id, judge_id, score) values ('${liveId}', '${judge}', 7);`);
+    await db.exec(`insert into public.dance_scores(id, episode_id, couple_id, dance_style_id, total_score, scaled_score) values ('${liveId}', '${episode}', '${couple}', '${style}', 8, 21);
+      insert into public.judge_scores(dance_score_id, judge_id, score) values ('${liveId}', '${judge}', 8);`);
     await commit(await snapshot());
     const published = await snapshot();
     expect(published.dances[0].id).toBe(liveId);
