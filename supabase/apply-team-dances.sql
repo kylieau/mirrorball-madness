@@ -1,8 +1,9 @@
 -- Team Dances: persisted team setup per episode plus an atomic team-score
 -- fan-out into members' drafts. Additive. Apply only with Kylie's OK in the
 -- Supabase Dashboard SQL Editor: preview and production share one database.
--- The app runs without this script (Enter Results hides the Team Dances card
--- and points to manual second-slot entry). Re-running it is safe.
+-- The app runs without this script: Enter Results infers teams from the
+-- couples' own Freestyle-and-song rows and saves marks through the ordinary
+-- draft save. Re-running it is safe.
 begin;
 
 -- Data only: the default style for a team dance. dance_styles.name is unique
