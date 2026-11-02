@@ -1,16 +1,31 @@
-export type DraftSaveResult = { error: string | null };
+export type DraftSaveResult = {
+  error: string | null;
+  // Which of the sent ids the server actually wrote. Absent means every sent
+  // id was written (older save paths).
+  acknowledgedIds?: string[];
+  // Sent ids the server refused to write because that couple is already
+  // posted. They stay dirty but are not re-sent until edited again.
+  skippedIds?: string[];
+};
 
 // Revisions distinguish a second edit to the same couple from the values
 // already in flight. Only one request may replace draft rows at a time.
 export class DraftSaveQueue {
   private revisions = new Map<string, number>();
+  private parked = new Map<string, number>();
   private revision = 0;
   private generation = 0;
   private pending: Promise<DraftSaveResult> | null = null;
   private pendingGeneration = 0;
 
+  // Edits that still need a save; a parked edit (refused as posted at its
+  // current revision) is excluded so it never blocks navigation or loops.
   dirtyIds(): string[] {
-    return [...this.revisions.keys()];
+    return [...this.revisions.keys()].filter((id) => this.parked.get(id) !== this.revisions.get(id));
+  }
+
+  parkedIds(): string[] {
+    return [...this.parked.keys()];
   }
 
   markDirty(id: string): void {
@@ -20,6 +35,7 @@ export class DraftSaveQueue {
   reset(): void {
     this.generation++;
     this.revisions.clear();
+    this.parked.clear();
   }
 
   flush<T>(
@@ -33,7 +49,8 @@ export class DraftSaveQueue {
     }
     this.pendingGeneration = generation;
     const run = async (): Promise<DraftSaveResult> => {
-      while (this.revisions.size > 0) {
+      const skipped = new Set<string>();
+      while (this.dirtyIds().length > 0) {
         const sent = new Map(this.revisions);
         let result: DraftSaveResult;
         try {
@@ -44,11 +61,20 @@ export class DraftSaveQueue {
         if (generation !== this.generation)
           return { error: "The selected episode changed during the save. Please try again." };
         if (result.error) return result;
+        const acknowledged = result.acknowledgedIds ? new Set(result.acknowledgedIds) : null;
+        const refused = new Set(result.skippedIds ?? []);
         for (const [id, revision] of sent) {
-          if (this.revisions.get(id) === revision) this.revisions.delete(id);
+          if (this.revisions.get(id) !== revision) continue;
+          if (refused.has(id)) {
+            this.parked.set(id, revision);
+            skipped.add(id);
+          } else if (!acknowledged || acknowledged.has(id)) {
+            this.revisions.delete(id);
+            this.parked.delete(id);
+          }
         }
       }
-      return { error: null };
+      return skipped.size > 0 ? { error: null, skippedIds: [...skipped] } : { error: null };
     };
     this.pending = run().finally(() => {
       this.pending = null;

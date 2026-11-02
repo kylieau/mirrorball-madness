@@ -3,6 +3,8 @@ import type { Database } from "@/lib/supabase/types";
 import { loadResultsTaxonomy } from "@/lib/results";
 import { loadDraftForEpisode, type DraftState } from "@/lib/results-draft";
 import type { ScoringJudge } from "@/lib/scoring-judges";
+import { loadEpisodeTeams } from "@/lib/episode-teams";
+import type { EpisodeTeam } from "@/lib/team-dances";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type CoupleWithStatus = Couple & { status: string; elimination_week: number | null };
@@ -57,6 +59,14 @@ export type ResultsPageData = {
   // Couples whose scores are live while the episode is still unpublished, with
   // their latest post time (drives Posted rows and the undo window).
   revealedByEpisode: Record<string, Record<string, string>>;
+  // Those same couples' live dance rows (style + song), so the Team Dances
+  // card can tell a posted member who already carries the team dance from
+  // one who was posted before it.
+  revealedDancesByEpisode: Record<string, Record<string, { danceStyleId: string; songTitle: string | null }[]>>;
+  // False until supabase/apply-team-dances.sql is applied; the pages then
+  // hide team setup instead of erroring.
+  teamsAvailable: boolean;
+  teamsByEpisode: Record<string, EpisodeTeam[]>;
   // Couples released from the draft to Spoiler-Free fans (draft_couple_releases),
   // per episode -- per couple, not a whole-episode flag.
   releasedCoupleIdsByEpisode: Record<string, string[]>;
@@ -134,7 +144,7 @@ export async function loadResultsPageData(
       .order("week_number"),
     supabase
       .from("dance_scores")
-      .select("id, episode_id, couple_id, dance_style_id, total_score, created_at"),
+      .select("id, episode_id, couple_id, dance_style_id, song_title, total_score, created_at"),
     supabase.from("judge_scores").select("dance_score_id, judge_id, score"),
     supabase
       .from("episode_results")
@@ -177,19 +187,28 @@ export async function loadResultsPageData(
   // user's own, to read every scheduled episode's in-progress draft up front
   // (so the form can rehydrate immediately on episode selection instead of
   // round-tripping).
-  const draftEntries = await Promise.all(
-    (episodes ?? []).map(async (e) => [e.id, await loadDraftForEpisode(admin, e.id)] as const)
-  );
+  const [draftEntries, teams] = await Promise.all([
+    Promise.all((episodes ?? []).map(async (e) => [e.id, await loadDraftForEpisode(admin, e.id)] as const)),
+    loadEpisodeTeams(
+      supabase,
+      (episodes ?? []).map((e) => e.id)
+    ),
+  ]);
   const draftsByEpisode: Record<string, DraftState> = Object.fromEntries(draftEntries);
 
   const unpublishedEpisodeIds = new Set(
     (episodes ?? []).filter((e) => !e.results_published_at).map((e) => e.id)
   );
   const revealedByEpisode: Record<string, Record<string, string>> = {};
+  const revealedDancesByEpisode: ResultsPageData["revealedDancesByEpisode"] = {};
   for (const row of danceScores ?? []) {
     if (!unpublishedEpisodeIds.has(row.episode_id)) continue;
     const byCouple = (revealedByEpisode[row.episode_id] ??= {});
     if (!byCouple[row.couple_id] || row.created_at > byCouple[row.couple_id]) byCouple[row.couple_id] = row.created_at;
+    ((revealedDancesByEpisode[row.episode_id] ??= {})[row.couple_id] ??= []).push({
+      danceStyleId: row.dance_style_id,
+      songTitle: row.song_title,
+    });
   }
 
   const publisherIds = [
@@ -248,6 +267,9 @@ export async function loadResultsPageData(
     episodeResults: episodeResults ?? [],
     draftsByEpisode,
     revealedByEpisode,
+    revealedDancesByEpisode,
+    teamsAvailable: teams.available,
+    teamsByEpisode: teams.teamsByEpisode,
     releasedCoupleIdsByEpisode,
     publishedByNames,
     season,

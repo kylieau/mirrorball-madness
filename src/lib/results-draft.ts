@@ -73,15 +73,37 @@ const EMPTY_DRAFT_STATE: DraftState = {
   inJeopardyCoupleIds: [],
 };
 
+export type SaveDraftResultsOutcome = {
+  error: string | null;
+  // Couples whose rows were written, and couples refused because their scores
+  // were already posted (unpublished episodes only). Together they cover
+  // every entry sent when there is no error.
+  acknowledgedIds: string[];
+  skippedPostedIds: string[];
+};
+
+// PostgREST's code for a function missing from its schema cache: the checked
+// RPC arrives with supabase/apply-team-dances.sql, so until that is applied
+// the legacy RPC (which re-copies live rows over a posted couple's draft)
+// still carries every save.
+const FUNCTION_MISSING_CODE = "PGRST202";
+
 // The database locks the episode and replaces only edited couples in one transaction.
 export async function saveDraftResults(
   admin: SupabaseClient<Database>, input: SaveDraftResultsInput
-): Promise<{ error: string | null }> {
+): Promise<SaveDraftResultsOutcome> {
+  const sentIds = input.entries.map((entry) => entry.coupleId);
   if (input.entries.some((entry) => entry.dances.some((dance) => dance.judgeScores.some(
     ({ score }) => !Number.isFinite(score) || score < 0 || score > 10
-  )))) return { error: "Judge scores must be between 0 and 10." };
+  )))) return { error: "Judge scores must be between 0 and 10.", acknowledgedIds: [], skippedPostedIds: [] };
+  const checked = await admin.rpc("save_episode_draft_checked", { p_input: input as unknown as Json });
+  if (!checked.error) {
+    const data = checked.data as { acknowledged?: string[]; skippedPosted?: string[] } | null;
+    return { error: null, acknowledgedIds: data?.acknowledged ?? sentIds, skippedPostedIds: data?.skippedPosted ?? [] };
+  }
+  if (checked.error.code !== FUNCTION_MISSING_CODE) return { error: checked.error.message, acknowledgedIds: [], skippedPostedIds: [] };
   const { error } = await admin.rpc("save_episode_draft", { p_input: input as unknown as Json });
-  return { error: error?.message ?? null };
+  return { error: error?.message ?? null, acknowledgedIds: error ? [] : sentIds, skippedPostedIds: [] };
 }
 
 export async function loadDraftForEpisode(

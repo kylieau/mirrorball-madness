@@ -932,6 +932,106 @@ export type Database = {
           },
         ]
       }
+      episode_team_members: {
+        Row: {
+          couple_id: string
+          created_at: string
+          episode_id: string
+          team_id: string
+        }
+        Insert: {
+          couple_id: string
+          created_at?: string
+          episode_id: string
+          team_id: string
+        }
+        Update: {
+          couple_id?: string
+          created_at?: string
+          episode_id?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_team_members_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_team_members_team_id_episode_id_fkey"
+            columns: ["team_id", "episode_id"]
+            isOneToOne: false
+            referencedRelation: "episode_teams"
+            referencedColumns: ["id", "episode_id"]
+          },
+        ]
+      }
+      episode_teams: {
+        Row: {
+          captain_couple_id: string | null
+          created_at: string
+          dance_style_id: string
+          episode_id: string
+          host_name: string | null
+          id: string
+          name: string
+          song_source: string | null
+          song_title: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          captain_couple_id?: string | null
+          created_at?: string
+          dance_style_id: string
+          episode_id: string
+          host_name?: string | null
+          id?: string
+          name: string
+          song_source?: string | null
+          song_title?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          captain_couple_id?: string | null
+          created_at?: string
+          dance_style_id?: string
+          episode_id?: string
+          host_name?: string | null
+          id?: string
+          name?: string
+          song_source?: string | null
+          song_title?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_teams_captain_couple_id_fkey"
+            columns: ["captain_couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_teams_dance_style_id_fkey"
+            columns: ["dance_style_id"]
+            isOneToOne: false
+            referencedRelation: "dance_styles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_teams_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       episodes: {
         Row: {
           airs_at: string
@@ -1854,6 +1954,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      apply_team_dance: {
+        Args: {
+          p_actor_id: string
+          p_couple_ids?: string[]
+          p_episode_id: string
+          p_marks: Json
+          p_team_id: string
+        }
+        Returns: Json
+      }
       assert_episode_draft_actor: {
         Args: { p_actor_id: string; p_episode_id: string }
         Returns: undefined
@@ -1931,6 +2041,10 @@ export type Database = {
       effective_hard_deadline_week: {
         Args: { p_league_id: string }
         Returns: number
+      }
+      episode_couple_dance_signature: {
+        Args: { p_couple_id: string; p_draft: boolean; p_episode_id: string }
+        Returns: Json
       }
       episode_publication_snapshot: {
         Args: { p_episode_id: string }
@@ -2199,6 +2313,11 @@ export type Database = {
         Returns: string
       }
       save_episode_draft: { Args: { p_input: Json }; Returns: undefined }
+      save_episode_draft_checked: { Args: { p_input: Json }; Returns: Json }
+      save_episode_teams: {
+        Args: { p_actor_id: string; p_episode_id: string; p_teams: Json }
+        Returns: Json
+      }
       seed_episode_correction: {
         Args: { p_episode_id: string; p_started_by: string }
         Returns: string

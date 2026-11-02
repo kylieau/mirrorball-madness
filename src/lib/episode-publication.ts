@@ -64,6 +64,28 @@ export function buildPublicationPlan(
     throw new Error(
       `Post every couple's scores before publishing results (${unposted.length} still to post).`
     );
+  // Publication keeps a posted couple's live rows and ignores their draft,
+  // which is only safe while the two agree. A team score applied after they
+  // were posted lives in the draft alone; refuse rather than drop it.
+  // commit_episode_publication enforces the same rule down to each mark.
+  const divergent = [...preserved].filter((coupleId) => {
+    const live = snapshot.dances
+      .filter((d) => d.episode_id === episodeId && d.couple_id === coupleId)
+      .map((d) => `${d.dance_style_id}|${d.song_title ?? ""}|${Number(d.total_score)}`);
+    const draft = drafts
+      .filter((d) => d.couple_id === coupleId)
+      .map((d) => {
+        const total = snapshot.draftJudges
+          .filter((j) => j.draft_dance_score_id === d.id)
+          .reduce((sum, j) => sum + Number(j.score), 0);
+        return `${d.dance_style_id}|${d.song_title ?? ""}|${total}`;
+      });
+    return live.sort().join(";") !== draft.sort().join(";");
+  });
+  if (divergent.length > 0)
+    throw new Error(
+      `Posted scores for ${divergent.length} ${divergent.length === 1 ? "couple" : "couples"} differ from their draft (a team score or edit arrived after they were posted). Un-Post and Publish them again before finishing the week.`
+    );
   const week = snapshot.weeks.find((w) => w.id === episode.week_id);
   const nowResolved = new Set(
     entries.filter((r) => RESOLVING_OUTCOMES.has(r.outcome as Outcome)).map((r) => r.couple_id)

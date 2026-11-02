@@ -12,7 +12,22 @@ import {
   releaseDraftCoupleAction,
   startEpisodeCorrection,
   withdrawDraftCoupleAction,
+  applyTeamDanceAction,
+  overridePostedTeamMemberAction,
+  saveEpisodeTeamsAction,
 } from "@/app/admin/results/actions";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { TeamDancesCard, type ApplyOutcome, type TeamCardView } from "@/components/team-dances-card";
+import { TeamEditor, teamDraftsFromTeams, teamDraftsToSetup, type TeamDraft } from "@/components/team-editor";
+import {
+  appliedTeamMarks,
+  buildNightSummary,
+  isTeamDanceRow,
+  teamApplyPlan,
+  validateTeamSetup,
+  type EpisodeTeam,
+  type TeamMark,
+} from "@/lib/team-dances";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -163,7 +178,8 @@ function isPerfectScore(dance: RowDance, judgeCount: number): boolean {
 function buildRowsFromDraft(
   draft: DraftState | undefined,
   couples: Couple[],
-  expectedDanceCount: number
+  expectedDanceCount: number,
+  teamByCouple: ReadonlyMap<string, EpisodeTeam>
 ): Record<string, CoupleRow> {
   const inJeopardy = new Set(draft?.inJeopardyCoupleIds ?? []);
   const rows: Record<string, CoupleRow> = {};
@@ -197,11 +213,14 @@ function buildRowsFromDraft(
 
   // A couple's dance rows default to however many dances the episode expects,
   // so entry is fill-in-the-blanks rather than a "+ Dance" click per row. A
-  // Did Not Dance couple gets none.
+  // Did Not Dance couple gets none. A team member's team dance arrives from
+  // the Team Dances card, so one slot is held for it instead of left blank.
   for (const coupleId of Object.keys(rows)) {
     const row = rows[coupleId];
     if (row.outcome === "bye") continue;
-    const fillCount = expectedDanceCount - row.dances.length;
+    const team = teamByCouple.get(coupleId);
+    const reserved = team && !row.dances.some((d) => isTeamDanceRow(team, d)) ? 1 : 0;
+    const fillCount = expectedDanceCount - row.dances.length - reserved;
     if (fillCount <= 0) continue;
     rows[coupleId] = {
       ...row,
@@ -236,6 +255,10 @@ export function ResultsForm({
   forceSelectEpisodeId,
   participantsByEpisode,
   guestJudgesByEpisode,
+  roundTypesByEpisode,
+  teamsAvailable,
+  teamsByEpisode,
+  revealedDancesByEpisode,
 }: {
   // Trusted contributors draft results; only site admins publish or correct.
   // Server-side requireAdminAccess is the real gate — this just avoids
@@ -257,6 +280,12 @@ export function ResultsForm({
   forceSelectEpisodeId?: string | null;
   participantsByEpisode: Record<string, string[]>;
   guestJudgesByEpisode: Record<string, string[]>;
+  roundTypesByEpisode: Record<string, string[]>;
+  // False until supabase/apply-team-dances.sql is applied: the Team Dances
+  // card stays hidden and a note points to manual second-slot entry.
+  teamsAvailable: boolean;
+  teamsByEpisode: Record<string, EpisodeTeam[]>;
+  revealedDancesByEpisode: Record<string, Record<string, { danceStyleId: string; songTitle: string | null }[]>>;
 }) {
   const weekById = new Map(weeks.map((week) => [week.id, week]));
   const nightsCountByWeek = new Map<string, number>();
@@ -316,6 +345,19 @@ export function ResultsForm({
     .map((id) => couplesById.get(id) ?? activeCouples.find((c) => c.id === id))
     .filter((c): c is Couple => !!c);
 
+  const episodeTeams = selectedEpisode ? (teamsByEpisode[selectedEpisode.id] ?? []) : [];
+  const teamByCouple = new Map<string, EpisodeTeam>(
+    episodeTeams.flatMap((team) => team.memberCoupleIds.map((coupleId) => [coupleId, team] as const))
+  );
+  // Ticking Team Dance under Round Types on Schedule is what brings the card
+  // out; saved teams keep it out even if the tick is later removed.
+  const isTeamNight =
+    episodeTeams.length > 0 || (roundTypesByEpisode[selectedEpisode?.id ?? ""] ?? []).includes("Team Dance");
+  // The night's panel: the standing judges plus this episode's guests.
+  const nightJudges = judgesForScoreInputs(judges, [], guestJudgesByEpisode[selectedEpisode?.id ?? ""] ?? []);
+  const freestyleStyleId =
+    danceStyles.find((s) => s.name.trim().toLowerCase() === "freestyle")?.id ?? danceStyles[0]?.id ?? "";
+
   const [rows, setRows] = useState<Record<string, CoupleRow>>({});
   const [customMoments, setCustomMoments] = useState<DraftState["customMoments"]>([]);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
@@ -344,6 +386,15 @@ export function ResultsForm({
   const [nowMs, setNowMs] = useState<number | null>(null);
 
   const [confirmNoElimination, setConfirmNoElimination] = useState(false);
+  // A team member about to be posted before their team is scored (frame 07).
+  const [confirmPublishTeamMember, setConfirmPublishTeamMember] = useState<string | null>(null);
+  const [teamBusy, setTeamBusy] = useState(false);
+  const [teamsSheetOpen, setTeamsSheetOpen] = useState(false);
+  const [teamDrafts, setTeamDrafts] = useState<TeamDraft[]>([]);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
+  const [savingTeams, setSavingTeams] = useState(false);
+  // Couples whose last edit was refused because they were posted in between.
+  const [postedSkipNotice, setPostedSkipNotice] = useState<string[]>([]);
   const [customMomentLabel, setCustomMomentLabel] = useState("");
   const [customMomentCoupleId, setCustomMomentCoupleId] = useState("");
   const [addingCustomMoment, setAddingCustomMoment] = useState(false);
@@ -406,6 +457,7 @@ export function ResultsForm({
       setShowLeaderboard(false);
       setUnlockedForCorrectionCoupleIds(new Set());
       setCoupleViewMode(selectedEpisode.results_published_at != null ? "published" : "inProgress");
+      setPostedSkipNotice([]);
       draftSaveQueue.current.reset();
     }
     const wasSelfTriggered = justSavedEpisodeId.current === selectedEpisode.id;
@@ -438,7 +490,7 @@ export function ResultsForm({
     }
     seedingEpisodeId.current = null;
     setSeedingCorrection(false);
-    setRows(buildRowsFromDraft(draft, episodeCouples, expectedDanceCount));
+    setRows(buildRowsFromDraft(draft, episodeCouples, expectedDanceCount, teamByCouple));
     setCustomMoments(draft?.customMoments ?? []);
     setDraftSavedAt(draft?.updatedAt ?? null);
     setHasDraft(draft?.hasDraft ?? false);
@@ -539,17 +591,135 @@ export function ResultsForm({
           setDraftSavedAt(new Date().toISOString());
           setHasDraft(true);
         }
-        return saved;
+        return { error: saved.error, acknowledgedIds: saved.acknowledgedIds, skippedIds: saved.skippedPostedIds };
       }
     );
     setError(result.error);
+    if (result.skippedIds && result.skippedIds.length > 0) {
+      // Those couples were posted while the edit was in flight. Say so, and
+      // put their rows back to what the server holds rather than keep
+      // showing an edit that never landed.
+      const skipped = new Set(result.skippedIds);
+      const serverRows = buildRowsFromDraft(
+        draftsByEpisode[selectedEpisode.id],
+        episodeCouples.filter((c) => skipped.has(c.id)),
+        expectedDanceCount,
+        teamByCouple
+      );
+      setRows((prev) => ({ ...prev, ...serverRows }));
+      setPostedSkipNotice(result.skippedIds);
+    }
     setSavingDraft(false);
     return result;
   }
 
-  async function handlePublishCouple(coupleId: string) {
+  // The members' own dances must be on the server before the team row is
+  // merged in, so the flush comes first. On success the applied rows are
+  // mirrored locally and this episode's revalidation is treated as our own.
+  async function handleApplyTeam(teamId: string, marks: TeamMark[]): Promise<ApplyOutcome> {
+    if (!selectedEpisode) return { error: "Select a week first." };
+    const team = episodeTeams.find((t) => t.id === teamId);
+    if (!team) return { error: "That team is no longer on this episode. Refresh and try again." };
+    setTeamBusy(true);
+    try {
+      const saved = await flushDraft();
+      if (saved.error) return { error: saved.error };
+      justSavedEpisodeId.current = selectedEpisode.id;
+      const outcome = await applyTeamDanceAction({ episodeId: selectedEpisode.id, teamId, marks });
+      if (outcome.error) {
+        justSavedEpisodeId.current = null;
+        return outcome;
+      }
+      const applied = new Set(outcome.result?.applied ?? []);
+      const scores = Object.fromEntries(marks.map((m) => [m.judgeId, String(m.score)]));
+      setRows((prev) => {
+        const next = { ...prev };
+        for (const coupleId of applied) {
+          const row = next[coupleId] ?? emptyRow();
+          const existing = row.dances.find((d) => isTeamDanceRow(team, d));
+          const teamRow: RowDance = {
+            key: existing?.key ?? `team-${teamId}-${coupleId}`,
+            danceStyleId: team.danceStyleId,
+            songTitle: team.songTitle ?? "",
+            scores,
+          };
+          next[coupleId] = {
+            ...row,
+            dances: existing ? row.dances.map((d) => (d.key === existing.key ? teamRow : d)) : [...row.dances, teamRow],
+          };
+        }
+        return next;
+      });
+      setDraftSavedAt(new Date().toISOString());
+      setHasDraft(true);
+      return outcome;
+    } catch {
+      return { error: "Could not confirm the update. Please refresh and try again." };
+    } finally {
+      setTeamBusy(false);
+    }
+  }
+
+  async function handleOverrideTeamMember(teamId: string, coupleId: string, marks: TeamMark[]) {
+    if (!selectedEpisode) return { error: "Select a week first." };
+    setTeamBusy(true);
+    try {
+      const result = await overridePostedTeamMemberAction({ episodeId: selectedEpisode.id, teamId, coupleId, marks });
+      router.refresh();
+      return result;
+    } catch {
+      return { error: "Could not confirm the update. Please refresh and try again." };
+    } finally {
+      setTeamBusy(false);
+    }
+  }
+
+  function openTeamsEditor() {
+    setTeamsError(null);
+    setTeamDrafts(teamDraftsFromTeams(episodeTeams));
+    setTeamsSheetOpen(true);
+  }
+
+  async function handleSaveTeams() {
+    if (!selectedEpisode) return;
+    const teams = teamDraftsToSetup(teamDrafts);
+    const invalid = validateTeamSetup(teams);
+    if (invalid) {
+      setTeamsError(invalid);
+      return;
+    }
+    setSavingTeams(true);
+    setTeamsError(null);
+    try {
+      const result = await saveEpisodeTeamsAction({ episodeId: selectedEpisode.id, teams });
+      if (result.error) {
+        setTeamsError(result.error);
+        return;
+      }
+      setTeamsSheetOpen(false);
+      if (result.result?.posted.length) {
+        setError(
+          `Team changes reached ${result.result.posted.length} posted ${result.result.posted.length === 1 ? "couple's draft" : "couples' drafts"}. Un-Post and Publish them again so their live scores match.`
+        );
+      }
+      router.refresh();
+    } catch {
+      setTeamsError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setSavingTeams(false);
+    }
+  }
+
+  async function handlePublishCouple(coupleId: string, opts: { force?: boolean } = {}) {
     try {
       if (!selectedEpisode) return;
+      // Posting a team member before their team is scored means the team
+      // score can only reach them through an un-post. Ask first (frame 07).
+      const team = teamByCouple.get(coupleId);
+      if (team && !opts.force && !(rows[coupleId]?.dances ?? []).some((d) => isTeamDanceRow(team, d))) {
+        setConfirmPublishTeamMember(coupleId);
+        return;
+      }
       setError(null);
       setRevealBusy(true);
       // Flush first so the server reads exactly what's on screen.
@@ -845,6 +1015,91 @@ export function ResultsForm({
     .filter((c) => c.elimination_week !== null || c.status === "winner" || c.status === "runner_up" || c.status === "third_place")
     .sort((a, b) => (a.elimination_week ?? 999) - (b.elimination_week ?? 999));
 
+  // What the Team Dances card shows per member, from the same rows the couple
+  // cards edit, so "Applies to N of M" and the couple cards never disagree.
+  const nightJudgeIds = nightJudges.map((j) => j.id);
+  const teamViews: TeamCardView[] = episodeTeams.map((team) => {
+    const plan = teamApplyPlan(
+      team,
+      team.memberCoupleIds.map((coupleId) => {
+        const row = rows[coupleId] ?? emptyRow();
+        const couple = couplesById.get(coupleId);
+        return {
+          coupleId,
+          status: couple?.status ?? "active",
+          eliminationWeek: couple?.elimination_week ?? null,
+          outcome: row.outcome,
+          dances: row.dances.map((d) => ({ danceStyleId: d.danceStyleId, songTitle: d.songTitle, scores: d.scores })),
+          posted: revealedCoupleIds.has(coupleId),
+          liveDances: revealedDancesByEpisode[selectedEpisode?.id ?? ""]?.[coupleId] ?? [],
+        };
+      }),
+      {
+        weekNumber: selectedWeek?.week_number ?? null,
+        participantIds: participantsByEpisode[selectedEpisode?.id ?? ""] ?? [],
+        judgeIds: nightJudgeIds,
+      }
+    );
+    return {
+      team,
+      styleName: danceStyleItems[team.danceStyleId] ?? "Freestyle",
+      plan,
+      applied: appliedTeamMarks(plan),
+      individualTotals: Object.fromEntries(
+        team.memberCoupleIds.map((coupleId) => [
+          coupleId,
+          (rows[coupleId] ?? emptyRow()).dances.filter((d) => !isTeamDanceRow(team, d)).reduce((sum, d) => sum + danceTotal(d), 0),
+        ])
+      ),
+    };
+  });
+  const nightSummary = buildNightSummary(
+    scoredCouples.map((c) => {
+      const team = teamByCouple.get(c.id);
+      return {
+        coupleId: c.id,
+        dances: (rows[c.id] ?? emptyRow()).dances
+          .filter((d) => d.danceStyleId)
+          .map((d) => ({
+            marks: Object.values(d.scores).filter((v) => v.trim() !== "").map(Number).filter(Number.isFinite),
+            teamName: team && isTeamDanceRow(team, d) ? team.name : null,
+          })),
+      };
+    })
+  );
+  const nightTagLabel = { top: "Top Scorer", within1: "Within 1", within2: "Within 2" } as const;
+
+  // A member's team dance is read-only on their own card (frames 06/08): the
+  // marks come from the Team Dances card, so one member can't drift from the
+  // rest of the team. Before the team is scored the row shows as waiting.
+  function renderTeamDanceRow(team: EpisodeTeam, dance: RowDance | null) {
+    const max = nightJudgeIds.length * 10;
+    return (
+      <div
+        key={dance?.key ?? `team-wait-${team.id}`}
+        className="flex flex-col gap-1 rounded-lg border border-dashed border-accent/40 bg-muted/30 p-1.5 text-xs"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-x-2">
+          <span className="font-medium">🔗 Dance · Team {team.name}</span>
+          <span className="text-muted-foreground">
+            {danceStyleItems[team.danceStyleId] ?? "Freestyle"}
+            {team.songTitle ? ` · ${team.songTitle}` : ""}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-2">
+          <span className="font-heading">
+            {nightJudgeIds.map((id) => dance?.scores[id]?.trim() || "_").join(" · ")}{" "}
+            <span className="font-semibold">{dance ? danceTotal(dance) : 0}</span>
+            <span className="text-muted-foreground">/{max}</span>
+          </span>
+          <span className={dance ? "text-emerald-text" : "text-amber-text"}>
+            {dance ? "From Team Dances" : "Waiting on Team Dances"}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   // Called as a plain function, not rendered as <Component/>: a component
   // declared inside this one gets a new identity every render, which would
   // remount its inputs on every keystroke and drop focus.
@@ -881,6 +1136,7 @@ export function ResultsForm({
     // narrows which one the UI lets you touch, read-only by default.
     const correctionLocked = published && (!canPublish || !unlockedForCorrectionCoupleIds.has(c.id));
     const locked = published ? correctionLocked : revealState === "posted";
+    const team = teamByCouple.get(c.id);
     const postedAtIso = revealedAtByCouple[c.id];
     const undoLeft = nowMs !== null && postedAtIso ? undoSecondsLeft(postedAtIso, nowMs) : 0;
     const publishBlocker = row.dances.filter((d) => d.danceStyleId).length === 0
@@ -898,7 +1154,7 @@ export function ResultsForm({
         </p>
 
         <fieldset disabled={locked || revealBusy || publishing || releasing} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
-          {row.dances.map((d) => (
+          {row.dances.map((d) => team && isTeamDanceRow(team, d) ? renderTeamDanceRow(team, d) : (
             <div key={d.key} className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-1.5">
               <div className="flex flex-wrap items-end gap-1.5">
                 <Select
@@ -951,6 +1207,7 @@ export function ResultsForm({
               </div>
             </div>
           ))}
+          {team && row.outcome !== "bye" && !row.dances.some((d) => isTeamDanceRow(team, d)) && renderTeamDanceRow(team, null)}
         </fieldset>
 
         {!published && (
@@ -1108,6 +1365,26 @@ export function ResultsForm({
       )}
 
       {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
+      {postedSkipNotice.length > 0 && (
+        <div role="alert" className="flex items-start justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-text">
+          <p>
+            {postedSkipNotice.map((coupleId, i) => {
+              const couple = namedCouple(coupleId);
+              return (
+                <span key={coupleId}>
+                  {i > 0 && (i === postedSkipNotice.length - 1 ? " and " : ", ")}
+                  {couple ? <CoupleName {...coupleParts(couple)} /> : "A couple"}
+                </span>
+              );
+            })}{" "}
+            {postedSkipNotice.length === 1 ? "was" : "were"} posted before your last edit saved, so that edit was not
+            applied. Their card shows what is live.
+          </p>
+          <Button size="xs" variant="ghost" onClick={() => setPostedSkipNotice([])}>
+            Dismiss
+          </Button>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -1201,6 +1478,34 @@ export function ResultsForm({
               </p>
             </div>
           )}
+          {isTeamNight && !teamsAvailable && (
+            <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Team Dances need the database update</p>
+              <p className="mt-0.5">
+                Until supabase/apply-team-dances.sql is applied, type the team&apos;s marks into each couple&apos;s
+                second dance slot, and post no team member until both of their dances are in.
+              </p>
+            </div>
+          )}
+          {isTeamNight && teamsAvailable && (
+            <TeamDancesCard
+              teams={teamViews}
+              judges={nightJudges}
+              judgeNames={judgeDisplayNames}
+              guestJudgeIds={new Set(guestJudgesByEpisode[selectedEpisode.id] ?? [])}
+              coupleName={(coupleId) => {
+                const couple = namedCouple(coupleId);
+                return couple ? <CoupleName {...coupleParts(couple)} /> : "This couple";
+              }}
+              canSetup={canPublish}
+              canOverride={canPublish && !published}
+              inputsDisabled={published && !canPublish}
+              busy={teamBusy || savingDraft || revealBusy || publishing || releasing}
+              onApply={handleApplyTeam}
+              onOverride={handleOverrideTeamMember}
+              onEditTeams={openTeamsEditor}
+            />
+          )}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
@@ -1251,9 +1556,54 @@ export function ResultsForm({
                 scoredCouples.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No scores entered yet.</p>
                 ) : (
-                  [...scoredCouples]
-                    .sort((a, b) => coupleTotal(rows[b.id] ?? emptyRow()) - coupleTotal(rows[a.id] ?? emptyRow()))
-                    .map((c, i) => renderDanceEntry(c, i + 1))
+                  <>
+                    {isTeamNight && nightSummary.length > 0 && (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold">Night Summary</p>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Night · Dance Card</p>
+                        </div>
+                        <div className="flex flex-col rounded-lg border border-border">
+                          {nightSummary.map((row, i) => {
+                            const couple = namedCouple(row.coupleId);
+                            return (
+                              <div key={row.coupleId} className="flex items-center gap-2 border-b border-border px-2.5 py-1.5 last:border-b-0">
+                                <span className="w-5 shrink-0 font-rank text-sm text-muted-foreground">{i + 1}</span>
+                                <div className="flex min-w-0 flex-1 flex-col">
+                                  <span className="flex flex-wrap items-center gap-1.5 text-sm">
+                                    {couple ? <CoupleName {...coupleParts(couple)} /> : null}
+                                    {row.tag && (
+                                      <Badge variant={row.tag === "top" ? "default" : "outline"}>{nightTagLabel[row.tag]}</Badge>
+                                    )}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    Individual {row.individualTotal}
+                                    {row.teamParts.map((part) => ` + ${part.teamName} ${part.total}`).join("")}
+                                  </span>
+                                </div>
+                                <div className="flex shrink-0 flex-col items-end">
+                                  <span className="font-heading text-base font-semibold">
+                                    {row.nightTotal}
+                                    <span className="text-xs font-normal text-muted-foreground">/{row.maxPossible}</span>
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    <span className="font-heading text-accent">{formatPoints(row.danceCardPreview)}</span> of 30
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Top Scorer and Within 1/2 are Curtain Call&apos;s raw-total bands; Dance Card is the night on the
+                          30-point basis, before the multiplier. Both are previews until Finish Week.
+                        </p>
+                      </div>
+                    )}
+                    {[...scoredCouples]
+                      .sort((a, b) => coupleTotal(rows[b.id] ?? emptyRow()) - coupleTotal(rows[a.id] ?? emptyRow()))
+                      .map((c, i) => renderDanceEntry(c, i + 1))}
+                  </>
                 )
               ) : coupleViewMode === "drafted" ? (
                 draftedCouples.length === 0 ? (
@@ -1341,6 +1691,77 @@ export function ResultsForm({
               </AccordionItem>
             </Accordion>
           </Card>
+
+          <Dialog open={confirmPublishTeamMember != null} onOpenChange={(open) => !open && setConfirmPublishTeamMember(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Wait for the Team Dance?</DialogTitle>
+                <DialogDescription>
+                  {(() => {
+                    const coupleId = confirmPublishTeamMember ?? "";
+                    const team = teamByCouple.get(coupleId);
+                    const couple = namedCouple(coupleId);
+                    return (
+                      <>
+                        {team?.name ?? "Their team"} isn&apos;t scored yet. If you publish{" "}
+                        {couple ? <CoupleName {...coupleParts(couple)} /> : "this couple"} now, the team score can&apos;t
+                        reach them until you un-post them. Waiting is safer.
+                      </>
+                    );
+                  })()}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const coupleId = confirmPublishTeamMember;
+                    setConfirmPublishTeamMember(null);
+                    if (coupleId) void handlePublishCouple(coupleId, { force: true });
+                  }}
+                >
+                  Publish Anyway
+                </Button>
+                <Button onClick={() => setConfirmPublishTeamMember(null)}>Wait for Team</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Sheet open={teamsSheetOpen} onOpenChange={setTeamsSheetOpen}>
+            <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>{episodeTeams.length === 0 ? "Set Up Teams" : "Edit Teams"}</SheetTitle>
+                <SheetDescription>
+                  One set of judge marks per team applies to every member who danced. Removing a team or a member
+                  takes the team dance out of their draft; a renamed song or style follows it. Saved here, not with
+                  the episode.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="flex flex-col gap-4 px-4 pb-4">
+                {teamsError && (
+                  <p role="alert" className="text-sm text-danger-text">
+                    {teamsError}
+                  </p>
+                )}
+                <TeamEditor
+                  teams={teamDrafts}
+                  onChange={setTeamDrafts}
+                  couples={episodeCouples.map((c) => ({ id: c.id, parts: coupleParts(c) }))}
+                  danceStyles={danceStyles}
+                  defaultStyleId={freestyleStyleId}
+                  disabled={savingTeams}
+                />
+                <div className="flex gap-2">
+                  <Button onClick={() => void handleSaveTeams()} disabled={savingTeams}>
+                    {savingTeams ? "Saving…" : "Save Teams"}
+                  </Button>
+                  <Button variant="ghost" onClick={() => setTeamsSheetOpen(false)} disabled={savingTeams}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
 
           <Dialog open={confirmNoElimination} onOpenChange={setConfirmNoElimination}>
             <DialogContent>
