@@ -5,6 +5,7 @@ import { cn } from "cn";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { mergeCoupleOutcomes } from "@/lib/competition-week";
+import { coupleDanceLines } from "@/lib/night-dance-lines";
 import { fanOutcomeBadge, showInJeopardyBadge, IN_JEOPARDY_BADGE } from "@/lib/results-outcome";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -16,6 +17,9 @@ type DanceScore = {
   dance_style_id: string;
   song_title: string | null;
   total_score: number;
+  // The 30-point basis; with total_score it recovers the panel size, which
+  // is how a multi-dance night's "Night 64/80" knows its max.
+  scaled_score: number;
 };
 type EpisodeResult = {
   episode_id: string;
@@ -46,6 +50,7 @@ export function WeeklyResultsView({
   pendingReveal,
   inJeopardyCoupleIds,
   scoresOnly = false,
+  teamDanceEpisodeIds,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
@@ -71,8 +76,12 @@ export function WeeklyResultsView({
   // A week still being revealed: list each posted couple by its judges' score,
   // with no outcome badges or eliminations.
   scoresOnly?: boolean;
+  // Episodes whose round types include Team Dance: their Freestyle reads as
+  // "Freestyle (Team)". Omitted for guests, who can't read round types.
+  teamDanceEpisodeIds?: string[];
 }) {
   const inJeopardy = new Set(inJeopardyCoupleIds ?? []);
+  const teamDanceEpisodes = new Set(teamDanceEpisodeIds ?? []);
   const episode = episodes[0];
   // No button here — the SpoilerFreeStrip at the top of the page is the one
   // control for marking a week watched; this card is context only.
@@ -141,11 +150,17 @@ export function WeeklyResultsView({
       return {
         ...r,
         parts: coupleParts(r.couple_id),
-        danceLabels: dances.map((d) => {
-          const style = danceStyleById.get(d.dance_style_id) ?? "Unknown dance";
-          const song = d.song_title?.trim();
-          return song ? `${style} · ${song}` : style;
-        }),
+        danceLabels: coupleDanceLines(
+          dances.map((d) => ({
+            episodeId: d.episode_id,
+            coupleId: d.couple_id,
+            style: danceStyleById.get(d.dance_style_id) ?? "Unknown dance",
+            song: d.song_title,
+            totalScore: Number(d.total_score),
+            scaledScore: Number(d.scaled_score),
+          })),
+          teamDanceEpisodes
+        ),
         total: dances.reduce((sum, d) => sum + d.total_score, 0),
       };
     })
