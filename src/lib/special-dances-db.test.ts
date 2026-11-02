@@ -323,7 +323,7 @@ describe("special dances in PostgreSQL", () => {
     await savePoints(danceOff, [{ coupleId: amber, points: 3, result: "Winner" }, { coupleId: julia, points: null, result: "Loser" }]);
     await expect(revealTeam(danceOff)).rejects.toThrow(/Dance-Off has points for 1 of 2 couples/);
     await saveMarks(team1, [9, 9, 9, 9]);
-    let data = await snapshot();
+    const data = await snapshot();
     expect(data.teamScores).toHaveLength(2);
     expect(() => buildPublicationPlan(data, episode)).toThrow(/Dance-Off has points for 1 of 2 couples/);
     await savePoints(danceOff, [{ coupleId: julia, points: 0, result: "Loser" }]);
