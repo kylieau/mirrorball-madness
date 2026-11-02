@@ -1,4 +1,5 @@
 import { roundPoints } from "./format-points";
+import { collapseToNights, type DanceScore } from "./scoring";
 
 export type RosterSlotPeriod = {
   managerId: string;
@@ -16,7 +17,9 @@ export function slotActiveInWeek(slot: RosterSlotPeriod, week: number): boolean 
 // and Dance Card was scoring count (mirrors which weeks buildWeeklyScoreRows
 // credits a roster slot). Deliberately judges' points only — survival and
 // placement bonuses are manager-level and stay out of per-couple lines.
-// Pass only slots active in `week`, so each couple appears once.
+// Pass only slots active in `week`, so each couple appears once. Dance rows
+// are collapsed per night first (collapseToNights), the same way the engine
+// pays them.
 export function judgePointsThroughWeek({
   slots,
   scores,
@@ -26,7 +29,7 @@ export function judgePointsThroughWeek({
   categoryWeight,
 }: {
   slots: RosterSlotPeriod[];
-  scores: { coupleId: string; weekNumber: number; scaledScore: number }[];
+  scores: (DanceScore & { weekNumber: number })[];
   judgesScoreStartsWeek: number;
   week: number;
   multiplier: number;
@@ -34,17 +37,22 @@ export function judgePointsThroughWeek({
 }): Map<string, { week: number; total: number }> {
   const scale = multiplier * categoryWeight;
   const points = new Map<string, { week: number; total: number }>();
+  const weekOfEpisode = new Map(scores.map((row) => [row.episodeId, row.weekNumber]));
+  const nights = collapseToNights(scores).map((night) => ({
+    ...night,
+    weekNumber: weekOfEpisode.get(night.episodeId)!,
+  }));
 
   for (const slot of slots) {
     const firstWeek = Math.max(slot.startWeek, judgesScoreStartsWeek);
     const lastWeek = Math.min(slot.endWeek ?? week, week);
     let weekScaled = 0;
     let totalScaled = 0;
-    for (const row of scores) {
-      if (row.coupleId !== slot.coupleId) continue;
-      if (row.weekNumber < firstWeek || row.weekNumber > lastWeek) continue;
-      totalScaled += row.scaledScore;
-      if (row.weekNumber === week) weekScaled += row.scaledScore;
+    for (const night of nights) {
+      if (night.coupleId !== slot.coupleId) continue;
+      if (night.weekNumber < firstWeek || night.weekNumber > lastWeek) continue;
+      totalScaled += night.scaledScore;
+      if (night.weekNumber === week) weekScaled += night.scaledScore;
     }
     points.set(slot.coupleId, { week: roundPoints(weekScaled * scale), total: roundPoints(totalScaled * scale) });
   }

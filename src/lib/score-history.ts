@@ -14,7 +14,7 @@ import {
   findEliminatedCoupleIds,
   resolveCurtainCallGuess,
   sumDanceScoresByCouple,
-  sumScaledScoresByCouple,
+  nightScaledScoresByCouple,
   type CategoryWeights,
   type CurtainCallVerdict,
   type DanceScore,
@@ -63,6 +63,7 @@ export function weekResults(
     danceScores: danceRows
       .filter((row) => inWeek.has(row.episode_id))
       .map((row) => ({
+        episodeId: row.episode_id,
         coupleId: row.couple_id,
         totalScore: Number(row.total_score),
         scaledScore: Number(row.scaled_score),
@@ -191,7 +192,7 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
     const w = week.weekNumber;
     if (w < input.anchorWeek) continue;
     const totals = sumDanceScoresByCouple(week.danceScores);
-    const scaledTotals = sumScaledScoresByCouple(week.danceScores);
+    const scaledTotals = nightScaledScoresByCouple(week.danceScores);
     const lastOutcome = new Map(week.outcomes.map((o) => [o.coupleId, o]));
     const resolvedThisWeek = [...lastOutcome.values()]
       .filter((o) => RESOLVING_OUTCOMES.has(o.outcome) && positionRanges.has(o.coupleId));
@@ -256,7 +257,8 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
 
       const rawTotal = totals.get(slot.coupleId) ?? 0;
       const judgesTotal = scaledTotals.get(slot.coupleId) ?? 0;
-      // A guest-judge night shows the TV total and the 30-point basis it pays on.
+      // A guest-judge or multi-dance night shows the TV total and the
+      // 30-point basis it pays on ("Jdg 64→24").
       const judgesLabel =
         rawTotal === judgesTotal ? trimNumber(judgesTotal) : `${trimNumber(rawTotal)}→${trimNumber(judgesTotal)}`;
       push(

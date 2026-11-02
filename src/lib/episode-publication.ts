@@ -129,13 +129,14 @@ export function buildPublicationPlan(
       (d) =>
         weekEpisodes.has(d.episode_id) && (d.episode_id !== episodeId || preserved.has(d.couple_id))
     )
-    .map(({ couple_id, total_score, scaled_score }) => ({ couple_id, total_score, scaled_score }));
+    .map(({ episode_id, couple_id, total_score, scaled_score }) => ({ episode_id, couple_id, total_score, scaled_score }));
   for (const d of drafts) {
     if (preserved.has(d.couple_id)) continue;
     const scores = snapshot.draftJudges
       .filter((j) => j.draft_dance_score_id === d.id)
       .map((j) => Number(j.score));
     dances.push({
+      episode_id: episodeId,
       couple_id: d.couple_id,
       total_score: scores.reduce((sum, v) => sum + v, 0),
       scaled_score: scaledJudgesScore(scores),

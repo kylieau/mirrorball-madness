@@ -13,7 +13,7 @@ export function buildRevealPlan(snapshot: PublicationSnapshot, episodeId: string
   const episodeIds = new Set(snapshot.episodes.filter((row) => row.week_id === week.id).map((row) => row.id));
   const before = snapshot.dances.filter((row) => episodeIds.has(row.episode_id));
   const after = before.filter((row) => row.episode_id !== episodeId || row.couple_id !== coupleId)
-    .map(({ couple_id, total_score, scaled_score }) => ({ couple_id, total_score, scaled_score }));
+    .map(({ episode_id, couple_id, total_score, scaled_score }) => ({ episode_id, couple_id, total_score, scaled_score }));
   if (!undo) {
     if (before.some((row) => row.episode_id === episodeId && row.couple_id === coupleId)) throw new Error("This couple's scores are already posted");
     const drafts = snapshot.draftDances.filter((row) => row.episode_id === episodeId && row.couple_id === coupleId);
@@ -21,7 +21,7 @@ export function buildRevealPlan(snapshot: PublicationSnapshot, episodeId: string
     for (const dance of drafts) {
       const scores = snapshot.draftJudges.filter((row) => row.draft_dance_score_id === dance.id).map((row) => Number(row.score));
       if (!scores.length || scores.some((score) => !Number.isFinite(score) || score < 0 || score > 10)) throw new Error("Complete this couple's judge scores before posting");
-      after.push({ couple_id: coupleId, total_score: scores.reduce((sum, score) => sum + score, 0), scaled_score: scaledJudgesScore(scores) });
+      after.push({ episode_id: episodeId, couple_id: coupleId, total_score: scores.reduce((sum, score) => sum + score, 0), scaled_score: scaledJudgesScore(scores) });
     }
   }
   const judgeRows = (dances: typeof after) => buildWeeklyScoreRows({

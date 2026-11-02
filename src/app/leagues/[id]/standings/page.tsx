@@ -189,6 +189,7 @@ export default async function LeagueStandingsPage({
             ? {
                 weekNumber: draftNight.weekNumber,
                 danceScores: draftNight.dances.map((dance) => ({
+                  episodeId: dance.episodeId,
                   coupleId: dance.coupleId,
                   totalScore: dance.total,
                   scaledScore: dance.scaled,
