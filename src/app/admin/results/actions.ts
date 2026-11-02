@@ -21,16 +21,9 @@ import {
   type SeasonSettingsInput,
 } from "@/lib/results-draft";
 import { publishEpisodeAtomically } from "@/lib/episode-publication";
-import { revealCouple, undoReveal } from "@/lib/results-reveal";
+import { revealCouple, revealTeam, undoReveal, undoTeamReveal } from "@/lib/results-reveal";
 import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
-import {
-  applyTeamDance,
-  overridePostedTeamMember,
-  saveEpisodeTeams,
-  type ApplyTeamDanceInput,
-  type ApplyTeamDanceResult,
-  type SaveTeamsResult,
-} from "@/lib/episode-teams";
+import { saveEpisodeTeams, saveTeamMarks, type SaveTeamsResult } from "@/lib/episode-teams";
 import type { TeamMark, TeamSetupInput } from "@/lib/team-dances";
 
 // Both checks return userId alongside error so callers that need to stamp
@@ -112,32 +105,37 @@ export async function saveEpisodeTeamsAction(input: {
   return result;
 }
 
-// Entering the team's marks is draft entry (propose tier); the RPC writes
-// drafts only and reports posted members rather than touching live rows.
-export async function applyTeamDanceAction(
-  input: ApplyTeamDanceInput
-): Promise<{ error: string | null; result?: ApplyTeamDanceResult }> {
+// Entering the team's marks is draft entry (propose tier); posting them is
+// the admin reveal below.
+export async function saveTeamMarksAction(input: {
+  episodeId: string;
+  teamId: string;
+  marks: TeamMark[];
+}): Promise<{ error: string | null }> {
   const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
-  const result = await applyTeamDance(createAdminClient(), input, access.userId);
+  const result = await saveTeamMarks(createAdminClient(), input, access.userId);
   if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
-// Un-post, apply, post again: each step recomputes every league, so only a
-// site admin (the reveal tier) may run it.
-export async function overridePostedTeamMemberAction(input: {
-  episodeId: string;
-  teamId: string;
-  coupleId: string;
-  marks: TeamMark[];
-}): Promise<{ error: string | null }> {
+// Posting a team recomputes every league's judges points, like posting a couple.
+export async function revealTeamScores(input: { episodeId: string; teamId: string }): Promise<{ error: string | null }> {
   const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
-  const result = await overridePostedTeamMember(createAdminClient(), input, access.userId);
-  revalidatePath("/admin/results", "layout");
+  const result = await revealTeam(createAdminClient(), input, access.userId);
+  if (!result.error) revalidatePath("/admin/results", "layout");
+  return result;
+}
+
+export async function undoTeamScores(input: { episodeId: string; teamId: string }): Promise<{ error: string | null }> {
+  const access = await requireAdminAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await undoTeamReveal(createAdminClient(), input, access.userId);
+  if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
