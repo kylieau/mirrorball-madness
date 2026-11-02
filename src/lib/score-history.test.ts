@@ -63,11 +63,11 @@ const weeks: HistoryWeekData[] = [
     weekNumber: 1,
     isDoubleElimination: false,
     danceScores: [
-      { episodeId: "ep1", coupleId: "A", totalScore: 30, scaledScore: 30 },
-      { episodeId: "ep1", coupleId: "B", totalScore: 24, scaledScore: 24 },
-      { episodeId: "ep1", coupleId: "C", totalScore: 20, scaledScore: 20 },
-      { episodeId: "ep1", coupleId: "D", totalScore: 18, scaledScore: 18 },
-      { episodeId: "ep1", coupleId: "E", totalScore: 12, scaledScore: 12 },
+      { episodeId: "ep1", coupleId: "A", totalScore: 30, scaledScore: 30, maxScore: null },
+      { episodeId: "ep1", coupleId: "B", totalScore: 24, scaledScore: 24, maxScore: null },
+      { episodeId: "ep1", coupleId: "C", totalScore: 20, scaledScore: 20, maxScore: null },
+      { episodeId: "ep1", coupleId: "D", totalScore: 18, scaledScore: 18, maxScore: null },
+      { episodeId: "ep1", coupleId: "E", totalScore: 12, scaledScore: 12, maxScore: null },
     ],
     outcomes: [
       { coupleId: "A", outcome: "safe", bonusPoints: 0 },
@@ -79,15 +79,16 @@ const weeks: HistoryWeekData[] = [
     inJeopardyCoupleIds: [],
   },
   // A guest-judge night: four judges, so totals are out of 40 and pay on the
-  // 30-point basis.
+  // 30-point basis. A won a Dance-Off worth +3, a bonus round in points.
   {
     weekNumber: 2,
     isDoubleElimination: true,
     danceScores: [
-      { episodeId: "ep1", coupleId: "A", totalScore: 38, scaledScore: 28.5 },
-      { episodeId: "ep1", coupleId: "B", totalScore: 35, scaledScore: 26.25 },
-      { episodeId: "ep1", coupleId: "C", totalScore: 30, scaledScore: 22.5 },
-      { episodeId: "ep1", coupleId: "D", totalScore: 22, scaledScore: 16.5 },
+      { episodeId: "ep1", coupleId: "A", totalScore: 38, scaledScore: 28.5, maxScore: null },
+      { episodeId: "ep1", coupleId: "A", totalScore: 3, scaledScore: 0, maxScore: 0 },
+      { episodeId: "ep1", coupleId: "B", totalScore: 35, scaledScore: 26.25, maxScore: null },
+      { episodeId: "ep1", coupleId: "C", totalScore: 30, scaledScore: 22.5, maxScore: null },
+      { episodeId: "ep1", coupleId: "D", totalScore: 22, scaledScore: 16.5, maxScore: null },
     ],
     outcomes: [
       { coupleId: "A", outcome: "safe", bonusPoints: 0 },
@@ -101,8 +102,8 @@ const weeks: HistoryWeekData[] = [
     weekNumber: 3,
     isDoubleElimination: false,
     danceScores: [
-      { episodeId: "ep1", coupleId: "A", totalScore: 30, scaledScore: 30 },
-      { episodeId: "ep1", coupleId: "B", totalScore: 29, scaledScore: 29 },
+      { episodeId: "ep1", coupleId: "A", totalScore: 30, scaledScore: 30, maxScore: null },
+      { episodeId: "ep1", coupleId: "B", totalScore: 29, scaledScore: 29, maxScore: null },
     ],
     outcomes: [
       { coupleId: "A", outcome: "winner", bonusPoints: 0 },
@@ -264,8 +265,10 @@ describe("buildScoreHistory lines", () => {
     expect(lines.map((l) => l.label)).toContain("Whitney: Survival");
   });
 
-  it("shows a guest-judge night's TV total and the 30-point basis it pays on", () => {
-    expect(lines.map((l) => l.label)).toContain("Whitney: Jdg 38→28.5 × 0.15");
+  it("shows a guest-judge night's TV total and the 30-point basis it pays on, with bonus points beside the marks", () => {
+    // 38/40 plus a +3 Dance-Off: 41/40 × 30 = 30.75.
+    expect(lines.map((l) => l.label)).toContain("Whitney: Jdg 38+3→30.75 × 0.15");
+    expect(lines.map((l) => l.label)).toContain("Robert: Jdg 22→16.5 × 0.15");
   });
 
   it("gives an eliminated couple judges points but no survival", () => {
@@ -429,8 +432,8 @@ describe("a week being revealed", () => {
     weekNumber: 3,
     isDoubleElimination: false,
     danceScores: [
-      { episodeId: "ep1", coupleId: "A", totalScore: 30, scaledScore: 30 },
-      { episodeId: "ep1", coupleId: "B", totalScore: 29, scaledScore: 29 },
+      { episodeId: "ep1", coupleId: "A", totalScore: 30, scaledScore: 30, maxScore: null },
+      { episodeId: "ep1", coupleId: "B", totalScore: 29, scaledScore: 29, maxScore: null },
     ],
     outcomes: [],
     inJeopardyCoupleIds: [],

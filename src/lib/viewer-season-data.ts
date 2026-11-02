@@ -1,8 +1,14 @@
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { detectTeamsMode } from "@/lib/episode-teams";
 
 type Client = SupabaseClient<Database>;
+
+// Which team-dance columns this database has (see TeamsMode). Probed once per
+// request, so every dance_scores reader on a page builds its select list
+// from the same answer.
+export const loadTeamsMode = cache(async (supabase: Client) => detectTeamsMode(supabase));
 
 // Request-scoped only (React cache): a fan page and the loaders it calls
 // (draft context, spoiler cutoff, league switcher, other-league picks) share

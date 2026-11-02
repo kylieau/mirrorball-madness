@@ -9,7 +9,8 @@ import { buildScoreHistory, weekResults, type HistoryWeekData, type ScoreHistory
 import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { isOwnMembership } from "@/lib/acting-manager";
-import { loadAllCouples, loadViewerSeason } from "@/lib/viewer-season-data";
+import { danceMaxScore, danceScoreColumns } from "@/lib/episode-teams";
+import { loadAllCouples, loadTeamsMode, loadViewerSeason } from "@/lib/viewer-season-data";
 
 // Matches the fallback the scoring engine (results.ts) applies, not the Picks UI default.
 const GRAND_FINALE_SCORED_METHOD_FALLBACK: GrandFinaleMethod = "exact_position";
@@ -30,10 +31,11 @@ export async function loadScoreHistory(
   if (!members.some((m) => m.user_id === managerId)) return { lines: null, error: "Manager not found in this league" };
 
   const draftContextPending = loadDraftScoreContext(supabase, userId);
-  const [season, { data: profile, error: profileError }, { data: settings }] = await Promise.all([
+  const [season, { data: profile, error: profileError }, { data: settings }, teamsMode] = await Promise.all([
     loadViewerSeason(supabase, userId),
     supabase.from("profiles").select("spoiler_free_mode").eq("id", userId).single(),
     supabase.from("scoring_settings").select("*").eq("league_id", leagueId).single(),
+    loadTeamsMode(supabase),
   ]);
   if (profileError || !profile) return { lines: null, error: "Could not load spoiler preferences. Please try again." };
   const { seasonId, weekRows, episodeRows } = season;
@@ -110,11 +112,17 @@ export async function loadScoreHistory(
       .eq("league_id", leagueId)
       .eq("manager_id", managerId)
       .maybeSingle(),
-    supabase.from("dance_scores").select("episode_id, couple_id, total_score, scaled_score").in("episode_id", episodeIds),
+    supabase
+      .from("dance_scores")
+      .select(danceScoreColumns(teamsMode, "episode_id, couple_id, total_score, scaled_score"))
+      .in("episode_id", episodeIds),
     supabase.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
     supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id").in("episode_id", episodeIds),
   ]);
   const couples = allCouples.filter((couple) => couple.season_id === seasonId);
+  const liveDanceRows = (
+    (danceRows ?? []) as unknown as { episode_id: string; couple_id: string; total_score: number; scaled_score: number; max_score?: number | null }[]
+  ).map((row) => ({ ...row, max_score: danceMaxScore(row) }));
 
   const nameParts = buildCoupleDisplayNames(
     couples.map((c) => ({ id: c.id, celebrity_name: c.celebrity?.name ?? "?", pro_name: c.pro?.name ?? "?" }))
@@ -125,12 +133,13 @@ export async function loadScoreHistory(
   // couple independently live-revealed via per-couple Publish keeps showing
   // even in an episode that also has other couples still mid-draft.
   const historyDanceRows = [
-    ...excludeReleasedCoupleRows(danceRows ?? [], draftNight?.releasedCoupleIdsByEpisode ?? {}),
+    ...excludeReleasedCoupleRows(liveDanceRows, draftNight?.releasedCoupleIdsByEpisode ?? {}),
     ...(draftNight?.dances.map((dance) => ({
       episode_id: dance.episodeId,
       couple_id: dance.coupleId,
       total_score: dance.total,
       scaled_score: dance.scaled,
+      max_score: null,
     })) ?? []),
   ];
   const weeks: HistoryWeekData[] = allowedWeeks.map((week) => {

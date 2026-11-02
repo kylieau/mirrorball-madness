@@ -1,10 +1,46 @@
 import { formatEpisodeCasual } from "./format-week";
 
+export type ActivityScore = {
+  celebrity: string;
+  // The dance style for a judged dance; the special dance's type ("Dance-Off")
+  // for a bonus round paid in points.
+  danceStyle: string;
+  total: number;
+  at: string;
+  bonus?: boolean;
+};
+
 export type ActivityWeek = {
   weekNumber: number;
   eliminated: string[];
-  scores: { celebrity: string; danceStyle: string; total: number; at: string }[];
+  scores: ActivityScore[];
 };
+
+export type ActivityDanceRow = {
+  episode_id: string;
+  couple_id: string;
+  total_score: number;
+  created_at: string;
+  dance_styles: { name: string } | null;
+  // Present once the team-dance and special-dances migrations are applied.
+  team_id?: string | null;
+  max_score?: number | string | null;
+};
+
+// A posted row as an activity entry: a bonus round paid in points names its
+// special dance's type; every judged dance keeps its style.
+export function activityScore(
+  row: ActivityDanceRow,
+  celebrity: string,
+  specialDanceLabels: Record<string, { danceType: string }>
+): ActivityScore {
+  const total = Number(row.total_score);
+  if (row.max_score != null && Number(row.max_score) === 0) {
+    const label = row.team_id ? specialDanceLabels[row.team_id]?.danceType : undefined;
+    return { celebrity, danceStyle: label?.trim() || "Bonus", total, at: row.created_at, bonus: true };
+  }
+  return { celebrity, danceStyle: row.dance_styles?.name ?? "Unknown dance", total, at: row.created_at };
+}
 
 export type ActivitySegment = { text: string; kind?: "couple" | "manager" | "league" | "score" };
 export type ActivityLine = { key: string; segments: ActivitySegment[]; weekLabel: string | null };
@@ -37,15 +73,29 @@ export function buildRecentActivity({
       .forEach((s, i) =>
         lines.push({
           key: `w${week.weekNumber}-score-${i}`,
-          segments: [
-            { text: s.celebrity, kind: "couple" },
-            { text: " scored " },
-            { text: String(s.total), kind: "score" },
-            { text: ` on their ${s.danceStyle}` },
-          ],
+          segments: s.bonus
+            ? [
+                { text: s.celebrity, kind: "couple" },
+                { text: " earned " },
+                { text: signedTotal(s.total), kind: "score" },
+                { text: ` in the ${s.danceStyle}` },
+              ]
+            : [
+                { text: s.celebrity, kind: "couple" },
+                { text: " scored " },
+                { text: String(s.total), kind: "score" },
+                { text: ` on their ${s.danceStyle}` },
+              ],
           weekLabel,
         })
       );
   }
   return lines;
+}
+
+// Bonus points are a raw judges' unit, not fantasy points, so they keep the
+// plain integer or half-point form ("+3", "−0.5").
+function signedTotal(total: number): string {
+  const magnitude = String(Math.round(Math.abs(total) * 100) / 100);
+  return total < 0 ? `−${magnitude}` : `+${magnitude}`;
 }

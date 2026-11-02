@@ -216,11 +216,14 @@ export function draftManagerScoresForNight(
     judgesScoreMultiplier: settings.judges_score_multiplier,
     judgesCategoryWeight: settings.judges_score_category_weight,
     rosterSlots,
+    // Drafts hold couples' own dances only, never a special dance's row, so
+    // every one is a legacy-shaped row.
     danceScores: night.dances.map((dance) => ({
       episodeId: dance.episodeId,
       coupleId: dance.coupleId,
       totalScore: dance.total,
       scaledScore: dance.scaled,
+      maxScore: null,
     })),
   });
 }

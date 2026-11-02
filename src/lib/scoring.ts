@@ -20,30 +20,47 @@ export type ScoringSettings = {
 export type RosterSlot = { managerId: string; coupleId: string };
 
 // One dance. totalScore is the raw judges' sum fans see (Curtain Call's top
-// scorer compares it within one night). scaledScore is that dance's judges'
-// average × 3, the 30-point basis, so a guest-judge night isn't worth a third
-// more. episodeId is required because Dance Card pays a couple once per
-// night, not once per dance — see collapseToNights.
-export type DanceScore = { episodeId: string; coupleId: string; totalScore: number; scaledScore: number };
+// scorer compares it within one night). scaledScore is that dance's marks
+// over the marks possible on the 30-point basis, so a guest-judge night isn't
+// worth a third more. maxScore is the marks possible: null for a legacy row
+// (recovered through judgeCountForDance), judges × per-judge max for a
+// special dance scored by marks, and 0 for a bonus round scored in points.
+// episodeId is required because Dance Card pays a couple once per night, not
+// once per dance — see collapseToNights.
+export type DanceScore = {
+  episodeId: string;
+  coupleId: string;
+  totalScore: number;
+  scaledScore: number;
+  maxScore: number | null;
+};
 
 export const STANDING_PANEL_SIZE = 3;
 export const MARK_MAX = 10;
+export const DANCE_CARD_BASIS = STANDING_PANEL_SIZE * MARK_MAX;
 
-export function scaledJudgesScore(judgeScores: number[]): number {
-  if (judgeScores.length === 0) return 0;
-  return (judgeScores.reduce((sum, score) => sum + score, 0) * STANDING_PANEL_SIZE) / judgeScores.length;
+// Marks over the marks possible, on the 30-point basis. With the default
+// per-judge max of 10 this is the judges' average × 3.
+export function scaledJudgesScore(judgeScores: number[], maxPerJudge: number = MARK_MAX): number {
+  if (judgeScores.length === 0 || !(maxPerJudge > 0)) return 0;
+  const total = judgeScores.reduce((sum, score) => sum + score, 0);
+  return (total * DANCE_CARD_BASIS) / (judgeScores.length * maxPerJudge);
 }
 
 // One couple's one night. scaledScore is what Dance Card pays on: every mark
-// the couple received that night over every mark possible (judges × 10 per
-// dance), on the 30-point basis. A 28/40 plus a 36/40 is 64/80 → 24, the same
-// as a single 24/30 — not 21 + 27. maxScore is that denominator.
+// the couple received that night, plus any bonus-round points, over every
+// mark possible (judges × per-judge max per dance), on the 30-point basis. A
+// 28/40 plus a 36/40 is 64/80 → 24, the same as a single 24/30 — not 21 + 27.
+// maxScore is that denominator; bonus points sit in the numerator only, so a
+// night with a bonus round can pay above 30. bonusScore is the part of
+// totalScore that came from points rather than marks.
 export type NightScore = {
   episodeId: string;
   coupleId: string;
   totalScore: number;
   scaledScore: number;
   maxScore: number;
+  bonusScore: number;
   danceCount: number;
 };
 
@@ -56,15 +73,31 @@ export function judgeCountForDance(dance: Pick<DanceScore, "totalScore" | "scale
   return judges >= 1 ? judges : null;
 }
 
-// Dance Card's per-night rule. A night with one dance keeps its stored
+function isPointsRow(dance: Pick<DanceScore, "maxScore">): boolean {
+  return dance.maxScore === 0;
+}
+
+// The panel behind one dance when it is known: a legacy row recovers it from
+// its stored scale, an out-of-10 special dance from its maxScore. A dance on
+// another scale, or with no marks, says nothing about the night's panel.
+function panelVote(dance: DanceScore): number | null {
+  if (dance.maxScore === null) return judgeCountForDance(dance);
+  if (!(dance.maxScore > 0)) return null;
+  const judges = dance.maxScore / MARK_MAX;
+  return Number.isInteger(judges) ? judges : null;
+}
+
+// Dance Card's per-night rule. A night with one legacy dance keeps its stored
 // scaledScore untouched, so single-dance weeks score exactly as they always
-// have. A night with several dances pays once on the combined marks, never
-// rounded here (the multiplier is applied downstream). A 0-mark dance borrows
-// the panel size most dances used that night, else the standing three.
+// have. Any other night pays once on the combined marks, never rounded here
+// (the multiplier is applied downstream). A 0-mark legacy dance borrows the
+// panel size most dances used that night, else the standing three; a night
+// that holds only bonus points is paid against one standard dance on that
+// same panel.
 export function collapseToNights(danceScores: DanceScore[]): NightScore[] {
   const panelVotes = new Map<string, Map<number, number>>();
   for (const dance of danceScores) {
-    const judges = judgeCountForDance(dance);
+    const judges = panelVote(dance);
     if (judges === null) continue;
     const votes = panelVotes.get(dance.episodeId) ?? new Map<number, number>();
     votes.set(judges, (votes.get(judges) ?? 0) + 1);
@@ -78,6 +111,8 @@ export function collapseToNights(danceScores: DanceScore[]): NightScore[] {
     }
     return best;
   };
+  const danceMax = (dance: DanceScore) =>
+    dance.maxScore ?? (judgeCountForDance(dance) ?? usualPanel(dance.episodeId)) * MARK_MAX;
 
   const nights = new Map<string, DanceScore[]>();
   for (const dance of danceScores) {
@@ -86,11 +121,15 @@ export function collapseToNights(danceScores: DanceScore[]): NightScore[] {
   }
   return [...nights.values()].map((dances) => {
     const { episodeId, coupleId } = dances[0];
-    const judges = dances.reduce((sum, d) => sum + (judgeCountForDance(d) ?? usualPanel(episodeId)), 0);
     const totalScore = dances.reduce((sum, d) => sum + d.totalScore, 0);
+    const bonusScore = dances.reduce((sum, d) => sum + (isPointsRow(d) ? d.totalScore : 0), 0);
+    const marksMax = dances.reduce((sum, d) => sum + danceMax(d), 0);
+    const maxScore = marksMax > 0 ? marksMax : usualPanel(episodeId) * MARK_MAX;
     const scaledScore =
-      dances.length === 1 ? dances[0].scaledScore : (totalScore * STANDING_PANEL_SIZE) / judges;
-    return { episodeId, coupleId, totalScore, scaledScore, maxScore: judges * MARK_MAX, danceCount: dances.length };
+      dances.length === 1 && dances[0].maxScore === null
+        ? dances[0].scaledScore
+        : (totalScore * DANCE_CARD_BASIS) / maxScore;
+    return { episodeId, coupleId, totalScore, scaledScore, maxScore, bonusScore, danceCount: dances.length };
   });
 }
 

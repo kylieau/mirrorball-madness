@@ -7,6 +7,7 @@ import {
   RESOLVING_OUTCOMES,
   classifyEliminationGuess,
   classifyTopScorerGuess,
+  collapseToNights,
   computeGrandFinalePoints,
   couplesRemainingAtWeek,
   curtainCallPayout,
@@ -54,7 +55,7 @@ type EpisodeRows<T> = ({ episode_id: string } & T)[];
 // last result row per couple decides survival and bonus, as in the engine).
 export function weekResults(
   episodeIds: string[],
-  danceRows: EpisodeRows<{ couple_id: string; total_score: number; scaled_score: number }>,
+  danceRows: EpisodeRows<{ couple_id: string; total_score: number; scaled_score: number; max_score: number | null }>,
   outcomeRows: EpisodeRows<{ couple_id: string; outcome: string; bonus_points: number }>
 ): Pick<HistoryWeekData, "danceScores" | "outcomes"> {
   const inWeek = new Set(episodeIds);
@@ -67,6 +68,7 @@ export function weekResults(
         coupleId: row.couple_id,
         totalScore: Number(row.total_score),
         scaledScore: Number(row.scaled_score),
+        maxScore: row.max_score == null ? null : Number(row.max_score),
       })),
     outcomes: outcomeRows
       .filter((row) => inWeek.has(row.episode_id))
@@ -193,6 +195,10 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
     if (w < input.anchorWeek) continue;
     const totals = sumDanceScoresByCouple(week.danceScores);
     const scaledTotals = nightScaledScoresByCouple(week.danceScores);
+    const bonusTotals = new Map<string, number>();
+    for (const night of collapseToNights(week.danceScores)) {
+      bonusTotals.set(night.coupleId, (bonusTotals.get(night.coupleId) ?? 0) + night.bonusScore);
+    }
     const lastOutcome = new Map(week.outcomes.map((o) => [o.coupleId, o]));
     const resolvedThisWeek = [...lastOutcome.values()]
       .filter((o) => RESOLVING_OUTCOMES.has(o.outcome) && positionRanges.has(o.coupleId));
@@ -257,10 +263,13 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
 
       const rawTotal = totals.get(slot.coupleId) ?? 0;
       const judgesTotal = scaledTotals.get(slot.coupleId) ?? 0;
+      const bonusTotal = bonusTotals.get(slot.coupleId) ?? 0;
       // A guest-judge or multi-dance night shows the TV total and the
-      // 30-point basis it pays on ("Jdg 64→24").
+      // 30-point basis it pays on ("Jdg 64→24"); bonus-round points sit
+      // beside the marks ("Jdg 64+3→25.13").
+      const rawLabel = bonusTotal !== 0 ? `${trimNumber(rawTotal - bonusTotal)}+${trimNumber(bonusTotal)}` : trimNumber(rawTotal);
       const judgesLabel =
-        rawTotal === judgesTotal ? trimNumber(judgesTotal) : `${trimNumber(rawTotal)}→${trimNumber(judgesTotal)}`;
+        rawTotal === judgesTotal && bonusTotal === 0 ? trimNumber(judgesTotal) : `${rawLabel}→${trimNumber(judgesTotal)}`;
       push(
         w,
         "danceCard",

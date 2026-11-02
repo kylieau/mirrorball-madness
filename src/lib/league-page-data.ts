@@ -11,7 +11,7 @@ import { draftManagerScoresForNight, homeStripChoice, scoresReplacingDraftWeek }
 import { formatManagerName } from "@/lib/manager-display";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
-import { loadAllCouples, loadViewerMemberships, loadViewerSeason } from "@/lib/viewer-season-data";
+import { loadAllCouples, loadTeamsMode, loadViewerMemberships, loadViewerSeason } from "@/lib/viewer-season-data";
 import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
 import { toBannerWeeks } from "@/lib/episode-banner";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
@@ -121,12 +121,13 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     accountSettingsData.spoilerFreeMode,
     completedEpisodes ?? []
   );
-  const [cutoff, { revealing, scoredIds, visible: revealingVisible }, draftContext, { data: allLeagueSlots }] =
+  const [cutoff, { revealing, scoredIds, visible: revealingVisible }, draftContext, { data: allLeagueSlots }, teamsMode] =
     await Promise.all([
       cutoffPending,
       loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
       draftContextPending,
       allLeagueSlotsPending,
+      loadTeamsMode(supabase),
     ]);
   const draftNight = draftContext.night;
   const { strip: spoilerFreeStrip, prompt: livePrompt, refreshWindows } = buildLiveAirChrome({
@@ -337,6 +338,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     leagueSlotPeriods,
     rosterSlotPeriods,
     visibleDanceWeeks,
+    teamsMode,
     switcherLeagues,
     switcherCurrent: { rank, totalMembers: standings.length },
   };

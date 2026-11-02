@@ -193,6 +193,7 @@ export default async function LeagueStandingsPage({
                   coupleId: dance.coupleId,
                   totalScore: dance.total,
                   scaledScore: dance.scaled,
+                  maxScore: null,
                 })),
               }
             : null),

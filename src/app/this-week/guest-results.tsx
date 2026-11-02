@@ -6,8 +6,8 @@ import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carouse
 import { PageHeader } from "@/components/page-header";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { loadGuestSeason } from "@/lib/guest-season-data";
-import { detectTeamEntity, loadTeamNames } from "@/lib/episode-teams";
-import { loadAllCouples } from "@/lib/viewer-season-data";
+import { danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
+import { loadAllCouples, loadTeamsMode } from "@/lib/viewer-season-data";
 import {
   adjacentThisWeekWeeks,
   buildThisWeekCarouselWeeks,
@@ -45,13 +45,13 @@ export async function GuestResults({
   const showResults = selectedMode === "results";
   const selectedEpisodeIds = selectedWeek?.episodes.map((episode) => episode.id) ?? [];
 
-  // team_id is selected only once the team-dance migration is applied.
-  const teamEntity = showResults && selectedEpisodeIds.length > 0 ? await detectTeamEntity(supabase) : false;
-  const [{ data: danceScores }, { data: episodeResults }, { data: inJeopardyRows }, teamNamesById] = await Promise.all([
+  // team_id and max_score are selected only once their migrations are applied.
+  const teamsMode = showResults && selectedEpisodeIds.length > 0 ? await loadTeamsMode(supabase) : "inferred";
+  const [{ data: danceScores }, { data: episodeResults }, { data: inJeopardyRows }, specialDanceLabels] = await Promise.all([
     showResults && selectedEpisodeIds.length > 0
       ? supabase
           .from("dance_scores")
-          .select(`id, episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score${teamEntity ? ", team_id" : ""}`)
+          .select(danceScoreColumns(teamsMode, "id, episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score", { teamId: true }))
           .in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] }),
     showResults && selectedEpisodeIds.length > 0
@@ -60,7 +60,7 @@ export async function GuestResults({
     showResults && selectedEpisodeIds.length > 0
       ? supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] as { couple_id: string }[] }),
-    teamEntity ? loadTeamNames(supabase, selectedEpisodeIds) : Promise.resolve({} as Record<string, string>),
+    showResults ? loadSpecialDanceLabels(supabase, selectedEpisodeIds, teamsMode) : Promise.resolve({}),
   ]);
 
   const flatCouples = allCouples.map((c) => ({
@@ -103,7 +103,7 @@ export async function GuestResults({
               episodeResults={episodeResults ?? []}
               inJeopardyCoupleIds={[...new Set((inJeopardyRows ?? []).map((row) => row.couple_id))]}
               danceScores={(danceScores ?? []) as unknown as React.ComponentProps<typeof WeeklyResultsView>["danceScores"]}
-              teamNamesById={teamNamesById}
+              specialDanceLabels={specialDanceLabels}
               danceStyles={danceStyles ?? []}
               couples={flatCouples}
               coupleDisplayNames={coupleDisplayNames}

@@ -18,12 +18,12 @@ import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { coupleLeagueNotes } from "@/lib/couple-league-notes";
 import { teamDanceEpisodeIds } from "@/lib/night-dance-lines";
-import { detectTeamEntity, loadTeamNames } from "@/lib/episode-teams";
+import { danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
 import { nextPredictedElimination } from "@/lib/grand-finale-pins";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
-import { loadAllCouples, loadViewerMemberships, loadViewerSeason } from "@/lib/viewer-season-data";
+import { loadAllCouples, loadTeamsMode, loadViewerMemberships, loadViewerSeason } from "@/lib/viewer-season-data";
 import {
   adjacentThisWeekWeeks,
   buildThisWeekCarouselWeeks,
@@ -133,9 +133,9 @@ export default async function ThisWeekPage({
     ? { weekNumber: cutoff.pendingRevealEpisode.week_number, theme: cutoff.pendingRevealEpisode.theme }
     : null;
 
-  // team_id is selected only once the team-dance migration is applied, so a
-  // deploy ahead of the SQL can never 400 this page.
-  const teamEntity = showResults && selectedEpisodeIds.length > 0 ? await detectTeamEntity(supabase) : false;
+  // team_id and max_score are selected only once their migrations are
+  // applied, so a deploy ahead of the SQL can never 400 this page.
+  const teamsMode = showResults && selectedEpisodeIds.length > 0 ? await loadTeamsMode(supabase) : "inferred";
   const [
     { data: danceScores },
     { data: episodeResults },
@@ -143,12 +143,12 @@ export default async function ThisWeekPage({
     { data: pastPredictions },
     { data: grandFinaleRows },
     { data: episodeRoundTypes },
-    teamNamesById,
+    specialDanceLabels,
   ] = await Promise.all([
     showResults && selectedEpisodeIds.length > 0
       ? supabase
           .from("dance_scores")
-          .select(`id, episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score${teamEntity ? ", team_id" : ""}`)
+          .select(danceScoreColumns(teamsMode, "id, episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score", { teamId: true }))
           .in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] }),
     showResults && selectedEpisodeIds.length > 0
@@ -181,7 +181,7 @@ export default async function ThisWeekPage({
     showResults && selectedEpisodeIds.length > 0
       ? supabase.from("episode_round_types").select("episode_id, round_types(name)").in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] }),
-    teamEntity ? loadTeamNames(supabase, selectedEpisodeIds) : Promise.resolve({} as Record<string, string>),
+    showResults ? loadSpecialDanceLabels(supabase, selectedEpisodeIds, teamsMode) : Promise.resolve({}),
   ]);
 
   const flatCouples = allCouples.map((c) => ({
@@ -338,7 +338,7 @@ export default async function ThisWeekPage({
           pendingReveal={pendingReveal}
           scoresOnly={selectedMode === "scores"}
           teamDanceEpisodeIds={[...teamDanceEpisodeIds(episodeRoundTypes ?? [])]}
-          teamNamesById={teamNamesById}
+          specialDanceLabels={specialDanceLabels}
         />
       )}
     </div>

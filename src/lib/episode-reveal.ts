@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "./supabase/types";
-import { isTeamRow, teamScoreRows, type PublicationSnapshot, type ScoringDance } from "./episode-publication";
+import { isTeamRow, PLAN_VERSION, scoringDance, teamScoreRows, type PublicationSnapshot, type ScoringDance } from "./episode-publication";
 import { buildWeeklyScoreRows, type WeeklyScoreRow } from "./weekly-score-rows";
 import { roundPoints } from "./format-points";
 import { scaledJudgesScore } from "./scoring";
@@ -38,13 +38,13 @@ function weekLiveDances(snapshot: PublicationSnapshot, episodeId: string) {
   return { week, before: snapshot.dances.filter((row) => episodeIds.has(row.episode_id)) };
 }
 
-const scoringOnly = ({ episode_id, couple_id, total_score, scaled_score }: ScoringDance): ScoringDance => ({ episode_id, couple_id, total_score, scaled_score });
+const scoringOnly = (row: ScoringDance): ScoringDance => scoringDance(row);
 
 // Posting or un-posting a couple moves only their OWN rows; a team's row for
 // that couple stays, exactly as commit_episode_reveal leaves it.
 export function buildRevealPlan(snapshot: PublicationSnapshot, episodeId: string, coupleId: string, undo: boolean) {
   const { week, before } = weekLiveDances(snapshot, episodeId);
-  if (!week) return { weeklyScores: [] };
+  if (!week) return { planVersion: PLAN_VERSION, weeklyScores: [] };
   const after: ScoringDance[] = before
     .filter((row) => !(row.episode_id === episodeId && row.couple_id === coupleId && !isTeamRow(row)))
     .map(scoringOnly);
@@ -55,23 +55,24 @@ export function buildRevealPlan(snapshot: PublicationSnapshot, episodeId: string
     for (const dance of drafts) {
       const scores = snapshot.draftJudges.filter((row) => row.draft_dance_score_id === dance.id).map((row) => Number(row.score));
       if (!scores.length || scores.some((score) => !Number.isFinite(score) || score < 0 || score > 10)) throw new Error("Complete this couple's judge scores before posting");
-      after.push({ episode_id: episodeId, couple_id: coupleId, total_score: scores.reduce((sum, score) => sum + score, 0), scaled_score: scaledJudgesScore(scores) });
+      after.push({ episode_id: episodeId, couple_id: coupleId, total_score: scores.reduce((sum, score) => sum + score, 0), scaled_score: scaledJudgesScore(scores), max_score: null });
     }
   }
-  return { weeklyScores: revealWeeklyScores(snapshot, week, episodeId, before.map(scoringOnly), after) };
+  return { planVersion: PLAN_VERSION, weeklyScores: revealWeeklyScores(snapshot, week, episodeId, before.map(scoringOnly), after) };
 }
 
-// Posting a team replaces its rows for every eligible member (a re-post
-// rewrites a re-scored team in place); un-posting removes them. Dance Card is
-// recomputed for the whole week from what is live, so a couple whose own
-// dance was posted earlier moves from a one-dance night to the combined one.
+// Posting a special dance replaces its rows for every eligible member (a
+// re-post rewrites a re-scored one in place); un-posting removes them. Dance
+// Card is recomputed for the whole week from what is live, so a couple whose
+// own dance was posted earlier moves from a one-dance night to the combined
+// one.
 export function buildTeamRevealPlan(snapshot: PublicationSnapshot, episodeId: string, teamId: string, undo: boolean) {
   const { week, before } = weekLiveDances(snapshot, episodeId);
-  if (!snapshot.teams?.some((team) => team.id === teamId && team.episode_id === episodeId)) throw new Error("That team is no longer on this episode");
-  if (!week) return { weeklyScores: [] };
+  if (!snapshot.teams?.some((team) => team.id === teamId && team.episode_id === episodeId)) throw new Error("That special dance is no longer on this episode");
+  if (!week) return { planVersion: PLAN_VERSION, weeklyScores: [] };
   const after: ScoringDance[] = before.filter((row) => row.team_id !== teamId).map(scoringOnly);
   if (!undo) after.push(...teamScoreRows(snapshot, episodeId, new Set([teamId])).map(scoringOnly));
-  return { weeklyScores: revealWeeklyScores(snapshot, week, episodeId, before.map(scoringOnly), after) };
+  return { planVersion: PLAN_VERSION, weeklyScores: revealWeeklyScores(snapshot, week, episodeId, before.map(scoringOnly), after) };
 }
 
 export async function changeEpisodeReveal(admin: SupabaseClient<Database>, input: { episodeId: string; coupleId: string }, actorId: string, undo: boolean) {

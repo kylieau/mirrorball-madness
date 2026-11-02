@@ -6,9 +6,10 @@ import { HomeDashboard } from "@/components/home-dashboard";
 import { PageHeader } from "@/components/page-header";
 import { computeEpisodeBannerState, toBannerWeeks, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
-import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
+import { activityScore, buildRecentActivity, type ActivityDanceRow, type ActivityWeek } from "@/lib/home-activity";
+import { danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
 import { loadGuestSeason } from "@/lib/guest-season-data";
-import { loadAllCouples } from "@/lib/viewer-season-data";
+import { loadAllCouples, loadTeamsMode } from "@/lib/viewer-season-data";
 
 // Signed-out Home: the season's banner and published results, with a sign-in
 // card where Your Leagues would be. Guests have no spoiler marks and never
@@ -24,14 +25,18 @@ export async function GuestHome({ supabase }: { supabase: SupabaseClient<Databas
   );
 
   if (episodeIds.length > 0) {
-    const [{ data: episodeResults }, { data: danceScores }, couples] = await Promise.all([
+    // team_id and max_score are selected only once their migrations are applied.
+    const teamsMode = await loadTeamsMode(supabase);
+    const [{ data: episodeResults }, { data: danceScoreRows }, specialDanceLabels, couples] = await Promise.all([
       supabase.from("episode_results").select("episode_id, couple_id, outcome").in("episode_id", episodeIds),
       supabase
         .from("dance_scores")
-        .select("episode_id, couple_id, total_score, created_at, dance_styles(name)")
+        .select(danceScoreColumns(teamsMode, "episode_id, couple_id, total_score, created_at, dance_styles(name)", { teamId: true }))
         .in("episode_id", episodeIds),
+      loadSpecialDanceLabels(supabase, episodeIds, teamsMode),
       loadAllCouples(supabase),
     ]);
+    const danceScores = (danceScoreRows ?? []) as unknown as ActivityDanceRow[];
     const displayNames = buildCoupleDisplayNames(
       couples.map((c) => ({ id: c.id, celebrity_name: c.celebrity?.name ?? "Unknown", pro_name: c.pro?.name ?? "Unknown" }))
     );
@@ -40,11 +45,11 @@ export async function GuestHome({ supabase }: { supabase: SupabaseClient<Databas
       const week = activityWeeks.get(weekNumberByEpisodeId.get(r.episode_id) ?? -1);
       if (r.outcome === "eliminated" && parts && week) week.eliminated.push(formatCoupleName(parts));
     }
-    for (const d of danceScores ?? []) {
+    for (const d of danceScores) {
       const parts = displayNames.get(d.couple_id);
       const week = activityWeeks.get(weekNumberByEpisodeId.get(d.episode_id) ?? -1);
       if (parts && week && d.dance_styles) {
-        week.scores.push({ celebrity: parts.celebrity, danceStyle: d.dance_styles.name, total: d.total_score, at: d.created_at });
+        week.scores.push(activityScore(d, parts.celebrity, specialDanceLabels));
       }
     }
   }

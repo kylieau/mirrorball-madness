@@ -16,6 +16,7 @@ const score = (coupleId: string, weekNumber: number, scaledScore: number, episod
   weekNumber,
   totalScore: scaledScore,
   scaledScore,
+  maxScore: null,
 });
 
 describe("slotActiveInWeek", () => {
@@ -70,8 +71,8 @@ describe("judgePointsThroughWeek", () => {
         score("a", 2, 24, "ep2a"),
         score("a", 2, 27, "ep2b"),
         // Week 3: one night, 28/40 then 36/40 — 64/80 → 24, not 21 + 27.
-        { episodeId: "ep3", coupleId: "a", weekNumber: 3, totalScore: 28, scaledScore: 21 },
-        { episodeId: "ep3", coupleId: "a", weekNumber: 3, totalScore: 36, scaledScore: 27 },
+        { episodeId: "ep3", coupleId: "a", weekNumber: 3, totalScore: 28, scaledScore: 21, maxScore: null },
+        { episodeId: "ep3", coupleId: "a", weekNumber: 3, totalScore: 36, scaledScore: 27, maxScore: null },
       ],
     });
     expect(points.get("a")).toEqual({ week: 24, total: 24 + 27 + 24 });
