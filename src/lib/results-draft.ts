@@ -83,7 +83,7 @@ export type SaveDraftResultsOutcome = {
 };
 
 // PostgREST's code for a function missing from its schema cache: the checked
-// RPC arrives with supabase/apply-team-dances.sql, so until that is applied
+// RPC arrives with supabase/apply-team-dance-entity.sql, so until that is applied
 // the legacy RPC (which re-copies live rows over a posted couple's draft)
 // still carries every save.
 const FUNCTION_MISSING_CODE = "PGRST202";

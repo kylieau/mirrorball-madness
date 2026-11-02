@@ -18,10 +18,12 @@ export type EpisodeTeam = {
   sortOrder: number;
   memberCoupleIds: string[];
   // Inferred teams are read off the couples' own slot-2 rows (a shared
-  // Freestyle and song on a Team Dance night) when no team has been saved --
-  // the path that works before supabase/apply-team-dances.sql is applied.
-  // They have no captain or host and are named after their song.
+  // Freestyle and song on a Team Dance night) -- the fallback before
+  // supabase/apply-team-dance-entity.sql is applied. They have no captain or
+  // host and are named after their song.
   inferred: boolean;
+  // When the team's score went live (entity model), else null.
+  postedAt: string | null;
 };
 
 export type TeamMark = { judgeId: string; score: number };
@@ -42,7 +44,7 @@ export function isTeamDanceRow(team: DanceSignature, dance: DanceSignature): boo
 export const INFERRED_TEAM_PREFIX = "inferred:";
 
 // Names for teams read off the draft, keyed by songKey(). A saved team
-// (supabase/apply-team-dances.sql) carries its own name; without one this is
+// (supabase/apply-team-dance-entity.sql) carries its own name; without one this is
 // the only place a name can live, and an unknown song names the team after
 // itself.
 export const KNOWN_TEAM_NAMES_BY_SONG: Record<string, string> = {
@@ -92,6 +94,7 @@ export function inferTeamsFromRows(
       sortOrder: index + 1,
       memberCoupleIds: group.memberCoupleIds,
       inferred: true,
+      postedAt: null,
     }));
 }
 
@@ -135,6 +138,44 @@ export function sameTeamMarks(a: TeamMark[] | null, b: TeamMark[] | null): boole
 }
 
 export type MemberDanceRow = DanceSignature & { scores: Record<string, string> };
+
+export type TeamEligibilityInput = {
+  coupleId: string;
+  status: string;
+  eliminationWeek: number | null;
+  // The draft outcome row for this episode, when one exists.
+  outcome: string | null;
+};
+
+export type SkipReason = "withdrawn" | "bye" | "eliminated" | "not_performing";
+
+// Mirrors team_eligible_members(): on the team, in tonight's cast, not
+// withdrawn, Did Not Dance, or eliminated before this week. Shared by the
+// publication and team-post planners and by the team entry's member list.
+export function eligibleTeamMembers(
+  team: Pick<EpisodeTeam, "memberCoupleIds">,
+  members: TeamEligibilityInput[],
+  opts: { weekNumber: number | null; participantIds: string[] }
+): { eligible: string[]; skipped: { coupleId: string; reason: SkipReason }[] } {
+  const restricted = opts.participantIds.length > 0;
+  const performing = new Set(opts.participantIds);
+  const eligible: string[] = [];
+  const skipped: { coupleId: string; reason: SkipReason }[] = [];
+  for (const coupleId of team.memberCoupleIds) {
+    const member = members.find((m) => m.coupleId === coupleId);
+    if (!member) continue;
+    if (member.outcome === "bye") skipped.push({ coupleId, reason: "bye" });
+    else if (member.outcome === "withdrawn" || member.status === "withdrawn") skipped.push({ coupleId, reason: "withdrawn" });
+    else if (
+      member.status === "eliminated" &&
+      (member.eliminationWeek == null || opts.weekNumber == null || member.eliminationWeek < opts.weekNumber)
+    )
+      skipped.push({ coupleId, reason: "eliminated" });
+    else if (restricted && !performing.has(coupleId)) skipped.push({ coupleId, reason: "not_performing" });
+    else eligible.push(coupleId);
+  }
+  return { eligible, skipped };
+}
 
 export type TeamMemberInput = {
   coupleId: string;
