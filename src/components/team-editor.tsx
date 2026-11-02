@@ -106,7 +106,7 @@ export function TeamEditor({
     <div className="flex flex-col gap-3">
       {teams.length === 0 && <p className="text-sm text-muted-foreground">No teams yet.</p>}
       {teams.map((team, index) => (
-        <fieldset key={team.key} disabled={disabled} className="flex flex-col gap-3 rounded-xl border border-border p-3">
+        <fieldset key={team.key} disabled={disabled} className="flex min-w-0 flex-col gap-3 rounded-xl border border-border p-3">
           <legend className="sr-only">Team {index + 1}</legend>
           <div className="flex items-center justify-between">
             <p className="font-heading text-base font-semibold">Team {index + 1}</p>
@@ -128,8 +128,8 @@ export function TeamEditor({
               onChange={(e) => update(team.key, { name: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`team-song-${team.key}`}>Song</Label>
               <Input
                 id={`team-song-${team.key}`}
@@ -138,7 +138,7 @@ export function TeamEditor({
                 onChange={(e) => update(team.key, { songTitle: e.target.value })}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`team-source-${team.key}`}>Source Show</Label>
               <Input
                 id={`team-source-${team.key}`}
@@ -148,8 +148,8 @@ export function TeamEditor({
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label>Style</Label>
               <Select
                 items={styleItems}
@@ -168,7 +168,7 @@ export function TeamEditor({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Label htmlFor={`team-host-${team.key}`}>Host</Label>
               <Input
                 id={`team-host-${team.key}`}

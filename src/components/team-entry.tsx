@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ScoringJudge } from "@/lib/scoring-judges";
 import type { ApplyTeamDanceResult } from "@/lib/episode-teams";
 import {
@@ -20,7 +19,7 @@ import {
   type TeamMemberPlan,
 } from "@/lib/team-dances";
 
-export type TeamCardView = {
+export type TeamEntryView = {
   team: EpisodeTeam;
   styleName: string;
   plan: TeamMemberPlan[];
@@ -41,7 +40,9 @@ function marksKey(marks: TeamMark[] | null): string {
   return (marks ?? []).map((m) => `${m.judgeId}:${m.score}`).sort().join(",");
 }
 
-function memberStateLabel(plan: TeamMemberPlan): { label: string; tone: "muted" | "ok" | "danger" | "warn" } {
+type Tone = "muted" | "ok" | "danger" | "warn";
+
+function memberStateLabel(plan: TeamMemberPlan): { label: string; tone: Tone } {
   switch (plan.state) {
     case "will_apply":
       return { label: "Will Apply", tone: "muted" };
@@ -61,7 +62,7 @@ function memberStateLabel(plan: TeamMemberPlan): { label: string; tone: "muted" 
               : plan.reason === "eliminated"
                 ? "Eliminated · Skipped"
                 : "Not Performing · Skipped",
-        tone: "muted",
+        tone: "warn",
       };
     case "collision":
       return {
@@ -71,38 +72,46 @@ function memberStateLabel(plan: TeamMemberPlan): { label: string; tone: "muted" 
   }
 }
 
-const TONE_CLASS = {
+const TONE_CLASS: Record<Tone, string> = {
   muted: "text-muted-foreground",
   ok: "text-emerald-text",
   danger: "text-danger-text",
   warn: "text-amber-text",
-} as const;
+};
 
-// One team: name, song and host, four judge boxes, and the live "Applies to
-// N of M" list. Nothing is written until every box holds a valid mark; the
-// fourth valid mark saves the team dance into every eligible member's draft.
-function TeamBlock({
+// One team as an entry in the couple picker: the same card shape as a
+// couple, with the team's style and song read-only, four judge boxes, and
+// the live "Applies to N of M" member list. Nothing is written until every
+// box holds a valid mark; the fourth valid mark saves the team dance into
+// every eligible member's Dance 2 draft.
+export function TeamEntry({
   view,
   judges,
   judgeNames,
   guestJudgeIds,
   coupleName,
   canOverride,
+  canSetup,
   inputsDisabled,
   busy,
   onApply,
   onOverride,
+  onEditTeams,
 }: {
-  view: TeamCardView;
+  view: TeamEntryView;
   judges: ScoringJudge[];
   judgeNames: Map<string, string>;
   guestJudgeIds: ReadonlySet<string>;
   coupleName: (coupleId: string) => ReactNode;
   canOverride: boolean;
+  // Saved teams (supabase/apply-team-dances.sql) can be edited by name; an
+  // inferred team is edited by changing the couples' own second slots.
+  canSetup: boolean;
   inputsDisabled: boolean;
   busy: boolean;
   onApply: (teamId: string, marks: TeamMark[]) => Promise<ApplyOutcome>;
   onOverride: (teamId: string, coupleId: string, marks: TeamMark[]) => Promise<{ error: string | null }>;
+  onEditTeams: () => void;
 }) {
   const { team, plan, applied } = view;
   const judgeIds = judges.map((j) => j.id);
@@ -164,9 +173,14 @@ function TeamBlock({
     .filter((id) => (inputs[id] ?? "").trim() === "")
     .map((id) => judgeNames.get(id) ?? "a judge");
   const guestNames = judges.filter((j) => guestJudgeIds.has(j.id)).map((j) => judgeNames.get(j.id) ?? j.name);
-  const total = parsed.marks ? teamMarksTotal(parsed.marks) : null;
+  // Running total of whatever valid marks are typed so far (27/40 at three of four).
+  const typedTotal = judgeIds.reduce((sum, id) => {
+    const raw = (inputs[id] ?? "").trim();
+    const n = Number(raw);
+    return raw !== "" && Number.isFinite(n) && n >= 0 && n <= TEAM_DANCE_MAX_PER_JUDGE ? sum + n : sum;
+  }, 0);
 
-  let status: { tone: "muted" | "ok" | "danger" | "warn"; text: string } | null = null;
+  let status: { tone: Tone; text: string } | null = null;
   if (parsed.invalidJudgeIds.length > 0) {
     const judgeId = parsed.invalidJudgeIds[0];
     status = {
@@ -186,72 +200,83 @@ function TeamBlock({
   } else if (parsed.marks) {
     status = {
       tone: "ok",
-      text: `All ${judgeIds.length} judges in. Saved to each couple's team dance for ${appliesTo.length} ${appliesTo.length === 1 ? "couple" : "couples"}, as drafts.`,
+      text: `All ${judgeIds.length} judges in. Saved as Dance 2 for ${appliesTo.length} ${appliesTo.length === 1 ? "couple" : "couples"}, as drafts.`,
     };
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border p-3">
-      <div className="flex flex-col gap-0.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-heading text-base font-semibold">{team.name}</p>
-          <Badge variant="secondary">{view.styleName}</Badge>
-        </div>
-        {(team.songTitle || team.songSource) && (
-          <p className="text-xs text-muted-foreground">
-            {team.songTitle ? `“${team.songTitle}”` : ""}
-            {team.songTitle && team.songSource ? " · " : ""}
-            {team.songSource ?? ""}
-          </p>
-        )}
-        {team.hostName && <p className="text-xs text-muted-foreground">Host {team.hostName} dances, not scored</p>}
-        {team.inferred && (
-          <p className="text-xs text-muted-foreground">
-            Read from the couples&apos; second slot: everyone whose Freestyle shares this song.
-          </p>
+    <div className="rounded-xl border border-accent/40 p-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">
+          <strong>{team.name}</strong> <span className="font-normal text-muted-foreground">· Team Dance</span>
+        </p>
+        {canSetup && (
+          <Button size="xs" variant="ghost" onClick={onEditTeams} disabled={busy}>
+            Edit Teams
+          </Button>
         )}
       </div>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {plan.map((p, i) => (
+          <span key={p.coupleId}>
+            {i > 0 && ", "}
+            {coupleName(p.coupleId)}
+            {team.captainCoupleId === p.coupleId && " (Captain)"}
+          </span>
+        ))}
+        {team.hostName && ` · Host ${team.hostName} dances, not scored`}
+        {team.inferred && " · Read from the couples' second slot"}
+      </p>
 
       {panelOk ? (
-        <fieldset disabled={inputsDisabled || busy} className="flex flex-col gap-1.5">
-          <div className="flex flex-wrap items-end gap-1.5">
-            {judges.map((j) => (
-              <div key={j.id} className="flex flex-col gap-0.5">
-                <Label className={`text-[11px] ${guestJudgeIds.has(j.id) ? "text-accent" : "text-muted-foreground"}`}>
-                  {judgeNames.get(j.id) ?? j.name}
-                </Label>
-                <Input
-                  inputMode="decimal"
-                  aria-label={`${judgeNames.get(j.id) ?? j.name} mark for ${team.name}`}
-                  className={`h-11 w-14 px-1.5 text-center text-base ${parsed.invalidJudgeIds.includes(j.id) ? "border-destructive" : ""}`}
-                  placeholder="—"
-                  value={inputs[j.id] ?? ""}
-                  onChange={(e) => {
-                    setDirty(true);
-                    setError(null);
-                    setInputs((prev) => ({ ...prev, [j.id]: e.target.value }));
-                  }}
-                />
-              </div>
-            ))}
-            <div className="flex flex-col gap-0.5">
-              <Label className="text-[11px] text-muted-foreground">Team</Label>
-              <p className="flex h-11 items-center px-1 font-heading text-lg font-semibold">
-                {total ?? teamMarksTotal(liveMarks ?? [])}
-                <span className="ml-0.5 text-xs font-normal text-muted-foreground">/{judgeIds.length * TEAM_DANCE_MAX_PER_JUDGE}</span>
-              </p>
+        <fieldset disabled={inputsDisabled || busy} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <Badge variant="secondary">{view.styleName}</Badge>
+              <span className="text-muted-foreground">
+                {team.songTitle ? `“${team.songTitle}”` : "No song yet"}
+                {team.songSource ? ` · ${team.songSource}` : ""}
+              </span>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-x-3 text-[11px] text-muted-foreground">
-            <span>0 to {TEAM_DANCE_MAX_PER_JUDGE} per judge</span>
-            <span>
-              {guestNames.length > 0 ? `${guestNames.join(" and ")} ${guestNames.length === 1 ? "is" : "are"} tonight's guest · ` : ""}
-              {parsed.filled} of {judgeIds.length} in
-            </span>
+            <div className="flex flex-wrap items-end gap-1.5">
+              {judges.map((j) => (
+                <div key={j.id} className="flex flex-col gap-0.5">
+                  <Label className={`text-[10px] ${guestJudgeIds.has(j.id) ? "text-accent" : "text-muted-foreground"}`}>
+                    {judgeNames.get(j.id) ?? j.name}
+                  </Label>
+                  <Input
+                    inputMode="decimal"
+                    aria-label={`${judgeNames.get(j.id) ?? j.name} mark for ${team.name}`}
+                    className={`h-8 w-12 px-1.5 text-center text-xs ${parsed.invalidJudgeIds.includes(j.id) ? "border-destructive" : ""}`}
+                    placeholder="—"
+                    value={inputs[j.id] ?? ""}
+                    onChange={(e) => {
+                      setDirty(true);
+                      setError(null);
+                      setInputs((prev) => ({ ...prev, [j.id]: e.target.value }));
+                    }}
+                  />
+                </div>
+              ))}
+              <div className="flex flex-col gap-0.5">
+                <Label className="text-[10px] text-muted-foreground">Team</Label>
+                <p className="flex h-8 items-center px-1 text-sm font-medium">
+                  {typedTotal}
+                  <span className="ml-0.5 text-xs font-normal text-muted-foreground">/{judgeIds.length * TEAM_DANCE_MAX_PER_JUDGE}</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 text-[10px] text-muted-foreground">
+              <span>0 to {TEAM_DANCE_MAX_PER_JUDGE} per judge · copied to every member&apos;s Dance 2</span>
+              <span>
+                {guestNames.length > 0 ? `${guestNames.join(" and ")} ${guestNames.length === 1 ? "is" : "are"} tonight's guest · ` : ""}
+                {parsed.filled} of {judgeIds.length} in
+              </span>
+            </div>
           </div>
         </fieldset>
       ) : (
-        <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-text">
+        <div role="alert" className="mt-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-text">
           Team Dances need exactly {TEAM_DANCE_JUDGE_COUNT} judges and this night has {judges.length}.{" "}
           <Link href="/admin/schedule" className="font-semibold underline underline-offset-2">
             Set the guest judge on Schedule
@@ -263,7 +288,7 @@ function TeamBlock({
       {status && (
         <p
           role={status.tone === "danger" ? "alert" : undefined}
-          className={`rounded-lg border px-3 py-2 text-xs ${
+          className={`mt-1.5 rounded-lg border px-3 py-2 text-xs ${
             status.tone === "danger"
               ? "border-destructive/40 bg-destructive/10 text-danger-text"
               : status.tone === "warn"
@@ -277,33 +302,33 @@ function TeamBlock({
         </p>
       )}
       {error && (
-        <p role="alert" className="text-xs text-danger-text">
+        <p role="alert" className="mt-1.5 text-xs text-danger-text">
           {error}
         </p>
       )}
       {applied.mismatch && (
-        <p className="text-xs text-amber-text">
+        <p className="mt-1.5 text-xs text-amber-text">
           Members&apos; team rows don&apos;t all agree. Entering the marks again rewrites every member.
         </p>
       )}
       {lastResult && lastResult.collisions.length > 0 && (
-        <p className="text-xs text-amber-text">
+        <p className="mt-1.5 text-xs text-amber-text">
           Not applied to {lastResult.collisions.length} {lastResult.collisions.length === 1 ? "couple" : "couples"}: a couple
           takes the team dance only once their own dance is saved and they have no extra dance rows.
         </p>
       )}
 
-      <div className="flex flex-col rounded-lg border border-border">
-        <div className="flex items-center justify-between border-b border-border px-2.5 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <div className="mt-2 flex flex-col rounded-lg border border-border">
+        <div className="flex items-center justify-between border-b border-border px-2.5 py-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
           <span>
             Applies to {appliesTo.length} of {plan.length} couples
           </span>
-          <span className="normal-case tracking-normal">Saved as each couple&apos;s team dance</span>
+          <span className="normal-case tracking-normal">Each couple&apos;s Dance 2</span>
         </div>
         {plan.map((p) => {
-          const state = isStale(p) ? { label: "Posted · Old Team Score", tone: "warn" as const } : memberStateLabel(p);
+          const state = isStale(p) ? { label: "Posted · Old Team Score", tone: "warn" as Tone } : memberStateLabel(p);
           return (
-            <div key={p.coupleId} className="flex min-h-10 items-center justify-between gap-2 border-b border-border px-2.5 py-1.5 text-sm last:border-b-0">
+            <div key={p.coupleId} className="flex min-h-9 items-center justify-between gap-2 border-b border-border px-2.5 py-1 text-sm last:border-b-0">
               <span className="flex flex-wrap items-center gap-1.5">
                 {coupleName(p.coupleId)}
                 {team.captainCoupleId === p.coupleId && <Badge variant="outline">Captain</Badge>}
@@ -315,7 +340,7 @@ function TeamBlock({
       </div>
 
       {needsOverride.map((p) => (
-        <div key={p.coupleId} className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+        <div key={p.coupleId} className="mt-2 flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
           {canOverride ? (
             <>
               <p className="text-danger-text">
@@ -345,10 +370,11 @@ function TeamBlock({
                   if (outcome.error) setError(outcome.error);
                 }}
               >
-                {overriding === p.coupleId ? "Working…" : <>Un-Post {coupleName(p.coupleId)} and Add Team Score</>}
+                {overriding === p.coupleId ? "Working…" : "Un-Post and Apply"}
               </Button>
               <p className="text-muted-foreground">
-                Un-posts them, adds the team score and posts them again. Each step rewrites this week in every league.
+                Un-posts {coupleName(p.coupleId)}, saves the team score into their Dance 2 and posts them again. Each step
+                rewrites this week in every league.
               </p>
             </>
           ) : (
@@ -361,89 +387,5 @@ function TeamBlock({
         </div>
       ))}
     </div>
-  );
-}
-
-export function TeamDancesCard({
-  teams,
-  judges,
-  judgeNames,
-  guestJudgeIds,
-  coupleName,
-  canSetup,
-  setupAvailable,
-  canOverride,
-  inputsDisabled,
-  busy,
-  onApply,
-  onOverride,
-  onEditTeams,
-}: {
-  teams: TeamCardView[];
-  judges: ScoringJudge[];
-  judgeNames: Map<string, string>;
-  guestJudgeIds: ReadonlySet<string>;
-  coupleName: (coupleId: string) => ReactNode;
-  canSetup: boolean;
-  // False until supabase/apply-team-dances.sql is applied: teams can only be
-  // inferred from the couples' rows, not named or given captains.
-  setupAvailable: boolean;
-  canOverride: boolean;
-  inputsDisabled: boolean;
-  busy: boolean;
-  onApply: (teamId: string, marks: TeamMark[]) => Promise<ApplyOutcome>;
-  onOverride: (teamId: string, coupleId: string, marks: TeamMark[]) => Promise<{ error: string | null }>;
-  onEditTeams: () => void;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle>Team Dances</CardTitle>
-          <div className="flex items-center gap-2">
-            {teams.length > 0 && (
-              <Badge variant="secondary">
-                {teams.length} {teams.length === 1 ? "Team" : "Teams"}
-              </Badge>
-            )}
-            {canSetup && (
-              <Button size="sm" variant="outline" onClick={onEditTeams} disabled={busy}>
-                {teams.length === 0 ? "Set Up Teams" : "Edit Teams"}
-              </Button>
-            )}
-          </div>
-        </div>
-        <CardDescription>
-          {teams.length === 0
-            ? setupAvailable
-              ? canSetup
-                ? "Set up each team's name, song and members, then type one set of judge marks per team."
-                : "No teams are set up yet. Ask a site admin to add them, or type the team's marks into each couple's second dance slot."
-              : "No teams found yet. Give each team's couples the same Freestyle and song in their second slot and they appear here; apply supabase/apply-team-dances.sql to set teams up by name instead."
-            : teams.some((t) => t.team.inferred)
-              ? `Type each team's scores once. They apply to every member who danced. Teams are read from the couples' second slot${setupAvailable ? "; Set Up Teams saves them by name" : ", so they are named after their song until supabase/apply-team-dances.sql is applied"}.`
-              : "Type each team's scores once. They apply to every member who danced."}
-        </CardDescription>
-      </CardHeader>
-      {teams.length > 0 && (
-        <CardContent className="flex flex-col gap-3">
-          {teams.map((view) => (
-            <TeamBlock
-              key={view.team.id}
-              view={view}
-              judges={judges}
-              judgeNames={judgeNames}
-              guestJudgeIds={guestJudgeIds}
-              coupleName={coupleName}
-              canOverride={canOverride}
-              inputsDisabled={inputsDisabled}
-              busy={busy}
-              onApply={onApply}
-              onOverride={onOverride}
-            />
-          ))}
-        </CardContent>
-      )}
-    </Card>
   );
 }

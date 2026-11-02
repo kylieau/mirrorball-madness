@@ -17,7 +17,7 @@ import {
   saveEpisodeTeamsAction,
 } from "@/app/admin/results/actions";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { TeamDancesCard, type ApplyOutcome, type TeamCardView } from "@/components/team-dances-card";
+import { TeamEntry, type ApplyOutcome, type TeamEntryView } from "@/components/team-entry";
 import { TeamEditor, teamDraftsFromTeams, teamDraftsToSetup, type TeamDraft } from "@/components/team-editor";
 import {
   appliedTeamMarks,
@@ -95,6 +95,9 @@ type CompetitionWeek = {
   is_double_elimination_week: boolean;
 };
 type Outcome = "safe" | "eliminated" | "withdrawn" | "bye" | "winner" | "runner_up" | "third_place";
+
+// Picker values for team entries, distinct from couple ids.
+const TEAM_PICK_PREFIX = "team:";
 type StatusValue = Outcome;
 
 const STATUS_LABELS: Record<StatusValue, string> = {
@@ -795,7 +798,7 @@ export function ResultsForm({
       // Posting a team member before their team is scored means the team
       // score can only reach them through an un-post. Ask first (frame 07).
       const team = teamByCouple.get(coupleId);
-      if (team && !opts.force && !(rows[coupleId]?.dances ?? []).some((d) => isTeamDanceRow(team, d))) {
+      if (team && !opts.force && !teamMarksComplete((rows[coupleId]?.dances ?? []).find((d) => isTeamDanceRow(team, d)) ?? null)) {
         setConfirmPublishTeamMember(coupleId);
         return;
       }
@@ -1097,7 +1100,7 @@ export function ResultsForm({
   // What the Team Dances card shows per member, from the same rows the couple
   // cards edit, so "Applies to N of M" and the couple cards never disagree.
   const nightJudgeIds = nightJudges.map((j) => j.id);
-  const teamViews: TeamCardView[] = episodeTeams.map((team) => {
+  const teamViews: TeamEntryView[] = episodeTeams.map((team) => {
     const plan = teamApplyPlan(
       team,
       team.memberCoupleIds.map((coupleId) => {
@@ -1151,6 +1154,30 @@ export function ResultsForm({
   // A member's team dance is read-only on their own card (frames 06/08): the
   // marks come from the Team Dances card, so one member can't drift from the
   // rest of the team. Before the team is scored the row shows as waiting.
+  function teamMarksComplete(dance: RowDance | null): boolean {
+    return !!dance && nightJudgeIds.every((id) => (dance.scores[id] ?? "").trim() !== "");
+  }
+
+  // "Individual 28 + Team 36 = Night 64/80 → Dance Card 24.00 of 30", with
+  // the team half Pending until all four marks are in.
+  function renderNightLine(team: EpisodeTeam, row: CoupleRow, coupleId: string) {
+    const teamRow = row.dances.find((d) => isTeamDanceRow(team, d)) ?? null;
+    const individual = row.dances.filter((d) => d.danceStyleId && d !== teamRow).reduce((sum, d) => sum + danceTotal(d), 0);
+    const complete = teamMarksComplete(teamRow);
+    const night = complete ? nightPreview(row, coupleId) : null;
+    return (
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        Individual {individual} + Team {complete && teamRow ? danceTotal(teamRow) : <span className="text-amber-text">Pending</span>}
+        {night ? (
+          <>
+            {" "}= Night {night.split(" → ")[0]}
+            {night.includes(" → ") ? <> → Dance Card <span className="font-heading text-accent">{night.split(" → ")[1]}</span> of 30</> : null}
+          </>
+        ) : null}
+      </p>
+    );
+  }
+
   function renderTeamDanceRow(team: EpisodeTeam, dance: RowDance | null) {
     const max = nightJudgeIds.length * 10;
     return (
@@ -1159,20 +1186,21 @@ export function ResultsForm({
         className="flex flex-col gap-1 rounded-lg border border-dashed border-accent/40 bg-muted/30 p-1.5 text-xs"
       >
         <div className="flex flex-wrap items-center justify-between gap-x-2">
-          <span className="font-medium">🔗 Team Dance · {team.name}</span>
-          <span className="text-muted-foreground">
-            {danceStyleItems[team.danceStyleId] ?? "Freestyle"}
-            {team.songTitle && !team.inferred ? ` · ${team.songTitle}` : ""}
-          </span>
+          <span className="font-medium">Dance 2 · Team Dance · {team.name}</span>
+          <button type="button" className="font-semibold text-accent" onClick={() => openTeamEntry(team.id)}>
+            Open team →
+          </button>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-x-2">
           <span className="font-heading">
-            {nightJudgeIds.map((id) => dance?.scores[id]?.trim() || "_").join(" · ")}{" "}
+            <span className="mr-2">{nightJudgeIds.map((id) => dance?.scores[id]?.trim() || "_").join(" · ")}</span>
             <span className="font-semibold">{dance ? danceTotal(dance) : 0}</span>
             <span className="text-muted-foreground">/{max}</span>
           </span>
-          <span className={dance ? "text-emerald-text" : "text-amber-text"}>
-            {dance ? "From Team Dances" : "Waiting on Team Dances"}
+          <span className={teamMarksComplete(dance) ? "text-emerald-text" : "text-amber-text"}>
+            {danceStyleItems[team.danceStyleId] ?? "Freestyle"}
+            {team.songTitle ? ` · ${team.songTitle}` : ""}
+            {teamMarksComplete(dance) ? " · From the team entry" : " · Pending"}
           </span>
         </div>
       </div>
@@ -1182,13 +1210,29 @@ export function ResultsForm({
   // Called as a plain function, not rendered as <Component/>: a component
   // declared inside this one gets a new identity every render, which would
   // remount its inputs on every keystroke and drop focus.
-  function renderCouplePicker(list: Couple[], selectedId: string, onSelect: (id: string) => void) {
-    const current = list.find((c) => c.id === selectedId) ?? list[0];
+  // Teams sit in the same picker as the couples (after them), each scored
+  // once through the couple-card layout. They are an entry-screen device
+  // only: nothing about them is a couple to scoring, standings or fans.
+  function renderCouplePicker(list: Couple[], selectedId: string, onSelect: (id: string) => void, teams: TeamEntryView[] = []) {
+    const teamValue = (teamId: string) => `${TEAM_PICK_PREFIX}${teamId}`;
+    const selectedTeam = selectedId.startsWith(TEAM_PICK_PREFIX)
+      ? teams.find((v) => teamValue(v.team.id) === selectedId)
+      : undefined;
+    const current = selectedTeam ? null : (list.find((c) => c.id === selectedId) ?? list[0] ?? null);
+    const value = selectedTeam ? teamValue(selectedTeam.team.id) : (current?.id ?? teamValue(teams[0]?.team.id ?? ""));
+    const teamLabel = (view: TeamEntryView) => (
+      <span>
+        <strong>{view.team.name}</strong> <span className="text-muted-foreground">· Team Dance</span>
+      </span>
+    );
     return (
       <>
         <Select
-          items={Object.fromEntries(list.map((c) => [c.id, coupleNameNode(coupleParts(c))]))}
-          value={current.id}
+          items={{
+            ...Object.fromEntries(list.map((c) => [c.id, coupleNameNode(coupleParts(c))])),
+            ...Object.fromEntries(teams.map((v) => [teamValue(v.team.id), teamLabel(v)])),
+          }}
+          value={value}
           onValueChange={(v) => onSelect(v ?? "")}
         >
           <SelectTrigger className="w-full">
@@ -1200,10 +1244,60 @@ export function ResultsForm({
                 {coupleNameNode(coupleParts(c))}
               </SelectItem>
             ))}
+            {teams.map((v) => (
+              <SelectItem key={v.team.id} value={teamValue(v.team.id)}>
+                <span className="flex flex-col">
+                  {teamLabel(v)}
+                  <span className="text-xs text-muted-foreground">
+                    {v.team.memberCoupleIds.map((id) => coupleParts(namedCouple(id) ?? { id, celebrity_name: "?", pro_name: "?" }).celebrity).join(", ")}
+                  </span>
+                </span>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        {renderDanceEntry(current)}
+        {selectedTeam
+          ? renderTeamEntry(selectedTeam)
+          : current
+            ? renderDanceEntry(current)
+            : teams[0]
+              ? renderTeamEntry(teams[0])
+              : null}
       </>
+    );
+  }
+
+  function openTeamEntry(teamId: string) {
+    setShowLeaderboard(false);
+    if (published) {
+      setCoupleViewMode("published");
+      setPublishedSelectedId(`${TEAM_PICK_PREFIX}${teamId}`);
+    } else {
+      setCoupleViewMode("inProgress");
+      setByCoupleSelectedId(`${TEAM_PICK_PREFIX}${teamId}`);
+    }
+  }
+
+  function renderTeamEntry(view: TeamEntryView) {
+    return (
+      <TeamEntry
+        key={view.team.id}
+        view={view}
+        judges={nightJudges}
+        judgeNames={judgeDisplayNames}
+        guestJudgeIds={new Set(guestJudgesByEpisode[selectedEpisode?.id ?? ""] ?? [])}
+        coupleName={(coupleId) => {
+          const couple = namedCouple(coupleId);
+          return couple ? <CoupleName {...coupleParts(couple)} /> : "This couple";
+        }}
+        canOverride={canPublish && !published}
+        canSetup={canPublish && teamsAvailable}
+        inputsDisabled={published && !canPublish}
+        busy={teamBusy || savingDraft || revealBusy || publishing || releasing}
+        onApply={handleApplyTeam}
+        onOverride={handleOverrideTeamMember}
+        onEditTeams={openTeamsEditor}
+      />
     );
   }
 
@@ -1229,9 +1323,6 @@ export function ResultsForm({
           {rank != null && <span className="text-muted-foreground">#{rank}</span>} <CoupleName {...coupleParts(c)} />
           {rank != null && (
             <span className="ml-1.5 text-muted-foreground">· {nightPreview(row, c.id) ?? `${coupleTotal(row)} pts`}</span>
-          )}
-          {rank == null && team && nightPreview(row, c.id) && (
-            <span className="ml-1.5 font-normal text-muted-foreground">· Night {nightPreview(row, c.id)}</span>
           )}
         </p>
 
@@ -1291,6 +1382,7 @@ export function ResultsForm({
           ))}
           {team && row.outcome !== "bye" && !row.dances.some((d) => isTeamDanceRow(team, d)) && renderTeamDanceRow(team, null)}
         </fieldset>
+        {team && row.outcome !== "bye" && renderNightLine(team, row, c.id)}
 
         {!published && (
           <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
@@ -1560,37 +1652,24 @@ export function ResultsForm({
               </p>
             </div>
           )}
-          {isTeamNight && (
-            <TeamDancesCard
-              teams={teamViews}
-              judges={nightJudges}
-              judgeNames={judgeDisplayNames}
-              guestJudgeIds={new Set(guestJudgesByEpisode[selectedEpisode.id] ?? [])}
-              coupleName={(coupleId) => {
-                const couple = namedCouple(coupleId);
-                return couple ? <CoupleName {...coupleParts(couple)} /> : "This couple";
-              }}
-              canSetup={canPublish && teamsAvailable}
-              setupAvailable={teamsAvailable}
-              canOverride={canPublish && !published}
-              inputsDisabled={published && !canPublish}
-              busy={teamBusy || savingDraft || revealBusy || publishing || releasing}
-              onApply={handleApplyTeam}
-              onOverride={handleOverrideTeamMember}
-              onEditTeams={openTeamsEditor}
-            />
-          )}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
                 <CardTitle>Couples &amp; Scores</CardTitle>
-                <button
-                  type="button"
-                  className="shrink-0 text-sm font-semibold text-accent"
-                  onClick={() => setShowLeaderboard(true)}
-                >
-                  Leaderboard →
-                </button>
+                <div className="flex shrink-0 items-center gap-3">
+                  {isTeamNight && canPublish && teamsAvailable && (
+                    <button type="button" className="text-sm font-semibold text-accent" onClick={openTeamsEditor}>
+                      {persistedTeams.length === 0 ? "Set Up Teams" : "Edit Teams"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="text-sm font-semibold text-accent"
+                    onClick={() => setShowLeaderboard(true)}
+                  >
+                    Leaderboard →
+                  </button>
+                </div>
               </div>
               <div className="flex gap-2 pt-1">
                 <Button
@@ -1691,9 +1770,9 @@ export function ResultsForm({
                 publishedCouples.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No couples published yet.</p>
                 ) : (
-                  renderCouplePicker(publishedCouples, publishedSelectedId, setPublishedSelectedId)
+                  renderCouplePicker(publishedCouples, publishedSelectedId, setPublishedSelectedId, published ? teamViews : [])
                 )
-              ) : inProgressCouples.length === 0 ? (
+              ) : inProgressCouples.length === 0 && (published || teamViews.length === 0) ? (
                 <p className="text-sm text-muted-foreground">
                   {episodeCouples.length === 0
                     ? "No couples to check for this episode."
@@ -1702,7 +1781,16 @@ export function ResultsForm({
                       : "Every couple's scores are drafted or published."}
                 </p>
               ) : (
-                renderCouplePicker(inProgressCouples, byCoupleSelectedId, setByCoupleSelectedId)
+                <>
+                  {renderCouplePicker(inProgressCouples, byCoupleSelectedId, setByCoupleSelectedId, published ? [] : teamViews)}
+                  {isTeamNight && teamViews.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No teams yet. Give each team&apos;s couples the same Freestyle and song in their second slot and the
+                      team appears here as its own entry
+                      {teamsAvailable ? ", or use Set Up Teams" : ""}.
+                    </p>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -1777,7 +1865,7 @@ export function ResultsForm({
                     const couple = namedCouple(coupleId);
                     return (
                       <>
-                        {team?.name ?? "Their team"} isn&apos;t scored yet. If you publish{" "}
+                        {team?.name ?? "Their team"} doesn&apos;t have all four team marks yet. If you publish{" "}
                         {couple ? <CoupleName {...coupleParts(couple)} /> : "this couple"} now, the team score can&apos;t
                         reach them until you un-post them. Waiting is safer.
                       </>

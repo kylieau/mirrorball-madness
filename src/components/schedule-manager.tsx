@@ -34,6 +34,7 @@ import { DEFAULT_EPISODE_DURATION_MINUTES } from "@/lib/episode-banner";
 import { saveEpisodeTeamsAction } from "@/app/admin/results/actions";
 import { TeamEditor, teamDraftsFromTeams, teamDraftsToSetup, type TeamDraft } from "@/components/team-editor";
 import { validateTeamSetup, type EpisodeTeam } from "@/lib/team-dances";
+import { buildCoupleDisplayNames } from "@/lib/couple-display";
 
 type Episode = {
   id: string;
@@ -263,6 +264,8 @@ export function ScheduleManager({
   const freestyleStyleId =
     danceStyles.find((s) => s.name.trim().toLowerCase() === "freestyle")?.id ?? danceStyles[0]?.id ?? "";
   const showTeamsSection = teamDanceRoundTypeId != null && roundTypeIds.has(teamDanceRoundTypeId);
+  // First names, as Enter Results shows them, for the team member picker.
+  const coupleDisplayNames = buildCoupleDisplayNames(seasonCouples);
   const teamsDirty = JSON.stringify(teamDraftsToSetup(teamDrafts)) !== JSON.stringify(teamDraftsToSetup(savedTeamDrafts));
 
   const parsedWeekNumber = competitionWeek.trim() === "" ? null : Number(competitionWeek);
@@ -791,7 +794,7 @@ export function ScheduleManager({
                     onChange={setTeamDrafts}
                     couples={selectableCouples
                       .filter((c) => participantCoupleIds.has(c.id))
-                      .map((c) => ({ id: c.id, parts: { celebrity: c.celebrity_name, pro: c.pro_name } }))}
+                      .map((c) => ({ id: c.id, parts: coupleDisplayNames.get(c.id) ?? { celebrity: c.celebrity_name, pro: c.pro_name } }))}
                     danceStyles={danceStyles}
                     defaultStyleId={freestyleStyleId}
                     disabled={submitting}
