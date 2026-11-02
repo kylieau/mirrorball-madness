@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   appliedTeamMarks,
   buildNightSummary,
+  eligibleTeamMembers,
   inferTeamsFromRows,
   isTeamDanceRow,
   isTeamStyleName,
@@ -26,6 +27,7 @@ const team: EpisodeTeam = {
   sortOrder: 1,
   memberCoupleIds: ["tatyana", "maura", "amber", "julia"],
   inferred: false,
+  postedAt: null,
 };
 const nine = Object.fromEntries(judges.map((j) => [j, "9"]));
 const member = (coupleId: string, overrides: Partial<TeamMemberInput> = {}): TeamMemberInput => ({
@@ -225,5 +227,29 @@ describe("inferTeamsFromRows", () => {
     expect(inferTeamsFromRows("ep", [{ coupleId: "a", dances: [row("waltz", "Zoo")] }, { coupleId: "b", dances: [row("waltz", "Zoo")] }], styles)).toEqual([]);
     expect(isTeamStyleName("Team Freestyle")).toBe(true);
     expect(isTeamStyleName("Waltz")).toBe(false);
+  });
+});
+
+describe("eligibleTeamMembers", () => {
+  it("mirrors team_eligible_members(): skips withdrawn, Did Not Dance, earlier eliminations and non-performers", () => {
+    const result = eligibleTeamMembers(
+      { memberCoupleIds: ["a", "b", "c", "d", "e", "f"] },
+      [
+        { coupleId: "a", status: "active", eliminationWeek: null, outcome: "safe" },
+        { coupleId: "b", status: "active", eliminationWeek: null, outcome: "bye" },
+        { coupleId: "c", status: "withdrawn", eliminationWeek: 7, outcome: null },
+        { coupleId: "d", status: "eliminated", eliminationWeek: 7, outcome: null },
+        { coupleId: "e", status: "eliminated", eliminationWeek: 8, outcome: "eliminated" },
+        { coupleId: "f", status: "active", eliminationWeek: null, outcome: null },
+      ],
+      { weekNumber: 8, participantIds: ["a", "b", "c", "d", "e"] }
+    );
+    expect(result.eligible).toEqual(["a", "e"]);
+    expect(result.skipped).toEqual([
+      { coupleId: "b", reason: "bye" },
+      { coupleId: "c", reason: "withdrawn" },
+      { coupleId: "d", reason: "eliminated" },
+      { coupleId: "f", reason: "not_performing" },
+    ]);
   });
 });
