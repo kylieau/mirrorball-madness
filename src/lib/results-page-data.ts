@@ -62,7 +62,7 @@ export type ResultsPageData = {
   // Those same couples' live dance rows (style + song), so the Team Dances
   // card can tell a posted member who already carries the team dance from
   // one who was posted before it.
-  revealedDancesByEpisode: Record<string, Record<string, { danceStyleId: string; songTitle: string | null }[]>>;
+  revealedDancesByEpisode: Record<string, Record<string, { danceStyleId: string; songTitle: string | null; totalScore: number }[]>>;
   // False until supabase/apply-team-dances.sql is applied; the pages then
   // hide team setup instead of erroring.
   teamsAvailable: boolean;
@@ -208,6 +208,7 @@ export async function loadResultsPageData(
     ((revealedDancesByEpisode[row.episode_id] ??= {})[row.couple_id] ??= []).push({
       danceStyleId: row.dance_style_id,
       songTitle: row.song_title,
+      totalScore: Number(row.total_score),
     });
   }
 

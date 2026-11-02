@@ -22,7 +22,9 @@ import { TeamEditor, teamDraftsFromTeams, teamDraftsToSetup, type TeamDraft } fr
 import {
   appliedTeamMarks,
   buildNightSummary,
+  inferTeamsFromRows,
   isTeamDanceRow,
+  isTeamStyleName,
   teamApplyPlan,
   validateTeamSetup,
   type EpisodeTeam,
@@ -219,8 +221,14 @@ function buildRowsFromDraft(
     const row = rows[coupleId];
     if (row.outcome === "bye") continue;
     const team = teamByCouple.get(coupleId);
-    const reserved = team && !row.dances.some((d) => isTeamDanceRow(team, d)) ? 1 : 0;
-    const fillCount = expectedDanceCount - row.dances.length - reserved;
+    const teamRows = team ? row.dances.filter((d) => isTeamDanceRow(team, d)).length : 0;
+    const reserved = team && teamRows === 0 ? 1 : 0;
+    // A member always keeps one slot for their own dance, even on a night
+    // scheduled with a single dance per couple.
+    const fillCount = Math.max(
+      expectedDanceCount - row.dances.length - reserved,
+      row.dances.length - teamRows === 0 ? 1 : 0
+    );
     if (fillCount <= 0) continue;
     rows[coupleId] = {
       ...row,
@@ -285,7 +293,7 @@ export function ResultsForm({
   // card stays hidden and a note points to manual second-slot entry.
   teamsAvailable: boolean;
   teamsByEpisode: Record<string, EpisodeTeam[]>;
-  revealedDancesByEpisode: Record<string, Record<string, { danceStyleId: string; songTitle: string | null }[]>>;
+  revealedDancesByEpisode: Record<string, Record<string, { danceStyleId: string; songTitle: string | null; totalScore: number }[]>>;
 }) {
   const weekById = new Map(weeks.map((week) => [week.id, week]));
   const nightsCountByWeek = new Map<string, number>();
@@ -345,16 +353,19 @@ export function ResultsForm({
     .map((id) => couplesById.get(id) ?? activeCouples.find((c) => c.id === id))
     .filter((c): c is Couple => !!c);
 
-  const episodeTeams = selectedEpisode ? (teamsByEpisode[selectedEpisode.id] ?? []) : [];
-  const teamByCouple = new Map<string, EpisodeTeam>(
-    episodeTeams.flatMap((team) => team.memberCoupleIds.map((coupleId) => [coupleId, team] as const))
+  const persistedTeams = selectedEpisode ? (teamsByEpisode[selectedEpisode.id] ?? []) : [];
+  // Saved teams hold one slot per member for the team dance; inferred teams
+  // are read off rows that already exist, so hydration only needs these.
+  const persistedTeamByCouple = new Map<string, EpisodeTeam>(
+    persistedTeams.flatMap((team) => team.memberCoupleIds.map((coupleId) => [coupleId, team] as const))
   );
+  const teamDanceTicked = (roundTypesByEpisode[selectedEpisode?.id ?? ""] ?? []).includes("Team Dance");
   // Ticking Team Dance under Round Types on Schedule is what brings the card
   // out; saved teams keep it out even if the tick is later removed.
-  const isTeamNight =
-    episodeTeams.length > 0 || (roundTypesByEpisode[selectedEpisode?.id ?? ""] ?? []).includes("Team Dance");
+  const isTeamNight = persistedTeams.length > 0 || teamDanceTicked;
   // The night's panel: the standing judges plus this episode's guests.
   const nightJudges = judgesForScoreInputs(judges, [], guestJudgesByEpisode[selectedEpisode?.id ?? ""] ?? []);
+  const teamStyleIds = new Set(danceStyles.filter((s) => isTeamStyleName(s.name)).map((s) => s.id));
   const freestyleStyleId =
     danceStyles.find((s) => s.name.trim().toLowerCase() === "freestyle")?.id ?? danceStyles[0]?.id ?? "";
 
@@ -384,6 +395,22 @@ export function ResultsForm({
   const [revealBusy, setRevealBusy] = useState(false);
   // Null until mounted so the undo countdown never renders a server clock.
   const [nowMs, setNowMs] = useState<number | null>(null);
+
+  // With no saved team, a Team Dance night's teams are the couples whose
+  // second slot shares a Freestyle and a song -- what the live draft already
+  // holds -- so the card works before the migration is applied.
+  const inferredTeams =
+    persistedTeams.length === 0 && teamDanceTicked && selectedEpisode
+      ? inferTeamsFromRows(
+          selectedEpisode.id,
+          episodeCouples.map((c) => ({ coupleId: c.id, dances: (rows[c.id] ?? emptyRow()).dances.filter((d) => d.danceStyleId) })),
+          teamStyleIds
+        )
+      : [];
+  const episodeTeams = persistedTeams.length > 0 ? persistedTeams : inferredTeams;
+  const teamByCouple = new Map<string, EpisodeTeam>(
+    episodeTeams.flatMap((team) => team.memberCoupleIds.map((coupleId) => [coupleId, team] as const))
+  );
 
   const [confirmNoElimination, setConfirmNoElimination] = useState(false);
   // A team member about to be posted before their team is scored (frame 07).
@@ -490,7 +517,7 @@ export function ResultsForm({
     }
     seedingEpisodeId.current = null;
     setSeedingCorrection(false);
-    setRows(buildRowsFromDraft(draft, episodeCouples, expectedDanceCount, teamByCouple));
+    setRows(buildRowsFromDraft(draft, episodeCouples, expectedDanceCount, persistedTeamByCouple));
     setCustomMoments(draft?.customMoments ?? []);
     setDraftSavedAt(draft?.updatedAt ?? null);
     setHasDraft(draft?.hasDraft ?? false);
@@ -596,32 +623,81 @@ export function ResultsForm({
     );
     setError(result.error);
     if (result.skippedIds && result.skippedIds.length > 0) {
-      // Those couples were posted while the edit was in flight. Say so, and
-      // put their rows back to what the server holds rather than keep
-      // showing an edit that never landed.
+      // Those couples were posted while a dance edit was in flight. Say so,
+      // and put their dances back to what the server holds rather than keep
+      // showing marks that never landed; outcome edits did save.
       const skipped = new Set(result.skippedIds);
       const serverRows = buildRowsFromDraft(
         draftsByEpisode[selectedEpisode.id],
         episodeCouples.filter((c) => skipped.has(c.id)),
         expectedDanceCount,
-        teamByCouple
+        persistedTeamByCouple
       );
-      setRows((prev) => ({ ...prev, ...serverRows }));
+      setRows((prev) => {
+        const next = { ...prev };
+        for (const [coupleId, serverRow] of Object.entries(serverRows)) {
+          next[coupleId] = { ...(prev[coupleId] ?? emptyRow()), dances: serverRow.dances };
+        }
+        return next;
+      });
       setPostedSkipNotice(result.skippedIds);
     }
     setSavingDraft(false);
     return result;
   }
 
-  // The members' own dances must be on the server before the team row is
-  // merged in, so the flush comes first. On success the applied rows are
-  // mirrored locally and this episode's revalidation is treated as our own.
+  // The team dance in page state: the member's existing team row (found by
+  // signature, never by slot) takes the marks, or one is appended.
+  function writeTeamMarksIntoRows(team: EpisodeTeam, marks: TeamMark[], coupleIds: Iterable<string>) {
+    const scores = Object.fromEntries(marks.map((m) => [m.judgeId, String(m.score)]));
+    setRows((prev) => {
+      const next = { ...prev };
+      for (const coupleId of coupleIds) {
+        const row = next[coupleId] ?? emptyRow();
+        const existing = row.dances.find((d) => isTeamDanceRow(team, d));
+        const teamRow: RowDance = {
+          key: existing?.key ?? `team-${team.id}-${coupleId}`,
+          danceStyleId: team.danceStyleId,
+          songTitle: existing?.songTitle ?? team.songTitle ?? "",
+          scores,
+        };
+        next[coupleId] = {
+          ...row,
+          dances: existing ? row.dances.map((d) => (d.key === existing.key ? teamRow : d)) : [...row.dances, teamRow],
+        };
+      }
+      return next;
+    });
+  }
+
+  // Saved teams merge server-side through apply_team_dance (the members' own
+  // dances are flushed first so the RPC sees them). Inferred teams, or any
+  // team before the migration is applied, write the marks into each eligible
+  // member's existing team row here and ride the ordinary draft save, so the
+  // card works with no database change.
   async function handleApplyTeam(teamId: string, marks: TeamMark[]): Promise<ApplyOutcome> {
     if (!selectedEpisode) return { error: "Select a week first." };
-    const team = episodeTeams.find((t) => t.id === teamId);
-    if (!team) return { error: "That team is no longer on this episode. Refresh and try again." };
+    const view = teamViews.find((v) => v.team.id === teamId);
+    if (!view) return { error: "That team is no longer on this episode. Refresh and try again." };
+    const { team, plan } = view;
     setTeamBusy(true);
     try {
+      if (team.inferred || !teamsAvailable) {
+        const applied = plan.filter((p) => p.state === "will_apply" || p.state === "applied").map((p) => p.coupleId);
+        writeTeamMarksIntoRows(team, marks, applied);
+        for (const coupleId of applied) draftSaveQueue.current.markDirty(coupleId);
+        const saved = await flushDraft();
+        if (saved.error) return { error: saved.error };
+        return {
+          error: null,
+          result: {
+            applied,
+            posted: plan.filter((p) => p.state === "posted_waiting").map((p) => p.coupleId),
+            skipped: plan.filter((p) => p.state === "skipped").map((p) => ({ coupleId: p.coupleId, reason: p.reason ?? "withdrawn" })),
+            collisions: plan.filter((p) => p.state === "collision").map((p) => ({ coupleId: p.coupleId, teamRows: 0, otherDances: p.otherDances })),
+          },
+        };
+      }
       const saved = await flushDraft();
       if (saved.error) return { error: saved.error };
       justSavedEpisodeId.current = selectedEpisode.id;
@@ -630,26 +706,7 @@ export function ResultsForm({
         justSavedEpisodeId.current = null;
         return outcome;
       }
-      const applied = new Set(outcome.result?.applied ?? []);
-      const scores = Object.fromEntries(marks.map((m) => [m.judgeId, String(m.score)]));
-      setRows((prev) => {
-        const next = { ...prev };
-        for (const coupleId of applied) {
-          const row = next[coupleId] ?? emptyRow();
-          const existing = row.dances.find((d) => isTeamDanceRow(team, d));
-          const teamRow: RowDance = {
-            key: existing?.key ?? `team-${teamId}-${coupleId}`,
-            danceStyleId: team.danceStyleId,
-            songTitle: team.songTitle ?? "",
-            scores,
-          };
-          next[coupleId] = {
-            ...row,
-            dances: existing ? row.dances.map((d) => (d.key === existing.key ? teamRow : d)) : [...row.dances, teamRow],
-          };
-        }
-        return next;
-      });
+      writeTeamMarksIntoRows(team, marks, outcome.result?.applied ?? []);
       setDraftSavedAt(new Date().toISOString());
       setHasDraft(true);
       return outcome;
@@ -660,13 +717,33 @@ export function ResultsForm({
     }
   }
 
+  // Un-post, carry the team score into the member's draft, post again. With a
+  // saved team the server action runs all three; otherwise the same three
+  // steps use the existing reveal actions around an ordinary draft save.
   async function handleOverrideTeamMember(teamId: string, coupleId: string, marks: TeamMark[]) {
     if (!selectedEpisode) return { error: "Select a week first." };
+    const team = episodeTeams.find((t) => t.id === teamId);
+    if (!team) return { error: "That team is no longer on this episode. Refresh and try again." };
     setTeamBusy(true);
     try {
-      const result = await overridePostedTeamMemberAction({ episodeId: selectedEpisode.id, teamId, coupleId, marks });
+      if (!team.inferred && teamsAvailable) {
+        const result = await overridePostedTeamMemberAction({ episodeId: selectedEpisode.id, teamId, coupleId, marks });
+        router.refresh();
+        return result;
+      }
+      const undone = await undoCoupleReveal({ episodeId: selectedEpisode.id, coupleId });
+      if (undone.error) return { error: `Could not un-post this couple: ${undone.error}` };
+      writeTeamMarksIntoRows(team, marks, [coupleId]);
+      draftSaveQueue.current.markDirty(coupleId);
+      const saved = await flushDraft();
+      if (saved.error) {
+        router.refresh();
+        return { error: `Un-posted, but the team score could not be saved: ${saved.error}` };
+      }
+      const reposted = await revealCoupleScores({ episodeId: selectedEpisode.id, coupleId });
       router.refresh();
-      return result;
+      if (reposted.error) return { error: `Team score saved, but this couple could not be posted again: ${reposted.error}` };
+      return { error: null };
     } catch {
       return { error: "Could not confirm the update. Please refresh and try again." };
     } finally {
@@ -674,6 +751,8 @@ export function ResultsForm({
     }
   }
 
+  // Opening the editor over inferred teams pre-fills members and song, so
+  // saving them by name is one step.
   function openTeamsEditor() {
     setTeamsError(null);
     setTeamDrafts(teamDraftsFromTeams(episodeTeams));
@@ -1080,10 +1159,10 @@ export function ResultsForm({
         className="flex flex-col gap-1 rounded-lg border border-dashed border-accent/40 bg-muted/30 p-1.5 text-xs"
       >
         <div className="flex flex-wrap items-center justify-between gap-x-2">
-          <span className="font-medium">🔗 Dance · Team {team.name}</span>
+          <span className="font-medium">🔗 Team Dance · {team.name}</span>
           <span className="text-muted-foreground">
             {danceStyleItems[team.danceStyleId] ?? "Freestyle"}
-            {team.songTitle ? ` · ${team.songTitle}` : ""}
+            {team.songTitle && !team.inferred ? ` · ${team.songTitle}` : ""}
           </span>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-x-2">
@@ -1150,6 +1229,9 @@ export function ResultsForm({
           {rank != null && <span className="text-muted-foreground">#{rank}</span>} <CoupleName {...coupleParts(c)} />
           {rank != null && (
             <span className="ml-1.5 text-muted-foreground">· {nightPreview(row, c.id) ?? `${coupleTotal(row)} pts`}</span>
+          )}
+          {rank == null && team && nightPreview(row, c.id) && (
+            <span className="ml-1.5 font-normal text-muted-foreground">· Night {nightPreview(row, c.id)}</span>
           )}
         </p>
 
@@ -1377,8 +1459,8 @@ export function ResultsForm({
                 </span>
               );
             })}{" "}
-            {postedSkipNotice.length === 1 ? "was" : "were"} posted before your last edit saved, so that edit was not
-            applied. Their card shows what is live.
+            {postedSkipNotice.length === 1 ? "was" : "were"} posted before that edit saved, so their dance scores were
+            reloaded from the saved draft. Everything else was saved.
           </p>
           <Button size="xs" variant="ghost" onClick={() => setPostedSkipNotice([])}>
             Dismiss
@@ -1478,16 +1560,7 @@ export function ResultsForm({
               </p>
             </div>
           )}
-          {isTeamNight && !teamsAvailable && (
-            <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Team Dances need the database update</p>
-              <p className="mt-0.5">
-                Until supabase/apply-team-dances.sql is applied, type the team&apos;s marks into each couple&apos;s
-                second dance slot, and post no team member until both of their dances are in.
-              </p>
-            </div>
-          )}
-          {isTeamNight && teamsAvailable && (
+          {isTeamNight && (
             <TeamDancesCard
               teams={teamViews}
               judges={nightJudges}
@@ -1497,7 +1570,8 @@ export function ResultsForm({
                 const couple = namedCouple(coupleId);
                 return couple ? <CoupleName {...coupleParts(couple)} /> : "This couple";
               }}
-              canSetup={canPublish}
+              canSetup={canPublish && teamsAvailable}
+              setupAvailable={teamsAvailable}
               canOverride={canPublish && !published}
               inputsDisabled={published && !canPublish}
               busy={teamBusy || savingDraft || revealBusy || publishing || releasing}

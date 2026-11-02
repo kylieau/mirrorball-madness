@@ -17,21 +17,72 @@ export type EpisodeTeam = {
   hostName: string | null;
   sortOrder: number;
   memberCoupleIds: string[];
+  // Inferred teams are read off the couples' own slot-2 rows (a shared
+  // Freestyle and song on a Team Dance night) when no team has been saved --
+  // the path that works before supabase/apply-team-dances.sql is applied.
+  // They have no captain or host and are named after their song.
+  inferred: boolean;
 };
 
 export type TeamMark = { judgeId: string; score: number };
 
 type DanceSignature = { danceStyleId: string; songTitle: string | null };
 
-function normalizedSong(song: string | null | undefined): string | null {
-  const trimmed = song?.trim();
-  return trimmed ? trimmed : null;
+// Case- and whitespace-insensitive, the same key team_song_key() uses in SQL.
+export function songKey(song: string | null | undefined): string {
+  return (song ?? "").trim().toLowerCase();
 }
 
 // A member's team dance is whichever draft row carries the team's style and
 // song -- never "the second slot". Mirrors the signature apply_team_dance uses.
 export function isTeamDanceRow(team: DanceSignature, dance: DanceSignature): boolean {
-  return dance.danceStyleId === team.danceStyleId && normalizedSong(dance.songTitle) === normalizedSong(team.songTitle);
+  return dance.danceStyleId === team.danceStyleId && songKey(dance.songTitle) === songKey(team.songTitle);
+}
+
+export const INFERRED_TEAM_PREFIX = "inferred:";
+
+// Teams read off the draft itself: on a Team Dance night, two or more couples
+// whose rows share a Freestyle and the same song are one team. This is what
+// the live Week 8 data already looks like (every couple's second slot holds
+// the team's Freestyle and song), so it needs no migration. A row's style
+// must be one of `teamStyleIds` (styles named like Freestyle).
+export function inferTeamsFromRows(
+  episodeId: string,
+  couples: { coupleId: string; dances: DanceSignature[] }[],
+  teamStyleIds: ReadonlySet<string>
+): EpisodeTeam[] {
+  const groups = new Map<string, { danceStyleId: string; songTitle: string | null; memberCoupleIds: string[] }>();
+  for (const couple of couples) {
+    const seen = new Set<string>();
+    for (const dance of couple.dances) {
+      if (!teamStyleIds.has(dance.danceStyleId)) continue;
+      const key = `${dance.danceStyleId}|${songKey(dance.songTitle)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const group = groups.get(key) ?? { danceStyleId: dance.danceStyleId, songTitle: dance.songTitle?.trim() || null, memberCoupleIds: [] };
+      group.memberCoupleIds.push(couple.coupleId);
+      groups.set(key, group);
+    }
+  }
+  return [...groups.entries()]
+    .filter(([, group]) => group.memberCoupleIds.length >= 2)
+    .map(([key, group], index) => ({
+      id: `${INFERRED_TEAM_PREFIX}${key}`,
+      episodeId,
+      name: group.songTitle ?? "Team Dance",
+      songTitle: group.songTitle,
+      songSource: null,
+      danceStyleId: group.danceStyleId,
+      captainCoupleId: null,
+      hostName: null,
+      sortOrder: index + 1,
+      memberCoupleIds: group.memberCoupleIds,
+      inferred: true,
+    }));
+}
+
+export function isTeamStyleName(name: string): boolean {
+  return /freestyle/i.test(name);
 }
 
 export type ParsedTeamMarks = {
@@ -79,8 +130,8 @@ export type TeamMemberInput = {
   outcome: string | null;
   dances: MemberDanceRow[];
   posted: boolean;
-  // Signatures of the couple's live dance rows while the episode is unpublished.
-  liveDances: DanceSignature[];
+  // The couple's live dance rows while the episode is unpublished.
+  liveDances: (DanceSignature & { totalScore: number })[];
 };
 
 export type TeamMemberState =
@@ -98,6 +149,9 @@ export type TeamMemberPlan = {
   reason: "withdrawn" | "bye" | "eliminated" | "not_performing" | null;
   otherDances: number;
   appliedMarks: TeamMark[] | null;
+  // The total of the team dance that is live for a posted member, so the
+  // card can tell when the team was re-scored after they were posted.
+  liveTeamTotal: number | null;
 };
 
 function marksFromRow(row: MemberDanceRow, judgeIds: string[]): TeamMark[] | null {
@@ -125,7 +179,8 @@ export function teamApplyPlan(
   return team.memberCoupleIds.flatMap((coupleId) => {
     const member = members.find((m) => m.coupleId === coupleId);
     if (!member) return [];
-    const base = { coupleId, reason: null, otherDances: 0, appliedMarks: null } satisfies Omit<TeamMemberPlan, "state">;
+    const liveTeamTotal = member.posted ? (member.liveDances.find((d) => isTeamDanceRow(team, d))?.totalScore ?? null) : null;
+    const base = { coupleId, reason: null, otherDances: 0, appliedMarks: null, liveTeamTotal } satisfies Omit<TeamMemberPlan, "state">;
     if (member.outcome === "bye") return [{ ...base, state: "skipped", reason: "bye" } as TeamMemberPlan];
     if (member.outcome === "withdrawn" || member.status === "withdrawn")
       return [{ ...base, state: "skipped", reason: "withdrawn" } as TeamMemberPlan];
@@ -146,8 +201,7 @@ export function teamApplyPlan(
     if (teamRows.length > 1) return [{ ...base, state: "collision", otherDances } as TeamMemberPlan];
     const appliedMarks = marksFromRow(teamRows[0], opts.judgeIds);
     if (member.posted) {
-      const live = member.liveDances.some((d) => isTeamDanceRow(team, d));
-      return [{ ...base, state: live ? "posted_applied" : "posted_waiting", otherDances, appliedMarks } as TeamMemberPlan];
+      return [{ ...base, state: liveTeamTotal == null ? "posted_waiting" : "posted_applied", otherDances, appliedMarks } as TeamMemberPlan];
     }
     return [{ ...base, state: appliedMarks ? "applied" : "will_apply", otherDances, appliedMarks } as TeamMemberPlan];
   });

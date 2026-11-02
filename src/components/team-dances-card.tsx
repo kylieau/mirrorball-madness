@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,15 +122,26 @@ function TeamBlock({
 
   const parsed = parseTeamMarks(inputs, judgeIds);
   const panelOk = judges.length === TEAM_DANCE_JUDGE_COUNT;
-  const pendingMarks = parsed.marks && !sameTeamMarks(parsed.marks, applied.marks) ? parsed.marks : null;
-  const pendingKey = marksKey(pendingMarks);
+  // Apply when the four marks change, and again when a member becomes
+  // eligible later (their own dance was saved after the team was scored).
+  // Each distinct marks + members key is attempted once, so a server
+  // decision that differs from the preview can never loop.
+  const waitingIds = plan.filter((p) => p.state === "will_apply").map((p) => p.coupleId).sort().join(",");
+  const attemptKey =
+    parsed.marks && panelOk && (!sameTeamMarks(parsed.marks, applied.marks) || waitingIds !== "")
+      ? `${marksKey(parsed.marks)}|${waitingIds}`
+      : "";
+  const attemptedKey = useRef("");
+  const pending = attemptKey !== "" && attemptedKey.current !== attemptKey;
 
   useEffect(() => {
-    if (!pendingMarks || inputsDisabled || !panelOk) return;
+    if (!pending || inputsDisabled || !parsed.marks) return;
+    const marks = parsed.marks;
     const timer = setTimeout(async () => {
+      attemptedKey.current = attemptKey;
       setApplying(true);
       setError(null);
-      const outcome = await onApply(team.id, pendingMarks);
+      const outcome = await onApply(team.id, marks);
       setApplying(false);
       if (outcome.error) setError(outcome.error);
       else {
@@ -139,16 +150,21 @@ function TeamBlock({
       }
     }, 900);
     return () => clearTimeout(timer);
-  }, [pendingKey, inputsDisabled, panelOk]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [attemptKey, pending, inputsDisabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const appliesTo = plan.filter((p) => APPLIES_STATES.has(p.state));
-  const postedWaiting = plan.filter((p) => p.state === "posted_waiting");
+  const liveMarks = parsed.marks ?? applied.marks;
+  const liveTotal = liveMarks ? teamMarksTotal(liveMarks) : null;
+  // A member posted with an earlier team score keeps it live until they are
+  // un-posted and posted again, just like one posted before any team score.
+  const isStale = (p: TeamMemberPlan) =>
+    p.state === "posted_applied" && liveTotal != null && p.liveTeamTotal != null && p.liveTeamTotal !== liveTotal;
+  const needsOverride = plan.filter((p) => p.state === "posted_waiting" || isStale(p));
   const missingNames = judgeIds
     .filter((id) => (inputs[id] ?? "").trim() === "")
     .map((id) => judgeNames.get(id) ?? "a judge");
   const guestNames = judges.filter((j) => guestJudgeIds.has(j.id)).map((j) => judgeNames.get(j.id) ?? j.name);
   const total = parsed.marks ? teamMarksTotal(parsed.marks) : null;
-  const liveMarks = parsed.marks ?? applied.marks;
 
   let status: { tone: "muted" | "ok" | "danger" | "warn"; text: string } | null = null;
   if (parsed.invalidJudgeIds.length > 0) {
@@ -165,7 +181,7 @@ function TeamBlock({
           ? `0 of ${judgeIds.length} judges in. Waiting for the team dance.`
           : `${parsed.filled} of ${judgeIds.length} judges in. Nothing reaches the couples until ${missingNames.join(" and ")}'s score is in, so each couple's own dance can still be posted.`,
     };
-  } else if (applying || pendingMarks) {
+  } else if (applying || pending) {
     status = { tone: "muted", text: `All ${judgeIds.length} judges in. Saving to ${appliesTo.length} couples…` };
   } else if (parsed.marks) {
     status = {
@@ -189,6 +205,11 @@ function TeamBlock({
           </p>
         )}
         {team.hostName && <p className="text-xs text-muted-foreground">Host {team.hostName} dances, not scored</p>}
+        {team.inferred && (
+          <p className="text-xs text-muted-foreground">
+            Read from the couples&apos; second slot: everyone whose Freestyle shares this song.
+          </p>
+        )}
       </div>
 
       {panelOk ? (
@@ -280,7 +301,7 @@ function TeamBlock({
           <span className="normal-case tracking-normal">Saved as each couple&apos;s team dance</span>
         </div>
         {plan.map((p) => {
-          const state = memberStateLabel(p);
+          const state = isStale(p) ? { label: "Posted · Old Team Score", tone: "warn" as const } : memberStateLabel(p);
           return (
             <div key={p.coupleId} className="flex min-h-10 items-center justify-between gap-2 border-b border-border px-2.5 py-1.5 text-sm last:border-b-0">
               <span className="flex flex-wrap items-center gap-1.5">
@@ -293,14 +314,23 @@ function TeamBlock({
         })}
       </div>
 
-      {postedWaiting.map((p) => (
+      {needsOverride.map((p) => (
         <div key={p.coupleId} className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
           {canOverride ? (
             <>
               <p className="text-danger-text">
-                {coupleName(p.coupleId)} were posted before the team was scored. A posted couple ignores new dances, so their
-                night is {view.individualTotals[p.coupleId] ?? 0}
-                {liveMarks ? `, not ${(view.individualTotals[p.coupleId] ?? 0) + teamMarksTotal(liveMarks)}` : ""}.
+                {isStale(p) ? (
+                  <>
+                    {coupleName(p.coupleId)} were posted with the team score at {p.liveTeamTotal}; the team is now {liveTotal}. A
+                    posted couple keeps the old marks until they are posted again.
+                  </>
+                ) : (
+                  <>
+                    {coupleName(p.coupleId)} were posted before the team was scored. A posted couple ignores new dances, so their
+                    night is {view.individualTotals[p.coupleId] ?? 0}
+                    {liveTotal != null ? `, not ${(view.individualTotals[p.coupleId] ?? 0) + liveTotal}` : ""}.
+                  </>
+                )}
               </p>
               <Button
                 size="sm"
@@ -324,7 +354,8 @@ function TeamBlock({
           ) : (
             <p className="text-danger-text">
               {coupleName(p.coupleId)} are already posted, so this team score can&apos;t reach them yet. It&apos;s saved
-              for the other couples. A site admin needs to un-post them to add it. Nothing for you to do.
+              for the other couples. A site admin needs to un-post them to {isStale(p) ? "update" : "add"} it. Nothing
+              for you to do.
             </p>
           )}
         </div>
@@ -340,6 +371,7 @@ export function TeamDancesCard({
   guestJudgeIds,
   coupleName,
   canSetup,
+  setupAvailable,
   canOverride,
   inputsDisabled,
   busy,
@@ -353,6 +385,9 @@ export function TeamDancesCard({
   guestJudgeIds: ReadonlySet<string>;
   coupleName: (coupleId: string) => ReactNode;
   canSetup: boolean;
+  // False until supabase/apply-team-dances.sql is applied: teams can only be
+  // inferred from the couples' rows, not named or given captains.
+  setupAvailable: boolean;
   canOverride: boolean;
   inputsDisabled: boolean;
   busy: boolean;
@@ -380,10 +415,14 @@ export function TeamDancesCard({
         </div>
         <CardDescription>
           {teams.length === 0
-            ? canSetup
-              ? "Set up each team's name, song and members, then type one set of judge marks per team."
-              : "No teams are set up yet. Ask a site admin to add them, or type the team's marks into each couple's second dance slot."
-            : "Type each team's scores once. They apply to every member who danced."}
+            ? setupAvailable
+              ? canSetup
+                ? "Set up each team's name, song and members, then type one set of judge marks per team."
+                : "No teams are set up yet. Ask a site admin to add them, or type the team's marks into each couple's second dance slot."
+              : "No teams found yet. Give each team's couples the same Freestyle and song in their second slot and they appear here; apply supabase/apply-team-dances.sql to set teams up by name instead."
+            : teams.some((t) => t.team.inferred)
+              ? `Type each team's scores once. They apply to every member who danced. Teams are read from the couples' second slot${setupAvailable ? "; Set Up Teams saves them by name" : ", so they are named after their song until supabase/apply-team-dances.sql is applied"}.`
+              : "Type each team's scores once. They apply to every member who danced."}
         </CardDescription>
       </CardHeader>
       {teams.length > 0 && (

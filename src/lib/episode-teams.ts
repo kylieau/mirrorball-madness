@@ -55,6 +55,7 @@ export async function loadEpisodeTeams(
       hostName: row.host_name,
       sortOrder: row.sort_order,
       memberCoupleIds: (membersByTeam.get(row.id) ?? []).sort(),
+      inferred: false,
     });
   }
   return { available: true, teamsByEpisode };

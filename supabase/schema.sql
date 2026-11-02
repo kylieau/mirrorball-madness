@@ -4211,7 +4211,6 @@ grant execute on function public.effective_grand_finale_deadline(uuid) to servic
 
 -- Team Dances: persisted team setup per episode plus an atomic team-score
 -- fan-out into members' drafts (supabase/apply-team-dances.sql).
-
 -- Data only: the default style for a team dance. dance_styles.name is unique
 -- but case-sensitive, so the existence check is case-insensitive.
 insert into public.dance_styles (name, category)
@@ -4267,6 +4266,15 @@ do $$ begin
       on public.episode_team_members for select to authenticated using (true);
   end if;
 end $$;
+
+-- The song half of a team dance's signature: case- and whitespace-insensitive,
+-- so a team saved as "Zoo" adopts a slot already typed as "zoo ".
+create or replace function public.team_song_key(p_song text)
+returns text language sql immutable set search_path = '' as $$
+  select lower(btrim(coalesce(p_song, '')));
+$$;
+revoke all on function public.team_song_key(text) from public, anon, authenticated;
+grant execute on function public.team_song_key(text) to service_role;
 
 -- A couple's dances as an order-independent value: style, song and every
 -- judge's mark. The draft and live copies must agree for a posted couple
@@ -4352,8 +4360,8 @@ begin
       continue;
     end if;
 
-    select count(*) filter (where d.dance_style_id = team.dance_style_id and d.song_title is not distinct from team.song_title),
-           count(*) filter (where not (d.dance_style_id = team.dance_style_id and d.song_title is not distinct from team.song_title))
+    select count(*) filter (where d.dance_style_id = team.dance_style_id and public.team_song_key(d.song_title) = public.team_song_key(team.song_title)),
+           count(*) filter (where not (d.dance_style_id = team.dance_style_id and public.team_song_key(d.song_title) = public.team_song_key(team.song_title)))
       into v_team_rows, v_other_rows
     from public.draft_dance_scores d where d.episode_id = ep.id and d.couple_id = member.id;
     if v_team_rows > 1 or (v_team_rows = 0 and v_other_rows <> 1) then
@@ -4367,8 +4375,9 @@ begin
     else
       select d.id into v_team_row from public.draft_dance_scores d
       where d.episode_id = ep.id and d.couple_id = member.id
-        and d.dance_style_id = team.dance_style_id and d.song_title is not distinct from team.song_title;
-      update public.draft_dance_scores set total_score = v_total, scaled_score = v_total / 4 * 3 where id = v_team_row;
+        and d.dance_style_id = team.dance_style_id and public.team_song_key(d.song_title) = public.team_song_key(team.song_title);
+      -- An adopted slot keeps its id and takes the team's exact song spelling.
+      update public.draft_dance_scores set total_score = v_total, scaled_score = v_total / 4 * 3, song_title = team.song_title where id = v_team_row;
       delete from public.draft_judge_scores where draft_dance_score_id = v_team_row;
     end if;
     insert into public.draft_judge_scores (draft_dance_score_id, judge_id, score)
@@ -4448,7 +4457,7 @@ begin
     if v_draft_open then
       with removed as (
         delete from public.draft_dance_scores d
-        where d.episode_id = ep.id and d.dance_style_id = existing.dance_style_id and d.song_title is not distinct from existing.song_title
+        where d.episode_id = ep.id and d.dance_style_id = existing.dance_style_id and public.team_song_key(d.song_title) = public.team_song_key(existing.song_title)
           and d.couple_id in (select couple_id from public.episode_team_members where team_id = existing.id)
         returning d.couple_id
       ) select coalesce(array_agg(distinct couple_id), '{}'::uuid[]) into v_deleted from removed;
@@ -4473,17 +4482,17 @@ begin
       with removed as (
         delete from public.draft_dance_scores d
         where d.episode_id = ep.id and d.couple_id = any(v_old_members) and not (d.couple_id = any(v_members))
-          and d.dance_style_id = existing.dance_style_id and d.song_title is not distinct from existing.song_title
+          and d.dance_style_id = existing.dance_style_id and public.team_song_key(d.song_title) = public.team_song_key(existing.song_title)
         returning d.couple_id
       ) select coalesce(array_agg(distinct couple_id), '{}'::uuid[]) into v_deleted from removed;
       if cardinality(v_deleted) > 0 then v_touched := true; end if;
       select v_posted || coalesce(array_agg(couple_id), '{}'::uuid[]) into v_posted from public.dance_scores
       where ep.results_published_at is null and episode_id = ep.id and couple_id = any(v_deleted);
-      if (existing.dance_style_id, existing.song_title) is distinct from (v_style, v_song) then
+      if (existing.dance_style_id, public.team_song_key(existing.song_title)) is distinct from (v_style, public.team_song_key(v_song)) then
         with renamed as (
           update public.draft_dance_scores d set dance_style_id = v_style, song_title = v_song
           where d.episode_id = ep.id and d.couple_id = any(v_kept)
-            and d.dance_style_id = existing.dance_style_id and d.song_title is not distinct from existing.song_title
+            and d.dance_style_id = existing.dance_style_id and public.team_song_key(d.song_title) = public.team_song_key(existing.song_title)
           returning d.couple_id
         ) select coalesce(array_agg(distinct couple_id), '{}'::uuid[]) into v_deleted from renamed;
         if cardinality(v_deleted) > 0 then v_touched := true; end if;
@@ -4530,7 +4539,7 @@ begin
       where js.draft_dance_score_id = (
         select d.id from public.draft_dance_scores d
         where d.episode_id = ep.id and d.couple_id = any(v_old_members) and not (d.couple_id = any(v_added))
-          and d.dance_style_id = v_style and d.song_title is not distinct from v_song
+          and d.dance_style_id = v_style and public.team_song_key(d.song_title) = public.team_song_key(v_song)
         order by d.couple_id limit 1);
       if v_marks is not null and jsonb_array_length(v_marks) = 4 then
         v_result := public.apply_team_dance(ep.id, p_actor_id, v_team_id, v_marks, v_added);
@@ -4552,17 +4561,19 @@ $$;
 revoke all on function public.save_episode_teams(uuid, uuid, jsonb) from public, anon, authenticated;
 grant execute on function public.save_episode_teams(uuid, uuid, jsonb) to service_role;
 
--- save_episode_draft, except that while the episode is unpublished an entry
--- for a couple whose scores are already live is skipped and reported instead
--- of re-copied from the live rows: the client learns the edit did not land,
--- and a team dance waiting in that couple's draft survives. Published
--- corrections pass every entry through unchanged.
+-- save_episode_draft, except that while the episode is unpublished a posted
+-- couple's draft dances are left exactly as they are instead of re-copied
+-- from the live rows (a team dance waiting in that draft survives). Their
+-- outcome and In Jeopardy still save, so Finish Week works after every
+-- couple is posted. An entry whose dances differ from the posted couple's
+-- draft is reported as skipped, so the client learns that edit did not land.
+-- Published corrections pass every entry through unchanged.
 create or replace function public.save_episode_draft_checked(p_input jsonb)
 returns jsonb language plpgsql security invoker set search_path = '' as $$
 declare
   ep public.episodes; actor public.profiles; entry jsonb; dance jsonb; js jsonb;
   couple uuid; draft_id uuid; total numeric; count_scores int; token uuid; base timestamptz;
-  v_acknowledged uuid[] := '{}'; v_skipped uuid[] := '{}';
+  v_acknowledged uuid[] := '{}'; v_skipped uuid[] := '{}'; v_incoming jsonb;
 begin
   select * into strict actor from public.profiles where id = (p_input->>'updatedBy')::uuid;
   if not (actor.is_super_admin or actor.can_propose_results) then raise exception 'Not authorized to enter results'; end if;
@@ -4582,21 +4593,32 @@ begin
     couple := (entry->>'coupleId')::uuid;
     if not exists (select 1 from public.couples where id = couple and season_id = ep.season_id) then raise exception 'Couple is not in this season'; end if;
     if ep.results_published_at is null and exists (select 1 from public.dance_scores where episode_id = ep.id and couple_id = couple) then
-      v_skipped := v_skipped || couple;
-      continue;
-    end if;
-    delete from public.draft_dance_scores where episode_id = ep.id and couple_id = couple;
-    for dance in select * from jsonb_array_elements(entry->'dances') loop
-      total := 0; count_scores := 0;
-      for js in select * from jsonb_array_elements(dance->'judgeScores') loop
-        if (js->>'score')::numeric not between 0 and 10 then raise exception 'Judge scores must be between 0 and 10'; end if;
-        total := total + (js->>'score')::numeric; count_scores := count_scores + 1;
+      select coalesce(jsonb_agg(sig order by sig::text), '[]'::jsonb) into v_incoming from (
+        select jsonb_build_array((d->>'danceStyleId')::uuid, coalesce(d->>'songTitle', ''),
+          (select coalesce(jsonb_agg(jsonb_build_array((j->>'judgeId')::uuid, (j->>'score')::numeric) order by (j->>'judgeId')::uuid), '[]'::jsonb)
+           from jsonb_array_elements(d->'judgeScores') j)) as sig
+        from jsonb_array_elements(coalesce(entry->'dances', '[]'::jsonb)) d
+      ) s;
+      if v_incoming is distinct from public.episode_couple_dance_signature(ep.id, couple, true) then
+        v_skipped := v_skipped || couple;
+      else
+        v_acknowledged := v_acknowledged || couple;
+      end if;
+    else
+      delete from public.draft_dance_scores where episode_id = ep.id and couple_id = couple;
+      for dance in select * from jsonb_array_elements(entry->'dances') loop
+        total := 0; count_scores := 0;
+        for js in select * from jsonb_array_elements(dance->'judgeScores') loop
+          if (js->>'score')::numeric not between 0 and 10 then raise exception 'Judge scores must be between 0 and 10'; end if;
+          total := total + (js->>'score')::numeric; count_scores := count_scores + 1;
+        end loop;
+        insert into public.draft_dance_scores (episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score)
+        values (ep.id, couple, (dance->>'danceStyleId')::uuid, dance->>'songTitle', total, case when count_scores = 0 then 0 else total / count_scores * 3 end) returning id into draft_id;
+        insert into public.draft_judge_scores (draft_dance_score_id, judge_id, score)
+        select draft_id, (j->>'judgeId')::uuid, (j->>'score')::numeric from jsonb_array_elements(dance->'judgeScores') j;
       end loop;
-      insert into public.draft_dance_scores (episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score)
-      values (ep.id, couple, (dance->>'danceStyleId')::uuid, dance->>'songTitle', total, case when count_scores = 0 then 0 else total / count_scores * 3 end) returning id into draft_id;
-      insert into public.draft_judge_scores (draft_dance_score_id, judge_id, score)
-      select draft_id, (j->>'judgeId')::uuid, (j->>'score')::numeric from jsonb_array_elements(dance->'judgeScores') j;
-    end loop;
+      v_acknowledged := v_acknowledged || couple;
+    end if;
     insert into public.draft_episode_results (episode_id, couple_id, outcome, saved_by_judges, had_immunity, bonus_points, bonus_note)
     values (ep.id, couple, entry->>'outcome', coalesce((entry->>'savedByJudges')::boolean, false), coalesce((entry->>'hadImmunity')::boolean, false), coalesce((entry->>'bonusPoints')::numeric, 0), entry->>'bonusNote')
     on conflict (episode_id, couple_id) do update set outcome = excluded.outcome, saved_by_judges = excluded.saved_by_judges, had_immunity = excluded.had_immunity, bonus_points = excluded.bonus_points, bonus_note = excluded.bonus_note;
@@ -4604,7 +4626,6 @@ begin
     if entry->>'outcome' = 'safe' and (p_input->'inJeopardyCoupleIds') ? couple::text then
       insert into public.draft_episode_in_jeopardy_couples (episode_id, couple_id) values (ep.id, couple);
     end if;
-    v_acknowledged := v_acknowledged || couple;
   end loop;
   return jsonb_build_object('acknowledged', to_jsonb(v_acknowledged), 'skippedPosted', to_jsonb(v_skipped));
 end;
