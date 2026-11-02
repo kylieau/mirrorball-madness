@@ -11,15 +11,15 @@ import {
   parseTeamMarks,
   sameTeamMarks,
   teamMarksTotal,
-  TEAM_DANCE_JUDGE_COUNT,
-  TEAM_DANCE_MAX_PER_JUDGE,
-  type EpisodeTeam,
+  DEFAULT_MARK_MAX,
+  SPECIAL_DANCE_MAX_JUDGES,
+  type SpecialDance,
   type TeamMark,
   type TeamMemberPlan,
 } from "@/lib/team-dances";
 
 export type TeamEntryView = {
-  team: EpisodeTeam;
+  team: SpecialDance;
   styleName: string;
   plan: TeamMemberPlan[];
   applied: { marks: TeamMark[] | null; mismatch: boolean };
@@ -103,7 +103,6 @@ export function TeamEntry({
   busy,
   onApply,
   onOverride,
-  onEditTeams,
 }: {
   view: TeamEntryView;
   judges: ScoringJudge[];
@@ -111,14 +110,12 @@ export function TeamEntry({
   guestJudgeIds: ReadonlySet<string>;
   coupleName: (coupleId: string) => ReactNode;
   canOverride: boolean;
-  // An inferred team is edited by changing the couples' own second slots;
-  // the entity model's saved teams use TeamEntityEntry instead.
+  // An inferred team is edited by changing the couples' own second slots.
   canSetup: boolean;
   inputsDisabled: boolean;
   busy: boolean;
   onApply: (teamId: string, marks: TeamMark[]) => Promise<ApplyOutcome>;
   onOverride: (teamId: string, coupleId: string, marks: TeamMark[]) => Promise<{ error: string | null }>;
-  onEditTeams: () => void;
 }) {
   const { team, plan, applied } = view;
   const judgeIds = judges.map((j) => j.id);
@@ -137,7 +134,7 @@ export function TeamEntry({
   }, [appliedKey, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const parsed = parseTeamMarks(inputs, judgeIds);
-  const panelOk = judges.length === TEAM_DANCE_JUDGE_COUNT;
+  const panelOk = judges.length === SPECIAL_DANCE_MAX_JUDGES;
   // Apply when the four marks change, and again when a member becomes
   // eligible later (their own dance was saved after the team was scored).
   // Each distinct marks + members key is attempted once, so a server
@@ -184,7 +181,7 @@ export function TeamEntry({
   const typedTotal = judgeIds.reduce((sum, id) => {
     const raw = (inputs[id] ?? "").trim();
     const n = Number(raw);
-    return raw !== "" && Number.isFinite(n) && n >= 0 && n <= TEAM_DANCE_MAX_PER_JUDGE ? sum + n : sum;
+    return raw !== "" && Number.isFinite(n) && n >= 0 && n <= DEFAULT_MARK_MAX ? sum + n : sum;
   }, 0);
 
   let status: { tone: Tone; text: string } | null = null;
@@ -192,7 +189,7 @@ export function TeamEntry({
     const judgeId = parsed.invalidJudgeIds[0];
     status = {
       tone: "danger",
-      text: `Judge scores must be between 0 and ${TEAM_DANCE_MAX_PER_JUDGE}. ${judgeNames.get(judgeId) ?? "That"}'s ${inputs[judgeId]?.trim()} isn't saved.`,
+      text: `Judge scores must be between 0 and ${DEFAULT_MARK_MAX}. ${judgeNames.get(judgeId) ?? "That"}'s ${inputs[judgeId]?.trim()} isn't saved.`,
     };
   } else if (parsed.filled < judgeIds.length) {
     status = {
@@ -217,11 +214,7 @@ export function TeamEntry({
         <p className="text-sm font-semibold">
           <strong>{team.name}</strong> <span className="font-normal text-muted-foreground">· Team Dance</span>
         </p>
-        {canSetup && (
-          <Button size="xs" variant="ghost" onClick={onEditTeams} disabled={busy}>
-            Edit Teams
-          </Button>
-        )}
+        {canSetup && <span className="text-[10px] text-muted-foreground">Edit each couple&apos;s second slot</span>}
       </div>
       <p className="mt-0.5 text-xs text-muted-foreground">
         {plan.map((p, i) => (
@@ -269,12 +262,12 @@ export function TeamEntry({
                 <Label className="text-[10px] text-muted-foreground">Team</Label>
                 <p className="flex h-8 items-center px-1 text-sm font-medium">
                   {typedTotal}
-                  <span className="ml-0.5 text-xs font-normal text-muted-foreground">/{judgeIds.length * TEAM_DANCE_MAX_PER_JUDGE}</span>
+                  <span className="ml-0.5 text-xs font-normal text-muted-foreground">/{judgeIds.length * DEFAULT_MARK_MAX}</span>
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-x-3 text-[10px] text-muted-foreground">
-              <span>0 to {TEAM_DANCE_MAX_PER_JUDGE} per judge · copied to every member&apos;s Dance 2</span>
+              <span>0 to {DEFAULT_MARK_MAX} per judge · copied to every member&apos;s Dance 2</span>
               <span>
                 {guestNames.length > 0 ? `${guestNames.join(" and ")} ${guestNames.length === 1 ? "is" : "are"} tonight's guest · ` : ""}
                 {parsed.filled} of {judgeIds.length} in
@@ -284,7 +277,7 @@ export function TeamEntry({
         </fieldset>
       ) : (
         <div role="alert" className="mt-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-text">
-          Team Dances need exactly {TEAM_DANCE_JUDGE_COUNT} judges and this night has {judges.length}.{" "}
+          Team Dances need exactly {SPECIAL_DANCE_MAX_JUDGES} judges and this night has {judges.length}.{" "}
           <Link href="/admin/schedule" className="font-semibold underline underline-offset-2">
             Set the guest judge on Schedule
           </Link>{" "}

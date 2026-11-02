@@ -31,10 +31,6 @@ import { exhibitionEpisodes, groupEpisodesByWeek } from "@/lib/competition-week"
 import { ChevronRightIcon, PlusIcon, XIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { DEFAULT_EPISODE_DURATION_MINUTES } from "@/lib/episode-banner";
-import { saveEpisodeTeamsAction } from "@/app/admin/results/actions";
-import { TeamEditor, teamDraftsFromTeams, teamDraftsToSetup, type TeamDraft } from "@/components/team-editor";
-import { validateTeamSetup, type EpisodeTeam } from "@/lib/team-dances";
-import { buildCoupleDisplayNames } from "@/lib/couple-display";
 
 type Episode = {
   id: string;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   appliedTeamMarks,
   automaticSpecialDanceName,
+  oxfordJoin,
   buildNightSummary,
   eligibleTeamMembers,
   inferTeamsFromRows,
@@ -340,6 +341,15 @@ describe("validateSpecialDanceSetup", () => {
     expect(validateSpecialDanceSetup(setup({ markMax: 10.5 }), others)).toMatch(/Out of/);
     expect(validateSpecialDanceSetup(setup({ panelJudgeIds: ["carrie"] }), others)).toMatch(/2 to 4 judges/);
     expect(validateSpecialDanceSetup(setup({ scoringMode: "points", markMax: 0, panelJudgeIds: ["carrie"] }), others)).toBeNull();
+  });
+});
+
+describe("oxfordJoin", () => {
+  it("uses an Oxford comma", () => {
+    expect(oxfordJoin([])).toBe("");
+    expect(oxfordJoin(["Tatyana"])).toBe("Tatyana");
+    expect(oxfordJoin(["Tatyana", "Jan"])).toBe("Tatyana and Jan");
+    expect(oxfordJoin(["Tatyana", "Maura", "Amber", "Julia"])).toBe("Tatyana, Maura, Amber, and Julia");
   });
 });
 
