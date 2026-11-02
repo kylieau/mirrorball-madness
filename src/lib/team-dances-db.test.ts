@@ -234,7 +234,13 @@ describe("team dances in PostgreSQL", () => {
     await reveal(julia); // Julia is posted with both dances.
     expect(await liveRows(julia)).toHaveLength(2);
     expect(await liveRows(amber)).toHaveLength(1);
-    await expect(finishWeek()).rejects.toThrow(/Posted scores for Celebrity 2 differ from their draft/);
+    const data = await snapshot();
+    // The client planner refuses first; the RPC refuses even a plan built around it.
+    expect(() => buildPublicationPlan(data, episode)).toThrow(/Posted scores for 1 couple differ from their draft/);
+    const blind = { ...data, draftDances: data.draftDances.filter((d) => !(d.couple_id === amber && d.dance_style_id === freestyle)) };
+    await expect(
+      db.query("select public.commit_episode_publication($1, $2, $3, $4)", [episode, admin, JSON.stringify(data), JSON.stringify(buildPublicationPlan(blind, episode))])
+    ).rejects.toThrow(/Posted scores for Celebrity 2 differ from their draft/);
     expect((await snapshot()).episodes[0].results_published_at).toBeNull();
     // The override: un-post, then post again from the draft that already holds the team row.
     await reveal(amber, true);
@@ -246,8 +252,8 @@ describe("team dances in PostgreSQL", () => {
     expect(published.episodes[0].results_published_at).not.toBeNull();
     expect(published.dances.filter((d) => d.couple_id === amber).map((d) => Number(d.total_score)).sort()).toEqual([33, 36]);
     const scores = (await db.query<{ manager_id: string; roster_points: number }>("select manager_id, roster_points::float as roster_points from public.weekly_manager_scores order by manager_id")).rows;
-    // Judges points still pay per dance here; the per-night scaling lands on its own branch.
-    expect(scores.find((s) => s.manager_id === admin)?.roster_points).toBe(24.75 + 27);
+    // Dance Card pays the night once: 33/40 + 36/40 = 69/80 → 25.875 on the 30-point basis.
+    expect(scores.find((s) => s.manager_id === admin)?.roster_points).toBe(25.88);
   });
 
   it("passes a team score through to every member of a published correction", async () => {

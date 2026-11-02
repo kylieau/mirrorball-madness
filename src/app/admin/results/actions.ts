@@ -17,11 +17,21 @@ import {
   startCorrection,
   applySeasonSettings,
   type SaveDraftResultsInput,
+  type SaveDraftResultsOutcome,
   type SeasonSettingsInput,
 } from "@/lib/results-draft";
 import { publishEpisodeAtomically } from "@/lib/episode-publication";
 import { revealCouple, undoReveal } from "@/lib/results-reveal";
 import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
+import {
+  applyTeamDance,
+  overridePostedTeamMember,
+  saveEpisodeTeams,
+  type ApplyTeamDanceInput,
+  type ApplyTeamDanceResult,
+  type SaveTeamsResult,
+} from "@/lib/episode-teams";
+import type { TeamMark, TeamSetupInput } from "@/lib/team-dances";
 
 // Both checks return userId alongside error so callers that need to stamp
 // updatedBy/createdBy/publishedBy don't need a second auth round trip.
@@ -77,12 +87,57 @@ export async function scheduleEpisode(
 
 export async function saveEpisodeDraft(
   input: Omit<SaveDraftResultsInput, "updatedBy">
-): Promise<{ error: string | null }> {
+): Promise<SaveDraftResultsOutcome> {
   const access = await requireProposeAccess();
-  if (access.error) return { error: access.error };
+  if (access.error) return { error: access.error, acknowledgedIds: [], skippedPostedIds: [] };
 
   const result = await saveDraftResults(createAdminClient(), { ...input, updatedBy: access.userId });
   if (!result.error) revalidatePath("/admin/results", "layout");
+  return result;
+}
+
+// Team setup is season-wide structural config, like the schedule: admin only.
+export async function saveEpisodeTeamsAction(input: {
+  episodeId: string;
+  teams: TeamSetupInput[];
+}): Promise<{ error: string | null; result?: SaveTeamsResult }> {
+  const access = await requireAdminAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await saveEpisodeTeams(createAdminClient(), input, access.userId);
+  if (!result.error) {
+    revalidatePath("/admin/results", "layout");
+    revalidatePath("/admin/schedule");
+  }
+  return result;
+}
+
+// Entering the team's marks is draft entry (propose tier); the RPC writes
+// drafts only and reports posted members rather than touching live rows.
+export async function applyTeamDanceAction(
+  input: ApplyTeamDanceInput
+): Promise<{ error: string | null; result?: ApplyTeamDanceResult }> {
+  const access = await requireProposeAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await applyTeamDance(createAdminClient(), input, access.userId);
+  if (!result.error) revalidatePath("/admin/results", "layout");
+  return result;
+}
+
+// Un-post, apply, post again: each step recomputes every league, so only a
+// site admin (the reveal tier) may run it.
+export async function overridePostedTeamMemberAction(input: {
+  episodeId: string;
+  teamId: string;
+  coupleId: string;
+  marks: TeamMark[];
+}): Promise<{ error: string | null }> {
+  const access = await requireAdminAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await overridePostedTeamMember(createAdminClient(), input, access.userId);
+  revalidatePath("/admin/results", "layout");
   return result;
 }
 

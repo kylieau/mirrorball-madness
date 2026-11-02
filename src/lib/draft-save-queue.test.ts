@@ -87,6 +87,38 @@ describe("DraftSaveQueue", () => {
     expect(queue.dirtyIds()).toEqual([]);
   });
 
+  it("clears only acknowledged ids and parks a posted couple's refused edit", async () => {
+    const queue = new DraftSaveQueue();
+    queue.markDirty("amber");
+    queue.markDirty("julia");
+    const save = vi.fn(async (ids: string[]) => ({
+      error: null,
+      acknowledgedIds: ids.filter((id) => id !== "amber"),
+      skippedIds: ids.filter((id) => id === "amber"),
+    }));
+    await expect(queue.flush((ids) => ids, save)).resolves.toEqual({ error: null, skippedIds: ["amber"] });
+    expect(save).toHaveBeenCalledTimes(1); // A refused edit is not re-sent in a loop.
+    expect(queue.dirtyIds()).toEqual([]);
+    expect(queue.parkedIds()).toEqual(["amber"]);
+    // Nothing new to send: the parked edit stays parked without a request.
+    await expect(queue.flush((ids) => ids, save)).resolves.toEqual({ error: null });
+    expect(save).toHaveBeenCalledTimes(1);
+    // Editing the couple again makes the edit sendable once more.
+    queue.markDirty("amber");
+    expect(queue.dirtyIds()).toEqual(["amber"]);
+    save.mockResolvedValueOnce({ error: null, acknowledgedIds: ["amber"], skippedIds: [] });
+    await expect(queue.flush((ids) => ids, save)).resolves.toEqual({ error: null });
+    expect(queue.parkedIds()).toEqual([]);
+    expect(queue.dirtyIds()).toEqual([]);
+  });
+
+  it("treats a save without acknowledgements as having written every sent id", async () => {
+    const queue = new DraftSaveQueue();
+    queue.markDirty("couple");
+    await expect(queue.flush((ids) => ids, async () => ({ error: null }))).resolves.toEqual({ error: null });
+    expect(queue.dirtyIds()).toEqual([]);
+  });
+
   it("retains edits when a request throws", async () => {
     const queue = new DraftSaveQueue();
     queue.markDirty("couple");
