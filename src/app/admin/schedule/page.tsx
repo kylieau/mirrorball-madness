@@ -41,7 +41,6 @@ export default async function SchedulePage() {
         roundTypesByEpisode={data.roundTypesByEpisode}
         judges={data.judges}
         guestJudgesByEpisode={data.guestJudgesByEpisode}
-        danceStyles={data.danceStyles}
       />
     </div>
   );

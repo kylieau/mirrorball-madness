@@ -196,7 +196,7 @@ Shipped in `b4254a8`; the user checked it on their phone. Still open:
 
 - **Judges' Save Active** now lives on the Schedule episode form (`episodes.judges_save_available`, no SQL needed) and Enter Results reads it; the switch is gone from Enter Results. Check it saves and that the Judges' Save column appears in Finish Week for that episode.
 - **Guest judges + scaled judges points** (`e554bd2`, `e506707`, Joe Buck on E06): **stored values verified live 2026-10-14** — all 11 published E06 `dance_scores` rows have 4 judge scores and `scaled_score` = total × 3/4 (e.g. 36 → 27). Still unchecked: Score History showing `Jdg 36→27` and roster/standings points paying on the scaled value in a real league.
-- **Team Dance:** the Score a Team Dance sheet is removed. A team-dance night is now marked by its Round Type on the Schedule form, and each couple's dance is entered on its own. Check this covers how team dances are actually entered.
+- **Team Dance / Special Dances:** the Score a Team Dance sheet is gone. Week 8 (Disney Night) already uses the team-entity path (`apply-team-dance-entity.sql` and `cleanup-disney-night-slot2.sql` are live). `supabase/apply-special-dances.sql` is written and PGlite-tested but **not applied live**; until it is, Enter Results stays on the entity path (existing teams are scoreable, no inline Add / Edit Details). After apply: Special Dances picker group, inline setup, Points mode, and Fantasy Bonus (pts). Check a real night after the SQL runs. Do not rerun the Disney Night cleanup.
 
 ## Spoiler-Free strip: extended past Home — unverified in a browser
 

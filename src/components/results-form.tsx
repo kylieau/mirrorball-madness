@@ -1263,7 +1263,7 @@ export function ResultsForm({
       const specials = specialDancesByCouple.get(c.id) ?? [];
       const own: NightSummaryDance[] = (rows[c.id] ?? emptyRow()).dances
         .filter((d) => d.danceStyleId)
-        .flatMap((d) => {
+        .flatMap((d): NightSummaryDance[] => {
           if (!entity && team && isTeamDanceRow(team, d)) {
             const marks = Object.values(d.scores).filter((v) => v.trim() !== "").map(Number).filter(Number.isFinite);
             return marks.length > 0 ? [{ marks, label: team.name }] : [];
@@ -1275,7 +1275,7 @@ export function ResultsForm({
             },
           ];
         });
-      const extra: NightSummaryDance[] = specials.flatMap((view) => {
+      const extra: NightSummaryDance[] = specials.flatMap((view): NightSummaryDance[] => {
         if (!view.eligible.includes(c.id)) return [];
         if (view.dance.scoringMode === "points") {
           const points = view.scores.find((s) => s.coupleId === c.id)?.points;
@@ -2135,7 +2135,7 @@ export function ResultsForm({
                   {renderCouplePicker(inProgressCouples, byCoupleSelectedId, setByCoupleSelectedId, published ? [] : openPickerTeams, { allowAdd: !published && special && canPublish })}
                   {isTeamNight && pickerTeams.length === 0 && !special && (
                     <p className="text-xs text-muted-foreground">
-                      No teams yet. Give each team's couples the same Freestyle and song in their second slot and the team appears here as its own entry.
+                      No teams yet. Give each team&apos;s couples the same Freestyle and song in their second slot and the team appears here as its own entry.
                     </p>
                   )}
                 </>
