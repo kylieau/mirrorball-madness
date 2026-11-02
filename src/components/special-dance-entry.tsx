@@ -867,20 +867,20 @@ export function SpecialDanceEntry({
         panelOk ? (
           <fieldset disabled={inputsDisabled || busy} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
             <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-1.5">
-              <div className="flex flex-wrap items-end gap-1.5">
+              <div className="grid grid-cols-2 gap-2 min-[420px]:flex min-[420px]:flex-wrap min-[420px]:items-end">
                 {nightPanelJudges.map((j) => {
                   const skipped = !panelIds.includes(j.id);
                   const fieldError = skipped ? null : markInputError(markInputs[j.id] ?? "", markMax);
                   return (
-                    <div key={j.id} className="flex min-w-16 flex-col gap-0.5">
-                      <Label className={`text-[10px] ${guestJudgeIds.has(j.id) ? "text-accent" : "text-muted-foreground"}`}>
+                    <div key={j.id} className="flex min-w-0 flex-col gap-1 min-[420px]:min-w-28">
+                      <Label className={`text-xs ${guestJudgeIds.has(j.id) ? "text-accent" : "text-muted-foreground"}`}>
                         {judgeNames.get(j.id) ?? j.name}
                       </Label>
                       <Input
                         inputMode="decimal"
                         aria-label={`${judgeNames.get(j.id) ?? j.name} mark for ${displayName}`}
                         aria-invalid={fieldError != null}
-                        className={`h-8 w-12 px-1.5 text-center text-xs ${fieldError ? "border-destructive" : ""}`}
+                        className={`h-11 w-full min-w-14 px-2 text-center text-sm min-[420px]:w-16 ${fieldError ? "border-destructive" : ""}`}
                         placeholder="—"
                         value={skipped ? "" : (markInputs[j.id] ?? "")}
                         disabled={skipped || posted}
@@ -890,9 +890,8 @@ export function SpecialDanceEntry({
                           setMarkInputs((prev) => ({ ...prev, [j.id]: e.target.value }));
                         }}
                       />
-                      <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <label className="flex min-h-11 items-center gap-2 text-xs text-muted-foreground">
                         <Switch
-                          size="sm"
                           checked={skipped}
                           disabled={inputsDisabled || busy || posted || savingPanel}
                           onCheckedChange={(checked) => void handleDidntJudge(j.id, checked)}
@@ -901,18 +900,18 @@ export function SpecialDanceEntry({
                         Didn&apos;t Judge
                       </label>
                       {fieldError && (
-                        <p role="alert" className="max-w-28 text-[10px] leading-tight text-danger-text">
+                        <p role="alert" className="text-xs leading-snug text-danger-text">
                           {fieldError}
                         </p>
                       )}
                     </div>
                   );
                 })}
-                <div className="flex flex-col gap-0.5">
-                  <Label className="text-[10px] text-muted-foreground">Total</Label>
-                  <p className="flex h-8 items-center px-1 text-sm font-medium">
+                <div className="col-span-2 flex flex-col gap-1 min-[420px]:col-span-1">
+                  <Label className="text-xs text-muted-foreground">Total</Label>
+                  <p className="flex h-11 items-center px-1 text-base font-medium">
                     {typedTotal}
-                    <span className="ml-0.5 text-xs font-normal text-muted-foreground">/{maxPossible}</span>
+                    <span className="ml-0.5 text-sm font-normal text-muted-foreground">/{maxPossible}</span>
                   </p>
                 </div>
               </div>

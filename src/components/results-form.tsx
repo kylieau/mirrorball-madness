@@ -1838,7 +1838,16 @@ export function ResultsForm({
     return (
       <tr key={c.id} className="border-t border-border">
         <td className="sticky left-0 z-10 bg-card py-1 pr-2 font-medium">
-          <CoupleName {...coupleParts(c)} />
+          <div className="flex flex-col items-start gap-1">
+            <CoupleName {...coupleParts(c)} />
+            <div className="min-[480px]:hidden">
+              <BonusDisclosure
+                row={row}
+                onChange={(patch) => updateRow(c.id, patch)}
+                bonusRoundPoints={(specialDancesByCouple.get(c.id) ?? []).some((v) => v.dance.scoringMode === "points" && v.scores.some((s) => s.coupleId === c.id && s.points != null))}
+              />
+            </div>
+          </div>
         </td>
         <td className="px-1 py-1">
           <Select
@@ -1885,7 +1894,7 @@ export function ResultsForm({
             onChange={(e) => updateRow(c.id, { hadImmunity: e.target.checked })}
           />
         </td>
-                        <td className="px-1">
+        <td className="hidden min-w-[10rem] px-1 min-[480px]:table-cell">
           <BonusDisclosure
             row={row}
             onChange={(patch) => updateRow(c.id, patch)}
@@ -2193,7 +2202,7 @@ export function ResultsForm({
                               <th className="px-2 text-center font-medium">Judges&apos; Save</th>
                             )}
                             <th className="px-2 text-center font-medium">Immunity</th>
-                            <th className="px-1 font-medium">Fantasy Bonus (pts)</th>
+                            <th className="hidden min-w-[10rem] px-1 font-medium whitespace-nowrap min-[480px]:table-cell">Fantasy Bonus (pts)</th>
                           </tr>
                         </thead>
                         <tbody>{episodeCouples.map((c) => renderOutcomeRow(c))}</tbody>
@@ -2469,7 +2478,7 @@ function BonusDisclosure({
 
   if (!open) {
     return (
-      <Button size="xs" variant="ghost" onClick={() => setOpen(true)}>
+      <Button size="xs" variant="ghost" className="whitespace-nowrap" onClick={() => setOpen(true)}>
         + Fantasy Bonus
       </Button>
     );
