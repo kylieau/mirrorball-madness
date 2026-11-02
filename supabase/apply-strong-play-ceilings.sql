@@ -1,3 +1,14 @@
+-- HISTORICAL. Applied once (2026-10). DO NOT RERUN.
+--
+-- The recompute below (_sp_recompute_league_week) adds every dance row's
+-- total_score per couple per week, which predates two rules the app now
+-- enforces in src/lib/scoring.ts: Dance Card pays on scaled_score (the
+-- 30-point basis), and pays a couple once per night — all marks received
+-- over all marks possible (collapseToNights) — rather than once per dance.
+-- Rerunning it would overwrite stored weekly_manager_scores with the old
+-- per-dance raw sum (double pay on any multi-dance night) and reset point
+-- budgets. Recompute through the app's publish/correct path instead.
+--
 -- Strong-play ceiling recalibration.
 --
 -- Module weights are shares of a strong-play season ceiling, not Monte Carlo
