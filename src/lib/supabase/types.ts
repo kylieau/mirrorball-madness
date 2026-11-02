@@ -224,6 +224,7 @@ export type Database = {
           id: string
           scaled_score: number
           song_title: string | null
+          team_id: string | null
           total_score: number
         }
         Insert: {
@@ -234,6 +235,7 @@ export type Database = {
           id?: string
           scaled_score?: number
           song_title?: string | null
+          team_id?: string | null
           total_score: number
         }
         Update: {
@@ -244,9 +246,17 @@ export type Database = {
           id?: string
           scaled_score?: number
           song_title?: string | null
+          team_id?: string | null
           total_score?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "dance_scores_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "episode_teams"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "dance_scores_couple_id_fkey"
             columns: ["couple_id"]
@@ -968,6 +978,45 @@ export type Database = {
           },
         ]
       }
+      episode_team_marks: {
+        Row: {
+          judge_id: string
+          score: number
+          team_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          judge_id: string
+          score: number
+          team_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          judge_id?: string
+          score?: number
+          team_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_team_marks_judge_id_fkey"
+            columns: ["judge_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_team_marks_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "episode_teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       episode_teams: {
         Row: {
           captain_couple_id: string | null
@@ -977,6 +1026,8 @@ export type Database = {
           host_name: string | null
           id: string
           name: string
+          posted_at: string | null
+          posted_by: string | null
           song_source: string | null
           song_title: string | null
           sort_order: number
@@ -990,6 +1041,8 @@ export type Database = {
           host_name?: string | null
           id?: string
           name: string
+          posted_at?: string | null
+          posted_by?: string | null
           song_source?: string | null
           song_title?: string | null
           sort_order?: number
@@ -1003,6 +1056,8 @@ export type Database = {
           host_name?: string | null
           id?: string
           name?: string
+          posted_at?: string | null
+          posted_by?: string | null
           song_source?: string | null
           song_title?: string | null
           sort_order?: number
@@ -1954,16 +2009,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      apply_team_dance: {
-        Args: {
-          p_actor_id: string
-          p_couple_ids?: string[]
-          p_episode_id: string
-          p_marks: Json
-          p_team_id: string
-        }
-        Returns: Json
-      }
       assert_episode_draft_actor: {
         Args: { p_actor_id: string; p_episode_id: string }
         Returns: undefined
@@ -1975,6 +2020,17 @@ export type Database = {
       }
       close_grand_finale_late: {
         Args: { p_league_id: string; p_manager_id: string }
+        Returns: undefined
+      }
+      commit_team_reveal: {
+        Args: {
+          p_actor_id: string
+          p_episode_id: string
+          p_plan: Json
+          p_snapshot: Json
+          p_team_id: string
+          p_undo: boolean
+        }
         Returns: undefined
       }
       commit_episode_publication: {
@@ -2317,6 +2373,18 @@ export type Database = {
       save_episode_teams: {
         Args: { p_actor_id: string; p_episode_id: string; p_teams: Json }
         Returns: Json
+      }
+      save_team_marks: {
+        Args: { p_actor_id: string; p_episode_id: string; p_marks: Json; p_team_id: string }
+        Returns: undefined
+      }
+      team_eligible_members: {
+        Args: { p_episode_id: string; p_team_id: string }
+        Returns: string[]
+      }
+      materialize_team_scores: {
+        Args: { p_episode_id: string; p_team_id: string }
+        Returns: undefined
       }
       seed_episode_correction: {
         Args: { p_episode_id: string; p_started_by: string }
