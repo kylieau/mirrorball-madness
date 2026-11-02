@@ -31,6 +31,9 @@ import { exhibitionEpisodes, groupEpisodesByWeek } from "@/lib/competition-week"
 import { ChevronRightIcon, PlusIcon, XIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { DEFAULT_EPISODE_DURATION_MINUTES } from "@/lib/episode-banner";
+import { saveEpisodeTeamsAction } from "@/app/admin/results/actions";
+import { TeamEditor, teamDraftsFromTeams, teamDraftsToSetup, type TeamDraft } from "@/components/team-editor";
+import { validateTeamSetup, type EpisodeTeam } from "@/lib/team-dances";
 
 type Episode = {
   id: string;
@@ -190,6 +193,9 @@ export function ScheduleManager({
   roundTypesByEpisode,
   judges,
   guestJudgesByEpisode,
+  danceStyles,
+  teamsAvailable,
+  teamsByEpisode,
 }: {
   // The schedule is readable by anyone signed in, but scheduling episodes is
   // season-wide structural config — admin only.
@@ -205,6 +211,11 @@ export function ScheduleManager({
   roundTypesByEpisode: Record<string, string[]>;
   judges: Judge[];
   guestJudgesByEpisode: Record<string, string[]>;
+  danceStyles: { id: string; name: string }[];
+  // False until supabase/apply-team-dances.sql is applied; the Teams section
+  // then explains instead of offering fields that cannot save.
+  teamsAvailable: boolean;
+  teamsByEpisode: Record<string, EpisodeTeam[]>;
 }) {
   const sortedEpisodes = [...episodes].sort(
     (a, b) => a.episode_number - b.episode_number || a.airs_at.localeCompare(b.airs_at)
@@ -243,6 +254,16 @@ export function ScheduleManager({
   const [guestJudgeNames, setGuestJudgeNames] = useState<string[]>([]);
   const [newGuestName, setNewGuestName] = useState("");
   const suggestedGuestNames = pastGuestNames.filter((name) => !guestJudgeNames.includes(name));
+  // Team setup (Option A) edits alongside the episode and saves through its
+  // own admin action after the episode, so Schedule keeps saving even when
+  // the team tables are missing.
+  const [teamDrafts, setTeamDrafts] = useState<TeamDraft[]>([]);
+  const [savedTeamDrafts, setSavedTeamDrafts] = useState<TeamDraft[]>([]);
+  const teamDanceRoundTypeId = roundTypes.find((rt) => rt.name === "Team Dance")?.id ?? null;
+  const freestyleStyleId =
+    danceStyles.find((s) => s.name.trim().toLowerCase() === "freestyle")?.id ?? danceStyles[0]?.id ?? "";
+  const showTeamsSection = teamDanceRoundTypeId != null && roundTypeIds.has(teamDanceRoundTypeId);
+  const teamsDirty = JSON.stringify(teamDraftsToSetup(teamDrafts)) !== JSON.stringify(teamDraftsToSetup(savedTeamDrafts));
 
   const parsedWeekNumber = competitionWeek.trim() === "" ? null : Number(competitionWeek);
   const assignedWeek =
@@ -319,6 +340,9 @@ export function ScheduleManager({
     setRoundTypeIds(new Set(roundTypes.filter((rt) => assignedNames.has(rt.name)).map((rt) => rt.id)));
     setGuestJudgeNames(guestNamesFor(e.id));
     setNewGuestName("");
+    const drafts = teamDraftsFromTeams(teamsByEpisode[e.id] ?? []);
+    setTeamDrafts(drafts);
+    setSavedTeamDrafts(drafts);
     setSheetOpen(true);
   }
 
@@ -342,6 +366,8 @@ export function ScheduleManager({
     setRoundTypeIds(new Set());
     setGuestJudgeNames([]);
     setNewGuestName("");
+    setTeamDrafts([]);
+    setSavedTeamDrafts([]);
   }
 
   function addGuestJudge(rawName: string) {
@@ -396,6 +422,15 @@ export function ScheduleManager({
       return;
     }
 
+    const teams = teamDraftsToSetup(teamDrafts);
+    if (showTeamsSection && teamsAvailable && editingId && teamsDirty) {
+      const invalid = validateTeamSetup(teams);
+      if (invalid) {
+        setError(invalid);
+        return;
+      }
+    }
+
     setSubmitting(true);
     // Sending every selectable couple back as "participants" is
     // functionally identical to sending none (resolveEpisodeCoupleIds
@@ -420,10 +455,19 @@ export function ScheduleManager({
     });
     if (result.error) {
       setError(result.error);
-    } else {
-      resetForm();
-      setSheetOpen(false);
+      setSubmitting(false);
+      return;
     }
+    if (showTeamsSection && teamsAvailable && editingId && teamsDirty) {
+      const teamsResult = await saveEpisodeTeamsAction({ episodeId: editingId, teams });
+      if (teamsResult.error) {
+        setError(`The episode was saved, but the teams were not: ${teamsResult.error}`);
+        setSubmitting(false);
+        return;
+      }
+    }
+    resetForm();
+    setSheetOpen(false);
     setSubmitting(false);
   }
 
@@ -720,6 +764,41 @@ export function ScheduleManager({
                 )}
               </div>
             </div>
+            {showTeamsSection && (
+              <div className="flex flex-col gap-2 rounded-xl border border-accent/30 bg-muted/20 p-3">
+                <div className="flex items-center justify-between">
+                  <Label>Teams</Label>
+                  {teamDrafts.length > 0 && (
+                    <Badge variant="secondary">
+                      {teamDrafts.length} {teamDrafts.length === 1 ? "Team" : "Teams"}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Shows when Team Dance is ticked. Enter Results gets one score row per team and applies it to every
+                  member who danced. Nothing here writes scores, so posting a couple&apos;s own dance is never blocked.
+                </p>
+                {!teamsAvailable ? (
+                  <p className="text-sm text-muted-foreground">
+                    Team setup needs the database update (supabase/apply-team-dances.sql). Until it is applied, type
+                    the team&apos;s marks into each couple&apos;s second dance slot on Enter Results.
+                  </p>
+                ) : !editingId ? (
+                  <p className="text-sm text-muted-foreground">Add the episode to the schedule first, then open it to set up teams.</p>
+                ) : (
+                  <TeamEditor
+                    teams={teamDrafts}
+                    onChange={setTeamDrafts}
+                    couples={selectableCouples
+                      .filter((c) => participantCoupleIds.has(c.id))
+                      .map((c) => ({ id: c.id, parts: { celebrity: c.celebrity_name, pro: c.pro_name } }))}
+                    danceStyles={danceStyles}
+                    defaultStyleId={freestyleStyleId}
+                    disabled={submitting}
+                  />
+                )}
+              </div>
+            )}
             {parsedWeekNumber != null && (
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-2 text-sm">
