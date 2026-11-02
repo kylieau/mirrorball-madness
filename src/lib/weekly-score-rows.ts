@@ -27,8 +27,9 @@ export type WeekScoringData = {
   episodes?: Pick<Row<"episodes">, "id" | "episode_number">[];
   // episode_id must survive every mapping into here: Dance Card collapses a
   // couple's dances per night (collapseToNights), so a row without its night
-  // would be paid as a separate dance.
-  dances: Pick<Row<"dance_scores">, "episode_id" | "couple_id" | "total_score" | "scaled_score">[];
+  // would be paid as a separate dance. max_score is null for a legacy row,
+  // the marks possible for a special dance, and 0 for a bonus round.
+  dances: Pick<Row<"dance_scores">, "episode_id" | "couple_id" | "total_score" | "scaled_score" | "max_score">[];
   outcomes: Pick<Row<"episode_results">, "episode_id" | "couple_id" | "outcome" | "bonus_points">[];
   couples: Pick<Row<"couples">, "id" | "status" | "elimination_week">[];
   jeopardy: Pick<Row<"episode_in_jeopardy_couples">, "couple_id">[];
@@ -60,6 +61,7 @@ export function buildWeeklyScoreRows(
     coupleId: row.couple_id,
     totalScore: Number(row.total_score),
     scaledScore: Number(row.scaled_score),
+    maxScore: row.max_score == null ? null : Number(row.max_score),
   }));
   const otherOutcomes = (allOutcomes ?? []).filter((row) => row.episode_id !== thisEpisodeId);
   const orderedOutcomeRows = [

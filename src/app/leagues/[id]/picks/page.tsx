@@ -19,6 +19,7 @@ import { LeaguePageShell } from "@/components/league-page-shell";
 import { loadLeaguePageBase } from "@/lib/league-page-data";
 import { formatCoupleName } from "@/lib/couple-display";
 import { excludeReleasedCoupleRows } from "@/lib/draft-scores";
+import { danceMaxScore, danceScoreColumns } from "@/lib/episode-teams";
 import { managerIdForPick, type DraftType } from "@/lib/draft";
 import { clampRosterCoupleForWeek, weeklyBonusPoints } from "@/lib/roster-weekly-points";
 import { partitionRecastSlots } from "@/lib/recast-framing";
@@ -91,6 +92,7 @@ export default async function LeaguePicksPage({
     leagueSlotPeriods,
     rosterSlotPeriods,
     visibleDanceWeeks,
+    teamsMode,
   } = base;
 
   const curtainCallWeekId = upcomingEpisode && curtainCallOn ? upcomingEpisode.id : null;
@@ -140,16 +142,16 @@ export default async function LeaguePicksPage({
         .eq("manager_id", myTeamId)
         .order("predicted_position", { ascending: true })
     : Promise.resolve({ data: null });
-  const leagueDanceScoresPending =
+  type LeagueDanceRow = { couple_id: string; episode_id: string; total_score: number; scaled_score: number; max_score?: number | null };
+  const leagueDanceScoresPending: PromiseLike<{ data: LeagueDanceRow[] | null }> =
     leagueSlotPeriods.length > 0 && episodeWeekNumber.size > 0
       ? supabase
           .from("dance_scores")
-          .select("couple_id, episode_id, total_score, scaled_score")
+          .select(danceScoreColumns(teamsMode, "couple_id, episode_id, total_score, scaled_score"))
           .in("episode_id", [...episodeWeekNumber.keys()])
           .in("couple_id", [...new Set(leagueSlotPeriods.map((slot) => slot.coupleId))])
-      : Promise.resolve({
-          data: [] as { couple_id: string; episode_id: string; total_score: number; scaled_score: number }[],
-        });
+          .then((result) => ({ data: result.data as unknown as LeagueDanceRow[] | null }))
+      : Promise.resolve({ data: [] as LeagueDanceRow[] });
   const yourRosterWeekJeopardyPending =
     yourRosterWeekEpisodeIds.length > 0
       ? supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", yourRosterWeekEpisodeIds)
@@ -314,6 +316,7 @@ export default async function LeaguePicksPage({
           weekNumber: episodeWeekNumber.get(row.episode_id) ?? 0,
           totalScore: Number(row.total_score),
           scaledScore: Number(row.scaled_score),
+          maxScore: danceMaxScore(row),
         })),
       ...(draftNight?.dances.map((dance) => ({
         episodeId: dance.episodeId,
@@ -321,6 +324,7 @@ export default async function LeaguePicksPage({
         weekNumber: draftNight.weekNumber,
         totalScore: dance.total,
         scaledScore: dance.scaled,
+        maxScore: null,
       })) ?? []),
     ],
     judgesScoreStartsWeek: scoringSettings?.judges_score_starts_week ?? 1,

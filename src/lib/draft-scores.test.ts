@@ -119,9 +119,9 @@ describe("draft week points", () => {
         { managerId: "b", coupleId: "c2" },
       ],
       danceScores: [
-        { episodeId: "ep1", coupleId: "c1", totalScore: 20, scaledScore: 20 },
-        { episodeId: "ep1", coupleId: "c1", totalScore: 10, scaledScore: 10 },
-        { episodeId: "ep1", coupleId: "c2", totalScore: 18, scaledScore: 18 },
+        { episodeId: "ep1", coupleId: "c1", totalScore: 20, scaledScore: 20, maxScore: null },
+        { episodeId: "ep1", coupleId: "c1", totalScore: 10, scaledScore: 10, maxScore: null },
+        { episodeId: "ep1", coupleId: "c2", totalScore: 18, scaledScore: 18, maxScore: null },
       ],
     });
     // c1's two dances share one night: (20 + 10) / 60 × 30 = 15 judges points,
@@ -156,7 +156,7 @@ describe("draft week points", () => {
         judgesScoreMultiplier: 1,
         judgesCategoryWeight: 1,
         rosterSlots: [{ managerId: "a", coupleId: "c1" }],
-        danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 30, scaledScore: 30 }],
+        danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 30, scaledScore: 30, maxScore: null }],
       })
     ).toEqual([]);
     const stored = [
@@ -170,20 +170,20 @@ describe("replaceWeekDanceScores", () => {
   it("uses the draft dances for that week", () => {
     const weeks = replaceWeekDanceScores(
       [
-        { weekNumber: 2, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 10, scaledScore: 10 }] },
-        { weekNumber: 3, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 8, scaledScore: 8 }] },
+        { weekNumber: 2, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 10, scaledScore: 10, maxScore: null }] },
+        { weekNumber: 3, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 8, scaledScore: 8, maxScore: null }] },
       ],
-      { weekNumber: 3, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27 }, { episodeId: "ep1", coupleId: "c2", totalScore: 24, scaledScore: 24 }] }
+      { weekNumber: 3, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27, maxScore: null }, { episodeId: "ep1", coupleId: "c2", totalScore: 24, scaledScore: 24, maxScore: null }] }
     );
-    expect(weeks[0].danceScores).toEqual([{ episodeId: "ep1", coupleId: "c1", totalScore: 10, scaledScore: 10 }]);
+    expect(weeks[0].danceScores).toEqual([{ episodeId: "ep1", coupleId: "c1", totalScore: 10, scaledScore: 10, maxScore: null }]);
     expect(weeks[1].danceScores).toEqual([
-      { episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27 },
-      { episodeId: "ep1", coupleId: "c2", totalScore: 24, scaledScore: 24 },
+      { episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27, maxScore: null },
+      { episodeId: "ep1", coupleId: "c2", totalScore: 24, scaledScore: 24, maxScore: null },
     ]);
   });
 
   it("merges live and released-draft rows by night and couple, never by couple alone", () => {
-    const live = (episodeId: string, coupleId: string, score: number) => ({ episodeId, coupleId, totalScore: score, scaledScore: score });
+    const live = (episodeId: string, coupleId: string, score: number) => ({ episodeId, coupleId, totalScore: score, scaledScore: score, maxScore: null });
     const weeks = replaceWeekDanceScores(
       [
         {
@@ -191,8 +191,8 @@ describe("replaceWeekDanceScores", () => {
           danceScores: [
             // c1 was live-revealed on night A (two dances) and has a released
             // draft for night B of the same week; c2 is live on night B.
-            { episodeId: "nightA", coupleId: "c1", totalScore: 28, scaledScore: 21 },
-            { episodeId: "nightA", coupleId: "c1", totalScore: 36, scaledScore: 27 },
+            { episodeId: "nightA", coupleId: "c1", totalScore: 28, scaledScore: 21, maxScore: null },
+            { episodeId: "nightA", coupleId: "c1", totalScore: 36, scaledScore: 27, maxScore: null },
             live("nightB", "c1", 20),
             live("nightB", "c2", 22),
           ],
@@ -201,8 +201,8 @@ describe("replaceWeekDanceScores", () => {
       { weekNumber: 3, danceScores: [live("nightB", "c1", 29)] }
     );
     expect(weeks[0].danceScores).toEqual([
-      { episodeId: "nightA", coupleId: "c1", totalScore: 28, scaledScore: 21 },
-      { episodeId: "nightA", coupleId: "c1", totalScore: 36, scaledScore: 27 },
+      { episodeId: "nightA", coupleId: "c1", totalScore: 28, scaledScore: 21, maxScore: null },
+      { episodeId: "nightA", coupleId: "c1", totalScore: 36, scaledScore: 27, maxScore: null },
       live("nightB", "c2", 22),
       live("nightB", "c1", 29),
     ]);
@@ -212,12 +212,12 @@ describe("replaceWeekDanceScores", () => {
 
   it("merges rather than replaces -- a couple not in the draft (e.g. independently live-revealed) keeps its existing entry", () => {
     const weeks = replaceWeekDanceScores(
-      [{ weekNumber: 3, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 8, scaledScore: 8 }, { episodeId: "ep1", coupleId: "c2", totalScore: 22, scaledScore: 22 }] }],
-      { weekNumber: 3, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27 }] }
+      [{ weekNumber: 3, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 8, scaledScore: 8, maxScore: null }, { episodeId: "ep1", coupleId: "c2", totalScore: 22, scaledScore: 22, maxScore: null }] }],
+      { weekNumber: 3, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27, maxScore: null }] }
     );
     expect(weeks[0].danceScores).toEqual([
-      { episodeId: "ep1", coupleId: "c2", totalScore: 22, scaledScore: 22 },
-      { episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27 },
+      { episodeId: "ep1", coupleId: "c2", totalScore: 22, scaledScore: 22, maxScore: null },
+      { episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27, maxScore: null },
     ]);
   });
 });

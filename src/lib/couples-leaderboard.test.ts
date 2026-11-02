@@ -26,10 +26,10 @@ const weeks = [
   {
     weekNumber: 1,
     danceScores: [
-      { episodeId: "ep1", coupleId: "A", totalScore: 20, scaledScore: 20 },
-      { episodeId: "ep1", coupleId: "B", totalScore: 18, scaledScore: 18 },
-      { episodeId: "ep1", coupleId: "C", totalScore: 16, scaledScore: 16 },
-      { episodeId: "ep1", coupleId: "D", totalScore: 10, scaledScore: 10 },
+      { episodeId: "ep1", coupleId: "A", totalScore: 20, scaledScore: 20, maxScore: null },
+      { episodeId: "ep1", coupleId: "B", totalScore: 18, scaledScore: 18, maxScore: null },
+      { episodeId: "ep1", coupleId: "C", totalScore: 16, scaledScore: 16, maxScore: null },
+      { episodeId: "ep1", coupleId: "D", totalScore: 10, scaledScore: 10, maxScore: null },
     ],
     outcomes: [
       { coupleId: "A", outcome: "safe" as const, bonusPoints: 0 },
@@ -41,9 +41,9 @@ const weeks = [
   {
     weekNumber: 2,
     danceScores: [
-      { episodeId: "ep1", coupleId: "A", totalScore: 28, scaledScore: 28 },
-      { episodeId: "ep1", coupleId: "B", totalScore: 26, scaledScore: 26 },
-      { episodeId: "ep1", coupleId: "C", totalScore: 14, scaledScore: 14 },
+      { episodeId: "ep1", coupleId: "A", totalScore: 28, scaledScore: 28, maxScore: null },
+      { episodeId: "ep1", coupleId: "B", totalScore: 26, scaledScore: 26, maxScore: null },
+      { episodeId: "ep1", coupleId: "C", totalScore: 14, scaledScore: 14, maxScore: null },
     ],
     outcomes: [
       { coupleId: "A", outcome: "winner" as const, bonusPoints: 0 },

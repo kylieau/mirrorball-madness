@@ -1,26 +1,50 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/types";
-import type { EpisodeTeam, TeamMark, TeamSetupInput } from "./team-dances";
+import {
+  DEFAULT_DANCE_TYPE,
+  isValidMark,
+  isValidPoints,
+  legacyTeamDefaults,
+  markRangeMessage,
+  SPECIAL_DANCE_MAX_JUDGES,
+  SPECIAL_DANCE_POINTS_LIMIT,
+  type SpecialDance,
+  type SpecialDanceDetail,
+  type SpecialDanceScore,
+  type SpecialDanceSetupInput,
+  type SpecialDanceSong,
+  type TeamMark,
+} from "./team-dances";
 
-// "entity": supabase/apply-team-dance-entity.sql is applied (dance_scores has
-// team_id, the team tables and marks exist). "inferred": not yet, so teams are
-// read off the couples' slot-2 rows and nothing selects team_id. Deploying
-// the code before the SQL therefore never 400s a page.
-export type TeamsMode = "entity" | "inferred";
+// "special": supabase/apply-special-dances.sql is applied (episode_teams has
+// scoring_mode, dance_scores has max_score). "entity": only
+// apply-team-dance-entity.sql is (dance_scores has team_id, the team tables
+// and marks exist). "inferred": neither, so teams are read off the couples'
+// slot-2 rows and nothing selects team_id. Deploying the code before either
+// SQL therefore never 400s a page.
+export type TeamsMode = "special" | "entity" | "inferred";
 
 export type EpisodeTeamsLoad = {
   mode: TeamsMode;
-  teamsByEpisode: Record<string, EpisodeTeam[]>;
-  // The saved marks per team (draft until posted). Service-role read.
+  teamsByEpisode: Record<string, SpecialDance[]>;
+  // The saved marks per special dance (draft until posted). Service-role read.
   marksByTeam: Record<string, TeamMark[]>;
+  // The saved points and results per Points-mode dance. Service-role read.
+  scoresByTeam: Record<string, SpecialDanceScore[]>;
 };
 
+export const EMPTY_TEAMS_LOAD = (mode: TeamsMode): EpisodeTeamsLoad => ({ mode, teamsByEpisode: {}, marksByTeam: {}, scoresByTeam: {} });
+
 // PostgREST reports a missing table as PGRST205 and a missing column as
-// 42703 (or PGRST204 on writes); Postgres itself says 42P01 for a table.
+// 42703 (or PGRST204 on writes); Postgres itself says 42P01 for a table and
+// 42883 for a function.
 export function isMissingSchemaError(error: { code?: string | null; message?: string | null } | null | undefined): boolean {
   if (!error) return false;
-  if (["PGRST205", "PGRST204", "42P01", "42703"].includes(error.code ?? "")) return true;
-  return /schema cache|does not exist/i.test(error.message ?? "") && /episode_team|team_id/i.test(error.message ?? "");
+  if (["PGRST205", "PGRST204", "PGRST202", "42P01", "42703", "42883"].includes(error.code ?? "")) return true;
+  return (
+    /schema cache|does not exist/i.test(error.message ?? "") &&
+    /episode_team|team_id|scoring_mode|max_score|special_dance/i.test(error.message ?? "")
+  );
 }
 
 // One cheap probe: can dance_scores.team_id be selected? Any failure reads as
@@ -30,102 +54,289 @@ export async function detectTeamEntity(client: SupabaseClient<Database>): Promis
   return !error;
 }
 
-// Callers probe with detectTeamEntity first; a missing-schema error here
-// still degrades to the inferred mode instead of failing the page.
+// Two cheap probes: can episode_teams.scoring_mode and dance_scores.max_score
+// be selected? Both must, or the page reads as entity mode.
+export async function detectSpecialDances(client: SupabaseClient<Database>): Promise<boolean> {
+  const [teams, dances] = await Promise.all([
+    client.from("episode_teams").select("scoring_mode").limit(1),
+    client.from("dance_scores").select("max_score").limit(1),
+  ]);
+  return !teams.error && !dances.error;
+}
+
+// All three probes together, so a page pays one round trip for the answer.
+export async function detectTeamsMode(client: SupabaseClient<Database>): Promise<TeamsMode> {
+  const [entity, special] = await Promise.all([detectTeamEntity(client), detectSpecialDances(client)]);
+  if (!entity) return "inferred";
+  return special ? "special" : "entity";
+}
+
+// The dance_scores select list for a reader: the base columns, team_id once
+// the entity migration is applied (when the reader wants it), and max_score
+// once the special-dances migration is. Selecting either earlier would 400
+// the page, so every loader builds its list here.
+export function danceScoreColumns(mode: TeamsMode, base: string, opts: { teamId?: boolean } = {}): string {
+  const extra = [opts.teamId && mode !== "inferred" ? "team_id" : null, mode === "special" ? "max_score" : null];
+  return [base, ...extra.filter((column): column is string => column !== null)].join(", ");
+}
+
+// max_score as the engine wants it: null for a legacy row or a reader that
+// could not select the column, a number otherwise (0 for a Points row).
+export function danceMaxScore(row: { max_score?: number | string | null }): number | null {
+  return row.max_score == null ? null : Number(row.max_score);
+}
+
+const BASE_TEAM_COLUMNS = "id, episode_id, name, song_title, song_source, dance_style_id, captain_couple_id, host_name, sort_order, posted_at";
+const SPECIAL_TEAM_COLUMNS =
+  ", dance_type, scoring_mode, mark_max, panel_judge_ids, second_dance_style_id, songs, theme_label, details, name_is_auto, updated_at";
+
+type TeamRow = {
+  id: string;
+  episode_id: string;
+  name: string;
+  song_title: string | null;
+  song_source: string | null;
+  dance_style_id: string;
+  captain_couple_id: string | null;
+  host_name: string | null;
+  sort_order: number;
+  posted_at: string | null;
+  dance_type?: string;
+  scoring_mode?: string;
+  mark_max?: number | string;
+  panel_judge_ids?: string[] | null;
+  second_dance_style_id?: string | null;
+  songs?: Json;
+  theme_label?: string | null;
+  details?: Json;
+  name_is_auto?: boolean;
+  updated_at?: string;
+};
+
+function parseSongs(value: Json | undefined): SpecialDanceSong[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.flatMap((song) => {
+    if (!song || typeof song !== "object" || Array.isArray(song)) return [];
+    const title = typeof song.title === "string" ? song.title : "";
+    if (!title.trim()) return [];
+    return [{ title, artist: typeof song.artist === "string" && song.artist.trim() ? song.artist : null }];
+  });
+}
+
+function parseDetails(value: Json | undefined): SpecialDanceDetail[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.flatMap((detail) => {
+    if (!detail || typeof detail !== "object" || Array.isArray(detail)) return [];
+    const label = typeof detail.label === "string" ? detail.label : "";
+    if (!label.trim()) return [];
+    return [
+      {
+        label,
+        value: typeof detail.value === "string" ? detail.value : "",
+        coupleId: typeof detail.coupleId === "string" && detail.coupleId ? detail.coupleId : null,
+      },
+    ];
+  });
+}
+
+export function specialDanceFromRow(row: TeamRow, memberCoupleIds: string[], captainName?: string | null): SpecialDance {
+  const legacy = legacyTeamDefaults({ songTitle: row.song_title, captainCoupleId: row.captain_couple_id, hostName: row.host_name, captainName });
+  return {
+    id: row.id,
+    episodeId: row.episode_id,
+    name: row.name,
+    nameIsAuto: row.name_is_auto ?? legacy.nameIsAuto,
+    danceType: row.dance_type?.trim() || legacy.danceType,
+    scoringMode: row.scoring_mode === "points" ? "points" : "marks",
+    markMax: row.mark_max == null ? legacy.markMax : Number(row.mark_max),
+    panelJudgeIds: row.panel_judge_ids ?? null,
+    danceStyleId: row.dance_style_id,
+    secondDanceStyleId: row.second_dance_style_id ?? null,
+    songs: parseSongs(row.songs) ?? legacy.songs,
+    songTitle: row.song_title,
+    songSource: row.song_source,
+    themeLabel: row.theme_label ?? null,
+    details: parseDetails(row.details) ?? legacy.details,
+    captainCoupleId: row.captain_couple_id,
+    hostName: row.host_name,
+    sortOrder: row.sort_order,
+    memberCoupleIds,
+    inferred: false,
+    postedAt: row.posted_at,
+    updatedAt: row.updated_at ?? null,
+  };
+}
+
+// Callers probe with detectTeamsMode first; a missing-schema error here
+// still degrades to the inferred mode instead of failing the page. In entity
+// mode only the original columns are selected and every dance reads as a
+// Team Dance scored by marks out of 10 on the night's panel.
 export async function loadEpisodeTeams(
   client: SupabaseClient<Database>,
   admin: SupabaseClient<Database>,
-  episodeIds: string[]
+  episodeIds: string[],
+  mode: Exclude<TeamsMode, "inferred"> = "entity"
 ): Promise<EpisodeTeamsLoad> {
-  if (episodeIds.length === 0) return { mode: "entity", teamsByEpisode: {}, marksByTeam: {} };
+  if (episodeIds.length === 0) return EMPTY_TEAMS_LOAD(mode);
   const [teams, members] = await Promise.all([
     client
       .from("episode_teams")
-      .select("id, episode_id, name, song_title, song_source, dance_style_id, captain_couple_id, host_name, sort_order, posted_at")
+      .select(`${BASE_TEAM_COLUMNS}${mode === "special" ? SPECIAL_TEAM_COLUMNS : ""}`)
       .in("episode_id", episodeIds)
       .order("sort_order")
       .order("created_at"),
-    client.from("episode_team_members").select("team_id, couple_id").in("episode_id", episodeIds),
+    client
+      .from("episode_team_members")
+      .select(`team_id, couple_id${mode === "special" ? ", sort_order" : ""}`)
+      .in("episode_id", episodeIds),
   ]);
   const failed = teams.error ?? members.error;
   if (failed) {
-    if (isMissingSchemaError(failed)) return { mode: "inferred", teamsByEpisode: {}, marksByTeam: {} };
+    if (isMissingSchemaError(failed)) return EMPTY_TEAMS_LOAD("inferred");
     throw new Error("Could not load the episode teams. Please try again.");
   }
-  const teamIds = (teams.data ?? []).map((t) => t.id);
-  const marks = teamIds.length > 0 ? await admin.from("episode_team_marks").select("team_id, judge_id, score").in("team_id", teamIds) : { data: [], error: null };
+  const teamRows = (teams.data ?? []) as unknown as TeamRow[];
+  const teamIds = teamRows.map((t) => t.id);
+  const [marks, scores] =
+    teamIds.length > 0
+      ? await Promise.all([
+          admin.from("episode_team_marks").select("team_id, judge_id, score").in("team_id", teamIds),
+          mode === "special"
+            ? admin.from("episode_team_scores").select("team_id, couple_id, points, result").in("team_id", teamIds)
+            : Promise.resolve({ data: [], error: null }),
+        ])
+      : [{ data: [], error: null }, { data: [], error: null }];
   if (marks.error) throw new Error("Could not load the team marks. Please try again.");
-  const membersByTeam = new Map<string, string[]>();
-  for (const row of members.data ?? []) {
-    (membersByTeam.get(row.team_id) ?? membersByTeam.set(row.team_id, []).get(row.team_id)!).push(row.couple_id);
+  if (scores.error) throw new Error("Could not load the special dance points. Please try again.");
+  const memberRows = (members.data ?? []) as unknown as { team_id: string; couple_id: string; sort_order?: number }[];
+  const membersByTeam = new Map<string, { coupleId: string; sortOrder: number }[]>();
+  for (const row of memberRows) {
+    (membersByTeam.get(row.team_id) ?? membersByTeam.set(row.team_id, []).get(row.team_id)!).push({
+      coupleId: row.couple_id,
+      sortOrder: row.sort_order ?? 0,
+    });
   }
   const marksByTeam: Record<string, TeamMark[]> = {};
   for (const row of marks.data ?? []) {
     (marksByTeam[row.team_id] ??= []).push({ judgeId: row.judge_id, score: Number(row.score) });
   }
-  const teamsByEpisode: Record<string, EpisodeTeam[]> = {};
-  for (const row of teams.data ?? []) {
-    (teamsByEpisode[row.episode_id] ??= []).push({
-      id: row.id,
-      episodeId: row.episode_id,
-      name: row.name,
-      songTitle: row.song_title,
-      songSource: row.song_source,
-      danceStyleId: row.dance_style_id,
-      captainCoupleId: row.captain_couple_id,
-      hostName: row.host_name,
-      sortOrder: row.sort_order,
-      memberCoupleIds: (membersByTeam.get(row.id) ?? []).sort(),
-      inferred: false,
-      postedAt: row.posted_at,
+  const scoresByTeam: Record<string, SpecialDanceScore[]> = {};
+  for (const row of scores.data ?? []) {
+    (scoresByTeam[row.team_id] ??= []).push({
+      coupleId: row.couple_id,
+      points: row.points == null ? null : Number(row.points),
+      result: row.result ?? null,
     });
   }
-  return { mode: "entity", teamsByEpisode, marksByTeam };
+  const teamsByEpisode: Record<string, SpecialDance[]> = {};
+  for (const row of teamRows) {
+    const memberIds = (membersByTeam.get(row.id) ?? [])
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.coupleId.localeCompare(b.coupleId))
+      .map((m) => m.coupleId);
+    (teamsByEpisode[row.episode_id] ??= []).push(specialDanceFromRow(row, memberIds));
+  }
+  return { mode, teamsByEpisode, marksByTeam, scoresByTeam };
 }
 
-// Team names for fan labels: authenticated viewers read every team, guests
-// only those of published episodes (RLS). Empty when the migration is not
-// applied, when the heuristic label stands in.
-export async function loadTeamNames(client: SupabaseClient<Database>, episodeIds: string[]): Promise<Record<string, string>> {
-  if (episodeIds.length === 0) return {};
-  const { data, error } = await client.from("episode_teams").select("id, name").in("episode_id", episodeIds);
+export type SpecialDanceLabel = { name: string; danceType: string; scoringMode: "marks" | "points" };
+
+// Names and types for fan labels: authenticated viewers read every special
+// dance, guests only those of published episodes (RLS). Empty when the
+// migration is not applied, when the heuristic label stands in; in entity
+// mode every entry reads as a Team Dance.
+export async function loadSpecialDanceLabels(
+  client: SupabaseClient<Database>,
+  episodeIds: string[],
+  mode: TeamsMode
+): Promise<Record<string, SpecialDanceLabel>> {
+  if (episodeIds.length === 0 || mode === "inferred") return {};
+  const { data, error } = await client
+    .from("episode_teams")
+    .select(`id, name${mode === "special" ? ", dance_type, scoring_mode" : ""}`)
+    .in("episode_id", episodeIds);
   if (error) return {};
-  return Object.fromEntries((data ?? []).map((t) => [t.id, t.name]));
+  return Object.fromEntries(
+    ((data ?? []) as unknown as { id: string; name: string; dance_type?: string; scoring_mode?: string }[]).map((t) => [
+      t.id,
+      { name: t.name, danceType: t.dance_type?.trim() || DEFAULT_DANCE_TYPE, scoringMode: t.scoring_mode === "points" ? "points" : "marks" },
+    ])
+  );
 }
 
 export const TEAM_TABLES_MISSING_MESSAGE =
   "Team Dances need the database update (supabase/apply-team-dance-entity.sql) before teams can be saved.";
+export const SPECIAL_DANCES_MISSING_MESSAGE =
+  "Special Dances need the database update (supabase/apply-special-dances.sql) before this can be saved.";
 
-export type SaveTeamsResult = { teamIds: string[] };
-
-export async function saveEpisodeTeams(
-  admin: SupabaseClient<Database>,
-  input: { episodeId: string; teams: TeamSetupInput[] },
-  actorId: string
-): Promise<{ error: string | null; result?: SaveTeamsResult }> {
-  const { data, error } = await admin.rpc("save_episode_teams", {
-    p_episode_id: input.episodeId,
-    p_actor_id: actorId,
-    p_teams: input.teams as unknown as Json,
-  });
-  if (error) return { error: isMissingSchemaError(error) ? TEAM_TABLES_MISSING_MESSAGE : error.message };
-  return { error: null, result: data as unknown as SaveTeamsResult };
+function translateError(error: { code?: string | null; message: string }, missingMessage: string): string {
+  return isMissingSchemaError(error) ? missingMessage : error.message;
 }
 
-// Partial sets are allowed (a mark at a time); posting needs all four.
-export async function saveTeamMarks(
+// Admin. Upserts one special dance's setup (the inline editor's Done).
+export async function saveSpecialDance(
   admin: SupabaseClient<Database>,
-  input: { episodeId: string; teamId: string; marks: TeamMark[] },
+  input: { episodeId: string; dance: SpecialDanceSetupInput },
+  actorId: string
+): Promise<{ error: string | null; result?: { id: string } }> {
+  const { data, error } = await admin.rpc("save_special_dance", {
+    p_episode_id: input.episodeId,
+    p_actor_id: actorId,
+    p_dance: input.dance as unknown as Json,
+  });
+  if (error) return { error: translateError(error, SPECIAL_DANCES_MISSING_MESSAGE) };
+  return { error: null, result: { id: data as string } };
+}
+
+// Admin. Removes a special dance that is not posted.
+export async function deleteSpecialDance(
+  admin: SupabaseClient<Database>,
+  input: { episodeId: string; teamId: string },
   actorId: string
 ): Promise<{ error: string | null }> {
-  if (input.marks.some((m) => !Number.isFinite(m.score) || m.score < 0 || m.score > 10))
-    return { error: "Judge scores must be between 0 and 10." };
+  const { error } = await admin.rpc("delete_special_dance", {
+    p_episode_id: input.episodeId,
+    p_team_id: input.teamId,
+    p_actor_id: actorId,
+  });
+  if (error) return { error: translateError(error, SPECIAL_DANCES_MISSING_MESSAGE) };
+  return { error: null };
+}
+
+// Propose tier. Partial sets are allowed (a mark at a time); posting needs a
+// mark from every judge on the dance's panel.
+export async function saveTeamMarks(
+  admin: SupabaseClient<Database>,
+  input: { episodeId: string; teamId: string; marks: TeamMark[]; markMax?: number },
+  actorId: string
+): Promise<{ error: string | null }> {
+  const markMax = input.markMax ?? 10;
+  if (input.marks.length > SPECIAL_DANCE_MAX_JUDGES) return { error: `Marks must be a list of at most ${SPECIAL_DANCE_MAX_JUDGES}.` };
+  if (input.marks.some((m) => !isValidMark(m.score, markMax))) return { error: `${markRangeMessage(markMax)}.` };
   const { error } = await admin.rpc("save_team_marks", {
     p_episode_id: input.episodeId,
     p_team_id: input.teamId,
     p_actor_id: actorId,
     p_marks: input.marks as unknown as Json,
   });
-  if (error) return { error: isMissingSchemaError(error) ? TEAM_TABLES_MISSING_MESSAGE : error.message };
+  if (error) return { error: translateError(error, TEAM_TABLES_MISSING_MESSAGE) };
+  return { error: null };
+}
+
+// Propose tier. Each participant's points and result in a Points-mode dance;
+// a blank box is sent as null and keeps the dance from posting.
+export async function saveSpecialDancePoints(
+  admin: SupabaseClient<Database>,
+  input: { episodeId: string; teamId: string; scores: SpecialDanceScore[] },
+  actorId: string
+): Promise<{ error: string | null }> {
+  if (input.scores.some((s) => s.points !== null && !isValidPoints(s.points)))
+    return { error: `Points must be between -${SPECIAL_DANCE_POINTS_LIMIT} and ${SPECIAL_DANCE_POINTS_LIMIT} in steps of 0.5.` };
+  const { error } = await admin.rpc("save_special_dance_points", {
+    p_episode_id: input.episodeId,
+    p_team_id: input.teamId,
+    p_actor_id: actorId,
+    p_scores: input.scores as unknown as Json,
+  });
+  if (error) return { error: translateError(error, SPECIAL_DANCES_MISSING_MESSAGE) };
   return { error: null };
 }

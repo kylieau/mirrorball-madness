@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRecentActivity, type ActivityLine, type ActivityWeek } from "./home-activity";
+import { activityScore, buildRecentActivity, type ActivityLine, type ActivityWeek } from "./home-activity";
 
 const plain = (line: ActivityLine) => line.segments.map((seg) => seg.text).join("");
 
@@ -55,5 +55,39 @@ describe("buildRecentActivity", () => {
       extraLines: [],
     });
     expect(lines.map(plain)).toEqual(["Week 2 results are in", "Ava scored 24 on their Waltz", "C & D eliminated"]);
+  });
+
+  it("reads a bonus round in points as earned, signed, in the special dance", () => {
+    const lines = buildRecentActivity({
+      weeks: [
+        week(8, {
+          scores: [
+            { celebrity: "Julia", danceStyle: "Dance-Off", total: 3, at: "2026-11-04T02:30:00Z", bonus: true },
+            { celebrity: "Harry", danceStyle: "Dance-Off", total: -1.5, at: "2026-11-04T02:30:00Z", bonus: true },
+            { celebrity: "Julia", danceStyle: "Freestyle", total: 36, at: "2026-11-04T02:00:00Z" },
+          ],
+        }),
+      ],
+      westWeek: null,
+      extraLines: [],
+    });
+    expect(lines.map(plain)).toEqual(["Julia earned +3 in the Dance-Off", "Harry earned −1.5 in the Dance-Off", "Julia scored 36 on their Freestyle"]);
+  });
+});
+
+describe("activityScore", () => {
+  const row = { episode_id: "ep", couple_id: "c", total_score: 36, created_at: "2026-11-04T02:00:00Z", dance_styles: { name: "Freestyle" } };
+
+  it("keeps a judged dance on its style and names a Points row after its special dance's type", () => {
+    expect(activityScore(row, "Julia", {})).toEqual({ celebrity: "Julia", danceStyle: "Freestyle", total: 36, at: row.created_at });
+    expect(activityScore({ ...row, team_id: "t1", max_score: "40" }, "Julia", { t1: { danceType: "Team Dance" } })).toMatchObject({ danceStyle: "Freestyle" });
+    expect(activityScore({ ...row, total_score: 3, team_id: "d1", max_score: 0 }, "Julia", { d1: { danceType: "Dance-Off" } })).toEqual({
+      celebrity: "Julia",
+      danceStyle: "Dance-Off",
+      total: 3,
+      at: row.created_at,
+      bonus: true,
+    });
+    expect(activityScore({ ...row, total_score: 3, team_id: "d1", max_score: 0 }, "Julia", {}).danceStyle).toBe("Bonus");
   });
 });

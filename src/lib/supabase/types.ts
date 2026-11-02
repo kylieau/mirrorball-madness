@@ -222,6 +222,7 @@ export type Database = {
           dance_style_id: string
           episode_id: string
           id: string
+          max_score: number | null
           scaled_score: number
           song_title: string | null
           team_id: string | null
@@ -233,6 +234,7 @@ export type Database = {
           dance_style_id: string
           episode_id: string
           id?: string
+          max_score?: number | null
           scaled_score?: number
           song_title?: string | null
           team_id?: string | null
@@ -244,6 +246,7 @@ export type Database = {
           dance_style_id?: string
           episode_id?: string
           id?: string
+          max_score?: number | null
           scaled_score?: number
           song_title?: string | null
           team_id?: string | null
@@ -947,18 +950,21 @@ export type Database = {
           couple_id: string
           created_at: string
           episode_id: string
+          sort_order: number
           team_id: string
         }
         Insert: {
           couple_id: string
           created_at?: string
           episode_id: string
+          sort_order?: number
           team_id: string
         }
         Update: {
           couple_id?: string
           created_at?: string
           episode_id?: string
+          sort_order?: number
           team_id?: string
         }
         Relationships: [
@@ -1017,50 +1023,119 @@ export type Database = {
           },
         ]
       }
+      episode_team_scores: {
+        Row: {
+          couple_id: string
+          points: number | null
+          result: string | null
+          team_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          couple_id: string
+          points?: number | null
+          result?: string | null
+          team_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          couple_id?: string
+          points?: number | null
+          result?: string | null
+          team_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_team_scores_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_team_scores_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "episode_teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       episode_teams: {
         Row: {
           captain_couple_id: string | null
           created_at: string
           dance_style_id: string
+          dance_type: string
+          details: Json
           episode_id: string
           host_name: string | null
           id: string
+          mark_max: number
           name: string
+          name_is_auto: boolean
+          panel_judge_ids: string[] | null
           posted_at: string | null
           posted_by: string | null
+          scoring_mode: string
+          second_dance_style_id: string | null
           song_source: string | null
           song_title: string | null
+          songs: Json
           sort_order: number
+          theme_label: string | null
           updated_at: string
         }
         Insert: {
           captain_couple_id?: string | null
           created_at?: string
           dance_style_id: string
+          dance_type?: string
+          details?: Json
           episode_id: string
           host_name?: string | null
           id?: string
+          mark_max?: number
           name: string
+          name_is_auto?: boolean
+          panel_judge_ids?: string[] | null
           posted_at?: string | null
           posted_by?: string | null
+          scoring_mode?: string
+          second_dance_style_id?: string | null
           song_source?: string | null
           song_title?: string | null
+          songs?: Json
           sort_order?: number
+          theme_label?: string | null
           updated_at?: string
         }
         Update: {
           captain_couple_id?: string | null
           created_at?: string
           dance_style_id?: string
+          dance_type?: string
+          details?: Json
           episode_id?: string
           host_name?: string | null
           id?: string
+          mark_max?: number
           name?: string
+          name_is_auto?: boolean
+          panel_judge_ids?: string[] | null
           posted_at?: string | null
           posted_by?: string | null
+          scoring_mode?: string
+          second_dance_style_id?: string | null
           song_source?: string | null
           song_title?: string | null
+          songs?: Json
           sort_order?: number
+          theme_label?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1083,6 +1158,13 @@ export type Database = {
             columns: ["episode_id"]
             isOneToOne: false
             referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_teams_second_dance_style_id_fkey"
+            columns: ["second_dance_style_id"]
+            isOneToOne: false
+            referencedRelation: "dance_styles"
             referencedColumns: ["id"]
           },
         ]
@@ -2374,6 +2456,20 @@ export type Database = {
         Args: { p_actor_id: string; p_episode_id: string; p_teams: Json }
         Returns: Json
       }
+      save_special_dance: {
+        Args: { p_actor_id: string; p_dance: Json; p_episode_id: string }
+        Returns: string
+      }
+      delete_special_dance: {
+        Args: { p_actor_id: string; p_episode_id: string; p_team_id: string }
+        Returns: undefined
+      }
+      save_special_dance_points: {
+        Args: { p_actor_id: string; p_episode_id: string; p_scores: Json; p_team_id: string }
+        Returns: undefined
+      }
+      special_dance_panel: { Args: { p_team_id: string }; Returns: string[] }
+      special_dance_complete: { Args: { p_team_id: string }; Returns: boolean }
       save_team_marks: {
         Args: { p_actor_id: string; p_episode_id: string; p_marks: Json; p_team_id: string }
         Returns: undefined

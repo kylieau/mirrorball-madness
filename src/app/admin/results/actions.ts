@@ -23,8 +23,8 @@ import {
 import { publishEpisodeAtomically } from "@/lib/episode-publication";
 import { revealCouple, revealTeam, undoReveal, undoTeamReveal } from "@/lib/results-reveal";
 import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
-import { saveEpisodeTeams, saveTeamMarks, type SaveTeamsResult } from "@/lib/episode-teams";
-import type { TeamMark, TeamSetupInput } from "@/lib/team-dances";
+import { deleteSpecialDance, saveSpecialDance, saveSpecialDancePoints, saveTeamMarks } from "@/lib/episode-teams";
+import type { SpecialDanceScore, SpecialDanceSetupInput, TeamMark } from "@/lib/team-dances";
 
 // Both checks return userId alongside error so callers that need to stamp
 // updatedBy/createdBy/publishedBy don't need a second auth round trip.
@@ -89,33 +89,56 @@ export async function saveEpisodeDraft(
   return result;
 }
 
-// Team setup is season-wide structural config, like the schedule: admin only.
-export async function saveEpisodeTeamsAction(input: {
+// Special dance setup (type, participants, style, songs, scoring, details) is
+// season-wide structural config, like the schedule: admin only.
+export async function saveSpecialDanceAction(input: {
   episodeId: string;
-  teams: TeamSetupInput[];
-}): Promise<{ error: string | null; result?: SaveTeamsResult }> {
+  dance: SpecialDanceSetupInput;
+}): Promise<{ error: string | null; result?: { id: string } }> {
   const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
-  const result = await saveEpisodeTeams(createAdminClient(), input, access.userId);
-  if (!result.error) {
-    revalidatePath("/admin/results", "layout");
-    revalidatePath("/admin/schedule");
-  }
+  const result = await saveSpecialDance(createAdminClient(), input, access.userId);
+  if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
-// Entering the team's marks is draft entry (propose tier); posting them is
-// the admin reveal below.
+export async function deleteSpecialDanceAction(input: { episodeId: string; teamId: string }): Promise<{ error: string | null }> {
+  const access = await requireAdminAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await deleteSpecialDance(createAdminClient(), input, access.userId);
+  if (!result.error) revalidatePath("/admin/results", "layout");
+  return result;
+}
+
+// Entering a special dance's marks is draft entry (propose tier); posting
+// them is the admin reveal below.
 export async function saveTeamMarksAction(input: {
   episodeId: string;
   teamId: string;
   marks: TeamMark[];
+  markMax?: number;
 }): Promise<{ error: string | null }> {
   const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
   const result = await saveTeamMarks(createAdminClient(), input, access.userId);
+  if (!result.error) revalidatePath("/admin/results", "layout");
+  return result;
+}
+
+// Points and results for a Points-mode special dance: draft entry, same tier
+// as marks.
+export async function saveSpecialDancePointsAction(input: {
+  episodeId: string;
+  teamId: string;
+  scores: SpecialDanceScore[];
+}): Promise<{ error: string | null }> {
+  const access = await requireProposeAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await saveSpecialDancePoints(createAdminClient(), input, access.userId);
   if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }

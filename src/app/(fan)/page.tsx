@@ -9,7 +9,8 @@ import { loadHomeLeagueData } from "@/lib/home-league-data";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { computeEpisodeBannerState, toBannerWeeks, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
-import { buildRecentActivity, type ActivityWeek } from "@/lib/home-activity";
+import { activityScore, buildRecentActivity, type ActivityDanceRow, type ActivityWeek } from "@/lib/home-activity";
+import { danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
 import { HomeSpoilerChrome } from "@/components/spoiler-free-strip";
 import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
 import { LiveScoresPrompt } from "@/components/live-scores-prompt";
@@ -19,7 +20,7 @@ import { excludeReleasedCoupleRows, homeStripChoice } from "@/lib/draft-scores";
 import type { ModuleStackInput } from "@/lib/league-triage";
 import { loadModuleStackInputs } from "@/lib/league-module-stack-data";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
-import { loadAllCouples, loadViewerMemberships } from "@/lib/viewer-season-data";
+import { loadAllCouples, loadTeamsMode, loadViewerMemberships } from "@/lib/viewer-season-data";
 import { GuestHome } from "./guest-home";
 
 export default async function Home() {
@@ -85,18 +86,22 @@ export default async function Home() {
   }
   const draftEpisodeIds = new Set(draftNight?.episodeIds ?? []);
   if (visibleEpisodeIds.length > 0 || draftEpisodeIds.size > 0) {
-    const [{ data: episodeResults }, { data: danceScores }, couples] = await Promise.all([
-      visibleEpisodeIds.length > 0
-        ? supabase.from("episode_results").select("episode_id, couple_id, outcome").in("episode_id", visibleEpisodeIds)
-        : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
+    // team_id and max_score are selected only once their migrations are applied.
+    const teamsMode = visibleEpisodeIds.length > 0 ? await loadTeamsMode(supabase) : "inferred";
+    const [{ data: danceScoreRows }, { data: episodeResults }, specialDanceLabels, couples] = await Promise.all([
       visibleEpisodeIds.length > 0
         ? supabase
             .from("dance_scores")
-            .select("episode_id, couple_id, total_score, created_at, dance_styles(name)")
+            .select(danceScoreColumns(teamsMode, "episode_id, couple_id, total_score, created_at, dance_styles(name)", { teamId: true }))
             .in("episode_id", visibleEpisodeIds)
-        : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; total_score: number; created_at: string; dance_styles: { name: string } | null }[] }),
+        : Promise.resolve({ data: [] }),
+      visibleEpisodeIds.length > 0
+        ? supabase.from("episode_results").select("episode_id, couple_id, outcome").in("episode_id", visibleEpisodeIds)
+        : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
+      loadSpecialDanceLabels(supabase, visibleEpisodeIds, teamsMode),
       loadAllCouples(supabase),
     ]);
+    const danceScores = (danceScoreRows ?? []) as unknown as ActivityDanceRow[];
     const displayNames = buildCoupleDisplayNames(
       couples.map((c) => ({
         id: c.id,
@@ -109,12 +114,12 @@ export default async function Home() {
       const week = activityWeeks.get(weekNumberByEpisodeId.get(r.episode_id) ?? -1);
       if (r.outcome === "eliminated" && parts && week) week.eliminated.push(formatCoupleName(parts));
     }
-    const liveDanceScores = excludeReleasedCoupleRows(danceScores ?? [], draftNight?.releasedCoupleIdsByEpisode ?? {});
+    const liveDanceScores = excludeReleasedCoupleRows(danceScores, draftNight?.releasedCoupleIdsByEpisode ?? {});
     for (const d of liveDanceScores) {
       const parts = displayNames.get(d.couple_id);
       const week = activityWeeks.get(weekNumberByEpisodeId.get(d.episode_id) ?? -1);
       if (parts && week && d.dance_styles) {
-        week.scores.push({ celebrity: parts.celebrity, danceStyle: d.dance_styles.name, total: d.total_score, at: d.created_at });
+        week.scores.push(activityScore(d, parts.celebrity, specialDanceLabels));
       }
     }
     if (draftNight) {

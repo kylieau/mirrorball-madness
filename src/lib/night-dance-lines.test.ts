@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coupleDanceLines, isTeamDance, teamDanceEpisodeIds, type NightDance } from "./night-dance-lines";
+import { coupleDanceLines, isTeamDance, teamDanceEpisodeIds, type NightDance, type SpecialDanceLabelInput } from "./night-dance-lines";
 
 const dance = (style: string, totalScore: number, scaledScore: number, song: string | null = null, episodeId = "ep1"): NightDance => ({
   episodeId,
@@ -8,8 +8,11 @@ const dance = (style: string, totalScore: number, scaledScore: number, song: str
   song,
   totalScore,
   scaledScore,
+  maxScore: null,
 });
 const teamNight = new Set(["ep1"]);
+const labels = (entries: Record<string, SpecialDanceLabelInput>) => new Map(Object.entries(entries));
+const slaytopia = labels({ t1: { name: "Slaytopia", danceType: "Team Dance", scoringMode: "marks" } });
 
 describe("coupleDanceLines", () => {
   it("shows each dance with its score and the night total over the max on a multi-dance night", () => {
@@ -39,13 +42,42 @@ describe("coupleDanceLines", () => {
     expect(isTeamDance("Freestyle", false)).toBe(false);
   });
 
-  it("labels a team-tagged row by its team name, or Team Dance when the name is not readable", () => {
+  it("labels a team-tagged row by its type and name, or Team Dance when the name is not readable", () => {
     const team = { ...dance("Freestyle", 36, 27, "Zoo"), teamId: "t1" };
-    expect(coupleDanceLines([dance("Quickstep", 28, 21), team], new Set(), new Map([["t1", "Slaytopia"]])).join(" · ")).toBe(
+    expect(coupleDanceLines([dance("Quickstep", 28, 21), team], new Set(), slaytopia).join(" · ")).toBe(
       "Quickstep 28 · Team Dance · Slaytopia 36 · Zoo · Night 64/80"
     );
     expect(coupleDanceLines([dance("Quickstep", 28, 21), team], new Set()).join(" · ")).toBe("Quickstep 28 · Team Dance 36 · Zoo · Night 64/80");
-    expect(coupleDanceLines([team], new Set(), new Map([["t1", "Slaytopia"]]))).toEqual(["Team Dance · Slaytopia · Zoo"]);
+    expect(coupleDanceLines([team], new Set(), slaytopia)).toEqual(["Team Dance · Slaytopia · Zoo"]);
+  });
+
+  it("does not repeat the type before an automatic name", () => {
+    const relay = { ...dance("Freestyle", 27, 27, null), teamId: "t2", maxScore: 30 };
+    const named = labels({ t2: { name: "Relay 2", danceType: "Relay", scoringMode: "marks" } });
+    expect(coupleDanceLines([dance("Tango", 24, 24), relay], new Set(), named)).toEqual(["Tango 24", "Relay 2 27", "Night 51/60"]);
+  });
+
+  it("reads a bonus round in points as a signed line and keeps the marks out of the max", () => {
+    const danceOff = { ...dance("Freestyle", 3, 0), teamId: "d1", maxScore: 0 };
+    const named = labels({ d1: { name: "Dance-Off 1", danceType: "Dance-Off", scoringMode: "points" } });
+    expect(coupleDanceLines([dance("Quickstep", 28, 28), dance("Freestyle", 36, 27, "Zoo"), danceOff], teamNight, named)).toEqual([
+      "Quickstep 28",
+      "Freestyle (Team) 36 · Zoo",
+      "Dance-Off · +3",
+      "Night 67 · 64/70",
+    ]);
+    expect(coupleDanceLines([{ ...danceOff, totalScore: -1.5 }], new Set(), named)).toEqual(["Dance-Off · −1.5"]);
+    expect(coupleDanceLines([danceOff], new Set())).toEqual(["Bonus · +3"]);
+  });
+
+  it("takes a special dance's own max when its row carries one", () => {
+    const outOfEight = { ...dance("Freestyle", 30, 28.125), teamId: "t3", maxScore: 32 };
+    const named = labels({ t3: { name: "Wildcats", danceType: "Team Dance", scoringMode: "marks" } });
+    expect(coupleDanceLines([dance("Tango", 24, 24), outOfEight], new Set(), named)).toEqual([
+      "Tango 24",
+      "Team Dance · Wildcats 30",
+      "Night 54/62",
+    ]);
   });
 
   it("uses each dance's own max on a mixed-panel night and keeps half points", () => {

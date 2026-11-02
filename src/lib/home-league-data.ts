@@ -54,6 +54,7 @@ export async function loadHomeLeagueData(
           coupleId: dance.coupleId,
           totalScore: dance.total,
           scaledScore: dance.scaled,
+          maxScore: null,
         })),
       }
     : null;

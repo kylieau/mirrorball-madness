@@ -3,8 +3,8 @@ import type { Database } from "@/lib/supabase/types";
 import { loadResultsTaxonomy } from "@/lib/results";
 import { loadDraftForEpisode, type DraftState } from "@/lib/results-draft";
 import type { ScoringJudge } from "@/lib/scoring-judges";
-import { detectTeamEntity, loadEpisodeTeams, type TeamsMode } from "@/lib/episode-teams";
-import type { EpisodeTeam, TeamMark } from "@/lib/team-dances";
+import { danceScoreColumns, detectTeamsMode, EMPTY_TEAMS_LOAD, loadEpisodeTeams, type TeamsMode } from "@/lib/episode-teams";
+import type { SpecialDance, SpecialDanceScore, TeamMark } from "@/lib/team-dances";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type CoupleWithStatus = Couple & { status: string; elimination_week: number | null };
@@ -45,9 +45,13 @@ export type ResultsPageData = {
     song_title: string | null;
     total_score: number;
     created_at: string;
-    // Null for a couple's own dance; a team's id for its score for them.
-    // Always null before supabase/apply-team-dance-entity.sql is applied.
+    // Null for a couple's own dance; a special dance's id for its score for
+    // them. Always null before supabase/apply-team-dance-entity.sql is applied.
     team_id: string | null;
+    // The marks possible for a special dance's row (0 for a bonus round in
+    // points); null for a couple's own row and before
+    // supabase/apply-special-dances.sql is applied.
+    max_score: number | null;
   }[];
   judgeScores: { dance_score_id: string; judge_id: string; score: number }[];
   episodeResults: {
@@ -67,13 +71,17 @@ export type ResultsPageData = {
   // Those same couples' live own dance rows (style + song), for the inferred
   // fallback's posted-member states.
   revealedDancesByEpisode: Record<string, Record<string, { danceStyleId: string; songTitle: string | null; totalScore: number }[]>>;
-  // "entity" once supabase/apply-team-dance-entity.sql is applied, else
-  // "inferred" (teams read off the couples' slot-2 rows, no team_id selected).
+  // "special" once supabase/apply-special-dances.sql is applied, "entity"
+  // with only supabase/apply-team-dance-entity.sql, else "inferred" (teams
+  // read off the couples' slot-2 rows, no team_id selected).
   teamsMode: TeamsMode;
-  teamsByEpisode: Record<string, EpisodeTeam[]>;
+  teamsByEpisode: Record<string, SpecialDance[]>;
   teamMarksByTeam: Record<string, TeamMark[]>;
-  // Live team rows per team: total and the couples carrying it (entity mode).
-  teamLiveByTeam: Record<string, { total: number; coupleIds: string[] }>;
+  // Saved points and results per Points-mode special dance (special mode).
+  teamScoresByTeam: Record<string, SpecialDanceScore[]>;
+  // Live rows per special dance: the couples carrying it and each one's
+  // total (one shared total for marks, per couple for points).
+  teamLiveByTeam: Record<string, { total: number; coupleIds: string[]; totalByCouple: Record<string, number> }>;
   // Couples released from the draft to Spoiler-Free fans (draft_couple_releases),
   // per episode -- per couple, not a whole-episode flag.
   releasedCoupleIdsByEpisode: Record<string, string[]>;
@@ -101,7 +109,7 @@ export async function loadResultsPageData(
   supabase: SupabaseClient<Database>,
   admin: SupabaseClient<Database>
 ): Promise<ResultsPageData> {
-  const [{ data: activeSeasonId }, teamEntity] = await Promise.all([supabase.rpc("active_season_id"), detectTeamEntity(supabase)]);
+  const [{ data: activeSeasonId }, teamsMode] = await Promise.all([supabase.rpc("active_season_id"), detectTeamsMode(supabase)]);
 
   const { data: season } = await supabase
     .from("seasons")
@@ -151,7 +159,7 @@ export async function loadResultsPageData(
       .order("week_number"),
     supabase
       .from("dance_scores")
-      .select(`id, episode_id, couple_id, dance_style_id, song_title, total_score, created_at${teamEntity ? ", team_id" : ""}`),
+      .select(danceScoreColumns(teamsMode, "id, episode_id, couple_id, dance_style_id, song_title, total_score, created_at", { teamId: true })),
     supabase.from("judge_scores").select("dance_score_id, judge_id, score"),
     supabase
       .from("episode_results")
@@ -196,11 +204,15 @@ export async function loadResultsPageData(
   // round-tripping).
   const [draftEntries, teams] = await Promise.all([
     Promise.all((episodes ?? []).map(async (e) => [e.id, await loadDraftForEpisode(admin, e.id)] as const)),
-    teamEntity
-      ? loadEpisodeTeams(supabase, admin, (episodes ?? []).map((e) => e.id))
-      : Promise.resolve({ mode: "inferred" as const, teamsByEpisode: {}, marksByTeam: {} }),
+    teamsMode === "inferred"
+      ? Promise.resolve(EMPTY_TEAMS_LOAD("inferred"))
+      : loadEpisodeTeams(supabase, admin, (episodes ?? []).map((e) => e.id), teamsMode),
   ]);
-  const liveRows = ((danceScores ?? []) as unknown as ResultsPageData["danceScores"]).map((row) => ({ ...row, team_id: row.team_id ?? null }));
+  const liveRows = ((danceScores ?? []) as unknown as ResultsPageData["danceScores"]).map((row) => ({
+    ...row,
+    team_id: row.team_id ?? null,
+    max_score: row.max_score == null ? null : Number(row.max_score),
+  }));
   const draftsByEpisode: Record<string, DraftState> = Object.fromEntries(draftEntries);
 
   const unpublishedEpisodeIds = new Set(
@@ -211,8 +223,9 @@ export async function loadResultsPageData(
   const teamLiveByTeam: ResultsPageData["teamLiveByTeam"] = {};
   for (const row of liveRows) {
     if (row.team_id) {
-      const live = (teamLiveByTeam[row.team_id] ??= { total: Number(row.total_score), coupleIds: [] });
+      const live = (teamLiveByTeam[row.team_id] ??= { total: Number(row.total_score), coupleIds: [], totalByCouple: {} });
       live.coupleIds.push(row.couple_id);
+      live.totalByCouple[row.couple_id] = Number(row.total_score);
       continue;
     }
     if (!unpublishedEpisodeIds.has(row.episode_id)) continue;
@@ -285,6 +298,7 @@ export async function loadResultsPageData(
     teamsMode: teams.mode,
     teamsByEpisode: teams.teamsByEpisode,
     teamMarksByTeam: teams.marksByTeam,
+    teamScoresByTeam: teams.scoresByTeam,
     teamLiveByTeam,
     releasedCoupleIdsByEpisode,
     publishedByNames,
