@@ -50,6 +50,8 @@ import type { DraftState } from "@/lib/results-draft";
 import { formatEpisodeCasual, formatEpisodeCasualWithTheme, formatEnterResultsOption } from "@/lib/format-week";
 import { resultsEntryCoupleIds, selectableCast } from "@/lib/episode-cast";
 import { judgesForScoreInputs, type ScoringJudge } from "@/lib/scoring-judges";
+import { collapseToNights, scaledJudgesScore } from "@/lib/scoring";
+import { formatPoints } from "@/lib/format-points";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type CoupleWithStatus = Couple & {
@@ -131,6 +133,25 @@ function danceTotal(dance: RowDance): number {
 
 function coupleTotal(row: CoupleRow): number {
   return row.dances.reduce((sum, d) => sum + danceTotal(d), 0);
+}
+
+// "64/80 → 24.00": the night's raw total over every mark possible, and the
+// 30-point basis Dance Card pays on, through the same collapse the engine
+// uses. The arrow only appears when the two differ (a guest judge or a
+// second dance), so a plain three-judge dance reads "28/30".
+function nightPreview(row: CoupleRow, coupleId: string): string | null {
+  const dances = row.dances.flatMap((d) => {
+    const marks = Object.values(d.scores)
+      .filter((v) => v.trim() !== "")
+      .map(Number)
+      .filter((n) => Number.isFinite(n));
+    if (marks.length === 0) return [];
+    return [{ episodeId: "", coupleId, totalScore: marks.reduce((sum, n) => sum + n, 0), scaledScore: scaledJudgesScore(marks) }];
+  });
+  if (dances.length === 0) return null;
+  const [night] = collapseToNights(dances);
+  const basis = night.scaledScore === night.totalScore ? "" : ` → ${formatPoints(night.scaledScore)}`;
+  return `${night.totalScore}/${night.maxScore}${basis}`;
 }
 
 function isPerfectScore(dance: RowDance, judgeCount: number): boolean {
@@ -871,7 +892,9 @@ export function ResultsForm({
       <div key={c.id} className="rounded-xl border border-border p-2.5">
         <p className="text-sm font-semibold">
           {rank != null && <span className="text-muted-foreground">#{rank}</span>} <CoupleName {...coupleParts(c)} />
-          {rank != null && <span className="ml-1.5 text-muted-foreground">· {coupleTotal(row)} pts</span>}
+          {rank != null && (
+            <span className="ml-1.5 text-muted-foreground">· {nightPreview(row, c.id) ?? `${coupleTotal(row)} pts`}</span>
+          )}
         </p>
 
         <fieldset disabled={locked || revealBusy || publishing || releasing} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
