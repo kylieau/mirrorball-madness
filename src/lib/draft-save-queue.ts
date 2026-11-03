@@ -32,6 +32,12 @@ export class DraftSaveQueue {
     this.revisions.set(id, ++this.revision);
   }
 
+  // Drops an id whose edits no longer have anywhere to go (a deleted dance).
+  discard(id: string): void {
+    this.revisions.delete(id);
+    this.parked.delete(id);
+  }
+
   reset(): void {
     this.generation++;
     this.revisions.clear();
@@ -60,7 +66,19 @@ export class DraftSaveQueue {
         }
         if (generation !== this.generation)
           return { error: "The selected episode changed during the save. Please try again." };
-        if (result.error) return result;
+        if (result.error) {
+          // A save that wrote some ids before failing says which; those are
+          // done, the rest stay dirty for a retry.
+          for (const id of result.acknowledgedIds ?? []) {
+            if (this.revisions.get(id) === sent.get(id)) this.discard(id);
+          }
+          // An edit made while this request was out may fix what failed (a
+          // corrected mark), and a flush that joined this one waits on it, so
+          // send again rather than report an error about an older value.
+          const editedSince = this.dirtyIds().some((id) => this.revisions.get(id) !== sent.get(id));
+          if (!editedSince) return result;
+          continue;
+        }
         const acknowledged = result.acknowledgedIds ? new Set(result.acknowledgedIds) : null;
         const refused = new Set(result.skippedIds ?? []);
         for (const [id, revision] of sent) {

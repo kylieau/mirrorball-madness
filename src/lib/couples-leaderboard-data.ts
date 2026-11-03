@@ -16,11 +16,11 @@ export async function loadCoupleWeekResults(
   const [{ data: danceRows }, { data: outcomeRows }] = await Promise.all([
     supabase
       .from("dance_scores")
-      .select(danceScoreColumns(mode, "episode_id, couple_id, total_score, scaled_score"))
+      .select(danceScoreColumns(mode, "episode_id, couple_id, total_score, scaled_score", { teamId: true }))
       .in("episode_id", episodeIds),
     supabase.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
   ]);
-  const dances = ((danceRows ?? []) as unknown as { episode_id: string; couple_id: string; total_score: number; scaled_score: number; max_score?: number | null }[]).map(
+  const dances = ((danceRows ?? []) as unknown as { episode_id: string; couple_id: string; total_score: number; scaled_score: number; max_score?: number | null; team_id?: string | null }[]).map(
     (row) => ({ ...row, max_score: danceMaxScore(row) })
   );
   return weeks.map((week) => ({

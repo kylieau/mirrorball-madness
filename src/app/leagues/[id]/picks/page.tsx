@@ -142,12 +142,12 @@ export default async function LeaguePicksPage({
         .eq("manager_id", myTeamId)
         .order("predicted_position", { ascending: true })
     : Promise.resolve({ data: null });
-  type LeagueDanceRow = { couple_id: string; episode_id: string; total_score: number; scaled_score: number; max_score?: number | null };
+  type LeagueDanceRow = { couple_id: string; episode_id: string; total_score: number; scaled_score: number; max_score?: number | null; team_id?: string | null };
   const leagueDanceScoresPending: PromiseLike<{ data: LeagueDanceRow[] | null }> =
     leagueSlotPeriods.length > 0 && episodeWeekNumber.size > 0
       ? supabase
           .from("dance_scores")
-          .select(danceScoreColumns(teamsMode, "couple_id, episode_id, total_score, scaled_score"))
+          .select(danceScoreColumns(teamsMode, "couple_id, episode_id, total_score, scaled_score", { teamId: true }))
           .in("episode_id", [...episodeWeekNumber.keys()])
           .in("couple_id", [...new Set(leagueSlotPeriods.map((slot) => slot.coupleId))])
           .then((result) => ({ data: result.data as unknown as LeagueDanceRow[] | null }))

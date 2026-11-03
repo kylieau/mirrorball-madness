@@ -55,7 +55,7 @@ type EpisodeRows<T> = ({ episode_id: string } & T)[];
 // last result row per couple decides survival and bonus, as in the engine).
 export function weekResults(
   episodeIds: string[],
-  danceRows: EpisodeRows<{ couple_id: string; total_score: number; scaled_score: number; max_score: number | null }>,
+  danceRows: EpisodeRows<{ couple_id: string; total_score: number; scaled_score: number; max_score: number | null; team_id?: string | null }>,
   outcomeRows: EpisodeRows<{ couple_id: string; outcome: string; bonus_points: number }>
 ): Pick<HistoryWeekData, "danceScores" | "outcomes"> {
   const inWeek = new Set(episodeIds);
@@ -69,6 +69,7 @@ export function weekResults(
         totalScore: Number(row.total_score),
         scaledScore: Number(row.scaled_score),
         maxScore: row.max_score == null ? null : Number(row.max_score),
+        teamId: row.team_id ?? null,
       })),
     outcomes: outcomeRows
       .filter((row) => inWeek.has(row.episode_id))

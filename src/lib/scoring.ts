@@ -33,6 +33,9 @@ export type DanceScore = {
   totalScore: number;
   scaledScore: number;
   maxScore: number | null;
+  // Set on a special dance's row (dance_scores.team_id), which a couple's
+  // released draft never replaces.
+  teamId?: string | null;
 };
 
 export const STANDING_PANEL_SIZE = 3;

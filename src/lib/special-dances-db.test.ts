@@ -395,6 +395,20 @@ describe("special dances in PostgreSQL", () => {
     expect((await liveRows(amber)).map((r) => r.total)).toEqual([33, 4]);
   });
 
+  it("releases a couple's own draft after its special dance posts, and still refuses one whose own dance is live", async () => {
+    await db.exec(readFileSync("supabase/apply-draft-release-own-rows.sql", "utf8"));
+    const danceOff = await saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [amber, julia], scoringMode: "points" });
+    await savePoints(danceOff, [{ coupleId: amber, points: 3 }, { coupleId: julia, points: 0 }]);
+    await revealTeam(danceOff);
+    await ownDances([amber, julia]);
+    const release = (coupleId: string) =>
+      db.query("select public.set_draft_couple_release($1, $2, $3, true)", [episode, coupleId, friend]);
+    await release(amber);
+    expect((await db.query("select couple_id from public.draft_couple_releases where episode_id = $1", [episode])).rows).toEqual([{ couple_id: amber }]);
+    await revealCouple(julia);
+    await expect(release(julia)).rejects.toThrow(/already live/);
+  });
+
   it("keeps points and results out of every API role's reach until posted", async () => {
     const danceOff = await saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [amber, julia], scoringMode: "points" });
     await savePoints(danceOff, [{ coupleId: amber, points: 3, result: "Winner" }]);

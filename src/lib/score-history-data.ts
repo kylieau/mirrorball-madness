@@ -114,14 +114,14 @@ export async function loadScoreHistory(
       .maybeSingle(),
     supabase
       .from("dance_scores")
-      .select(danceScoreColumns(teamsMode, "episode_id, couple_id, total_score, scaled_score"))
+      .select(danceScoreColumns(teamsMode, "episode_id, couple_id, total_score, scaled_score", { teamId: true }))
       .in("episode_id", episodeIds),
     supabase.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
     supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id").in("episode_id", episodeIds),
   ]);
   const couples = allCouples.filter((couple) => couple.season_id === seasonId);
   const liveDanceRows = (
-    (danceRows ?? []) as unknown as { episode_id: string; couple_id: string; total_score: number; scaled_score: number; max_score?: number | null }[]
+    (danceRows ?? []) as unknown as { episode_id: string; couple_id: string; total_score: number; scaled_score: number; max_score?: number | null; team_id?: string | null }[]
   ).map((row) => ({ ...row, max_score: danceMaxScore(row) }));
 
   const nameParts = buildCoupleDisplayNames(

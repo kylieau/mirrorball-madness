@@ -4155,7 +4155,8 @@ begin
   perform public.assert_episode_draft_actor(p_episode_id,p_actor_id);
   if exists(select 1 from public.episodes where id=p_episode_id and results_published_at is not null) then raise exception 'This episode is already published'; end if;
   if p_release then
-    if exists(select 1 from public.dance_scores where episode_id=p_episode_id and couple_id=p_couple_id) then raise exception 'This couple is already live'; end if;
+    -- A posted special dance (team_id) is not the couple's own dance going live.
+    if exists(select 1 from public.dance_scores where episode_id=p_episode_id and couple_id=p_couple_id and team_id is null) then raise exception 'This couple is already live'; end if;
     if not exists(select 1 from public.draft_dance_scores where episode_id=p_episode_id and couple_id=p_couple_id)
       or exists(select 1 from public.draft_dance_scores d where d.episode_id=p_episode_id and d.couple_id=p_couple_id and not exists(select 1 from public.draft_judge_scores where draft_dance_score_id=d.id)) then raise exception 'Complete the saved judge scores before releasing'; end if;
     insert into public.draft_couple_releases(episode_id,couple_id,released_by) values(p_episode_id,p_couple_id,p_actor_id)

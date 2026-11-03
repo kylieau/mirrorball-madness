@@ -5,6 +5,7 @@ import {
   draftReleaseLabel,
   draftScoresVisible,
   draftManagerScoresForNight,
+  draftNightDanceScores,
   draftWeekManagerScores,
   excludeReleasedCoupleRows,
   findDraftRelease,
@@ -78,6 +79,16 @@ describe("excludeReleasedCoupleRows", () => {
     expect(excludeReleasedCoupleRows(rows, { e1: ["c1"] })).toEqual([
       { episode_id: "e1", couple_id: "c2", note: "not released" },
       { episode_id: "e2", couple_id: "c1", note: "different episode, same couple id" },
+    ]);
+  });
+
+  it("keeps a released couple's posted special dance, since the draft holds only its own dances", () => {
+    const rows = [
+      { episode_id: "e1", couple_id: "c1", team_id: null, note: "own dance" },
+      { episode_id: "e1", couple_id: "c1", team_id: "t1", note: "team dance" },
+    ];
+    expect(excludeReleasedCoupleRows(rows, { e1: ["c1"] })).toEqual([
+      { episode_id: "e1", couple_id: "c1", team_id: "t1", note: "team dance" },
     ]);
   });
 });
@@ -220,6 +231,35 @@ describe("replaceWeekDanceScores", () => {
       { episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27, maxScore: null },
     ]);
   });
+
+  it("keeps a posted special dance beside the couple's drafted own dance, paying the night once", () => {
+    const team = { episodeId: "ep1", coupleId: "c1", totalScore: 36, scaledScore: 27, maxScore: 40, teamId: "t1" };
+    const weeks = replaceWeekDanceScores(
+      [{ weekNumber: 3, danceScores: [team] }],
+      { weekNumber: 3, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 28, scaledScore: 21, maxScore: 40 }] }
+    );
+    expect(weeks[0].danceScores).toContainEqual(team);
+    expect(nightScaledScoresByCouple(weeks[0].danceScores).get("c1")).toBe(24);
+  });
+});
+
+describe("draftNightDanceScores", () => {
+  it("adds the week's live rows to the released drafts, dropping only a released couple's own live rows", () => {
+    const night = {
+      releasedCoupleIdsByEpisode: { ep1: ["c1"] },
+      dances: [{ episodeId: "ep1", coupleId: "c1", total: 27, scaled: 27 }],
+      liveDances: [
+        { episodeId: "ep1", coupleId: "c1", totalScore: 20, scaledScore: 20, maxScore: null, teamId: null },
+        { episodeId: "ep1", coupleId: "c1", totalScore: 36, scaledScore: 27, maxScore: 40, teamId: "t1" },
+        { episodeId: "ep1", coupleId: "c2", totalScore: 24, scaledScore: 24, maxScore: null, teamId: null },
+      ],
+    };
+    expect(draftNightDanceScores(night)).toEqual([
+      { episodeId: "ep1", coupleId: "c1", totalScore: 36, scaledScore: 27, maxScore: 40, teamId: "t1" },
+      { episodeId: "ep1", coupleId: "c2", totalScore: 24, scaledScore: 24, maxScore: null, teamId: null },
+      { episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27, maxScore: null },
+    ]);
+  });
 });
 
 describe("locked strip copy", () => {
@@ -265,7 +305,7 @@ describe("draftReleaseLabel", () => {
 
 describe("draftManagerScoresForNight", () => {
   const settings = { judges_score_multiplier: 1, judges_score_category_weight: 1, judges_score_starts_week: 1 };
-  const night = { weekNumber: 4, dances: [{ episodeId: "ep1", coupleId: "c1", total: 30, scaled: 22.5 }] };
+  const night = { weekNumber: 4, danceScores: [{ episodeId: "ep1", coupleId: "c1", totalScore: 30, scaledScore: 22.5, maxScore: null }] };
 
   it("pays the manager who held the couple that week, on the scaled score", () => {
     const slots = [

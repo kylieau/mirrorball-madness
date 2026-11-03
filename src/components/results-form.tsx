@@ -20,7 +20,7 @@ import {
   undoTeamScores,
 } from "@/app/admin/results/actions";
 import { TeamEntry, type ApplyOutcome, type TeamEntryView } from "@/components/team-entry";
-import { SpecialDanceEntry, blankSpecialDance, type SpecialDanceView } from "@/components/special-dance-entry";
+import { SpecialDanceEntry, blankSpecialDance, type SpecialDanceView, type SpecialScoreEdit } from "@/components/special-dance-entry";
 import type { TeamsMode } from "@/lib/episode-teams";
 import {
   ADD_SPECIAL_VALUE,
@@ -453,6 +453,15 @@ export function ResultsForm({
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushDraftRef = useRef<() => Promise<{ error: string | null }>>(async () => ({ error: null }));
+  // Special dances' typed marks and points, keyed by dance, held here rather
+  // than in the entry so an edit survives the entry closing and saves in
+  // order through its own queue. They are not a couple-week draft: saving
+  // them never flips hasDraft or calls flushDraft.
+  const specialSaveQueue = useRef(new DraftSaveQueue());
+  const specialEdits = useRef(new Map<string, SpecialScoreEdit>());
+  const specialAutosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [, setSpecialEditsVersion] = useState(0);
+  const [specialSaveErrors, setSpecialSaveErrors] = useState<Record<string, string>>({});
   const draftSavedAgo = useRelativeTimeAgo(draftSavedAt);
 
   // saveEpisodeDraft's revalidatePath("/admin/results", "layout") makes Next
@@ -633,6 +642,63 @@ export function ResultsForm({
 
   draftInputRef.current = buildDraftInput;
 
+  function editSpecialScores(teamId: string, edit: SpecialScoreEdit) {
+    specialEdits.current.set(teamId, edit);
+    specialSaveQueue.current.markDirty(teamId);
+    setSpecialEditsVersion((v) => v + 1);
+    setSpecialSaveErrors((prev) => {
+      const next = { ...prev };
+      delete next[teamId];
+      return next;
+    });
+    if (specialAutosaveTimer.current) clearTimeout(specialAutosaveTimer.current);
+    specialAutosaveTimer.current = setTimeout(() => void flushSpecialSavesRef.current(), 900);
+  }
+
+  async function saveSpecialScores(teamId: string, edit: SpecialScoreEdit): Promise<{ error: string | null }> {
+    if (edit.save.kind === "invalid") return { error: edit.save.error };
+    try {
+      return edit.save.kind === "marks"
+        ? await saveTeamMarksAction({ episodeId: edit.episodeId, teamId, marks: edit.save.marks, markMax: edit.save.markMax })
+        : await saveSpecialDancePointsAction({ episodeId: edit.episodeId, teamId, scores: edit.save.scores });
+    } catch {
+      return { error: "Could not confirm the update. Please refresh and try again." };
+    }
+  }
+
+  // Saves every special dance's pending scores, one dance at a time. A dance
+  // that fails (or holds an invalid mark) stays dirty, keeps blocking Finish
+  // Week and leaving, and does not hold back the others.
+  async function flushSpecialSaves(): Promise<{ error: string | null }> {
+    const failures: Record<string, string> = {};
+    const result = await specialSaveQueue.current.flush(
+      (ids) => ids.flatMap((id) => {
+        const edit = specialEdits.current.get(id);
+        return edit ? [[id, edit] as const] : [];
+      }),
+      async (entries) => {
+        const acknowledgedIds: string[] = [];
+        let firstError: string | null = null;
+        for (const [teamId, edit] of entries) {
+          const saved = await saveSpecialScores(teamId, edit);
+          if (saved.error) {
+            firstError ??= saved.error;
+            // The entry already shows an invalid mark inline.
+            if (edit.save.kind !== "invalid") failures[teamId] = saved.error;
+          } else acknowledgedIds.push(teamId);
+        }
+        return { error: firstError, acknowledgedIds };
+      }
+    );
+    const stillDirty = new Set(specialSaveQueue.current.dirtyIds());
+    for (const id of [...specialEdits.current.keys()]) if (!stillDirty.has(id)) specialEdits.current.delete(id);
+    setSpecialEditsVersion((v) => v + 1);
+    // A retry within this flush may have saved a dance whose first try failed.
+    const stillFailing = Object.entries(failures).filter(([id]) => stillDirty.has(id));
+    if (stillFailing.length > 0) setSpecialSaveErrors((prev) => ({ ...prev, ...Object.fromEntries(stillFailing) }));
+    return result;
+  }
+
   async function flushDraft(): Promise<{ error: string | null }> {
     if (!selectedEpisode) return { error: null };
     setSavingDraft(true);
@@ -756,19 +822,9 @@ export function ResultsForm({
     }
   }
 
-  // Entity model: marks live on the team and save as they are typed; the
-  // team posts, un-posts or re-posts on its own and the week's judges points
-  // are recomputed each time. This is not a couple-week draft: do not flip
-  // hasDraft or call flushDraft.
-  async function handleSaveTeamMarks(teamId: string, marks: TeamMark[], markMax?: number) {
-    if (!selectedEpisode) return { error: "Select a week first." };
-    try {
-      return await saveTeamMarksAction({ episodeId: selectedEpisode.id, teamId, marks, markMax });
-    } catch {
-      return { error: "Could not confirm the update. Please refresh and try again." };
-    }
-  }
-
+  // Entity model: marks live on the team and save as they are typed
+  // (flushSpecialSaves); the team posts, un-posts or re-posts on its own and
+  // the week's judges points are recomputed each time.
   async function handlePostTeam(teamId: string) {
     if (!selectedEpisode) return { error: "Select a week first." };
     setTeamBusy(true);
@@ -826,19 +882,14 @@ export function ResultsForm({
     try {
       const result = await deleteSpecialDanceAction({ episodeId: selectedEpisode.id, teamId });
       if (!result.error) {
+        // Its typed scores have nowhere to go once the dance is gone.
+        specialEdits.current.delete(teamId);
+        specialSaveQueue.current.discard(teamId);
+        setSpecialEditsVersion((v) => v + 1);
         setDraftSpecial(null);
         router.refresh();
       }
       return result;
-    } catch {
-      return { error: "Could not confirm the update. Please refresh and try again." };
-    }
-  }
-
-  async function handleSaveSpecialPoints(teamId: string, scores: SpecialDanceScore[]) {
-    if (!selectedEpisode) return { error: "Select a week first." };
-    try {
-      return await saveSpecialDancePointsAction({ episodeId: selectedEpisode.id, teamId, scores });
     } catch {
       return { error: "Could not confirm the update. Please refresh and try again." };
     }
@@ -968,6 +1019,12 @@ export function ResultsForm({
       setError(null);
       setPublishing(true);
       // Flush any pending edits first so Publish never publishes stale data.
+      const specialResult = await flushSpecialSaves();
+      if (specialResult.error) {
+        setError(specialResult.error);
+        setPublishing(false);
+        return;
+      }
       const saveResult = await flushDraft();
       if (saveResult.error) {
         setPublishing(false);
@@ -999,6 +1056,8 @@ export function ResultsForm({
   // always calls whichever flushDraft closure is current when it actually
   // fires, not the one from the render that scheduled it.
   flushDraftRef.current = flushDraft;
+  const flushSpecialSavesRef = useRef(flushSpecialSaves);
+  flushSpecialSavesRef.current = flushSpecialSaves;
 
   function scheduleAutosave() {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
@@ -1009,9 +1068,11 @@ export function ResultsForm({
 
   useEffect(() => {
     const queue = draftSaveQueue.current;
+    const specialQueue = specialSaveQueue.current;
+    const unsaved = () => queue.dirtyIds().length > 0 || specialQueue.dirtyIds().length > 0;
     let navigating = false;
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (queue.dirtyIds().length === 0) return;
+      if (!unsaved()) return;
       event.preventDefault();
       event.returnValue = "";
     };
@@ -1021,12 +1082,17 @@ export function ResultsForm({
       if (!anchor || anchor.target === "_blank" || anchor.hasAttribute("download")) return;
       const url = new URL(anchor.href, window.location.href);
       if (url.origin !== window.location.origin || (url.pathname === window.location.pathname && url.search === window.location.search)) return;
-      if (queue.dirtyIds().length === 0) return;
+      if (!unsaved()) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       if (navigating) return;
       navigating = true;
       try {
+        const special = await flushSpecialSavesRef.current();
+        if (special.error) {
+          setError(special.error);
+          return;
+        }
         const result = await flushDraftRef.current();
         if (!result.error) router.push(url.pathname + url.search + url.hash);
       } finally {
@@ -1040,9 +1106,11 @@ export function ResultsForm({
       window.removeEventListener("beforeunload", beforeUnload);
       document.removeEventListener("click", onClick, true);
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+      if (specialAutosaveTimer.current) clearTimeout(specialAutosaveTimer.current);
       // Internal links await the save above. Other unmounts still attempt to
       // drain edits; abrupt browser termination cannot guarantee delivery.
       if (queue.dirtyIds().length > 0) void flushDraftRef.current();
+      if (specialQueue.dirtyIds().length > 0) void flushSpecialSavesRef.current();
     };
   }, [router]);
 
@@ -1569,8 +1637,10 @@ export function ResultsForm({
         startInEdit={view.dance.id === NEW_SPECIAL_ID}
         onSaveSetup={handleSaveSpecial}
         onDelete={handleDeleteSpecial}
-        onSaveMarks={handleSaveTeamMarks}
-        onSavePoints={handleSaveSpecialPoints}
+        unsaved={specialEdits.current.get(view.dance.id)?.inputs ?? null}
+        saveError={specialSaveErrors[view.dance.id] ?? null}
+        onEditScores={editSpecialScores}
+        onFlushScores={() => flushSpecialSavesRef.current()}
         onPost={handlePostTeam}
         onUndo={handleUndoTeam}
       />

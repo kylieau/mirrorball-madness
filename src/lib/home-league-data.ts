@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { computeLeagueHomeSummary } from "@/lib/league-home-summary";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
+import { draftNightDanceScores } from "@/lib/draft-scores";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { loadViewerSeason } from "@/lib/viewer-season-data";
@@ -49,13 +50,7 @@ export async function loadHomeLeagueData(
     ? {
         weekId: draftContext.night.weekId,
         weekNumber: draftContext.night.weekNumber,
-        dances: draftContext.night.dances.map((dance) => ({
-          episodeId: dance.episodeId,
-          coupleId: dance.coupleId,
-          totalScore: dance.total,
-          scaledScore: dance.scaled,
-          maxScore: null,
-        })),
+        dances: draftNightDanceScores(draftContext.night),
       }
     : null;
 

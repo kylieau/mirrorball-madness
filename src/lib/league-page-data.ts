@@ -7,7 +7,7 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
-import { draftManagerScoresForNight, homeStripChoice, scoresReplacingDraftWeek } from "@/lib/draft-scores";
+import { draftManagerScoresForNight, draftNightDanceScores, homeStripChoice, scoresReplacingDraftWeek } from "@/lib/draft-scores";
 import { formatManagerName } from "@/lib/manager-display";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
@@ -140,7 +140,12 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     bannerWeeks: toBannerWeeks(groupedWeeks),
   });
   const draftManagers =
-    draftNight && scoringSettings ? draftManagerScoresForNight(scoringSettings, allLeagueSlots ?? [], draftNight) : [];
+    draftNight && scoringSettings
+      ? draftManagerScoresForNight(scoringSettings, allLeagueSlots ?? [], {
+          weekNumber: draftNight.weekNumber,
+          danceScores: draftNightDanceScores(draftNight),
+        })
+      : [];
   const scoreRows =
     draftNight && draftManagers.length > 0
       ? scoresReplacingDraftWeek(allScores ?? [], draftNight.weekId, draftManagers)

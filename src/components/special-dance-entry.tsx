@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { PencilIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,19 @@ export type SpecialDanceView = {
   live: { total: number; coupleIds: string[]; totalByCouple: Record<string, number> } | null;
 };
 
+// Typed marks or points the page holds until they save, so closing and
+// reopening an entry, or switching episodes, never loses or reorders an edit.
+export type SpecialScoreInputs = {
+  marks: Record<string, string>;
+  points: Record<string, string>;
+  results: Record<string, string>;
+};
+export type SpecialScoreSave =
+  | { kind: "marks"; marks: TeamMark[]; markMax: number }
+  | { kind: "points"; scores: SpecialDanceScore[] }
+  | { kind: "invalid"; error: string };
+export type SpecialScoreEdit = { episodeId: string; inputs: SpecialScoreInputs; save: SpecialScoreSave };
+
 export type SpecialDanceParticipant = {
   id: string;
   celebrity: string;
@@ -82,6 +95,23 @@ export type SpecialDanceParticipant = {
 };
 
 const MARK_MAX_OPTIONS = Array.from({ length: 19 }, (_, i) => (i + 2) / 2);
+
+function pointsToInputs(scores: SpecialDanceScore[]): Record<string, string> {
+  return Object.fromEntries(scores.filter((s) => s.points != null).map((s) => [s.coupleId, String(s.points)]));
+}
+
+function resultsToInputs(scores: SpecialDanceScore[]): Record<string, string> {
+  return Object.fromEntries(scores.filter((s) => s.result).map((s) => [s.coupleId, s.result!]));
+}
+
+// The filled-in, in-range marks; blanks are not sent (a partial panel saves).
+function typedMarksFrom(inputs: Record<string, string>, panelIds: string[], markMax: number): TeamMark[] {
+  return panelIds.flatMap((id) => {
+    const raw = (inputs[id] ?? "").trim();
+    const n = Number(raw);
+    return raw !== "" && isValidMark(n, markMax) ? [{ judgeId: id, score: n }] : [];
+  });
+}
 
 function marksToInputs(marks: TeamMark[]): Record<string, string> {
   return Object.fromEntries(marks.map((m) => [m.judgeId, String(m.score)]));
@@ -173,8 +203,10 @@ export function SpecialDanceEntry({
   startInEdit = false,
   onSaveSetup,
   onDelete,
-  onSaveMarks,
-  onSavePoints,
+  unsaved,
+  saveError,
+  onEditScores,
+  onFlushScores,
   onPost,
   onUndo,
 }: {
@@ -199,8 +231,11 @@ export function SpecialDanceEntry({
   startInEdit?: boolean;
   onSaveSetup: (dance: SpecialDanceSetupInput) => Promise<{ error: string | null; id?: string }>;
   onDelete: (teamId: string) => Promise<{ error: string | null }>;
-  onSaveMarks: (teamId: string, marks: TeamMark[], markMax: number) => Promise<{ error: string | null }>;
-  onSavePoints: (teamId: string, scores: SpecialDanceScore[]) => Promise<{ error: string | null }>;
+  // This dance's typed scores that have not saved yet (null once saved).
+  unsaved: SpecialScoreInputs | null;
+  saveError: string | null;
+  onEditScores: (teamId: string, edit: SpecialScoreEdit) => void;
+  onFlushScores: () => Promise<{ error: string | null }>;
   onPost: (teamId: string) => Promise<{ error: string | null }>;
   onUndo: (teamId: string) => Promise<{ error: string | null }>;
 }) {
@@ -210,21 +245,14 @@ export function SpecialDanceEntry({
   const [setup, setSetup] = useState(() => setupFromDance(dance));
   const [setupError, setSetupError] = useState<string | null>(null);
   const [savingSetup, setSavingSetup] = useState(false);
-  const [markInputs, setMarkInputs] = useState<Record<string, string>>(() => marksToInputs(view.marks));
-  const [pointInputs, setPointInputs] = useState<Record<string, string>>(() =>
-    Object.fromEntries(view.scores.filter((s) => s.points != null).map((s) => [s.coupleId, String(s.points)]))
-  );
-  const [results, setResults] = useState<Record<string, string>>(() =>
-    Object.fromEntries(view.scores.filter((s) => s.result).map((s) => [s.coupleId, s.result!]))
-  );
-  const [marksDirty, setMarksDirty] = useState(false);
-  const [pointsDirty, setPointsDirty] = useState(false);
-  const [savingMarks, setSavingMarks] = useState(false);
-  const [savingPoints, setSavingPoints] = useState(false);
+  const [markInputs, setMarkInputs] = useState<Record<string, string>>(() => unsaved?.marks ?? marksToInputs(view.marks));
+  const [pointInputs, setPointInputs] = useState<Record<string, string>>(() => unsaved?.points ?? pointsToInputs(view.scores));
+  const [results, setResults] = useState<Record<string, string>>(() => unsaved?.results ?? resultsToInputs(view.scores));
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSecondStyle, setShowSecondStyle] = useState(dance.secondDanceStyleId != null);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const dirty = unsaved != null;
 
   useEffect(() => {
     if (!editing) setSetup(setupFromDance(dance));
@@ -232,16 +260,16 @@ export function SpecialDanceEntry({
 
   const savedMarksKey = marksKey(view.marks);
   useEffect(() => {
-    if (!marksDirty) setMarkInputs(marksToInputs(view.marks));
-  }, [savedMarksKey, marksDirty]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!dirty) setMarkInputs(marksToInputs(view.marks));
+  }, [savedMarksKey, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const savedScoresKey = scoresKey(view.scores);
   useEffect(() => {
-    if (!pointsDirty) {
-      setPointInputs(Object.fromEntries(view.scores.filter((s) => s.points != null).map((s) => [s.coupleId, String(s.points)])));
-      setResults(Object.fromEntries(view.scores.filter((s) => s.result).map((s) => [s.coupleId, s.result!])));
+    if (!dirty) {
+      setPointInputs(pointsToInputs(view.scores));
+      setResults(resultsToInputs(view.scores));
     }
-  }, [savedScoresKey, pointsDirty]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [savedScoresKey, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scoringMode = editing ? setup.scoringMode : dance.scoringMode;
   const markMax = editing ? setup.markMax : dance.markMax;
@@ -257,56 +285,50 @@ export function SpecialDanceEntry({
   const scoringLocked = hasSavedScores || posted;
 
   const parsedMarks = parseTeamMarks(markInputs, panelIds, markMax);
-  const typedMarks: TeamMark[] = panelIds.flatMap((id) => {
-    const raw = (markInputs[id] ?? "").trim();
-    const n = Number(raw);
-    return raw !== "" && isValidMark(n, markMax) ? [{ judgeId: id, score: n }] : [];
-  });
-  const typedMarksKey = marksKey(typedMarks);
-  const attemptedMarks = useRef(savedMarksKey);
-  const pendingMarks =
-    !isNew && scoringMode === "marks" && marksDirty && panelOk && invalidMarkIds.length === 0 && parsedMarks.invalidJudgeIds.length === 0 && typedMarksKey !== savedMarksKey && attemptedMarks.current !== typedMarksKey;
-
-  useEffect(() => {
-    if (!pendingMarks || inputsDisabled) return;
-    const marks = typedMarks;
-    const timer = setTimeout(async () => {
-      attemptedMarks.current = typedMarksKey;
-      setSavingMarks(true);
-      setError(null);
-      const outcome = await onSaveMarks(dance.id, marks, markMax);
-      setSavingMarks(false);
-      if (outcome.error) setError(outcome.error);
-      else setMarksDirty(false);
-    }, 900);
-    return () => clearTimeout(timer);
-  }, [typedMarksKey, pendingMarks, inputsDisabled]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  const typedMarks = typedMarksFrom(markInputs, panelIds, markMax);
   const parsedPoints = parseSpecialPoints(pointInputs, eligible);
-  const typedScores: SpecialDanceScore[] = eligible.map((coupleId) => ({
-    coupleId,
-    points: pointInputs[coupleId]?.trim() === "" || pointInputs[coupleId] == null ? null : Number(pointInputs[coupleId]),
-    result: results[coupleId]?.trim() || null,
-  }));
-  const typedScoresKey = scoresKey(typedScores);
-  const attemptedScores = useRef(savedScoresKey);
-  const pendingPoints =
-    !isNew && scoringMode === "points" && pointsDirty && typedScoresKey !== savedScoresKey && attemptedScores.current !== typedScoresKey;
 
-  useEffect(() => {
-    if (!pendingPoints || inputsDisabled) return;
-    const scores = typedScores;
-    const timer = setTimeout(async () => {
-      attemptedScores.current = typedScoresKey;
-      setSavingPoints(true);
-      setError(null);
-      const outcome = await onSavePoints(dance.id, scores);
-      setSavingPoints(false);
-      if (outcome.error) setError(outcome.error);
-      else setPointsDirty(false);
-    }, 900);
-    return () => clearTimeout(timer);
-  }, [typedScoresKey, pendingPoints, inputsDisabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Every edit goes to the page, which saves it in order (autosave, Finish
+  // Week, leaving); an invalid value is held there unsent so it keeps
+  // blocking until fixed.
+  function editScores(next: SpecialScoreInputs) {
+    let save: SpecialScoreSave;
+    if (scoringMode === "marks") {
+      const invalid = !panelOk || panelIds.some((id) => markInputError(next.marks[id] ?? "", markMax) != null) || parseTeamMarks(next.marks, panelIds, markMax).invalidJudgeIds.length > 0;
+      save = invalid
+        ? { kind: "invalid", error: `Fix the judges' marks on ${displayName} first.` }
+        : { kind: "marks", marks: typedMarksFrom(next.marks, panelIds, markMax), markMax };
+    } else {
+      save = parseSpecialPoints(next.points, eligible).invalidCoupleIds.length > 0
+        ? { kind: "invalid", error: `Fix the points on ${displayName} first.` }
+        : {
+            kind: "points",
+            scores: eligible.map((coupleId) => ({
+              coupleId,
+              points: next.points[coupleId]?.trim() ? Number(next.points[coupleId]) : null,
+              result: next.results[coupleId]?.trim() || null,
+            })),
+          };
+    }
+    setError(null);
+    onEditScores(dance.id, { episodeId: dance.episodeId, inputs: next, save });
+  }
+
+  // Publish reads the saved marks, so a value typed inside the autosave
+  // window has to land first.
+  async function post() {
+    setPosting(true);
+    const saved = await onFlushScores();
+    if (saved.error) {
+      setPosting(false);
+      setError(saved.error);
+      return;
+    }
+    setError(null);
+    const outcome = await onPost(dance.id);
+    setPosting(false);
+    if (outcome.error) setError(outcome.error);
+  }
 
   const complete = specialDanceComplete(
     { scoringMode, panelJudgeIds: editing ? setup.panelJudgeIds : dance.panelJudgeIds },
@@ -394,7 +416,7 @@ export function SpecialDanceEntry({
       tone: parsedPoints.filled === eligible.length && eligible.length > 0 ? "ok" : parsedPoints.filled === 0 ? "muted" : "warn",
       text: `${parsedPoints.filled} of ${eligible.length} ${eligible.length === 1 ? "couple has" : "couples have"} points.`,
     };
-  } else if (savingMarks || pendingMarks || savingPoints || pendingPoints) {
+  } else if (unsaved && !saveError) {
     status = { tone: "muted", text: "Saving…" };
   } else if (posted && stale) {
     status = { tone: "warn", text: "Saved scores differ from what is live. Re-post to update every participant." };
@@ -844,9 +866,9 @@ export function SpecialDanceEntry({
                         value={markInputs[j.id] ?? ""}
                         disabled={posted}
                         onChange={(e) => {
-                          setMarksDirty(true);
-                          setError(null);
-                          setMarkInputs((prev) => ({ ...prev, [j.id]: e.target.value }));
+                          const next = { ...markInputs, [j.id]: e.target.value };
+                          setMarkInputs(next);
+                          editScores({ marks: next, points: pointInputs, results });
                         }}
                       />
                       {fieldError && (
@@ -904,17 +926,18 @@ export function SpecialDanceEntry({
                   placeholder="—"
                   value={pointInputs[coupleId] ?? ""}
                   onChange={(e) => {
-                    setPointsDirty(true);
-                    setError(null);
-                    setPointInputs((prev) => ({ ...prev, [coupleId]: e.target.value }));
+                    const next = { ...pointInputs, [coupleId]: e.target.value };
+                    setPointInputs(next);
+                    editScores({ marks: markInputs, points: next, results });
                   }}
                 />
                 <Select
                   items={Object.fromEntries(RESULT_SUGGESTIONS.map((r) => [r, r]))}
                   value={results[coupleId] ?? null}
                   onValueChange={(v) => {
-                    setPointsDirty(true);
-                    setResults((prev) => ({ ...prev, [coupleId]: v ?? "" }));
+                    const next = { ...results, [coupleId]: v ?? "" };
+                    setResults(next);
+                    editScores({ marks: markInputs, points: pointInputs, results: next });
                   }}
                 >
                   <SelectTrigger className="h-8 w-28 text-xs">
@@ -951,9 +974,9 @@ export function SpecialDanceEntry({
           {status.text}
         </p>
       )}
-      {error && (
+      {(error ?? saveError) && (
         <p role="alert" className="mt-1.5 text-xs text-danger-text">
-          {error}
+          {error ?? saveError}
         </p>
       )}
 
@@ -1012,13 +1035,7 @@ export function SpecialDanceEntry({
                 {stale && (
                   <Button
                     disabled={busy || posting || !complete}
-                    onClick={async () => {
-                      setPosting(true);
-                      setError(null);
-                      const outcome = await onPost(dance.id);
-                      setPosting(false);
-                      if (outcome.error) setError(outcome.error);
-                    }}
+                    onClick={() => void post()}
                   >
                     {posting ? "Posting…" : "Re-post"}
                   </Button>
@@ -1027,13 +1044,7 @@ export function SpecialDanceEntry({
             ) : (
               <Button
                 disabled={busy || posting || !complete || eligible.length === 0 || invalidMarkIds.length > 0}
-                onClick={async () => {
-                  setPosting(true);
-                  setError(null);
-                  const outcome = await onPost(dance.id);
-                  setPosting(false);
-                  if (outcome.error) setError(outcome.error);
-                }}
+                onClick={() => void post()}
               >
                 {posting ? "Publishing…" : scoringMode === "points" ? "Publish" : "Publish Team"}
               </Button>

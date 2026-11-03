@@ -55,6 +55,79 @@ describe("DraftSaveQueue", () => {
     expect(queue.dirtyIds()).toEqual([]);
   });
 
+  it("clears the ids a failed save did write and keeps the rest", async () => {
+    const queue = new DraftSaveQueue();
+    queue.markDirty("a");
+    queue.markDirty("b");
+    await expect(
+      queue.flush(
+        (ids) => ids,
+        async () => ({ error: "b is invalid", acknowledgedIds: ["a"] })
+      )
+    ).resolves.toEqual({ error: "b is invalid", acknowledgedIds: ["a"] });
+    expect(queue.dirtyIds()).toEqual(["b"]);
+  });
+
+  it("resends a newer edit when a failed save acknowledges the older one", async () => {
+    const queue = new DraftSaveQueue();
+    const first = deferred();
+    const save = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValue({ error: "offline" });
+    queue.markDirty("a");
+    const flushed = queue.flush((ids) => ids, save);
+    queue.markDirty("a");
+    first.resolve({ error: "offline", acknowledgedIds: ["a"] } as { error: string | null });
+    await expect(flushed).resolves.toEqual({ error: "offline" });
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(queue.dirtyIds()).toEqual(["a"]);
+  });
+
+  it("sends a value reverted to the saved one while a newer save was in flight", async () => {
+    const queue = new DraftSaveQueue();
+    let mark = 9;
+    const first = deferred();
+    const save = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValue({ error: null });
+    queue.markDirty("team");
+    const flushed = queue.flush(() => mark, save);
+    mark = 8;
+    queue.markDirty("team");
+    first.resolve({ error: null });
+    await flushed;
+    expect(save.mock.calls).toEqual([[9], [8]]);
+  });
+
+  it("resends instead of failing when the failed id was edited during the request", async () => {
+    const queue = new DraftSaveQueue();
+    let valid = false;
+    const first = deferred();
+    const save = vi
+      .fn()
+      .mockReturnValueOnce(first.promise)
+      .mockImplementation(async () => (valid ? { error: null } : { error: "invalid" }));
+    queue.markDirty("a");
+    queue.markDirty("b");
+    const flushed = queue.flush((ids) => ids, save);
+    valid = true;
+    queue.markDirty("b");
+    first.resolve({ error: "invalid", acknowledgedIds: ["a"] } as { error: string | null });
+    await expect(flushed).resolves.toEqual({ error: null });
+    expect(save.mock.calls).toEqual([[["a", "b"]], [["b"]]]);
+    expect(queue.dirtyIds()).toEqual([]);
+  });
+
+  it("forgets a discarded id, even mid-save", async () => {
+    const queue = new DraftSaveQueue();
+    const first = deferred();
+    const save = vi.fn().mockReturnValueOnce(first.promise).mockResolvedValue({ error: null });
+    queue.markDirty("a");
+    const flushed = queue.flush((ids) => ids, save);
+    queue.markDirty("a");
+    queue.discard("a");
+    first.resolve({ error: null });
+    await expect(flushed).resolves.toEqual({ error: null });
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(queue.dirtyIds()).toEqual([]);
+  });
+
   it("does not acknowledge edits from another episode", async () => {
     const queue = new DraftSaveQueue();
     const first = deferred();

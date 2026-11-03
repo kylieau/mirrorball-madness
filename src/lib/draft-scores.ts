@@ -97,8 +97,9 @@ export function findDraftRelease(
 // draft's own rows for exactly those couples. A couple independently
 // live-revealed via per-couple Publish (never in releasedCoupleIdsByEpisode)
 // keeps its live row untouched, even in an episode that also has other
-// couples still mid-draft.
-export function excludeReleasedCoupleRows<T extends { episode_id: string; couple_id: string }>(
+// couples still mid-draft. A posted special dance's row (team_id) stays too:
+// the draft holds only the couple's own dances.
+export function excludeReleasedCoupleRows<T extends { episode_id: string; couple_id: string; team_id?: string | null }>(
   rows: T[],
   releasedCoupleIdsByEpisode: Record<string, string[]>
 ): T[] {
@@ -107,7 +108,7 @@ export function excludeReleasedCoupleRows<T extends { episode_id: string; couple
       coupleIds.map((coupleId) => `${episodeId}:${coupleId}`)
     )
   );
-  return rows.filter((row) => !released.has(`${row.episode_id}:${row.couple_id}`));
+  return rows.filter((row) => row.team_id != null || !released.has(`${row.episode_id}:${row.couple_id}`));
 }
 
 // Mark Watched (finished the East broadcast) raises draft_unlocked_week.
@@ -189,6 +190,33 @@ export function draftWeekManagerScores(input: {
   }));
 }
 
+// Every dance that counts toward a draft night's judges points: the
+// released couples' drafted dances plus the week's live rows (couples posted
+// on their own and posted special dances), minus a released couple's own
+// live rows, which the draft stands in for. Drafts hold only couples' own
+// dances, so every drafted row is legacy-shaped.
+export function draftNightDanceScores(night: {
+  releasedCoupleIdsByEpisode: Record<string, string[]>;
+  dances: { episodeId: string; coupleId: string; total: number; scaled: number }[];
+  liveDances: DanceScore[];
+}): DanceScore[] {
+  const released = new Set(
+    Object.entries(night.releasedCoupleIdsByEpisode).flatMap(([episodeId, coupleIds]) =>
+      coupleIds.map((coupleId) => `${episodeId}:${coupleId}`)
+    )
+  );
+  return [
+    ...night.liveDances.filter((d) => d.teamId != null || !released.has(`${d.episodeId}:${d.coupleId}`)),
+    ...night.dances.map((dance) => ({
+      episodeId: dance.episodeId,
+      coupleId: dance.coupleId,
+      totalScore: dance.total,
+      scaledScore: dance.scaled,
+      maxScore: null,
+    })),
+  ];
+}
+
 // The league's draft-night standings from rows the page already loaded: only
 // roster periods that held a couple that week count.
 export function draftManagerScoresForNight(
@@ -198,7 +226,7 @@ export function draftManagerScoresForNight(
     judges_score_starts_week: number;
   },
   slots: { manager_id: string; couple_id: string | null; start_week: number; end_week: number | null }[],
-  night: { weekNumber: number; dances: { episodeId: string; coupleId: string; total: number; scaled: number }[] }
+  night: { weekNumber: number; danceScores: DanceScore[] }
 ): DraftManagerScore[] {
   const rosterSlots = slots.flatMap((slot) => {
     if (!slot.couple_id) return [];
@@ -216,15 +244,7 @@ export function draftManagerScoresForNight(
     judgesScoreMultiplier: settings.judges_score_multiplier,
     judgesCategoryWeight: settings.judges_score_category_weight,
     rosterSlots,
-    // Drafts hold couples' own dances only, never a special dance's row, so
-    // every one is a legacy-shaped row.
-    danceScores: night.dances.map((dance) => ({
-      episodeId: dance.episodeId,
-      coupleId: dance.coupleId,
-      totalScore: dance.total,
-      scaledScore: dance.scaled,
-      maxScore: null,
-    })),
+    danceScores: night.danceScores,
   });
 }
 
@@ -263,7 +283,8 @@ export function scoresReplacingDraftWeek(
 // this week -- e.g. one independently live-revealed via per-couple Publish --
 // must stay, not get wiped by a lone released couple's draft dance. Keyed by
 // night and couple, never couple alone: a two-night week can hold a couple's
-// live rows for one night beside their released draft for the other.
+// live rows for one night beside their released draft for the other. A
+// posted special dance's row stays beside the couple's drafted own dances.
 export function replaceWeekDanceScores<T extends { weekNumber: number; danceScores: DanceScore[] }>(
   weeks: T[],
   draft: { weekNumber: number; danceScores: DanceScore[] } | null
@@ -273,7 +294,7 @@ export function replaceWeekDanceScores<T extends { weekNumber: number; danceScor
   const draftNights = new Set(draft.danceScores.map(nightKey));
   return weeks.map((week) =>
     week.weekNumber === draft.weekNumber
-      ? { ...week, danceScores: [...week.danceScores.filter((d) => !draftNights.has(nightKey(d))), ...draft.danceScores] }
+      ? { ...week, danceScores: [...week.danceScores.filter((d) => d.teamId != null || !draftNights.has(nightKey(d))), ...draft.danceScores] }
       : week
   );
 }

@@ -81,6 +81,6 @@ describe("unapplied special-dances polish SQL", () => {
       friend,
       JSON.stringify(judges.map((judgeId) => ({ judgeId, score: 8 }))),
     ]);
-    expect((await db.query("select count(*)::int as n from public.draft_episode_overrides where episode_id = $1", [episode])).rows[0].n).toBe(0);
+    expect((await db.query<{ n: number }>("select count(*)::int as n from public.draft_episode_overrides where episode_id = $1", [episode])).rows[0].n).toBe(0);
   });
 });

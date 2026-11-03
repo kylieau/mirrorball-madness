@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { danceMaxScore, danceScoreColumns } from "@/lib/episode-teams";
+import type { DanceScore } from "@/lib/scoring";
 import {
   draftReleaseLabel,
   draftScoresVisible,
   findDraftRelease,
   type DraftRelease,
 } from "@/lib/draft-scores";
-import { loadAllCouples, loadViewerSeason } from "@/lib/viewer-season-data";
+import { loadAllCouples, loadTeamsMode, loadViewerSeason } from "@/lib/viewer-season-data";
 
 export type VisibleDraftNight = DraftRelease & {
   isDoubleElimination: boolean;
@@ -18,6 +20,9 @@ export type VisibleDraftNight = DraftRelease & {
     scaled: number;
     at: string;
   }[];
+  // The week's live rows, which still count on a draft night
+  // (draftNightDanceScores).
+  liveDances: DanceScore[];
 };
 
 export type DraftScoreContext = {
@@ -61,9 +66,12 @@ export async function loadDraftScoreContext(
   const release = findDraftRelease(episodes, weekNumberById, releasedCoupleIdsByEpisode);
   const unlockedWeek = season.draftUnlockedWeek;
   const visible = !!release && draftScoresVisible(unlockedWeek, release.weekNumber);
-  const [latestRelease, dancesResult] = await Promise.all([
+  const [latestRelease, dancesResult, liveDances] = await Promise.all([
     release ? loadLatestRelease(supabase, seasonId, releases ?? [], release) : null,
     visible ? supabase.rpc("visible_draft_dance_scores") : null,
+    // Every night of the week, not only the ones with a release: a sibling
+    // night's posted scores still count on this week's draft standings.
+    visible ? loadLiveDances(supabase, episodes.filter((e) => e.week_id === release.weekId).map((e) => e.id)) : [],
   ]);
   if (!release || !dancesResult || dancesResult.error || !dancesResult.data) {
     return { release, latestRelease, unlockedWeek, night: null };
@@ -88,8 +96,27 @@ export async function loadDraftScoreContext(
           scaled: Number(row.scaled_score),
           at: row.created_at,
         })),
+      liveDances,
     },
   };
+}
+
+async function loadLiveDances(supabase: SupabaseClient<Database>, episodeIds: string[]): Promise<DanceScore[]> {
+  const mode = await loadTeamsMode(supabase);
+  const { data } = await supabase
+    .from("dance_scores")
+    .select(danceScoreColumns(mode, "episode_id, couple_id, total_score, scaled_score", { teamId: true }))
+    .in("episode_id", episodeIds);
+  return ((data ?? []) as unknown as { episode_id: string; couple_id: string; total_score: number; scaled_score: number; max_score?: number | null; team_id?: string | null }[]).map(
+    (row) => ({
+      episodeId: row.episode_id,
+      coupleId: row.couple_id,
+      totalScore: Number(row.total_score),
+      scaledScore: Number(row.scaled_score),
+      maxScore: danceMaxScore(row),
+      teamId: row.team_id ?? null,
+    })
+  );
 }
 
 async function loadLatestRelease(

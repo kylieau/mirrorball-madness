@@ -4,20 +4,39 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Special dances follow-ups — 2026-11-03
 
-- Review PR #57's hand-resolved merge in `special-dance-entry.tsx`: #56's
-  picker tweaks and #57's polish should both survive.
-- Check no other path still creates a week draft when a special dance is saved
-  (client `flushDraft`/`setHasDraft`, SQL `draft_episode_overrides` inserts).
-- Check the 1-to-max, 0.5-step mark rule matches in `team-dances.ts` and in
-  `check_team_mark` / `save_team_marks`, half points included.
-- `special-dance-entry.tsx` still has a "Didn't judge" label (~line 648); confirm
-  it's the setup panel picker, not the dropped scoring toggle.
-- Stale docs: CLAUDE.md says `apply-special-dances.sql` isn't applied (it is live,
-  probed 2026-11-03) and still lists Didn't-judge toggles;
-  `apply-special-dances-polish.sql`'s header says UNAPPLIED, but grokbot reports it
-  applied live. Confirm with Kylie, then fix both.
-- E07 and E08 each still hold 10 `draft_dance_scores` rows after publish, likely
-  correction seeds from reopening the week. Confirm that's harmless.
+Decided by Kylie (2026-11-03), not built yet:
+- One shared judge-score row for couples and special dances: the special
+  grid's look (larger boxes, error under the box, `total/max`, a "Guest" label
+  rather than colour alone), no "is tonight's guest" caption, **whole marks
+  1–10 only** (no half points) for both, same check on the page and in SQL
+  (couples today: server 0–10, any decimal; specials: 1–max in 0.5 steps).
+- Special dances always use the night's judges, out of 10: drop the per-dance
+  panel checkboxes (still labelled "Didn't judge") and the "Out of" picker.
+- Retire Special Moments' custom events (label-only, no reader anywhere). Decide
+  whether the Perfect Score / Judges' Save pills move or go.
+- Special dances get draft release like a couple's dance (propose tier, fans
+  see it once they unlock drafts), instead of admin-only posting.
+- Unused setup fields with no reader: Artist, Theme / Source, Extra Details,
+  per-couple Result. Cut or keep is still Kylie's call.
+
+Open questions for Kylie:
+- Show bonus points sit in the night's numerator, so the same +3 is worth 3 on
+  a one-dance night (30/30 + 3 → 33) but 1.5 on a two-dance night (60/60 + 3 →
+  31.5). Keep that, or convert bonus points at a fixed rate?
+
+Still to check:
+- `apply-special-dances-polish.sql`'s header says UNAPPLIED, but grokbot
+  reports it applied live. Confirm with Kylie, then fix the header.
+- Browser check still owed for the special-dance save rework (`1114165`):
+  type a mark and switch away at once, then reopen (mark still there); an
+  invalid mark refuses Finish Week by name; deleting a dance with unsaved marks
+  doesn't leave Finish Week blocked; with a couple's draft released, posting
+  its special dance still counts on Standings.
+- E07 and E08 each still hold 10 `draft_dance_scores` rows after publish,
+  likely correction seeds from reopening the week. Confirm that's harmless.
+- Known limit: when a draft week has a sibling night that is already
+  published, draft-night standings replace that week's stored survival and
+  Curtain Call points with the judges-only draft computation.
 
 ## E08 night follow-ups — 2026-10-27
 
