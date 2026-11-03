@@ -16,10 +16,8 @@ import {
   markInputError,
   markRangeMessage,
   MARK_MIN,
-  panelAfterDidntJudge,
   parseSpecialPoints,
   parseTeamMarks,
-  specialDancePanelPersistPlan,
   recentSuggestions,
   sameTeamMarks,
   specialDanceComplete,
@@ -100,17 +98,6 @@ describe("mark and point ranges", () => {
     expect(markInputError("10.5", 10)).toBe(markRangeMessage(10));
     expect(markInputError("11", 10)).toBe(markRangeMessage(10));
     expect(markInputError("0.25", 10)).toBe(markRangeMessage(10));
-  });
-
-  it("drops a Didn't Judge from the panel and keeps night order", () => {
-    expect(panelAfterDidntJudge(judges, null, "bruno", true)).toEqual(["carrie", "derek", "cynthia"]);
-    expect(panelAfterDidntJudge(judges, ["carrie", "derek", "cynthia"], "bruno", false)).toBeNull();
-    expect(specialDancePanelPersistPlan(
-      [{ judgeId: "carrie", score: 8 }, { judgeId: "bruno", score: 9 }],
-      ["carrie", "derek"],
-      judges
-    )).toEqual({ remainingMarks: [{ judgeId: "carrie", score: 8 }], needsUnlock: true });
-    expect(specialDancePanelPersistPlan([], null, judges)).toEqual({ remainingMarks: [], needsUnlock: false });
   });
 
   it("limits the per-judge max to 1 to 10 in half steps", () => {

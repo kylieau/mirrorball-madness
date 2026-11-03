@@ -59,7 +59,7 @@ describe("unapplied special-dances polish SQL", () => {
   });
   beforeEach(seedSeason);
 
-  it("refuses a 0 mark, does not create a week draft, and can drop a judge after marks exist", async () => {
+  it("refuses a 0 mark and does not create a week draft", async () => {
     const duel = await saveSpecial({
       danceType: "Challenge",
       name: "Cha-Cha Challenge",
@@ -82,10 +82,5 @@ describe("unapplied special-dances polish SQL", () => {
       JSON.stringify(judges.map((judgeId) => ({ judgeId, score: 8 }))),
     ]);
     expect((await db.query("select count(*)::int as n from public.draft_episode_overrides where episode_id = $1", [episode])).rows[0].n).toBe(0);
-    await db.query("select public.save_special_dance_panel($1, $2, $3, $4)", [episode, duel, friend, [judges[0], judges[1]]]);
-    expect((await db.query("select judge_id from public.episode_team_marks where team_id = $1 order by judge_id", [duel])).rows.map((r) => r.judge_id)).toEqual(
-      [judges[0], judges[1]].sort()
-    );
-    expect((await db.query("select panel_judge_ids from public.episode_teams where id = $1", [duel])).rows[0].panel_judge_ids).toEqual([judges[0], judges[1]]);
   });
 });

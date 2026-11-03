@@ -107,41 +107,10 @@ export function markInputError(raw: string, markMax: number): string | null {
   return Number.isFinite(score) && isValidMark(score, markMax) ? null : markRangeMessage(markMax);
 }
 
-// Didn't Judge drops a night judge from the panel (null still means "the
-// whole night"). Turning it back on restores that judge. Order follows the
-// night so evening-out uses the remaining panel, not a leftover max.
-export function panelAfterDidntJudge(
-  nightJudgeIds: string[],
-  currentPanel: string[] | null,
-  judgeId: string,
-  didntJudge: boolean
-): string[] | null {
-  const current = currentPanel ?? nightJudgeIds;
-  const next = didntJudge ? current.filter((id) => id !== judgeId) : [...new Set([...current, judgeId])];
-  const ordered = [...nightJudgeIds.filter((id) => next.includes(id)), ...next.filter((id) => !nightJudgeIds.includes(id))];
-  const sameAsNight = ordered.length === nightJudgeIds.length && nightJudgeIds.every((id) => ordered.includes(id));
-  return sameAsNight ? null : ordered;
-}
-
 // The judges whose marks a special dance takes: its own panel when one was
 // chosen, else the night's. Mirrors special_dance_panel() in SQL.
 export function specialDancePanel(dance: Pick<SpecialDance, "panelJudgeIds">, nightJudgeIds: string[]): string[] {
   return dance.panelJudgeIds ?? nightJudgeIds;
-}
-
-// Live save_special_dance refuses a panel change while any mark exists. Until
-// supabase/apply-special-dances-polish.sql is applied, the scoring-form
-// toggle clears marks, writes the panel, then puts the remaining marks back.
-// That path is special-dance-only; it must not be used to flip a week draft.
-export function specialDancePanelPersistPlan(existingMarks: TeamMark[], nextPanel: string[] | null, nightJudgeIds: string[]): {
-  remainingMarks: TeamMark[];
-  needsUnlock: boolean;
-} {
-  const panel = specialDancePanel({ panelJudgeIds: nextPanel }, nightJudgeIds);
-  return {
-    remainingMarks: existingMarks.filter((m) => panel.includes(m.judgeId)),
-    needsUnlock: existingMarks.length > 0,
-  };
 }
 
 // Case- and whitespace-insensitive, the same key team_song_key() uses in SQL.
@@ -578,14 +547,6 @@ export type SpecialDanceSetupInput = {
   details: SpecialDanceDetail[];
   sortOrder: number;
 };
-
-// remainingMarks is only for the scoring-form Didn't Judge toggle: live SQL
-// refuses a panel change while marks exist, so the save clears, writes the
-// panel, then restores these. Ordinary Done omits it.
-export type SpecialDanceSetupSave = (
-  dance: SpecialDanceSetupInput,
-  opts?: { remainingMarks?: TeamMark[] }
-) => Promise<{ error: string | null; id?: string }>;
 
 // Client-side mirror of save_special_dance's checks so the inline editor can
 // explain a problem before the round trip. The RPC still enforces every rule.

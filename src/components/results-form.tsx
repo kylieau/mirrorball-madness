@@ -43,7 +43,6 @@ import {
   recentSuggestions,
   specialDanceComplete,
   specialDancePanel,
-  specialDancePanelPersistPlan,
   specialDanceProgress,
   teamApplyPlan,
   teamMarksTotal,
@@ -801,38 +800,13 @@ export function ResultsForm({
     }
   }
 
-  // Done and Didn't Judge go through save_special_dance only. Done does not
-  // auto-save the week: no flushDraft, no hasDraft. remainingMarks is the
-  // live-SQL unlock for a panel change after marks already exist.
-  async function handleSaveSpecial(setup: SpecialDanceSetupInput, opts?: { remainingMarks?: TeamMark[] }) {
+  // Done goes through save_special_dance only. It does not auto-save the
+  // week: no flushDraft, no hasDraft.
+  async function handleSaveSpecial(setup: SpecialDanceSetupInput) {
     if (!selectedEpisode) return { error: "Select a week first." };
-    const teamId = setup.id;
-    const existingMarks = teamId ? (teamMarksByTeam[teamId] ?? []) : [];
-    const persist = opts?.remainingMarks
-      ? specialDancePanelPersistPlan(existingMarks, setup.panelJudgeIds, nightJudges.map((j) => j.id))
-      : { remainingMarks: [] as TeamMark[], needsUnlock: false };
     try {
-      if (persist.needsUnlock && teamId) {
-        const cleared = await saveTeamMarksAction({ episodeId: selectedEpisode.id, teamId, marks: [], markMax: setup.markMax });
-        if (cleared.error) return { error: cleared.error };
-      }
       const result = await saveSpecialDanceAction({ episodeId: selectedEpisode.id, dance: setup });
-      if (result.error) {
-        if (persist.needsUnlock && teamId && existingMarks.length > 0) {
-          await saveTeamMarksAction({ episodeId: selectedEpisode.id, teamId, marks: existingMarks, markMax: setup.markMax });
-        }
-        return { error: result.error };
-      }
-      if (persist.needsUnlock && teamId && persist.remainingMarks.length > 0) {
-        const restored = await saveTeamMarksAction({
-          episodeId: selectedEpisode.id,
-          teamId,
-          marks: opts?.remainingMarks ?? persist.remainingMarks,
-          markMax: setup.markMax,
-        });
-        if (restored.error) return { error: restored.error, id: result.result?.id };
-      }
-      if (result.result?.id) {
+      if (!result.error && result.result?.id) {
         setDraftSpecial(null);
         const value = teamPickValue(result.result.id);
         if (published) setPublishedSelectedId(value);

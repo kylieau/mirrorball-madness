@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Dialog,
@@ -47,7 +46,6 @@ import {
   markRangeMessage,
   MARK_MIN,
   oxfordJoin,
-  panelAfterDidntJudge,
   parseSpecialPoints,
   parseTeamMarks,
   specialDanceComplete,
@@ -61,7 +59,6 @@ import {
   type SpecialDanceDetail,
   type SpecialDanceScore,
   type SpecialDanceSetupInput,
-  type SpecialDanceSetupSave,
   type TeamMark,
 } from "@/lib/team-dances";
 
@@ -200,7 +197,7 @@ export function SpecialDanceEntry({
   busy: boolean;
   nowMs: number | null;
   startInEdit?: boolean;
-  onSaveSetup: SpecialDanceSetupSave;
+  onSaveSetup: (dance: SpecialDanceSetupInput) => Promise<{ error: string | null; id?: string }>;
   onDelete: (teamId: string) => Promise<{ error: string | null }>;
   onSaveMarks: (teamId: string, marks: TeamMark[], markMax: number) => Promise<{ error: string | null }>;
   onSavePoints: (teamId: string, scores: SpecialDanceScore[]) => Promise<{ error: string | null }>;
@@ -228,12 +225,9 @@ export function SpecialDanceEntry({
   const [error, setError] = useState<string | null>(null);
   const [showSecondStyle, setShowSecondStyle] = useState(dance.secondDanceStyleId != null);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const [savingPanel, setSavingPanel] = useState(false);
-  const [panelOverride, setPanelOverride] = useState<string[] | null | undefined>(undefined);
 
   useEffect(() => {
     if (!editing) setSetup(setupFromDance(dance));
-    setPanelOverride(undefined);
   }, [dance.id, dance.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const savedMarksKey = marksKey(view.marks);
@@ -252,11 +246,10 @@ export function SpecialDanceEntry({
   const scoringMode = editing ? setup.scoringMode : dance.scoringMode;
   const markMax = editing ? setup.markMax : dance.markMax;
   const panelIds = specialDancePanel(
-    { panelJudgeIds: editing ? setup.panelJudgeIds : panelOverride !== undefined ? panelOverride : dance.panelJudgeIds },
+    { panelJudgeIds: editing ? setup.panelJudgeIds : dance.panelJudgeIds },
     nightJudgeIds
   );
   const panelJudges = panelIds.map((id) => judges.find((j) => j.id === id)).filter((j): j is ScoringJudge => !!j);
-  const nightPanelJudges = nightJudgeIds.map((id) => judges.find((j) => j.id === id)).filter((j): j is ScoringJudge => !!j);
   const panelOk = specialMode ? isValidPanelSize(panelIds.length) : nightJudgeIds.length === SPECIAL_DANCE_MAX_JUDGES;
   const invalidMarkIds = panelIds.filter((id) => markInputError(markInputs[id] ?? "", markMax) != null);
   const hasSavedScores = view.marks.length > 0 || view.scores.some((s) => s.points != null);
@@ -316,7 +309,7 @@ export function SpecialDanceEntry({
   }, [typedScoresKey, pendingPoints, inputsDisabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const complete = specialDanceComplete(
-    { scoringMode, panelJudgeIds: editing ? setup.panelJudgeIds : panelOverride !== undefined ? panelOverride : dance.panelJudgeIds },
+    { scoringMode, panelJudgeIds: editing ? setup.panelJudgeIds : dance.panelJudgeIds },
     { marks: view.marks, scores: view.scores, eligibleCoupleIds: eligible, nightJudgeIds }
   );
   const progress = specialDanceProgress(
@@ -370,36 +363,6 @@ export function SpecialDanceEntry({
     setSavingSetup(false);
     if (outcome.error) setSetupError(outcome.error);
     else setEditing(false);
-  }
-
-  async function handleDidntJudge(judgeId: string, didntJudge: boolean) {
-    const currentPanel = editing ? setup.panelJudgeIds : panelOverride !== undefined ? panelOverride : dance.panelJudgeIds;
-    const next = panelAfterDidntJudge(nightJudgeIds, currentPanel, judgeId, didntJudge);
-    if (next && !isValidPanelSize(next.length)) {
-      setError(`Judges' Marks need ${SPECIAL_DANCE_MIN_JUDGES} to ${SPECIAL_DANCE_MAX_JUDGES} judges.`);
-      return;
-    }
-    setError(null);
-    setMarkInputs((prev) => {
-      if (!didntJudge) return prev;
-      const copy = { ...prev };
-      delete copy[judgeId];
-      return copy;
-    });
-    if (didntJudge) setMarksDirty(true);
-    if (editing || isNew) {
-      patchSetup({ panelJudgeIds: next });
-      return;
-    }
-    const remainingMarks = typedMarks.filter((m) => (next ?? nightJudgeIds).includes(m.judgeId) && m.judgeId !== judgeId);
-    setSavingPanel(true);
-    setPanelOverride(next);
-    const outcome = await onSaveSetup({ ...setupFromDance(dance), panelJudgeIds: next }, { remainingMarks });
-    setSavingPanel(false);
-    if (outcome.error) {
-      setPanelOverride(undefined);
-      setError(outcome.error);
-    }
   }
 
   function handleCancel() {
@@ -868,9 +831,8 @@ export function SpecialDanceEntry({
           <fieldset disabled={inputsDisabled || busy} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
             <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-1.5">
               <div className="grid grid-cols-2 gap-2 min-[420px]:flex min-[420px]:flex-wrap min-[420px]:items-end">
-                {nightPanelJudges.map((j) => {
-                  const skipped = !panelIds.includes(j.id);
-                  const fieldError = skipped ? null : markInputError(markInputs[j.id] ?? "", markMax);
+                {panelJudges.map((j) => {
+                  const fieldError = markInputError(markInputs[j.id] ?? "", markMax);
                   return (
                     <div key={j.id} className="flex min-w-0 flex-col gap-1 min-[420px]:min-w-28">
                       <Label className={`text-xs ${guestJudgeIds.has(j.id) ? "text-accent" : "text-muted-foreground"}`}>
@@ -882,23 +844,14 @@ export function SpecialDanceEntry({
                         aria-invalid={fieldError != null}
                         className={`h-11 w-full min-w-14 px-2 text-center text-sm min-[420px]:w-16 ${fieldError ? "border-destructive" : ""}`}
                         placeholder="—"
-                        value={skipped ? "" : (markInputs[j.id] ?? "")}
-                        disabled={skipped || posted}
+                        value={markInputs[j.id] ?? ""}
+                        disabled={posted}
                         onChange={(e) => {
                           setMarksDirty(true);
                           setError(null);
                           setMarkInputs((prev) => ({ ...prev, [j.id]: e.target.value }));
                         }}
                       />
-                      <label className="flex min-h-11 items-center gap-2 text-xs text-muted-foreground">
-                        <Switch
-                          checked={skipped}
-                          disabled={inputsDisabled || busy || posted || savingPanel}
-                          onCheckedChange={(checked) => void handleDidntJudge(j.id, checked)}
-                          aria-label={`Didn't Judge · ${judgeNames.get(j.id) ?? j.name}`}
-                        />
-                        Didn&apos;t Judge
-                      </label>
                       {fieldError && (
                         <p role="alert" className="text-xs leading-snug text-danger-text">
                           {fieldError}
