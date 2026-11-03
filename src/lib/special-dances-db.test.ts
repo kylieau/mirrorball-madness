@@ -346,7 +346,14 @@ describe("special dances in PostgreSQL", () => {
     expect((await liveRows(julia)).filter((r) => r.team_id === danceOff)).toMatchObject([{ total: -1.5, max: 0 }]);
     await finishWeek();
     // Amber: 33 own + 36 team + 3 bonus = 72 over 80 marks -> 27. Julia: 33 + 36 - 1.5 = 67.5/80 -> 25.31.
-    expect((await liveRows(amber)).map((r) => [r.total, r.max])).toEqual([[33, null], [36, 40], [3, 0]]);
+    // liveRows orders tagged rows by team_id; those UUIDs are assigned at
+    // insert, so Slaytopia vs Dance-Off order is not stable. The three
+    // [total, max] pairs are the assertion.
+    expect(
+      (await liveRows(amber))
+        .map((r) => [r.total, r.max] as [number, number | null])
+        .sort((a, b) => (a[1] ?? -1) - (b[1] ?? -1) || a[0] - b[0])
+    ).toEqual([[33, null], [3, 0], [36, 40]]);
     expect(await rosterPoints(admin)).toBe(27);
     expect(await rosterPoints(friend)).toBe(25.31);
     expect(await postedAt(team1)).not.toBeNull();
