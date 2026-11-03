@@ -2,6 +2,23 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Special dances follow-ups — 2026-11-03
+
+- Review PR #57's hand-resolved merge in `special-dance-entry.tsx`: #56's
+  picker tweaks and #57's polish should both survive.
+- Check no other path still creates a week draft when a special dance is saved
+  (client `flushDraft`/`setHasDraft`, SQL `draft_episode_overrides` inserts).
+- Check the 1-to-max, 0.5-step mark rule matches in `team-dances.ts` and in
+  `check_team_mark` / `save_team_marks`, half points included.
+- `special-dance-entry.tsx` still has a "Didn't judge" label (~line 648); confirm
+  it's the setup panel picker, not the dropped scoring toggle.
+- Stale docs: CLAUDE.md says `apply-special-dances.sql` isn't applied (it is live,
+  probed 2026-11-03) and still lists Didn't-judge toggles;
+  `apply-special-dances-polish.sql`'s header says UNAPPLIED, but grokbot reports it
+  applied live. Confirm with Kylie, then fix both.
+- E07 and E08 each still hold 10 `draft_dance_scores` rows after publish, likely
+  correction seeds from reopening the week. Confirm that's harmless.
+
 ## E08 night follow-ups — 2026-10-27
 
 - `docs/audit-release-runbook.md` says E08 has no guest judges; Shirley Ballas
