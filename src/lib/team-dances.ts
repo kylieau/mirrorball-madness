@@ -11,6 +11,9 @@ export const SPECIAL_DANCE_MAX_DETAILS = 12;
 export const SPECIAL_DANCE_POINTS_LIMIT = 100;
 export const DEFAULT_DANCE_TYPE = "Team Dance";
 export const DEFAULT_MARK_MAX = MARK_MAX;
+// DWTS judges do not give a 0. One constant so the floor can move later
+// without hunting every range check and hint.
+export const MARK_MIN = 1;
 
 export const DANCE_TYPE_SUGGESTIONS = [
   "Team Dance",
@@ -80,7 +83,7 @@ export function isHalfStep(value: number): boolean {
 }
 
 export function isValidMark(score: number, markMax: number): boolean {
-  return isHalfStep(score) && score >= 0 && score <= markMax;
+  return isHalfStep(score) && score >= MARK_MIN && score <= markMax;
 }
 
 export function isValidMarkMax(markMax: number): boolean {
@@ -92,7 +95,16 @@ export function isValidPoints(points: number): boolean {
 }
 
 export function markRangeMessage(markMax: number): string {
-  return `Judge scores must be 0 to ${markMax} in steps of 0.5`;
+  return `Judge scores must be ${MARK_MIN} to ${markMax} in steps of 0.5`;
+}
+
+// Empty is "not yet entered". Anything typed that is off-step or outside
+// MARK_MIN..markMax is an error the card must show and refuse to save.
+export function markInputError(raw: string, markMax: number): string | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  const score = Number(trimmed);
+  return Number.isFinite(score) && isValidMark(score, markMax) ? null : markRangeMessage(markMax);
 }
 
 // The judges whose marks a special dance takes: its own panel when one was
@@ -211,8 +223,8 @@ export type ParsedTeamMarks = {
 };
 
 // The card's boxes as typed. Complete only when every one of the dance's
-// judges (2 to 4 of them) has a mark from 0 to the per-judge max in steps of
-// 0.5; nothing is posted before that.
+// judges (2 to 4 of them) has a mark from MARK_MIN to the per-judge max in
+// steps of 0.5; nothing is posted before that.
 export function parseTeamMarks(inputs: Record<string, string>, judgeIds: string[], markMax: number = DEFAULT_MARK_MAX): ParsedTeamMarks {
   const invalidJudgeIds: string[] = [];
   const marks: TeamMark[] = [];
@@ -312,6 +324,28 @@ export type TeamEligibilityInput = {
 
 export type SkipReason = "withdrawn" | "bye" | "eliminated" | "not_performing";
 
+// Eliminated on an earlier week, or eliminated with no week when we cannot
+// tell. Same week stays pickable: they still danced tonight.
+export function eliminatedBeforeWeek(
+  couple: { status: string; eliminationWeek: number | null },
+  weekNumber: number | null
+): boolean {
+  return (
+    couple.status === "eliminated" &&
+    (couple.eliminationWeek == null || weekNumber == null || couple.eliminationWeek < weekNumber)
+  );
+}
+
+// The special's Add-participant list. Filtering is safe: eligibility already
+// skips these couples, so adding one would only create a skipped row.
+export function addableSpecialDanceParticipants<T extends { id: string; status: string; eliminationWeek: number | null }>(
+  participants: T[],
+  selectedIds: readonly string[],
+  weekNumber: number | null
+): T[] {
+  return participants.filter((p) => !selectedIds.includes(p.id) && !eliminatedBeforeWeek(p, weekNumber));
+}
+
 // Mirrors team_eligible_members(): on the team, in tonight's cast, not
 // withdrawn, Did Not Dance, or eliminated before this week. Shared by the
 // publication and team-post planners and by the team entry's member list.
@@ -329,11 +363,7 @@ export function eligibleTeamMembers(
     if (!member) continue;
     if (member.outcome === "bye") skipped.push({ coupleId, reason: "bye" });
     else if (member.outcome === "withdrawn" || member.status === "withdrawn") skipped.push({ coupleId, reason: "withdrawn" });
-    else if (
-      member.status === "eliminated" &&
-      (member.eliminationWeek == null || opts.weekNumber == null || member.eliminationWeek < opts.weekNumber)
-    )
-      skipped.push({ coupleId, reason: "eliminated" });
+    else if (eliminatedBeforeWeek(member, opts.weekNumber)) skipped.push({ coupleId, reason: "eliminated" });
     else if (restricted && !performing.has(coupleId)) skipped.push({ coupleId, reason: "not_performing" });
     else eligible.push(coupleId);
   }
@@ -403,10 +433,7 @@ export function teamApplyPlan(
     if (member.outcome === "bye") return [{ ...base, state: "skipped", reason: "bye" } as TeamMemberPlan];
     if (member.outcome === "withdrawn" || member.status === "withdrawn")
       return [{ ...base, state: "skipped", reason: "withdrawn" } as TeamMemberPlan];
-    if (
-      member.status === "eliminated" &&
-      (member.eliminationWeek == null || opts.weekNumber == null || member.eliminationWeek < opts.weekNumber)
-    )
+    if (eliminatedBeforeWeek(member, opts.weekNumber))
       return [{ ...base, state: "skipped", reason: "eliminated" } as TeamMemberPlan];
     if (restricted && !performing.has(coupleId))
       return [{ ...base, state: "skipped", reason: "not_performing" } as TeamMemberPlan];

@@ -9,6 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -31,9 +39,12 @@ import {
   SPECIAL_DANCE_MAX_JUDGES,
   THEME_LABELS,
   automaticSpecialDanceName,
+  addableSpecialDanceParticipants,
   isValidMark,
   isValidPanelSize,
+  markInputError,
   markRangeMessage,
+  MARK_MIN,
   oxfordJoin,
   parseSpecialPoints,
   parseTeamMarks,
@@ -153,6 +164,7 @@ export function SpecialDanceEntry({
   recentDanceTypes,
   recentDetailLabels,
   coupleName,
+  weekNumber,
   canPost,
   canSetup,
   inputsDisabled,
@@ -178,6 +190,7 @@ export function SpecialDanceEntry({
   recentDanceTypes: string[];
   recentDetailLabels: string[];
   coupleName: (coupleId: string) => ReactNode;
+  weekNumber: number | null;
   canPost: boolean;
   canSetup: boolean;
   inputsDisabled: boolean;
@@ -211,6 +224,7 @@ export function SpecialDanceEntry({
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSecondStyle, setShowSecondStyle] = useState(dance.secondDanceStyleId != null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   useEffect(() => {
     if (!editing) setSetup(setupFromDance(dance));
@@ -237,6 +251,7 @@ export function SpecialDanceEntry({
   );
   const panelJudges = panelIds.map((id) => judges.find((j) => j.id === id)).filter((j): j is ScoringJudge => !!j);
   const panelOk = specialMode ? isValidPanelSize(panelIds.length) : nightJudgeIds.length === SPECIAL_DANCE_MAX_JUDGES;
+  const invalidMarkIds = panelIds.filter((id) => markInputError(markInputs[id] ?? "", markMax) != null);
   const hasSavedScores = view.marks.length > 0 || view.scores.some((s) => s.points != null);
   const posted = dance.postedAt != null;
   const scoringLocked = hasSavedScores || posted;
@@ -250,7 +265,7 @@ export function SpecialDanceEntry({
   const typedMarksKey = marksKey(typedMarks);
   const attemptedMarks = useRef(savedMarksKey);
   const pendingMarks =
-    !isNew && scoringMode === "marks" && marksDirty && panelOk && parsedMarks.invalidJudgeIds.length === 0 && typedMarksKey !== savedMarksKey && attemptedMarks.current !== typedMarksKey;
+    !isNew && scoringMode === "marks" && marksDirty && panelOk && invalidMarkIds.length === 0 && parsedMarks.invalidJudgeIds.length === 0 && typedMarksKey !== savedMarksKey && attemptedMarks.current !== typedMarksKey;
 
   useEffect(() => {
     if (!pendingMarks || inputsDisabled) return;
@@ -335,6 +350,10 @@ export function SpecialDanceEntry({
     const invalid = validateSpecialDanceSetup(setup, otherDances);
     if (invalid) {
       setSetupError(invalid);
+      return;
+    }
+    if (setup.scoringMode === "marks" && invalidMarkIds.length > 0) {
+      setSetupError(`${markRangeMessage(setup.markMax)}.`);
       return;
     }
     setSavingSetup(true);
@@ -455,7 +474,9 @@ export function SpecialDanceEntry({
               })}
             </div>
             <Select
-              items={Object.fromEntries(participants.filter((p) => !setup.memberCoupleIds.includes(p.id)).map((p) => [p.id, p.celebrity]))}
+              items={Object.fromEntries(
+                addableSpecialDanceParticipants(participants, setup.memberCoupleIds, weekNumber).map((p) => [p.id, p.celebrity])
+              )}
               value={null}
               onValueChange={(v) => {
                 if (v) patchSetup({ memberCoupleIds: [...setup.memberCoupleIds, v] });
@@ -466,17 +487,15 @@ export function SpecialDanceEntry({
                 <SelectValue placeholder={posted ? "Un-post to change participants" : "Add a participant"} />
               </SelectTrigger>
               <SelectContent>
-                {participants
-                  .filter((p) => !setup.memberCoupleIds.includes(p.id))
-                  .map((p) => {
-                    const reason = participantReason(p);
-                    return (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.celebrity} & {p.pro}
-                        {reason ? ` · ${reason}` : ""}
-                      </SelectItem>
-                    );
-                  })}
+                {addableSpecialDanceParticipants(participants, setup.memberCoupleIds, weekNumber).map((p) => {
+                  const reason = participantReason(p);
+                  return (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.celebrity} & {p.pro}
+                      {reason ? ` · ${reason}` : ""}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             {overlapWarning.length > 0 && (
@@ -782,7 +801,7 @@ export function SpecialDanceEntry({
             </p>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => void handleDone()} disabled={savingSetup || busy}>
+            <Button onClick={() => void handleDone()} disabled={savingSetup || busy || (setup.scoringMode === "marks" && invalidMarkIds.length > 0)}>
               {savingSetup ? "Saving…" : "Done"}
             </Button>
             <Button variant="ghost" onClick={handleCancel} disabled={savingSetup}>
@@ -793,12 +812,9 @@ export function SpecialDanceEntry({
               className="text-danger-text"
               disabled={posted || isNew || savingSetup || busy}
               title={posted ? "Un-post first" : undefined}
-              onClick={async () => {
+              onClick={() => {
                 if (isNew) return;
-                setSavingSetup(true);
-                const outcome = await onDelete(dance.id);
-                setSavingSetup(false);
-                if (outcome.error) setSetupError(outcome.error);
+                setConfirmRemove(true);
               }}
             >
               {posted ? "Un-post first" : "Remove Special Dance"}
@@ -811,36 +827,48 @@ export function SpecialDanceEntry({
         panelOk ? (
           <fieldset disabled={inputsDisabled || busy} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
             <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-1.5">
-              <div className="flex flex-wrap items-end gap-1.5">
-                {panelJudges.map((j) => (
-                  <div key={j.id} className="flex flex-col gap-0.5">
-                    <Label className={`text-[10px] ${guestJudgeIds.has(j.id) ? "text-accent" : "text-muted-foreground"}`}>
-                      {judgeNames.get(j.id) ?? j.name}
-                    </Label>
-                    <Input
-                      inputMode="decimal"
-                      aria-label={`${judgeNames.get(j.id) ?? j.name} mark for ${displayName}`}
-                      className={`h-8 w-12 px-1.5 text-center text-xs ${parsedMarks.invalidJudgeIds.includes(j.id) ? "border-destructive" : ""}`}
-                      placeholder="—"
-                      value={markInputs[j.id] ?? ""}
-                      onChange={(e) => {
-                        setMarksDirty(true);
-                        setError(null);
-                        setMarkInputs((prev) => ({ ...prev, [j.id]: e.target.value }));
-                      }}
-                    />
-                  </div>
-                ))}
-                <div className="flex flex-col gap-0.5">
-                  <Label className="text-[10px] text-muted-foreground">Total</Label>
-                  <p className="flex h-8 items-center px-1 text-sm font-medium">
+              <div className="grid grid-cols-2 gap-2 min-[420px]:flex min-[420px]:flex-wrap min-[420px]:items-end">
+                {panelJudges.map((j) => {
+                  const fieldError = markInputError(markInputs[j.id] ?? "", markMax);
+                  return (
+                    <div key={j.id} className="flex min-w-0 flex-col gap-1 min-[420px]:min-w-28">
+                      <Label className={`text-xs ${guestJudgeIds.has(j.id) ? "text-accent" : "text-muted-foreground"}`}>
+                        {judgeNames.get(j.id) ?? j.name}
+                      </Label>
+                      <Input
+                        inputMode="decimal"
+                        aria-label={`${judgeNames.get(j.id) ?? j.name} mark for ${displayName}`}
+                        aria-invalid={fieldError != null}
+                        className={`h-11 w-full min-w-14 px-2 text-center text-sm min-[420px]:w-16 ${fieldError ? "border-destructive" : ""}`}
+                        placeholder="—"
+                        value={markInputs[j.id] ?? ""}
+                        disabled={posted}
+                        onChange={(e) => {
+                          setMarksDirty(true);
+                          setError(null);
+                          setMarkInputs((prev) => ({ ...prev, [j.id]: e.target.value }));
+                        }}
+                      />
+                      {fieldError && (
+                        <p role="alert" className="text-xs leading-snug text-danger-text">
+                          {fieldError}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+                <div className="col-span-2 flex flex-col gap-1 min-[420px]:col-span-1">
+                  <Label className="text-xs text-muted-foreground">Total</Label>
+                  <p className="flex h-11 items-center px-1 text-base font-medium">
                     {typedTotal}
-                    <span className="ml-0.5 text-xs font-normal text-muted-foreground">/{maxPossible}</span>
+                    <span className="ml-0.5 text-sm font-normal text-muted-foreground">/{maxPossible}</span>
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-x-3 text-[10px] text-muted-foreground">
-                <span>0 to {markMax} in steps of 0.5</span>
+                <span>
+                  {MARK_MIN} to {markMax} in steps of 0.5
+                </span>
                 {guestNames.length > 0 ? (
                   <span>
                     {`${oxfordJoin(guestNames)} ${guestNames.length === 1 ? "is" : "are"} tonight's guest`}
@@ -998,7 +1026,7 @@ export function SpecialDanceEntry({
               </>
             ) : (
               <Button
-                disabled={busy || posting || !complete || eligible.length === 0}
+                disabled={busy || posting || !complete || eligible.length === 0 || invalidMarkIds.length > 0}
                 onClick={async () => {
                   setPosting(true);
                   setError(null);
@@ -1018,6 +1046,41 @@ export function SpecialDanceEntry({
           </p>
         </div>
       )}
+
+      <Dialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Special Dance?</DialogTitle>
+            <DialogDescription>Remove this special dance? Its marks will be deleted.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmRemove(false)} disabled={savingSetup}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={savingSetup || busy}
+              onClick={async () => {
+                if (isNew) {
+                  setConfirmRemove(false);
+                  return;
+                }
+                setSavingSetup(true);
+                const outcome = await onDelete(dance.id);
+                setSavingSetup(false);
+                if (outcome.error) {
+                  setSetupError(outcome.error);
+                  setConfirmRemove(false);
+                  return;
+                }
+                setConfirmRemove(false);
+              }}
+            >
+              {savingSetup ? "Removing…" : "Remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
