@@ -26,8 +26,6 @@ import {
   ADD_SPECIAL_VALUE,
   NEW_SPECIAL_ID,
   coupleIdsForDraft,
-  memberPickValue,
-  parseMemberPick,
   teamPickValue,
 } from "@/lib/results-draft-input";
 import {
@@ -43,7 +41,6 @@ import {
   recentSuggestions,
   specialDanceComplete,
   specialDancePanel,
-  specialDanceProgress,
   teamApplyPlan,
   teamMarksTotal,
   type NightSummaryDance,
@@ -1420,15 +1417,19 @@ export function ResultsForm({
   // Called as a plain function, not rendered as <Component/>: a component
   // declared inside this one gets a new identity every render, which would
   // remount its inputs on every keystroke and drop focus.
-  // Teams sit in the same picker as the couples (after them), each scored
-  // once through the couple-card layout. They are an entry-screen device
-  // only: nothing about them is a couple to scoring, standings or fans.
+  // Specials sit in the same picker as the couples (after them), A–Z by name,
+  // members on one line. They are an entry-screen device only: nothing about
+  // them is a couple to scoring, standings or fans.
   type PickerTeam = { dance: SpecialDance; view?: SpecialDanceView; inferredView?: TeamEntryView; render: () => ReactNode };
   function firstName(coupleId: string) {
     return coupleParts(namedCouple(coupleId) ?? { id: coupleId, celebrity_name: "?", pro_name: "?" }).celebrity;
   }
   function renderCouplePicker(list: Couple[], selectedId: string, onSelect: (id: string) => void, teams: PickerTeam[] = [], opts: { allowAdd?: boolean } = {}) {
     const allowAdd = Boolean(opts.allowAdd && special && canPublish);
+    const listedTeams = [...teams.filter((t) => t.dance.id !== NEW_SPECIAL_ID)].sort((a, b) => {
+      const byName = (a.dance.name || "").localeCompare(b.dance.name || "", undefined, { sensitivity: "base" });
+      return byName !== 0 ? byName : teams.indexOf(a) - teams.indexOf(b);
+    });
     const selectedTeam = selectedId === ADD_SPECIAL_VALUE
       ? teams.find((v) => v.dance.id === NEW_SPECIAL_ID)
       : selectedId.startsWith("team:")
@@ -1439,33 +1440,29 @@ export function ResultsForm({
       ? ADD_SPECIAL_VALUE
       : selectedTeam
         ? teamPickValue(selectedTeam.dance.id)
-        : (current?.id ?? (allowAdd ? ADD_SPECIAL_VALUE : teamPickValue(teams[0]?.dance.id ?? "")));
+        : (current?.id ?? (allowAdd ? ADD_SPECIAL_VALUE : teamPickValue(listedTeams[0]?.dance.id ?? "")));
     const teamLabel = (item: PickerTeam) => {
-      const progress = item.view
-        ? specialDanceProgress(item.view.dance, {
-            marks: item.view.marks,
-            scores: item.view.scores,
-            eligibleCoupleIds: item.view.eligible,
-            nightJudgeIds,
-          }).label
+      const members = oxfordJoin(item.dance.memberCoupleIds.map(firstName));
+      const status = item.view
+        ? item.dance.postedAt
+          ? "Posted"
+          : null
         : item.dance.postedAt
           ? "Posted"
           : "Team Dance";
       return (
-        <span className="flex flex-wrap items-center gap-1.5">
-          <strong>{item.dance.name || "New Special Dance"}</strong>
-          {item.dance.danceType && <Badge variant="secondary">{item.dance.danceType}</Badge>}
-          <span className="text-muted-foreground">{progress}</span>
+        <span className="flex flex-col">
+          <span className="flex flex-wrap items-center gap-1.5">
+            <strong>{item.dance.name || "New Special Dance"}</strong>
+            {item.dance.danceType && <Badge variant="secondary">{item.dance.danceType}</Badge>}
+            {status && <span className="text-muted-foreground">{status}</span>}
+          </span>
+          {members ? <span className="text-xs text-muted-foreground">{members}</span> : null}
         </span>
       );
     };
     const items: Record<string, ReactNode> = {
-      ...Object.fromEntries(
-        teams.flatMap((v) => [
-          [teamPickValue(v.dance.id), teamLabel(v)],
-          ...v.dance.memberCoupleIds.map((id) => [memberPickValue(v.dance.id, id), firstName(id)] as const),
-        ])
-      ),
+      ...Object.fromEntries(listedTeams.map((v) => [teamPickValue(v.dance.id), teamLabel(v)])),
       ...Object.fromEntries(list.map((c) => [c.id, coupleNameNode(coupleParts(c))])),
     };
     if (allowAdd) items[ADD_SPECIAL_VALUE] = "+ Add Special Dance";
@@ -1480,11 +1477,6 @@ export function ResultsForm({
               startAddSpecialDance();
               return;
             }
-            const member = parseMemberPick(v);
-            if (member) {
-              openCoupleEntry(member.coupleId);
-              return;
-            }
             onSelect(v);
           }}
         >
@@ -1492,35 +1484,6 @@ export function ResultsForm({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {teams.length > 0 && (
-              <SelectGroup>
-                <SelectLabel>Special Dances · {teams.filter((t) => t.dance.id !== NEW_SPECIAL_ID).length}</SelectLabel>
-                {teams.filter((t) => t.dance.id !== NEW_SPECIAL_ID).map((v) => (
-                  <div key={v.dance.id}>
-                    <SelectItem value={teamPickValue(v.dance.id)}>
-                      <span className="flex flex-col">
-                        {teamLabel(v)}
-                        <span className="text-xs text-muted-foreground">
-                          {oxfordJoin(v.dance.memberCoupleIds.map(firstName))}
-                        </span>
-                      </span>
-                    </SelectItem>
-                    {v.dance.memberCoupleIds.map((id) => (
-                      <SelectItem key={memberPickValue(v.dance.id, id)} value={memberPickValue(v.dance.id, id)} className="pl-6">
-                        {coupleNameNode(coupleParts(namedCouple(id) ?? { id, celebrity_name: "?", pro_name: "?" }))}
-                      </SelectItem>
-                    ))}
-                  </div>
-                ))}
-                {allowAdd && <SelectItem value={ADD_SPECIAL_VALUE}>+ Add Special Dance</SelectItem>}
-              </SelectGroup>
-            )}
-            {teams.length === 0 && allowAdd && (
-              <SelectGroup>
-                <SelectLabel>Special Dances · 0</SelectLabel>
-                <SelectItem value={ADD_SPECIAL_VALUE}>+ Add Special Dance</SelectItem>
-              </SelectGroup>
-            )}
             {list.length > 0 && (
               <SelectGroup>
                 <SelectLabel>Couples · {list.length}</SelectLabel>
@@ -1529,6 +1492,17 @@ export function ResultsForm({
                     {coupleNameNode(coupleParts(c))}
                   </SelectItem>
                 ))}
+              </SelectGroup>
+            )}
+            {(listedTeams.length > 0 || allowAdd) && (
+              <SelectGroup>
+                <SelectLabel>Special Dances · {listedTeams.length}</SelectLabel>
+                {listedTeams.map((v) => (
+                  <SelectItem key={v.dance.id} value={teamPickValue(v.dance.id)}>
+                    {teamLabel(v)}
+                  </SelectItem>
+                ))}
+                {allowAdd && <SelectItem value={ADD_SPECIAL_VALUE}>+ Add Special Dance</SelectItem>}
               </SelectGroup>
             )}
           </SelectContent>
@@ -1554,20 +1528,6 @@ export function ResultsForm({
     } else {
       setCoupleViewMode("inProgress");
       setByCoupleSelectedId(value);
-    }
-  }
-
-  function openCoupleEntry(coupleId: string) {
-    setShowLeaderboard(false);
-    if (publishedCouples.some((c) => c.id === coupleId)) {
-      setCoupleViewMode("published");
-      setPublishedSelectedId(coupleId);
-    } else if (draftedCouples.some((c) => c.id === coupleId)) {
-      setCoupleViewMode("drafted");
-      setDraftedSelectedId(coupleId);
-    } else {
-      setCoupleViewMode("inProgress");
-      setByCoupleSelectedId(coupleId);
     }
   }
 

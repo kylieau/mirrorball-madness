@@ -382,13 +382,10 @@ export function SpecialDanceEntry({
   } else if (scoringMode === "marks" && parsedMarks.invalidJudgeIds.length > 0) {
     const judgeId = parsedMarks.invalidJudgeIds[0];
     status = { tone: "danger", text: `${markRangeMessage(markMax)}. ${judgeNames.get(judgeId) ?? "That"}'s ${markInputs[judgeId]?.trim()} isn't saved.` };
-  } else if (scoringMode === "marks" && parsedMarks.filled < panelIds.length) {
+  } else if (scoringMode === "marks" && parsedMarks.filled > 0 && parsedMarks.filled < panelIds.length) {
     status = {
-      tone: parsedMarks.filled === 0 ? "muted" : "warn",
-      text:
-        parsedMarks.filled === 0
-          ? `0 of ${panelIds.length} judges in.`
-          : `${parsedMarks.filled} of ${panelIds.length} judges in. Can be posted once ${oxfordJoin(missingNames)}'s score is in.`,
+      tone: "warn",
+      text: `Can be posted once ${oxfordJoin(missingNames)}'s score is in.`,
     };
   } else if (scoringMode === "points" && parsedPoints.invalidCoupleIds.length > 0) {
     status = { tone: "danger", text: "Points must be between −100 and 100 in steps of 0.5." };
@@ -872,10 +869,11 @@ export function SpecialDanceEntry({
                 <span>
                   {MARK_MIN} to {markMax} in steps of 0.5
                 </span>
-                <span>
-                  {guestNames.length > 0 ? `${oxfordJoin(guestNames)} ${guestNames.length === 1 ? "is" : "are"} tonight's guest · ` : ""}
-                  {parsedMarks.filled} of {panelIds.length} in
-                </span>
+                {guestNames.length > 0 ? (
+                  <span>
+                    {`${oxfordJoin(guestNames)} ${guestNames.length === 1 ? "is" : "are"} tonight's guest`}
+                  </span>
+                ) : null}
               </div>
             </div>
           </fieldset>
