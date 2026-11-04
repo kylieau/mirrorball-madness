@@ -27,13 +27,14 @@ Open questions for Kylie:
 Still to check:
 - `apply-special-dances-polish.sql`'s header says UNAPPLIED, but grokbot
   reports it applied live. Confirm with Kylie, then fix the header.
-- Browser check still owed for the special-dance save rework (`1114165`):
+- Browser check still owed for the special-dance save rework (`e3e0ea3`):
   type a mark and switch away at once, then reopen (mark still there); an
   invalid mark refuses Finish Week by name; deleting a dance with unsaved marks
   doesn't leave Finish Week blocked; with a couple's draft released, posting
   its special dance still counts on Standings.
-- E07 and E08 each still hold 10 `draft_dance_scores` rows after publish,
-  likely correction seeds from reopening the week. Confirm that's harmless.
+- E07 and E08 each still hold 10 `draft_dance_scores` rows after publish, and
+  E09 holds 8, likely correction seeds from reopening the week. Confirm that's
+  harmless.
 - Known limit: when a draft week has a sibling night that is already
   published, draft-night standings replace that week's stored survival and
   Curtain Call points with the judges-only draft computation.
