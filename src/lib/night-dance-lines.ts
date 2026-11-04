@@ -1,12 +1,9 @@
-import { collapseToNights, judgeCountForDance } from "./scoring";
-
 export type NightDance = {
   episodeId: string;
   coupleId: string;
   style: string;
   song: string | null;
   totalScore: number;
-  scaledScore: number;
   // Null for a legacy row; the marks possible for a special dance scored by
   // marks; 0 for a bonus round scored in points.
   maxScore: number | null;
@@ -68,47 +65,43 @@ function styleLabel(dance: NightDance, team: boolean, labels: ReadonlyMap<string
   return `${dance.style}${team ? " (Team)" : ""}`;
 }
 
-function danceLine(dance: NightDance, team: boolean, labels: ReadonlyMap<string, SpecialDanceLabelInput>, withScore: boolean): string {
+function danceLine(dance: NightDance, team: boolean, labels: ReadonlyMap<string, SpecialDanceLabelInput>, alone: boolean): string {
   const label = styleLabel(dance, isTeamDance(dance.style, team), labels);
-  // A bonus round carries its points in the line itself ("Dance-Off · +3"),
-  // on a one-dance night too, since the card total is not a judges' score.
-  if (isPointsRow(dance) && dance.teamId) return `${label} · ${signed(dance.totalScore)}`;
+  // A lone bonus round keeps its points in its line ("Dance-Off · +3"), since
+  // the card total is then not a judges' score.
+  if (isPointsRow(dance) && dance.teamId) return alone ? `${label} · ${signed(dance.totalScore)}` : label;
   const song = dance.song?.trim();
-  const scored = withScore ? `${label} ${trimNumber(dance.totalScore)}` : label;
-  return song ? `${scored} · ${song}` : scored;
+  return song ? `${label} · ${song}` : label;
 }
 
-// One couple's dance lines on a Results card, in the order given. A night
-// with one dance keeps the plain "Style · Song" line (its score is the card
-// total). A night with several dances shows each dance with its own score,
-// then the night total over every mark possible — "Quickstep 28",
-// "Team Dance · Slaytopia 36", "Dance-Off · +3", "Night 67 · 64/80" — so the
-// card total reads as one night, not a list of unrelated numbers. When a
-// row's panel can't be recovered (no marks stored), the night line shows the
-// total only.
+export type CoupleDanceSummary = {
+  // "Style · Song" per dance, with no scores in them.
+  lines: string[];
+  // On a card with more than one dance, each dance's score for the right
+  // column under the card total: marks ("40", "36") and bonus rounds
+  // ("+3"), in line order. Null on a one-dance card, whose total is its score.
+  parts: { marks: string[]; bonus: string[] } | null;
+};
+
+// One couple's dances on a Results card, a night at a time in the order
+// given: the lines on the left, and the scores that make up the card total
+// on the right ("40 + 40", "27 +3 bonus").
 export function coupleDanceLines(
   dances: NightDance[],
   teamDanceEpisodes: ReadonlySet<string>,
   labels: ReadonlyMap<string, SpecialDanceLabelInput> = new Map()
-): string[] {
+): CoupleDanceSummary {
   const byEpisode = new Map<string, NightDance[]>();
   for (const dance of dances) byEpisode.set(dance.episodeId, [...(byEpisode.get(dance.episodeId) ?? []), dance]);
-
-  const lines: string[] = [];
-  for (const [episodeId, night] of byEpisode) {
-    const team = teamDanceEpisodes.has(episodeId);
-    if (night.length < 2) {
-      for (const dance of night) lines.push(danceLine(dance, team, labels, false));
-      continue;
-    }
-    for (const dance of night) lines.push(danceLine(dance, team, labels, true));
-    const [collapsed] = collapseToNights(night);
-    const panelKnown = night.every((dance) => dance.maxScore !== null || judgeCountForDance(dance) !== null);
-    const marks = collapsed.totalScore - collapsed.bonusScore;
-    const nightTotal = trimNumber(collapsed.totalScore);
-    if (!panelKnown) lines.push(`Night ${nightTotal}`);
-    else if (collapsed.bonusScore !== 0) lines.push(`Night ${nightTotal} · ${trimNumber(marks)}/${collapsed.maxScore}`);
-    else lines.push(`Night ${nightTotal}/${collapsed.maxScore}`);
-  }
-  return lines;
+  const ordered = [...byEpisode.values()].flat();
+  const alone = ordered.length < 2;
+  return {
+    lines: ordered.map((dance) => danceLine(dance, teamDanceEpisodes.has(dance.episodeId), labels, alone)),
+    parts: alone
+      ? null
+      : {
+          marks: ordered.filter((dance) => !(isPointsRow(dance) && dance.teamId)).map((dance) => trimNumber(dance.totalScore)),
+          bonus: ordered.filter((dance) => isPointsRow(dance) && dance.teamId).map((dance) => signed(dance.totalScore)),
+        },
+  };
 }

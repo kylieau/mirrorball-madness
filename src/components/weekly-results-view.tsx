@@ -18,9 +18,6 @@ type DanceScore = {
   song_title: string | null;
   team_id?: string | null;
   total_score: number;
-  // The 30-point basis; with total_score it recovers a legacy row's panel
-  // size, which is how a multi-dance night's "Night 64/80" knows its max.
-  scaled_score: number;
   // The marks possible for a special dance (0 for a bonus round in points);
   // absent before the special-dances migration, null for a couple's own row.
   max_score?: number | string | null;
@@ -158,14 +155,13 @@ export function WeeklyResultsView({
       return {
         ...r,
         parts: coupleParts(r.couple_id),
-        danceLabels: coupleDanceLines(
+        dances: coupleDanceLines(
           dances.map((d) => ({
             episodeId: d.episode_id,
             coupleId: d.couple_id,
             style: danceStyleById.get(d.dance_style_id) ?? "Unknown dance",
             song: d.song_title,
             totalScore: Number(d.total_score),
-            scaledScore: Number(d.scaled_score),
             maxScore: d.max_score == null ? null : Number(d.max_score),
             teamId: d.team_id ?? null,
           })),
@@ -213,7 +209,7 @@ export function WeeklyResultsView({
             >
               <div>
                 <p className="text-sm font-semibold">{r.parts ? <CoupleName {...r.parts} /> : "Unknown"}</p>
-                {r.danceLabels.map((label, i) => (
+                {r.dances.lines.map((label, i) => (
                   <p key={i} className="mt-0.5 text-xs text-muted-foreground">
                     {label}
                   </p>
@@ -243,6 +239,14 @@ export function WeeklyResultsView({
                 <span className="block font-heading text-base font-semibold text-foreground">
                   {r.outcome === "bye" ? "—" : r.total}
                 </span>
+                {r.outcome !== "bye" && r.dances.parts && (
+                  <span className="block whitespace-nowrap text-[11px] tabular-nums">
+                    {r.dances.parts.marks.join(" + ")}
+                    {r.dances.parts.bonus.map((points, i) => (
+                      <span key={i} className="text-accent">{` ${points} bonus`}</span>
+                    ))}
+                  </span>
+                )}
               </div>
             </div>
           );

@@ -148,7 +148,7 @@ export default async function ThisWeekPage({
     showResults && selectedEpisodeIds.length > 0
       ? supabase
           .from("dance_scores")
-          .select(danceScoreColumns(teamsMode, "id, episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score", { teamId: true }))
+          .select(danceScoreColumns(teamsMode, "id, episode_id, couple_id, dance_style_id, song_title, total_score", { teamId: true }))
           .in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] }),
     showResults && selectedEpisodeIds.length > 0
