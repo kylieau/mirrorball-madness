@@ -32,6 +32,13 @@ export type DraftDance = {
   at: string;
 };
 
+// A release read just before its dance was posted can arrive beside the
+// posted rows from a separate read; the posted rows win.
+export function unpostedDraftDances(dances: DraftDance[], liveTeamIds: Iterable<string | null | undefined>): DraftDance[] {
+  const posted = new Set([...liveTeamIds].filter((id): id is string => id != null));
+  return dances.filter((dance) => dance.teamId == null || !posted.has(dance.teamId));
+}
+
 export function draftDanceScores(dances: DraftDance[]): DanceScore[] {
   return dances.map((dance) => ({
     episodeId: dance.episodeId,
@@ -228,7 +235,7 @@ export function draftNightDanceScores(night: {
   );
   return [
     ...night.liveDances.filter((d) => d.teamId != null || !released.has(`${d.episodeId}:${d.coupleId}`)),
-    ...draftDanceScores(night.dances),
+    ...draftDanceScores(unpostedDraftDances(night.dances, night.liveDances.map((d) => d.teamId))),
   ];
 }
 
@@ -309,9 +316,15 @@ export function replaceWeekDanceScores<T extends { weekNumber: number; danceScor
   if (!draft) return weeks;
   const nightKey = (d: DanceScore) => `${d.episodeId}:${d.coupleId}`;
   const draftNights = new Set(draft.danceScores.filter((d) => d.teamId == null).map(nightKey));
-  return weeks.map((week) =>
-    week.weekNumber === draft.weekNumber
-      ? { ...week, danceScores: [...week.danceScores.filter((d) => d.teamId != null || !draftNights.has(nightKey(d))), ...draft.danceScores] }
-      : week
-  );
+  return weeks.map((week) => {
+    if (week.weekNumber !== draft.weekNumber) return week;
+    const postedTeams = new Set(week.danceScores.map((d) => d.teamId).filter((id) => id != null));
+    return {
+      ...week,
+      danceScores: [
+        ...week.danceScores.filter((d) => d.teamId != null || !draftNights.has(nightKey(d))),
+        ...draft.danceScores.filter((d) => d.teamId == null || !postedTeams.has(d.teamId)),
+      ],
+    };
+  });
 }

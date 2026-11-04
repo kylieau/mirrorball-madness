@@ -220,6 +220,20 @@ describe("replaceWeekDanceScores", () => {
     expect(week.danceScores).toEqual([own, special]);
   });
 
+  it("lets a special dance's posted rows win over its draft read a moment earlier", () => {
+    const own = { episodeId: "ep1", coupleId: "c1", totalScore: 24, scaledScore: 24, maxScore: null, teamId: null };
+    const posted = { episodeId: "ep1", coupleId: "c1", totalScore: 3, scaledScore: 0, maxScore: 0, teamId: "t1" };
+    const [week] = replaceWeekDanceScores([{ weekNumber: 3, danceScores: [own, posted] }], { weekNumber: 3, danceScores: [posted] });
+    expect(week.danceScores).toEqual([own, posted]);
+    expect(
+      draftNightDanceScores({
+        releasedCoupleIdsByEpisode: {},
+        dances: [{ episodeId: "ep1", coupleId: "c1", teamId: "t1", danceStyle: "Freestyle", total: 3, scaled: 0, maxScore: 0, at: "t" }],
+        liveDances: [own, posted],
+      })
+    ).toEqual([own, posted]);
+  });
+
   it("merges live and released-draft rows by night and couple, never by couple alone", () => {
     const live = (episodeId: string, coupleId: string, score: number) => ({ episodeId, coupleId, totalScore: score, scaledScore: score, maxScore: null });
     const weeks = replaceWeekDanceScores(

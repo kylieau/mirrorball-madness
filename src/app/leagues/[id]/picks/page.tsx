@@ -18,7 +18,7 @@ import { RecastNudgeCard } from "@/components/recast-nudge-card";
 import { LeaguePageShell } from "@/components/league-page-shell";
 import { loadLeaguePageBase } from "@/lib/league-page-data";
 import { formatCoupleName } from "@/lib/couple-display";
-import { draftDanceScores, excludeReleasedCoupleRows } from "@/lib/draft-scores";
+import { draftDanceScores, excludeReleasedCoupleRows, unpostedDraftDances } from "@/lib/draft-scores";
 import { danceMaxScore, danceScoreColumns } from "@/lib/episode-teams";
 import { managerIdForPick, type DraftType } from "@/lib/draft";
 import { clampRosterCoupleForWeek, weeklyBonusPoints } from "@/lib/roster-weekly-points";
@@ -318,7 +318,12 @@ export default async function LeaguePicksPage({
           scaledScore: Number(row.scaled_score),
           maxScore: danceMaxScore(row),
         })),
-      ...(draftNight ? draftDanceScores(draftNight.dances).map((dance) => ({ ...dance, weekNumber: draftNight.weekNumber })) : []),
+      ...(draftNight
+        ? draftDanceScores(unpostedDraftDances(draftNight.dances, (leagueDanceScores ?? []).map((row) => row.team_id))).map((dance) => ({
+            ...dance,
+            weekNumber: draftNight.weekNumber,
+          }))
+        : []),
     ],
     judgesScoreStartsWeek: scoringSettings?.judges_score_starts_week ?? 1,
     multiplier: scoringSettings?.judges_score_multiplier ?? 1,

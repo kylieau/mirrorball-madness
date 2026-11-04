@@ -16,7 +16,7 @@ import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
 import { LiveScoresPrompt } from "@/components/live-scores-prompt";
 import { HomeDraftChrome } from "@/components/draft-scores-strip";
 import type { LeagueTriage } from "@/components/league-triage-card";
-import { excludeReleasedCoupleRows, homeStripChoice } from "@/lib/draft-scores";
+import { excludeReleasedCoupleRows, homeStripChoice, unpostedDraftDances } from "@/lib/draft-scores";
 import type { ModuleStackInput } from "@/lib/league-triage";
 import { loadModuleStackInputs } from "@/lib/league-module-stack-data";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
@@ -125,7 +125,7 @@ export default async function Home() {
     if (draftNight) {
       const week = activityWeeks.get(draftNight.weekNumber);
       if (week) {
-        for (const dance of draftNight.dances) {
+        for (const dance of unpostedDraftDances(draftNight.dances, danceScores.map((d) => d.team_id))) {
           const parts = displayNames.get(dance.coupleId);
           if (parts) {
             week.scores.push(

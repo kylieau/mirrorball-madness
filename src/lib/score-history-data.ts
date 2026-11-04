@@ -3,7 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
-import { excludeReleasedCoupleRows } from "@/lib/draft-scores";
+import { excludeReleasedCoupleRows, unpostedDraftDances } from "@/lib/draft-scores";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { buildScoreHistory, weekResults, type HistoryWeekData, type ScoreHistoryLine } from "@/lib/score-history";
 import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
@@ -63,9 +63,16 @@ export async function loadScoreHistory(
   ]);
   const completedAllowedWeeks = completedWeeks.filter((week) => cutoff.allowedEpisodeIds.has(week.id));
   const draftNight = draftContext.night;
+  // A two-night week can be posting on one night with a released draft on the
+  // other; the week lists both nights.
   const revealingWeek =
     revealing && revealingVisible
-      ? { ...revealing.week, episodes: revealing.week.episodes.filter((e) => revealing.episodeIds.includes(e.id)) }
+      ? {
+          ...revealing.week,
+          episodes: revealing.week.episodes.filter(
+            (e) => revealing.episodeIds.includes(e.id) || (draftNight?.weekId === revealing.week.id && draftNight.episodeIds.includes(e.id))
+          ),
+        }
       : null;
   const draftHistoryWeek =
     draftNight && !revealingWeek && !completedAllowedWeeks.some((week) => week.id === draftNight.weekId)
@@ -134,14 +141,14 @@ export async function loadScoreHistory(
   // even in an episode that also has other couples still mid-draft.
   const historyDanceRows = [
     ...excludeReleasedCoupleRows(liveDanceRows, draftNight?.releasedCoupleIdsByEpisode ?? {}),
-    ...(draftNight?.dances.map((dance) => ({
+    ...(unpostedDraftDances(draftNight?.dances ?? [], liveDanceRows.map((row) => row.team_id)).map((dance) => ({
       episode_id: dance.episodeId,
       couple_id: dance.coupleId,
       total_score: dance.total,
       scaled_score: dance.scaled,
       max_score: dance.maxScore,
       team_id: dance.teamId,
-    })) ?? []),
+    }))),
   ];
   const weeks: HistoryWeekData[] = allowedWeeks.map((week) => {
     const inWeek = new Set(week.episodes.map((episode) => episode.id));
