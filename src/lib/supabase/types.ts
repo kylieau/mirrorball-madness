@@ -110,6 +110,174 @@ export type Database = {
         }
         Relationships: []
       }
+      _backup_20261102_disney_slot2: {
+        Row: {
+          backed_up_at: string | null
+          couple_id: string | null
+          created_at: string | null
+          dance_style_id: string | null
+          episode_id: string | null
+          id: string | null
+          scaled_score: number | null
+          song_title: string | null
+          total_score: number | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          couple_id?: string | null
+          created_at?: string | null
+          dance_style_id?: string | null
+          episode_id?: string | null
+          id?: string | null
+          scaled_score?: number | null
+          song_title?: string | null
+          total_score?: number | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          couple_id?: string | null
+          created_at?: string | null
+          dance_style_id?: string | null
+          episode_id?: string | null
+          id?: string | null
+          scaled_score?: number | null
+          song_title?: string | null
+          total_score?: number | null
+        }
+        Relationships: []
+      }
+      _backup_20261102_week9_draft_override: {
+        Row: {
+          correction_base_published_at: string | null
+          correction_token: string | null
+          episode_id: string | null
+          guest_judge_name: string | null
+          judges_save_available: boolean | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          correction_base_published_at?: string | null
+          correction_token?: string | null
+          episode_id?: string | null
+          guest_judge_name?: string | null
+          judges_save_available?: boolean | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          correction_base_published_at?: string | null
+          correction_token?: string | null
+          episode_id?: string | null
+          guest_judge_name?: string | null
+          judges_save_available?: boolean | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      _backup_20261103_episode_team_marks: {
+        Row: {
+          backed_up_at: string | null
+          judge_id: string | null
+          score: number | null
+          team_id: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          judge_id?: string | null
+          score?: number | null
+          team_id?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          judge_id?: string | null
+          score?: number | null
+          team_id?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      _backup_20261103_episode_team_members: {
+        Row: {
+          backed_up_at: string | null
+          couple_id: string | null
+          created_at: string | null
+          episode_id: string | null
+          team_id: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          couple_id?: string | null
+          created_at?: string | null
+          episode_id?: string | null
+          team_id?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          couple_id?: string | null
+          created_at?: string | null
+          episode_id?: string | null
+          team_id?: string | null
+        }
+        Relationships: []
+      }
+      _backup_20261103_episode_teams: {
+        Row: {
+          backed_up_at: string | null
+          captain_couple_id: string | null
+          created_at: string | null
+          dance_style_id: string | null
+          episode_id: string | null
+          host_name: string | null
+          id: string | null
+          name: string | null
+          posted_at: string | null
+          posted_by: string | null
+          song_source: string | null
+          song_title: string | null
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          captain_couple_id?: string | null
+          created_at?: string | null
+          dance_style_id?: string | null
+          episode_id?: string | null
+          host_name?: string | null
+          id?: string | null
+          name?: string | null
+          posted_at?: string | null
+          posted_by?: string | null
+          song_source?: string | null
+          song_title?: string | null
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          captain_couple_id?: string | null
+          created_at?: string | null
+          dance_style_id?: string | null
+          episode_id?: string | null
+          host_name?: string | null
+          id?: string | null
+          name?: string | null
+          posted_at?: string | null
+          posted_by?: string | null
+          song_source?: string | null
+          song_title?: string | null
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       competition_weeks: {
         Row: {
           id: string
@@ -254,13 +422,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "dance_scores_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "episode_teams"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "dance_scores_couple_id_fkey"
             columns: ["couple_id"]
             isOneToOne: false
@@ -279,6 +440,13 @@ export type Database = {
             columns: ["episode_id"]
             isOneToOne: false
             referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dance_scores_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "episode_teams"
             referencedColumns: ["id"]
           },
         ]
@@ -945,45 +1113,6 @@ export type Database = {
           },
         ]
       }
-      episode_team_members: {
-        Row: {
-          couple_id: string
-          created_at: string
-          episode_id: string
-          sort_order: number
-          team_id: string
-        }
-        Insert: {
-          couple_id: string
-          created_at?: string
-          episode_id: string
-          sort_order?: number
-          team_id: string
-        }
-        Update: {
-          couple_id?: string
-          created_at?: string
-          episode_id?: string
-          sort_order?: number
-          team_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "episode_team_members_couple_id_fkey"
-            columns: ["couple_id"]
-            isOneToOne: false
-            referencedRelation: "couples"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "episode_team_members_team_id_episode_id_fkey"
-            columns: ["team_id", "episode_id"]
-            isOneToOne: false
-            referencedRelation: "episode_teams"
-            referencedColumns: ["id", "episode_id"]
-          },
-        ]
-      }
       episode_team_marks: {
         Row: {
           judge_id: string
@@ -1020,6 +1149,52 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "episode_teams"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_team_marks_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      episode_team_members: {
+        Row: {
+          couple_id: string
+          created_at: string
+          episode_id: string
+          sort_order: number
+          team_id: string
+        }
+        Insert: {
+          couple_id: string
+          created_at?: string
+          episode_id: string
+          sort_order?: number
+          team_id: string
+        }
+        Update: {
+          couple_id?: string
+          created_at?: string
+          episode_id?: string
+          sort_order?: number
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_team_members_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_team_members_team_id_episode_id_fkey"
+            columns: ["team_id", "episode_id"]
+            isOneToOne: false
+            referencedRelation: "episode_teams"
+            referencedColumns: ["id", "episode_id"]
           },
         ]
       }
@@ -1061,6 +1236,13 @@ export type Database = {
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "episode_teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_team_scores_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1158,6 +1340,13 @@ export type Database = {
             columns: ["episode_id"]
             isOneToOne: false
             referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_teams_posted_by_fkey"
+            columns: ["posted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2095,6 +2284,10 @@ export type Database = {
         Args: { p_actor_id: string; p_episode_id: string }
         Returns: undefined
       }
+      assert_special_dance_plan: {
+        Args: { p_episode_id: string; p_plan: Json }
+        Returns: undefined
+      }
       cancel_account_deletion: { Args: never; Returns: undefined }
       capture_expired_finale_deadlines: {
         Args: { p_league_id?: string }
@@ -2102,17 +2295,6 @@ export type Database = {
       }
       close_grand_finale_late: {
         Args: { p_league_id: string; p_manager_id: string }
-        Returns: undefined
-      }
-      commit_team_reveal: {
-        Args: {
-          p_actor_id: string
-          p_episode_id: string
-          p_plan: Json
-          p_snapshot: Json
-          p_team_id: string
-          p_undo: boolean
-        }
         Returns: undefined
       }
       commit_episode_publication: {
@@ -2131,6 +2313,17 @@ export type Database = {
           p_episode_id: string
           p_plan: Json
           p_snapshot: Json
+          p_undo: boolean
+        }
+        Returns: undefined
+      }
+      commit_team_reveal: {
+        Args: {
+          p_actor_id: string
+          p_episode_id: string
+          p_plan: Json
+          p_snapshot: Json
+          p_team_id: string
           p_undo: boolean
         }
         Returns: undefined
@@ -2168,6 +2361,10 @@ export type Database = {
         }
       }
       delete_league: { Args: { p_league_id: string }; Returns: undefined }
+      delete_special_dance: {
+        Args: { p_actor_id: string; p_episode_id: string; p_team_id: string }
+        Returns: undefined
+      }
       demote_commissioner: {
         Args: { p_league_id: string; p_user_id: string }
         Returns: undefined
@@ -2332,6 +2529,10 @@ export type Database = {
         Args: { p_week_number: number }
         Returns: undefined
       }
+      materialize_team_scores: {
+        Args: { p_episode_id: string; p_team_id: string }
+        Returns: undefined
+      }
       mutate_draft_moment: {
         Args: {
           p_actor_id: string
@@ -2460,26 +2661,22 @@ export type Database = {
         Args: { p_actor_id: string; p_dance: Json; p_episode_id: string }
         Returns: string
       }
-      delete_special_dance: {
-        Args: { p_actor_id: string; p_episode_id: string; p_team_id: string }
-        Returns: undefined
-      }
       save_special_dance_points: {
-        Args: { p_actor_id: string; p_episode_id: string; p_scores: Json; p_team_id: string }
+        Args: {
+          p_actor_id: string
+          p_episode_id: string
+          p_scores: Json
+          p_team_id: string
+        }
         Returns: undefined
       }
-      special_dance_panel: { Args: { p_team_id: string }; Returns: string[] }
-      special_dance_complete: { Args: { p_team_id: string }; Returns: boolean }
       save_team_marks: {
-        Args: { p_actor_id: string; p_episode_id: string; p_marks: Json; p_team_id: string }
-        Returns: undefined
-      }
-      team_eligible_members: {
-        Args: { p_episode_id: string; p_team_id: string }
-        Returns: string[]
-      }
-      materialize_team_scores: {
-        Args: { p_episode_id: string; p_team_id: string }
+        Args: {
+          p_actor_id: string
+          p_episode_id: string
+          p_marks: Json
+          p_team_id: string
+        }
         Returns: undefined
       }
       seed_episode_correction: {
@@ -2519,6 +2716,17 @@ export type Database = {
         Args: { p_enabled: boolean; p_user_id: string }
         Returns: undefined
       }
+      special_dance_blocker: {
+        Args: { p_team_id: string; p_when: string }
+        Returns: string
+      }
+      special_dance_complete: { Args: { p_team_id: string }; Returns: boolean }
+      special_dance_label: {
+        Args: { p_team: Database["public"]["Tables"]["episode_teams"]["Row"] }
+        Returns: string
+      }
+      special_dance_panel: { Args: { p_team_id: string }; Returns: string[] }
+      special_dance_status: { Args: { p_team_id: string }; Returns: Json }
       start_draft: {
         Args: { p_league_id: string }
         Returns: {
@@ -2617,6 +2825,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      team_eligible_members: {
+        Args: { p_episode_id: string; p_team_id: string }
+        Returns: string[]
+      }
+      team_song_key: { Args: { p_song: string }; Returns: string }
       undo_last_pick: { Args: { p_league_id: string }; Returns: undefined }
       unlock_draft_scores_through: {
         Args: { p_week_number: number }

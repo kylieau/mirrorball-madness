@@ -11,9 +11,8 @@ page, in the server actions and in `supabase/apply-whole-judge-marks.sql`
 Follow-ups from it:
 - Drop `episode_teams.mark_max` and `panel_judge_ids` together with every SQL
   and TS reader (`special_dance_panel`, `materialize_team_scores`,
-  `save_special_dance`, `episode-publication.ts`, `SpecialDance`), once the
-  types can be regenerated (the access token in `.env.local` is invalid) and
-  not in a show week.
+  `save_special_dance`, `episode-publication.ts`, `SpecialDance`), then
+  regenerate the types; not in a show week.
 - `TeamEntry` (`team-entry.tsx`, inferred-teams fallback) still has its own
   small score boxes and a "tonight's guest" caption. Production runs
   `special`, so it is only the fresh-project fallback; delete it rather than
@@ -33,8 +32,10 @@ Open questions for Kylie:
   31.5). Keep that, or convert bonus points at a fixed rate?
 
 Still to check:
-- `apply-special-dances-polish.sql`'s header says UNAPPLIED, but grokbot
-  reports it applied live. Confirm with Kylie, then fix the header.
+- `apply-special-dances-polish.sql` is not applied live (read from the live
+  function bodies 2026-11-04; grokbot's report was wrong). Until Kylie runs it,
+  saving special-dance marks or points still creates a week draft and a 0 mark
+  is accepted.
 - Browser check still owed for the special-dance save rework (`e3e0ea3`):
   type a mark and switch away at once, then reopen (mark still there); an
   invalid mark refuses Finish Week by name; deleting a dance with unsaved marks
