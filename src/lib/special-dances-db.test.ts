@@ -389,6 +389,26 @@ describe("special dances in PostgreSQL", () => {
     expect((await liveRows(amber)).map((r) => r.total)).toEqual([33, 4]);
   });
 
+  it("runs a Grammy Night: an immune couple's bonus, two dance-offs with 0 for each loser, then Finish Week", async () => {
+    const immunity = await saveSpecial({ danceType: "Immunity", memberCoupleIds: [tatyana], scoringMode: "points" });
+    const first = await saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [amber, julia], scoringMode: "points" });
+    const second = await saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [connor, ezra], scoringMode: "points" });
+    await ownDances([tatyana, maura, amber, julia, connor, ezra]);
+    for (const couple of [tatyana, maura, amber, julia, connor, ezra]) await revealCouple(couple);
+    // Out of 40 with the guest, so a win is +2.
+    await savePoints(immunity, [{ coupleId: tatyana, points: 2 }]);
+    await savePoints(first, [{ coupleId: amber, points: 2, result: "Winner" }, { coupleId: julia, points: null, result: "Loser" }]);
+    await savePoints(second, [{ coupleId: ezra, points: 2, result: "Winner" }, { coupleId: connor, points: 0, result: "Loser" }]);
+    await expect(finishWeek()).rejects.toThrow(/Dance-Off has points for 1 of 2 couples/);
+    await savePoints(first, [{ coupleId: amber, points: 2, result: "Winner" }, { coupleId: julia, points: 0, result: "Loser" }]);
+    await finishWeek();
+    // Amber won: (33 + 2) / 40 x 30 = 26.25. Julia lost: 33 / 40 x 30 = 24.75.
+    expect(await rosterPoints(admin)).toBe(26.25);
+    expect(await rosterPoints(friend)).toBe(24.75);
+    expect((await liveRows(tatyana)).map((r) => [r.total, r.max])).toEqual([[33, null], [2, 0]]);
+    expect((await liveRows(julia)).map((r) => [r.total, r.max])).toEqual([[33, null], [0, 0]]);
+  });
+
   it("releases a couple's own draft after its special dance posts, and still refuses one whose own dance is live", async () => {
     await db.exec(readFileSync("supabase/apply-draft-release-own-rows.sql", "utf8"));
     const danceOff = await saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [amber, julia], scoringMode: "points" });

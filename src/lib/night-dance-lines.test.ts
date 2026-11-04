@@ -57,6 +57,18 @@ describe("coupleDanceLines", () => {
     expect(coupleDanceLines([danceOff], new Set()).lines).toEqual(["Bonus · +3"]);
   });
 
+  it("leaves out a dance-off loser's 0, and lists nothing when only the couple's own dance is left", () => {
+    const lost = { ...dance("Cha-Cha", 0), teamId: "d1", maxScore: 0 };
+    const named = labels({ d1: { name: "Dance-Off", danceType: "Dance-Off", scoringMode: "points" } });
+    expect(coupleDanceLines([dance("Tango", 27), lost], new Set(), named)).toEqual({ lines: ["Tango", "Dance-Off"], parts: null });
+    const immune = { ...dance("Freestyle", 3), teamId: "i1", maxScore: 0 };
+    const immunity = labels({ i1: { name: "Immunity", danceType: "Immunity", scoringMode: "points" } });
+    expect(coupleDanceLines([dance("Tango", 27), immune], new Set(), immunity)).toEqual({
+      lines: ["Tango", "Immunity"],
+      parts: { marks: ["27"], bonus: ["+3"] },
+    });
+  });
+
   it("keeps half points in a part", () => {
     expect(coupleDanceLines([dance("Tango", 24), dance("Freestyle", 38.5)], teamNight).parts).toEqual({ marks: ["24", "38.5"], bonus: [] });
   });

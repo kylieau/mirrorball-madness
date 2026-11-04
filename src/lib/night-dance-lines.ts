@@ -79,7 +79,8 @@ export type CoupleDanceSummary = {
   lines: string[];
   // On a card with more than one dance, each dance's score for the right
   // column under the card total: marks ("40", "36") and bonus rounds
-  // ("+3"), in line order. Null on a one-dance card, whose total is its score.
+  // ("+3"), in line order. Null when there is only one part to list, since
+  // the card total already is that score.
   parts: { marks: string[]; bonus: string[] } | null;
 };
 
@@ -95,13 +96,12 @@ export function coupleDanceLines(
   for (const dance of dances) byEpisode.set(dance.episodeId, [...(byEpisode.get(dance.episodeId) ?? []), dance]);
   const ordered = [...byEpisode.values()].flat();
   const alone = ordered.length < 2;
+  const isBonus = (dance: NightDance) => isPointsRow(dance) && !!dance.teamId;
+  const marks = ordered.filter((dance) => !isBonus(dance)).map((dance) => trimNumber(dance.totalScore));
+  // A dance-off loser's 0 adds nothing to the total, so it is not listed.
+  const bonus = ordered.filter((dance) => isBonus(dance) && dance.totalScore !== 0).map((dance) => signed(dance.totalScore));
   return {
     lines: ordered.map((dance) => danceLine(dance, teamDanceEpisodes.has(dance.episodeId), labels, alone)),
-    parts: alone
-      ? null
-      : {
-          marks: ordered.filter((dance) => !(isPointsRow(dance) && dance.teamId)).map((dance) => trimNumber(dance.totalScore)),
-          bonus: ordered.filter((dance) => isPointsRow(dance) && dance.teamId).map((dance) => signed(dance.totalScore)),
-        },
+    parts: marks.length + bonus.length < 2 ? null : { marks, bonus },
   };
 }

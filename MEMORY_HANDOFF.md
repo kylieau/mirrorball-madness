@@ -2,7 +2,7 @@
 
 ## 1. Current State
 
-**`main` is at `488a45d`, pushed and deploying.** Nothing of ours is uncommitted. E09 (Week 8) was published 2026-11-03 06:55Z. E10 (Week 9, Grammy Night) airs Monday 2026-11-10 ET and has no data yet.
+**`main` is at `488a45d`, pushed and deploying.** Nothing of ours is uncommitted. E09 (Week 8) was published 2026-11-03 06:55Z. E10 (Week 9, Grammy Night) airs Tuesday 2026-11-10, 8pm ET and has no data yet.
 
 Shipped to `main` today, each reviewed by Codex and the advisor:
 - **Special-dance saves held by the page** (`e3e0ea3`): typed marks/points live in `results-form.tsx` (`specialEdits`, its own `DraftSaveQueue`), so switching entries never drops an edit. Draft merges keep posted special rows.

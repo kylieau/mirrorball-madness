@@ -34,7 +34,7 @@ Cleanups:
   (the payload skips styleless dances). Pre-existing; maybe make the style
   required before the boxes take input.
 
-Still to see on a real night (E10, Monday 2026-11-10 ET), none browser-checked:
+Still to see on a real night (E10, Tuesday 2026-11-10, 8pm ET), none browser-checked:
 - Special-dance card: a typed mark survives switching away and back; an
   invalid mark blocks Finish Week by name; Save as Draft Score → Drafted ·
   Withdraw; a released special shows on Home / Standings for viewers who
