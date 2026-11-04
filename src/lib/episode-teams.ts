@@ -1,11 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/types";
+import { isValidMark, JUDGE_MARK_MESSAGE } from "./judge-marks";
 import {
   DEFAULT_DANCE_TYPE,
-  isValidMark,
   isValidPoints,
   legacyTeamDefaults,
-  markRangeMessage,
   SPECIAL_DANCE_MAX_JUDGES,
   SPECIAL_DANCE_POINTS_LIMIT,
   type SpecialDance,
@@ -306,12 +305,11 @@ export async function deleteSpecialDance(
 // mark from every judge on the dance's panel.
 export async function saveTeamMarks(
   admin: SupabaseClient<Database>,
-  input: { episodeId: string; teamId: string; marks: TeamMark[]; markMax?: number },
+  input: { episodeId: string; teamId: string; marks: TeamMark[] },
   actorId: string
 ): Promise<{ error: string | null }> {
-  const markMax = input.markMax ?? 10;
   if (input.marks.length > SPECIAL_DANCE_MAX_JUDGES) return { error: `Marks must be a list of at most ${SPECIAL_DANCE_MAX_JUDGES}.` };
-  if (input.marks.some((m) => !isValidMark(m.score, markMax))) return { error: `${markRangeMessage(markMax)}.` };
+  if (input.marks.some((m) => !isValidMark(m.score))) return { error: JUDGE_MARK_MESSAGE };
   const { error } = await admin.rpc("save_team_marks", {
     p_episode_id: input.episodeId,
     p_team_id: input.teamId,

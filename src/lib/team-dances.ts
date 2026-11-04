@@ -1,9 +1,10 @@
 import { roundPoints } from "./format-points";
+import { isValidMark } from "./judge-marks";
 import { collapseToNights, MARK_MAX, scaledJudgesScore } from "./scoring";
 
-// A special dance's panel is 2 to 4 judges: the night's standing panel plus
-// its guest by default, with "Didn't judge" dropping one. The SQL checks the
-// same bounds (episode_teams_special_checks, save_team_marks).
+// A special dance takes marks from the night's judges: the standing panel plus
+// that episode's guests, 2 to 4 of them. The SQL checks the same bounds
+// (episode_teams_special_checks, save_team_marks).
 export const SPECIAL_DANCE_MIN_JUDGES = 2;
 export const SPECIAL_DANCE_MAX_JUDGES = 4;
 export const SPECIAL_DANCE_MAX_SONGS = 4;
@@ -11,9 +12,6 @@ export const SPECIAL_DANCE_MAX_DETAILS = 12;
 export const SPECIAL_DANCE_POINTS_LIMIT = 100;
 export const DEFAULT_DANCE_TYPE = "Team Dance";
 export const DEFAULT_MARK_MAX = MARK_MAX;
-// DWTS judges do not give a 0. One constant so the floor can move later
-// without hunting every range check and hint.
-export const MARK_MIN = 1;
 
 export const DANCE_TYPE_SUGGESTIONS = [
   "Team Dance",
@@ -44,8 +42,10 @@ export type SpecialDance = {
   nameIsAuto: boolean;
   danceType: string;
   scoringMode: SpecialDanceScoringMode;
+  // Stored, but the app no longer sets either: every dance is out of 10 on
+  // the night's panel (null), which episode_teams_night_panel pins. The
+  // publication math still reads them, so they go together (BACKLOG).
   markMax: number;
-  // null means the night's panel (standing judges plus the episode's guests).
   panelJudgeIds: string[] | null;
   danceStyleId: string;
   secondDanceStyleId: string | null;
@@ -82,29 +82,8 @@ export function isHalfStep(value: number): boolean {
   return Number.isFinite(value) && value * 2 === Math.trunc(value * 2);
 }
 
-export function isValidMark(score: number, markMax: number): boolean {
-  return isHalfStep(score) && score >= MARK_MIN && score <= markMax;
-}
-
-export function isValidMarkMax(markMax: number): boolean {
-  return isHalfStep(markMax) && markMax > 0 && markMax <= MARK_MAX;
-}
-
 export function isValidPoints(points: number): boolean {
   return isHalfStep(points) && Math.abs(points) <= SPECIAL_DANCE_POINTS_LIMIT;
-}
-
-export function markRangeMessage(markMax: number): string {
-  return `Judge scores must be ${MARK_MIN} to ${markMax} in steps of 0.5`;
-}
-
-// Empty is "not yet entered". Anything typed that is off-step or outside
-// MARK_MIN..markMax is an error the card must show and refuse to save.
-export function markInputError(raw: string, markMax: number): string | null {
-  const trimmed = raw.trim();
-  if (trimmed === "") return null;
-  const score = Number(trimmed);
-  return Number.isFinite(score) && isValidMark(score, markMax) ? null : markRangeMessage(markMax);
 }
 
 // The judges whose marks a special dance takes: its own panel when one was
@@ -223,9 +202,8 @@ export type ParsedTeamMarks = {
 };
 
 // The card's boxes as typed. Complete only when every one of the dance's
-// judges (2 to 4 of them) has a mark from MARK_MIN to the per-judge max in
-// steps of 0.5; nothing is posted before that.
-export function parseTeamMarks(inputs: Record<string, string>, judgeIds: string[], markMax: number = DEFAULT_MARK_MAX): ParsedTeamMarks {
+// judges (2 to 4 of them) has a valid mark; nothing is posted before that.
+export function parseTeamMarks(inputs: Record<string, string>, judgeIds: string[]): ParsedTeamMarks {
   const invalidJudgeIds: string[] = [];
   const marks: TeamMark[] = [];
   let filled = 0;
@@ -234,7 +212,7 @@ export function parseTeamMarks(inputs: Record<string, string>, judgeIds: string[
     if (raw === "") continue;
     filled += 1;
     const score = Number(raw);
-    if (!isValidMark(score, markMax)) invalidJudgeIds.push(judgeId);
+    if (!isValidMark(score)) invalidJudgeIds.push(judgeId);
     else marks.push({ judgeId, score });
   }
   const complete = isValidPanelSize(judgeIds.length) && invalidJudgeIds.length === 0 && marks.length === judgeIds.length;
@@ -540,8 +518,6 @@ export type SpecialDanceSetupInput = {
   secondDanceStyleId: string | null;
   songs: SpecialDanceSong[];
   scoringMode: SpecialDanceScoringMode;
-  markMax: number;
-  panelJudgeIds: string[] | null;
   songSource: string | null;
   themeLabel: string | null;
   details: SpecialDanceDetail[];
@@ -564,11 +540,6 @@ export function validateSpecialDanceSetup(
   if (input.songs.length > SPECIAL_DANCE_MAX_SONGS) return `A special dance can list up to ${SPECIAL_DANCE_MAX_SONGS} songs.`;
   if (input.details.length > SPECIAL_DANCE_MAX_DETAILS) return `A special dance can carry up to ${SPECIAL_DANCE_MAX_DETAILS} extra details.`;
   if (input.details.some((d) => !d.label.trim())) return "Every extra detail needs a label.";
-  if (input.scoringMode === "marks") {
-    if (!isValidMarkMax(input.markMax)) return "Out of must be 1 to 10 in steps of 0.5.";
-    if (input.panelJudgeIds && !isValidPanelSize(input.panelJudgeIds.length))
-      return `Judges' Marks need ${SPECIAL_DANCE_MIN_JUDGES} to ${SPECIAL_DANCE_MAX_JUDGES} judges.`;
-  }
   return null;
 }
 

@@ -9,13 +9,8 @@ import {
   isHalfStep,
   isTeamDanceRow,
   isTeamStyleName,
-  isValidMark,
-  isValidMarkMax,
   isValidPoints,
   legacyTeamDefaults,
-  markInputError,
-  markRangeMessage,
-  MARK_MIN,
   parseSpecialPoints,
   parseTeamMarks,
   recentSuggestions,
@@ -80,31 +75,6 @@ describe("mark and point ranges", () => {
     expect(isHalfStep(Number.NaN)).toBe(false);
   });
 
-  it("checks a mark against the dance's own per-judge max", () => {
-    expect(isValidMark(10, 10)).toBe(true);
-    expect(isValidMark(8.5, 8)).toBe(false);
-    expect(isValidMark(8, 8)).toBe(true);
-    expect(isValidMark(-0.5, 10)).toBe(false);
-    expect(isValidMark(0, 10)).toBe(false);
-    expect(isValidMark(MARK_MIN, 10)).toBe(true);
-    expect(isValidMark(0.5, 10)).toBe(false);
-  });
-
-  it("shows a visible range error for 0, off-step, and over-max values", () => {
-    expect(markRangeMessage(10)).toBe("Judge scores must be 1 to 10 in steps of 0.5");
-    expect(markInputError("", 10)).toBeNull();
-    expect(markInputError("8", 10)).toBeNull();
-    expect(markInputError("0", 10)).toBe(markRangeMessage(10));
-    expect(markInputError("10.5", 10)).toBe(markRangeMessage(10));
-    expect(markInputError("11", 10)).toBe(markRangeMessage(10));
-    expect(markInputError("0.25", 10)).toBe(markRangeMessage(10));
-  });
-
-  it("limits the per-judge max to 1 to 10 in half steps", () => {
-    expect([0.5, 1, 7.5, 10].map(isValidMarkMax)).toEqual([true, true, true, true]);
-    expect([0, 10.5, 11, 7.25].map(isValidMarkMax)).toEqual([false, false, false, false]);
-  });
-
   it("allows negative points in half steps within the limit", () => {
     expect([3, -1.5, 0, 100, -100].map(isValidPoints)).toEqual([true, true, true, true, true]);
     expect([100.5, 0.25, Number.NaN].map(isValidPoints)).toEqual([false, false, false]);
@@ -112,12 +82,12 @@ describe("mark and point ranges", () => {
 });
 
 describe("parseTeamMarks", () => {
-  it("is complete only when every judge on the panel holds a mark from 1 to the max", () => {
+  it("is complete only when every judge on the panel holds a whole mark from 1 to 10", () => {
     expect(parseTeamMarks({ carrie: "9", derek: "9", bruno: "9" }, judges)).toMatchObject({ marks: null, filled: 3, invalidJudgeIds: [] });
     expect(parseTeamMarks({ ...nine, derek: "11" }, judges)).toMatchObject({ marks: null, filled: 4, invalidJudgeIds: ["derek"] });
     expect(parseTeamMarks({ ...nine, derek: "x" }, judges).invalidJudgeIds).toEqual(["derek"]);
     expect(parseTeamMarks(nine, judges).marks).toEqual(judges.map((judgeId) => ({ judgeId, score: 9 })));
-    expect(parseTeamMarks({ ...nine, cynthia: " 9.5 " }, judges).marks?.find((m) => m.judgeId === "cynthia")?.score).toBe(9.5);
+    expect(parseTeamMarks({ ...nine, cynthia: " 10 " }, judges).marks?.find((m) => m.judgeId === "cynthia")?.score).toBe(10);
   });
 
   it("completes on two or three judges, never on one or five", () => {
@@ -127,14 +97,9 @@ describe("parseTeamMarks", () => {
     expect(parseTeamMarks({ ...nine, extra: "9" }, [...judges, "extra"]).marks).toBeNull();
   });
 
-  it("holds marks to the dance's own max and to half steps", () => {
-    expect(parseTeamMarks({ carrie: "8", derek: "8.5" }, judges.slice(0, 2), 8)).toMatchObject({ marks: null, invalidJudgeIds: ["derek"] });
-    expect(parseTeamMarks({ carrie: "7.25", derek: "8" }, judges.slice(0, 2), 8).invalidJudgeIds).toEqual(["carrie"]);
-    expect(parseTeamMarks({ carrie: "8", derek: "7.5" }, judges.slice(0, 2), 8).marks).toEqual([
-      { judgeId: "carrie", score: 8 },
-      { judgeId: "derek", score: 7.5 },
-    ]);
-    expect(parseTeamMarks({ carrie: "0", derek: "8" }, judges.slice(0, 2)).invalidJudgeIds).toEqual(["carrie"]);
+  it("refuses half marks, 0 and anything over 10", () => {
+    expect(parseTeamMarks({ carrie: "8", derek: "8.5" }, judges.slice(0, 2))).toMatchObject({ marks: null, invalidJudgeIds: ["derek"] });
+    expect(parseTeamMarks({ carrie: "0", derek: "11" }, judges.slice(0, 2)).invalidJudgeIds).toEqual(["carrie", "derek"]);
   });
 });
 
@@ -337,8 +302,6 @@ describe("validateSpecialDanceSetup", () => {
     secondDanceStyleId: null,
     songs: [{ title: "Zoo", artist: null }],
     scoringMode: "marks",
-    markMax: 10,
-    panelJudgeIds: null,
     songSource: null,
     themeLabel: null,
     details: [],
@@ -357,9 +320,6 @@ describe("validateSpecialDanceSetup", () => {
     expect(validateSpecialDanceSetup(setup({ name: "" }), others)).toBeNull();
     expect(validateSpecialDanceSetup(setup({ songs: Array(5).fill({ title: "x", artist: null }) }), others)).toMatch(/up to 4 songs/);
     expect(validateSpecialDanceSetup(setup({ details: [{ label: " ", value: "x", coupleId: null }] }), others)).toMatch(/needs a label/);
-    expect(validateSpecialDanceSetup(setup({ markMax: 10.5 }), others)).toMatch(/Out of/);
-    expect(validateSpecialDanceSetup(setup({ panelJudgeIds: ["carrie"] }), others)).toMatch(/2 to 4 judges/);
-    expect(validateSpecialDanceSetup(setup({ scoringMode: "points", markMax: 0, panelJudgeIds: ["carrie"] }), others)).toBeNull();
   });
 });
 

@@ -23,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { JudgeScoreRow } from "@/components/judge-score-row";
+import { isValidMark, JUDGE_MARK_MESSAGE, markInputError } from "@/lib/judge-marks";
 import type { ScoringJudge } from "@/lib/scoring-judges";
 import { undoSecondsLeft } from "@/lib/reveal-state";
 import { NEW_SPECIAL_ID } from "@/lib/results-draft-input";
@@ -40,11 +42,7 @@ import {
   THEME_LABELS,
   automaticSpecialDanceName,
   addableSpecialDanceParticipants,
-  isValidMark,
   isValidPanelSize,
-  markInputError,
-  markRangeMessage,
-  MARK_MIN,
   oxfordJoin,
   parseSpecialPoints,
   parseTeamMarks,
@@ -81,7 +79,7 @@ export type SpecialScoreInputs = {
   results: Record<string, string>;
 };
 export type SpecialScoreSave =
-  | { kind: "marks"; marks: TeamMark[]; markMax: number }
+  | { kind: "marks"; marks: TeamMark[] }
   | { kind: "points"; scores: SpecialDanceScore[] }
   | { kind: "invalid"; error: string };
 export type SpecialScoreEdit = { episodeId: string; inputs: SpecialScoreInputs; save: SpecialScoreSave };
@@ -94,7 +92,6 @@ export type SpecialDanceParticipant = {
   eliminationWeek: number | null;
 };
 
-const MARK_MAX_OPTIONS = Array.from({ length: 19 }, (_, i) => (i + 2) / 2);
 
 function pointsToInputs(scores: SpecialDanceScore[]): Record<string, string> {
   return Object.fromEntries(scores.filter((s) => s.points != null).map((s) => [s.coupleId, String(s.points)]));
@@ -105,11 +102,11 @@ function resultsToInputs(scores: SpecialDanceScore[]): Record<string, string> {
 }
 
 // The filled-in, in-range marks; blanks are not sent (a partial panel saves).
-function typedMarksFrom(inputs: Record<string, string>, panelIds: string[], markMax: number): TeamMark[] {
+function typedMarksFrom(inputs: Record<string, string>, panelIds: string[]): TeamMark[] {
   return panelIds.flatMap((id) => {
     const raw = (inputs[id] ?? "").trim();
     const n = Number(raw);
-    return raw !== "" && isValidMark(n, markMax) ? [{ judgeId: id, score: n }] : [];
+    return raw !== "" && isValidMark(n) ? [{ judgeId: id, score: n }] : [];
   });
 }
 
@@ -135,8 +132,6 @@ function setupFromDance(dance: SpecialDance): SpecialDanceSetupInput {
     secondDanceStyleId: dance.secondDanceStyleId,
     songs: dance.songs.length > 0 ? dance.songs : [{ title: dance.songTitle ?? "", artist: null }],
     scoringMode: dance.scoringMode,
-    markMax: dance.markMax,
-    panelJudgeIds: dance.panelJudgeIds,
     songSource: dance.songSource,
     themeLabel: dance.themeLabel,
     details: dance.details,
@@ -272,20 +267,15 @@ export function SpecialDanceEntry({
   }, [savedScoresKey, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scoringMode = editing ? setup.scoringMode : dance.scoringMode;
-  const markMax = editing ? setup.markMax : dance.markMax;
-  const panelIds = specialDancePanel(
-    { panelJudgeIds: editing ? setup.panelJudgeIds : dance.panelJudgeIds },
-    nightJudgeIds
-  );
+  const panelIds = specialDancePanel(dance, nightJudgeIds);
   const panelJudges = panelIds.map((id) => judges.find((j) => j.id === id)).filter((j): j is ScoringJudge => !!j);
   const panelOk = specialMode ? isValidPanelSize(panelIds.length) : nightJudgeIds.length === SPECIAL_DANCE_MAX_JUDGES;
-  const invalidMarkIds = panelIds.filter((id) => markInputError(markInputs[id] ?? "", markMax) != null);
+  const invalidMarkIds = panelIds.filter((id) => markInputError(markInputs[id] ?? "") != null);
   const hasSavedScores = view.marks.length > 0 || view.scores.some((s) => s.points != null);
   const posted = dance.postedAt != null;
   const scoringLocked = hasSavedScores || posted;
 
-  const parsedMarks = parseTeamMarks(markInputs, panelIds, markMax);
-  const typedMarks = typedMarksFrom(markInputs, panelIds, markMax);
+  const parsedMarks = parseTeamMarks(markInputs, panelIds);
   const parsedPoints = parseSpecialPoints(pointInputs, eligible);
 
   // Every edit goes to the page, which saves it in order (autosave, Finish
@@ -294,10 +284,10 @@ export function SpecialDanceEntry({
   function editScores(next: SpecialScoreInputs) {
     let save: SpecialScoreSave;
     if (scoringMode === "marks") {
-      const invalid = !panelOk || panelIds.some((id) => markInputError(next.marks[id] ?? "", markMax) != null) || parseTeamMarks(next.marks, panelIds, markMax).invalidJudgeIds.length > 0;
+      const invalid = !panelOk || parseTeamMarks(next.marks, panelIds).invalidJudgeIds.length > 0;
       save = invalid
         ? { kind: "invalid", error: `Fix the judges' marks on ${displayName} first.` }
-        : { kind: "marks", marks: typedMarksFrom(next.marks, panelIds, markMax), markMax };
+        : { kind: "marks", marks: typedMarksFrom(next.marks, panelIds) };
     } else {
       save = parseSpecialPoints(next.points, eligible).invalidCoupleIds.length > 0
         ? { kind: "invalid", error: `Fix the points on ${displayName} first.` }
@@ -331,7 +321,7 @@ export function SpecialDanceEntry({
   }
 
   const complete = specialDanceComplete(
-    { scoringMode, panelJudgeIds: editing ? setup.panelJudgeIds : dance.panelJudgeIds },
+    { scoringMode, panelJudgeIds: dance.panelJudgeIds },
     { marks: view.marks, scores: view.scores, eligibleCoupleIds: eligible, nightJudgeIds }
   );
   const progress = specialDanceProgress(
@@ -339,8 +329,6 @@ export function SpecialDanceEntry({
     { marks: view.marks, scores: view.scores, eligibleCoupleIds: eligible, nightJudgeIds }
   );
   const savedTotal = scoringMode === "marks" && view.marks.length === panelIds.length ? teamMarksTotal(view.marks) : null;
-  const typedTotal = teamMarksTotal(typedMarks);
-  const maxPossible = panelIds.length * markMax;
   const stale =
     posted &&
     live != null &&
@@ -375,7 +363,7 @@ export function SpecialDanceEntry({
       return;
     }
     if (setup.scoringMode === "marks" && invalidMarkIds.length > 0) {
-      setSetupError(`${markRangeMessage(setup.markMax)}.`);
+      setSetupError(JUDGE_MARK_MESSAGE);
       return;
     }
     setSavingSetup(true);
@@ -394,7 +382,6 @@ export function SpecialDanceEntry({
     if (!isNew) setEditing(false);
   }
 
-  const guestNames = panelJudges.filter((j) => guestJudgeIds.has(j.id)).map((j) => judgeNames.get(j.id) ?? j.name);
   const missingNames = panelIds.filter((id) => (markInputs[id] ?? "").trim() === "").map((id) => judgeNames.get(id) ?? "a judge");
   const displayName = dance.name || automaticSpecialDanceName(setup.danceType || DEFAULT_DANCE_TYPE, otherDances, setup.id);
 
@@ -403,7 +390,7 @@ export function SpecialDanceEntry({
     status = { tone: "muted", text: "Pick a Dance Type and at least one participant, then Done. Nothing is saved until then." };
   } else if (scoringMode === "marks" && parsedMarks.invalidJudgeIds.length > 0) {
     const judgeId = parsedMarks.invalidJudgeIds[0];
-    status = { tone: "danger", text: `${markRangeMessage(markMax)}. ${judgeNames.get(judgeId) ?? "That"}'s ${markInputs[judgeId]?.trim()} isn't saved.` };
+    status = { tone: "danger", text: `${JUDGE_MARK_MESSAGE} ${judgeNames.get(judgeId) ?? "That"}'s ${markInputs[judgeId]?.trim()} isn't saved.` };
   } else if (scoringMode === "marks" && parsedMarks.filled > 0 && parsedMarks.filled < panelIds.length) {
     status = {
       tone: "warn",
@@ -613,7 +600,7 @@ export function SpecialDanceEntry({
                   size="sm"
                   variant={setup.scoringMode === mode ? "default" : "outline"}
                   disabled={scoringLocked}
-                  onClick={() => patchSetup({ scoringMode: mode, panelJudgeIds: mode === "points" ? null : setup.panelJudgeIds })}
+                  onClick={() => patchSetup({ scoringMode: mode })}
                 >
                   {mode === "marks" ? "Judges' Marks" : "Points per Couple"}
                 </Button>
@@ -621,63 +608,8 @@ export function SpecialDanceEntry({
             </div>
             {scoringLocked && (
               <p className="text-xs text-muted-foreground">
-                {posted ? "Un-post first to change how this is scored." : "Clear the saved scores to change the mode, panel, or max."}
+                {posted ? "Un-post first to change how this is scored." : "Clear the saved scores to change how this is scored."}
               </p>
-            )}
-            {setup.scoringMode === "marks" && (
-              <>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs">Out of</Label>
-                  <Select
-                    items={Object.fromEntries(MARK_MAX_OPTIONS.map((n) => [String(n), String(n)])) }
-                    value={String(setup.markMax)}
-                    onValueChange={(v) => patchSetup({ markMax: Number(v) })}
-                    disabled={scoringLocked}
-                  >
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MARK_MAX_OPTIONS.map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  {judges.filter((j) => nightJudgeIds.includes(j.id)).map((j) => {
-                    const ticked = setup.panelJudgeIds == null || setup.panelJudgeIds.includes(j.id);
-                    return (
-                      <label key={j.id} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={ticked}
-                          disabled={scoringLocked}
-                          onChange={(e) => {
-                            const night = nightJudgeIds;
-                            const current = setup.panelJudgeIds ?? night;
-                            const next = e.target.checked ? [...new Set([...current, j.id])] : current.filter((id) => id !== j.id);
-                            const sameAsNight = next.length === night.length && night.every((id) => next.includes(id));
-                            patchSetup({ panelJudgeIds: sameAsNight ? null : next });
-                          }}
-                        />
-                        <span className={guestJudgeIds.has(j.id) ? "text-accent" : ""}>
-                          {judgeNames.get(j.id) ?? j.name}
-                          {guestJudgeIds.has(j.id) ? " · Guest" : ""}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{ticked ? "" : "Didn't judge"}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-                {setup.panelJudgeIds && !isValidPanelSize(setup.panelJudgeIds.length) && (
-                  <p className="text-xs text-amber-text">
-                    Judges&apos; Marks need {SPECIAL_DANCE_MIN_JUDGES} to {SPECIAL_DANCE_MAX_JUDGES} judges.
-                  </p>
-                )}
-              </>
             )}
           </div>
 
@@ -848,66 +780,29 @@ export function SpecialDanceEntry({
       {!isNew && scoringMode === "marks" && (
         panelOk ? (
           <fieldset disabled={inputsDisabled || busy} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
-            <div className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-1.5">
-              <div className="grid grid-cols-2 gap-2 min-[420px]:flex min-[420px]:flex-wrap min-[420px]:items-end">
-                {panelJudges.map((j) => {
-                  const fieldError = markInputError(markInputs[j.id] ?? "", markMax);
-                  return (
-                    <div key={j.id} className="flex min-w-0 flex-col gap-1 min-[420px]:min-w-28">
-                      <Label className={`text-xs ${guestJudgeIds.has(j.id) ? "text-accent" : "text-muted-foreground"}`}>
-                        {judgeNames.get(j.id) ?? j.name}
-                      </Label>
-                      <Input
-                        inputMode="decimal"
-                        aria-label={`${judgeNames.get(j.id) ?? j.name} mark for ${displayName}`}
-                        aria-invalid={fieldError != null}
-                        className={`h-11 w-full min-w-14 px-2 text-center text-sm min-[420px]:w-16 ${fieldError ? "border-destructive" : ""}`}
-                        placeholder="—"
-                        value={markInputs[j.id] ?? ""}
-                        disabled={posted}
-                        onChange={(e) => {
-                          const next = { ...markInputs, [j.id]: e.target.value };
-                          setMarkInputs(next);
-                          editScores({ marks: next, points: pointInputs, results });
-                        }}
-                      />
-                      {fieldError && (
-                        <p role="alert" className="text-xs leading-snug text-danger-text">
-                          {fieldError}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-                <div className="col-span-2 flex flex-col gap-1 min-[420px]:col-span-1">
-                  <Label className="text-xs text-muted-foreground">Total</Label>
-                  <p className="flex h-11 items-center px-1 text-base font-medium">
-                    {typedTotal}
-                    <span className="ml-0.5 text-sm font-normal text-muted-foreground">/{maxPossible}</span>
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-x-3 text-[10px] text-muted-foreground">
-                <span>
-                  {MARK_MIN} to {markMax} in steps of 0.5
-                </span>
-                {guestNames.length > 0 ? (
-                  <span>
-                    {`${oxfordJoin(guestNames)} ${guestNames.length === 1 ? "is" : "are"} tonight's guest`}
-                  </span>
-                ) : null}
-              </div>
+            <div className="rounded-lg bg-muted/50 p-1.5">
+              <JudgeScoreRow
+                judges={panelJudges.map((j) => ({ id: j.id, name: judgeNames.get(j.id) ?? j.name, guest: guestJudgeIds.has(j.id) }))}
+                values={markInputs}
+                subject={displayName}
+                disabled={posted}
+                onChange={(judgeId, value) => {
+                  const next = { ...markInputs, [judgeId]: value };
+                  setMarkInputs(next);
+                  editScores({ marks: next, points: pointInputs, results });
+                }}
+              />
             </div>
           </fieldset>
         ) : (
           <div role="alert" className="mt-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-text">
             {specialMode
-              ? `This dance needs ${SPECIAL_DANCE_MIN_JUDGES} to ${SPECIAL_DANCE_MAX_JUDGES} judges and has ${panelIds.length}.`
+              ? `This dance needs ${SPECIAL_DANCE_MIN_JUDGES} to ${SPECIAL_DANCE_MAX_JUDGES} judges and this night has ${panelIds.length}.`
               : `Team Dances need exactly ${SPECIAL_DANCE_MAX_JUDGES} judges and this night has ${nightJudgeIds.length}.`}{" "}
             <Link href="/admin/schedule" className="font-semibold underline underline-offset-2">
               Set the guest judge on Schedule
-            </Link>{" "}
-            or choose its judges under Edit Details.
+            </Link>
+            .
           </div>
         )
       )}

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./supabase/types";
 import { describe, expect, it, vi } from "vitest";
+import { JUDGE_MARK_MESSAGE } from "./judge-marks";
 import {
   danceMaxScore,
   danceScoreColumns,
@@ -213,10 +214,9 @@ describe("saveTeamMarks", () => {
   it("refuses out-of-range marks before any round trip and translates a missing migration", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: null, error: missingTable });
     const { client } = clientWith({}, rpc);
-    expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 11 }] }, "friend")).error).toMatch(/1 to 10 in steps of 0.5/);
-    expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 0 }] }, "friend")).error).toMatch(/1 to 10/);
-    expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 8.5 }], markMax: 8 }, "friend")).error).toMatch(/1 to 8/);
-    expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 7.25 }] }, "friend")).error).toMatch(/steps of 0.5/);
+    for (const score of [11, 0, 8.5]) {
+      expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score }] }, "friend")).error).toBe(JUDGE_MARK_MESSAGE);
+    }
     expect(rpc).not.toHaveBeenCalled();
     expect((await saveTeamMarks(client, { episodeId: "ep", teamId: "t", marks: [{ judgeId: "j", score: 9 }] }, "friend")).error).toMatch(/apply-team-dance-entity\.sql/);
     expect(rpc).toHaveBeenCalledWith("save_team_marks", expect.objectContaining({ p_actor_id: "friend", p_team_id: "t" }));
@@ -230,7 +230,7 @@ describe("saveSpecialDance and saveSpecialDancePoints", () => {
     const { client } = clientWith({}, rpc);
     const dance = {
       id: null, danceType: "Dance-Off", name: "", memberCoupleIds: ["a"], danceStyleId: null, secondDanceStyleId: null, songs: [],
-      scoringMode: "points" as const, markMax: 10, panelJudgeIds: null, songSource: null, themeLabel: null, details: [], sortOrder: 1,
+      scoringMode: "points" as const, songSource: null, themeLabel: null, details: [], sortOrder: 1,
     };
     expect((await saveSpecialDance(client, { episodeId: "ep", dance }, "admin")).error).toMatch(/apply-special-dances\.sql/);
     expect(rpc).toHaveBeenCalledWith("save_special_dance", { p_episode_id: "ep", p_actor_id: "admin", p_dance: dance });

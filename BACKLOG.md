@@ -4,14 +4,22 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Special dances follow-ups — 2026-11-03
 
+Built on `feat/shared-score-row` (stacked on `fix/special-dance-saves`):
+one `JudgeScoreRow` for couples and special dances, whole marks 1–10 on the
+page, in the server actions and in `supabase/apply-whole-judge-marks.sql`
+(not yet applied; deploy the app first), and no "Out of" or per-dance panel.
+Follow-ups from it:
+- Drop `episode_teams.mark_max` and `panel_judge_ids` together with every SQL
+  and TS reader (`special_dance_panel`, `materialize_team_scores`,
+  `save_special_dance`, `episode-publication.ts`, `SpecialDance`), once the
+  types can be regenerated (the access token in `.env.local` is invalid) and
+  not in a show week.
+- `TeamEntry` (`team-entry.tsx`, inferred-teams fallback) still has its own
+  small score boxes and a "tonight's guest" caption. Production runs
+  `special`, so it is only the fresh-project fallback; delete it rather than
+  restyle it.
+
 Decided by Kylie (2026-11-03), not built yet:
-- One shared judge-score row for couples and special dances: the special
-  grid's look (larger boxes, error under the box, `total/max`, a "Guest" label
-  rather than colour alone), no "is tonight's guest" caption, **whole marks
-  1–10 only** (no half points) for both, same check on the page and in SQL
-  (couples today: server 0–10, any decimal; specials: 1–max in 0.5 steps).
-- Special dances always use the night's judges, out of 10: drop the per-dance
-  panel checkboxes (still labelled "Didn't judge") and the "Out of" picker.
 - Retire Special Moments' custom events (label-only, no reader anywhere). Decide
   whether the Perfect Score / Judges' Save pills move or go.
 - Special dances get draft release like a couple's dance (propose tier, fans

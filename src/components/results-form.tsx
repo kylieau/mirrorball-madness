@@ -20,6 +20,7 @@ import {
   undoTeamScores,
 } from "@/app/admin/results/actions";
 import { TeamEntry, type ApplyOutcome, type TeamEntryView } from "@/components/team-entry";
+import { JudgeScoreRow } from "@/components/judge-score-row";
 import { SpecialDanceEntry, blankSpecialDance, type SpecialDanceView, type SpecialScoreEdit } from "@/components/special-dance-entry";
 import type { TeamsMode } from "@/lib/episode-teams";
 import {
@@ -75,7 +76,8 @@ import {
 import { BOTTOM_NAV_STACK_ABOVE } from "@/components/bottom-nav";
 import { DraftSaveQueue } from "@/lib/draft-save-queue";
 import { couplesRevealState, undoSecondsLeft } from "@/lib/reveal-state";
-import { buildPeopleDisplayNames, type CoupleNameParts } from "@/lib/couple-display";
+import { isValidMark } from "@/lib/judge-marks";
+import { buildPeopleDisplayNames, formatCoupleName, type CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName, coupleNameNode } from "@/components/couple-name";
 import {
   deriveResultsStatus,
@@ -659,7 +661,7 @@ export function ResultsForm({
     if (edit.save.kind === "invalid") return { error: edit.save.error };
     try {
       return edit.save.kind === "marks"
-        ? await saveTeamMarksAction({ episodeId: edit.episodeId, teamId, marks: edit.save.marks, markMax: edit.save.markMax })
+        ? await saveTeamMarksAction({ episodeId: edit.episodeId, teamId, marks: edit.save.marks })
         : await saveSpecialDancePointsAction({ episodeId: edit.episodeId, teamId, scores: edit.save.scores });
     } catch {
       return { error: "Could not confirm the update. Please refresh and try again." };
@@ -706,12 +708,34 @@ export function ResultsForm({
       (ids) => draftInputRef.current(ids),
       async (input) => {
         justSavedEpisodeId.current = input.episodeId;
-        const saved = await saveEpisodeDraft(input);
-        if (!saved.error) {
+        // A couple holding a mark the rule refuses stays unsaved, by name,
+        // while every other couple's edits save.
+        const held = new Set(
+          input.entries
+            .filter((entry) => entry.dances.some((dance) => dance.judgeScores.some(({ score }) => !isValidMark(score))))
+            .map((entry) => entry.coupleId)
+        );
+        const toSave = {
+          ...input,
+          entries: input.entries.filter((entry) => !held.has(entry.coupleId)),
+          inJeopardyCoupleIds: input.inJeopardyCoupleIds.filter((id) => !held.has(id)),
+        };
+        const saved = toSave.entries.length > 0
+          ? await saveEpisodeDraft(toSave)
+          : { error: null, acknowledgedIds: [], skippedPostedIds: [] };
+        if (!saved.error && toSave.entries.length > 0) {
           setDraftSavedAt(new Date().toISOString());
           setHasDraft(true);
         }
-        return { error: saved.error, acknowledgedIds: saved.acknowledgedIds, skippedIds: saved.skippedPostedIds };
+        if (saved.error || held.size === 0) {
+          return { error: saved.error, acknowledgedIds: saved.acknowledgedIds, skippedIds: saved.skippedPostedIds };
+        }
+        const first = namedCouple([...held][0]);
+        return {
+          error: `Fix the judges' marks on ${first ? formatCoupleName(coupleParts(first)) : "a couple"} first.`,
+          acknowledgedIds: saved.acknowledgedIds,
+          skippedIds: saved.skippedPostedIds,
+        };
       }
     );
     setError(result.error);
@@ -1185,6 +1209,7 @@ export function ResultsForm({
   }
 
   const judgeDisplayNames = buildPeopleDisplayNames(judges);
+  const nightGuestIds = new Set(guestJudgesByEpisode[selectedEpisodeId] ?? []);
   function judgesForDance(dance: RowDance) {
     const scoredIds = Object.entries(dance.scores)
       .filter(([, v]) => v.trim() !== "")
@@ -1726,23 +1751,6 @@ export function ResultsForm({
                   value={d.songTitle}
                   onChange={(e) => updateDance(c.id, d.key, { songTitle: e.target.value })}
                 />
-              </div>
-              <div className="flex flex-wrap items-end gap-1.5">
-                {judgesForDance(d).map((j) => (
-                  <div key={j.id} className="flex flex-col gap-0.5">
-                    <Label className="text-[10px] text-muted-foreground">{judgeDisplayNames.get(j.id) ?? j.name}</Label>
-                    <Input
-                      className="h-8 w-12 px-1.5 text-center text-xs"
-                      placeholder="—"
-                      value={d.scores[j.id] ?? ""}
-                      onChange={(e) => updateDance(c.id, d.key, { scores: { ...d.scores, [j.id]: e.target.value } })}
-                    />
-                  </div>
-                ))}
-                <div className="flex flex-col gap-0.5">
-                  <Label className="text-[10px] text-muted-foreground">Total</Label>
-                  <p className="flex h-8 items-center px-1 text-sm font-medium">{danceTotal(d)}</p>
-                </div>
                 <Button
                   size="xs"
                   variant="ghost"
@@ -1752,6 +1760,12 @@ export function ResultsForm({
                   Clear
                 </Button>
               </div>
+              <JudgeScoreRow
+                judges={judgesForDance(d).map((j) => ({ id: j.id, name: judgeDisplayNames.get(j.id) ?? j.name, guest: nightGuestIds.has(j.id) }))}
+                values={d.scores}
+                subject={formatCoupleName(coupleParts(c))}
+                onChange={(judgeId, value) => updateDance(c.id, d.key, { scores: { ...d.scores, [judgeId]: value } })}
+              />
             </div>
           ))}
           {!entity && team && row.outcome !== "bye" && !row.dances.some((d) => isTeamDanceRow(team, d)) && renderTeamDanceRow(team, null)}

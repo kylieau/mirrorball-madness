@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DraftSaveQueue } from "./draft-save-queue";
+import { DraftSaveQueue, type DraftSaveResult } from "./draft-save-queue";
 
 function deferred() {
   let resolve!: (value: { error: string | null }) => void;
@@ -182,6 +182,22 @@ describe("DraftSaveQueue", () => {
     save.mockResolvedValueOnce({ error: null, acknowledgedIds: ["amber"], skippedIds: [] });
     await expect(queue.flush((ids) => ids, save)).resolves.toEqual({ error: null });
     expect(queue.parkedIds()).toEqual([]);
+    expect(queue.dirtyIds()).toEqual([]);
+  });
+
+  it("parks a posted couple's edit when the same save fails on another couple", async () => {
+    const queue = new DraftSaveQueue();
+    queue.markDirty("amber");
+    queue.markDirty("julia");
+    queue.markDirty("typo");
+    const save = vi.fn(async (): Promise<DraftSaveResult> => ({ error: "Fix typo first.", acknowledgedIds: ["julia"], skippedIds: ["amber"] }));
+    await expect(queue.flush((ids) => ids, save)).resolves.toEqual({ error: "Fix typo first.", acknowledgedIds: ["julia"], skippedIds: ["amber"] });
+    expect(queue.dirtyIds()).toEqual(["typo"]);
+    expect(queue.parkedIds()).toEqual(["amber"]);
+    // Nothing but the held couple keeps a flush going.
+    save.mockResolvedValueOnce({ error: null, acknowledgedIds: ["typo"], skippedIds: ["amber"] });
+    await expect(queue.flush((ids) => ids, save)).resolves.toEqual({ error: null, skippedIds: ["amber"] });
+    expect(save).toHaveBeenCalledTimes(2);
     expect(queue.dirtyIds()).toEqual([]);
   });
 

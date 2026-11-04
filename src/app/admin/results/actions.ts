@@ -118,7 +118,6 @@ export async function saveTeamMarksAction(input: {
   episodeId: string;
   teamId: string;
   marks: TeamMark[];
-  markMax?: number;
 }): Promise<{ error: string | null }> {
   const access = await requireProposeAccess();
   if (access.error) return { error: access.error };

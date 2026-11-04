@@ -267,42 +267,36 @@ describe("special dances in PostgreSQL", () => {
     expect((await db.query("select id from public.episode_teams")).rows).toHaveLength(2);
   });
 
-  it("scores marks on a panel of 2 to 4 with half points and a per-dance max, posting max_score with every row", async () => {
-    // Bruno and Carrie Ann only: a two-judge dance out of 8.
-    const duel = await saveSpecial({ danceType: "Challenge", name: "Cha-Cha Challenge", memberCoupleIds: [amber, julia], markMax: 8, panelJudgeIds: [judges[0], judges[2]] });
+  it("scores marks on the night's panel in whole numbers, posting max_score with every row", async () => {
+    const duel = await saveSpecial({ danceType: "Challenge", name: "Cha-Cha Challenge", memberCoupleIds: [amber, julia] });
     await ownDances([amber, julia]);
     await revealCouple(amber);
     await revealCouple(julia);
-    await expect(saveMarks(duel, [8.5, 7], [judges[0], judges[2]])).rejects.toThrow(/0 to 8 in steps of 0.5/);
-    await expect(saveMarks(duel, [7.25, 7], [judges[0], judges[2]])).rejects.toThrow(/steps of 0.5/);
-    await expect(saveMarks(duel, [7, 7], [judges[0], judges[1]])).rejects.toThrow(/this dance's judges/);
-    await expect(saveMarks(duel, [7, 7, 7], [judges[0], judges[2], judges[1]])).rejects.toThrow(/at most 2/);
-    await saveMarks(duel, [7.5], [judges[0]]);
-    await expect(revealTeam(duel)).rejects.toThrow(/Cha-Cha Challenge has 1 of 2 marks/);
-    await saveMarks(duel, [7.5, 6], [judges[0], judges[2]]);
+    // The table itself refuses a half mark, not only the app.
+    await expect(saveMarks(duel, [8.5, 9, 9, 9])).rejects.toThrow(/episode_team_marks_whole_mark/);
+    await expect(saveMarks(duel, [9, 9], [judges[0], amber])).rejects.toThrow(/this dance's judges/);
+    await saveMarks(duel, [10], [judges[0]]);
+    await expect(revealTeam(duel)).rejects.toThrow(/Cha-Cha Challenge has 1 of 4 marks/);
+    await saveMarks(duel, [10, 9, 9, 9]);
     await revealTeam(duel);
-    // 13.5 of 16 scaled to 30 is 25.3125; the live row records max_score 16 and both judges' marks.
-    expect((await liveRows(amber)).filter((r) => r.team_id === duel)).toMatchObject([{ total: 13.5, scaled: 25.3125, max: 16, judges: 2 }]);
-    // Amber's night: 33/40 own + 13.5/16 challenge = 46.5/56 -> 24.91, the same for Julia.
-    expect(await rosterPoints(admin)).toBe(24.91);
-    expect(await rosterPoints(friend)).toBe(24.91);
-    // The trigger guards the table itself, not only the RPC.
-    await expect(db.query("insert into public.episode_team_marks(team_id, judge_id, score) values ($1, $2, 8.5)", [duel, judges[1]])).rejects.toThrow(/0 to 8 in steps of 0.5/);
+    // 37 of 40 scaled to 30 is 27.75; the live row records max_score 40 and all four judges' marks.
+    expect((await liveRows(amber)).filter((r) => r.team_id === duel)).toMatchObject([{ total: 37, scaled: 27.75, max: 40, judges: 4 }]);
+    // Amber's night: 33/40 own + 37/40 challenge = 70/80 -> 26.25, the same for Julia.
+    expect(await rosterPoints(admin)).toBe(26.25);
+    expect(await rosterPoints(friend)).toBe(26.25);
     // Scoring is locked while marks are saved, and participants while posted.
-    await expect(saveSpecial({ id: duel, markMax: 10 })).rejects.toThrow(/Un-post Cha-Cha Challenge before changing how it is scored/);
+    await expect(saveSpecial({ id: duel, scoringMode: "points" })).rejects.toThrow(/Un-post Cha-Cha Challenge before changing how it is scored/);
     await expect(saveSpecial({ id: duel, memberCoupleIds: [amber] })).rejects.toThrow(/before changing its participants/);
     // Display fields stay editable and the live rows follow the style and song.
     await saveSpecial({ id: duel, danceStyleId: contemporary, songs: [{ title: "Sway" }] });
     expect((await db.query<{ style: string; song: string }>("select distinct dance_style_id as style, song_title as song from public.dance_scores where team_id = $1", [duel])).rows)
       .toEqual([{ style: contemporary, song: "Sway" }]);
     await revealTeam(duel, true);
-    await expect(saveSpecial({ id: duel, markMax: 10 })).rejects.toThrow(/Clear the saved scores of Cha-Cha Challenge/);
-    await saveMarks(duel, [], [judges[0], judges[2]]);
-    await saveSpecial({ id: duel, markMax: 10, panelJudgeIds: null });
+    await expect(saveSpecial({ id: duel, scoringMode: "points" })).rejects.toThrow(/Clear the saved scores of Cha-Cha Challenge/);
+    await saveMarks(duel, []);
+    await saveSpecial({ id: duel, scoringMode: "points" });
+    await saveSpecial({ id: duel, scoringMode: "marks" });
     expect(await team(duel)).toMatchObject({ mark_max: 10, panel_judge_ids: null });
-    // The night's panel (three standing judges plus the guest) now applies: four marks needed.
-    await saveMarks(duel, [9, 9, 9]);
-    await expect(revealTeam(duel)).rejects.toThrow(/Cha-Cha Challenge has 3 of 4 marks/);
     // A panel outside 2 to 4 blocks marks by name.
     await db.exec(`delete from public.episode_guest_judges where episode_id = '${episode}'; update public.people set archived_at = now() where id in ('${judges[1]}', '${judges[2]}')`);
     await expect(saveMarks(duel, [9], [judges[0]])).rejects.toThrow(/needs 2 to 4 judges and this night has 1/);

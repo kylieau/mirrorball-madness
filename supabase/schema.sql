@@ -3987,10 +3987,11 @@ $$;
 revoke all on function public.replace_weekly_scores(uuid,text,jsonb) from public,anon,authenticated;
 grant execute on function public.replace_weekly_scores(uuid,text,jsonb) to service_role;
 
+-- Whole marks from 1 to 10 (supabase/apply-whole-judge-marks.sql).
 DO $$ declare t text; begin
   foreach t in array array['judge_scores','draft_judge_scores'] loop
-    if not exists(select 1 from pg_catalog.pg_constraint where conname=t||'_score_range') then
-      execute format('alter table public.%I add constraint %I check(score between 0 and 10) not valid',t,t||'_score_range');
+    if not exists(select 1 from pg_catalog.pg_constraint where conname=t||'_whole_mark') then
+      execute format('alter table public.%I add constraint %I check(score between 1 and 10 and score = trunc(score))',t,t||'_whole_mark');
     end if;
   end loop;
 end $$;
@@ -4254,7 +4255,7 @@ create index if not exists idx_episode_team_members_episode on public.episode_te
 create table if not exists public.episode_team_marks (
   team_id uuid not null references public.episode_teams(id) on delete cascade,
   judge_id uuid not null references public.people(id),
-  score numeric not null check (score between 0 and 10),
+  score numeric not null constraint episode_team_marks_whole_mark check (score between 1 and 10 and score = trunc(score)),
   updated_at timestamptz not null default now(),
   updated_by uuid references public.profiles(id) on delete set null,
   primary key (team_id, judge_id)

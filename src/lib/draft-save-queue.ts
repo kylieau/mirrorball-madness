@@ -68,15 +68,21 @@ export class DraftSaveQueue {
           return { error: "The selected episode changed during the save. Please try again." };
         if (result.error) {
           // A save that wrote some ids before failing says which; those are
-          // done, the rest stay dirty for a retry.
+          // done, and the ones refused as posted are parked as on success.
+          // The rest stay dirty for a retry.
           for (const id of result.acknowledgedIds ?? []) {
             if (this.revisions.get(id) === sent.get(id)) this.discard(id);
+          }
+          for (const id of result.skippedIds ?? []) {
+            if (this.revisions.get(id) !== sent.get(id)) continue;
+            this.parked.set(id, sent.get(id)!);
+            skipped.add(id);
           }
           // An edit made while this request was out may fix what failed (a
           // corrected mark), and a flush that joined this one waits on it, so
           // send again rather than report an error about an older value.
           const editedSince = this.dirtyIds().some((id) => this.revisions.get(id) !== sent.get(id));
-          if (!editedSince) return result;
+          if (!editedSince) return skipped.size > 0 ? { ...result, skippedIds: [...skipped] } : result;
           continue;
         }
         const acknowledged = result.acknowledgedIds ? new Set(result.acknowledgedIds) : null;

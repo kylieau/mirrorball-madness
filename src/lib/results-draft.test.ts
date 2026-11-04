@@ -43,8 +43,10 @@ describe("saveDraftResults", () => {
   it("rejects out-of-range marks before any round trip", async () => {
     const rpc = vi.fn();
     const admin = { rpc } as unknown as SupabaseClient<Database>;
-    const bad = { ...input, entries: [{ ...input.entries[0], dances: [{ danceStyleId: "s", songTitle: null, judgeScores: [{ judgeId: "j", score: 11 }] }] }] };
-    expect((await saveDraftResults(admin, bad)).error).toMatch(/between 0 and 10/);
+    for (const score of [11, 0, 8.5]) {
+      const bad = { ...input, entries: [{ ...input.entries[0], dances: [{ danceStyleId: "s", songTitle: null, judgeScores: [{ judgeId: "j", score }] }] }] };
+      expect((await saveDraftResults(admin, bad)).error).toBe("Judge scores must be whole numbers from 1 to 10.");
+    }
     expect(rpc).not.toHaveBeenCalled();
   });
 });

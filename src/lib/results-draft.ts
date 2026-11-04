@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { isValidMark, JUDGE_MARK_MESSAGE } from "./judge-marks";
 import type { Outcome } from "./scoring";
 import type { Json } from "./supabase/types";
 
@@ -93,9 +94,8 @@ export async function saveDraftResults(
   admin: SupabaseClient<Database>, input: SaveDraftResultsInput
 ): Promise<SaveDraftResultsOutcome> {
   const sentIds = input.entries.map((entry) => entry.coupleId);
-  if (input.entries.some((entry) => entry.dances.some((dance) => dance.judgeScores.some(
-    ({ score }) => !Number.isFinite(score) || score < 0 || score > 10
-  )))) return { error: "Judge scores must be between 0 and 10.", acknowledgedIds: [], skippedPostedIds: [] };
+  if (input.entries.some((entry) => entry.dances.some((dance) => dance.judgeScores.some(({ score }) => !isValidMark(score)))))
+    return { error: JUDGE_MARK_MESSAGE, acknowledgedIds: [], skippedPostedIds: [] };
   const checked = await admin.rpc("save_episode_draft_checked", { p_input: input as unknown as Json });
   if (!checked.error) {
     const data = checked.data as { acknowledged?: string[]; skippedPosted?: string[] } | null;
