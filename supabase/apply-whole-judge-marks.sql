@@ -1,3 +1,5 @@
+-- Applied live 2026-11-04 (constraints and save_team_marks verified).
+--
 -- Judge marks are whole numbers from 1 to 10, for couples and special dances
 -- alike, and every special dance is out of 10 on the night's judges.
 --

@@ -4,10 +4,10 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Special dances follow-ups — 2026-11-03
 
-Built on `feat/shared-score-row` (stacked on `fix/special-dance-saves`):
+Shipped to `main` 2026-11-04 (`bffd9aa`):
 one `JudgeScoreRow` for couples and special dances, whole marks 1–10 on the
 page, in the server actions and in `supabase/apply-whole-judge-marks.sql`
-(not yet applied; deploy the app first), and no "Out of" or per-dance panel.
+(applied live 2026-11-04 after the deploy), and no "Out of" or per-dance panel.
 Follow-ups from it:
 - Drop `episode_teams.mark_max` and `panel_judge_ids` together with every SQL
   and TS reader (`special_dance_panel`, `materialize_team_scores`,
