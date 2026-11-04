@@ -6,8 +6,6 @@ import {
   saveEpisodeDraft,
   revealCoupleScores,
   undoCoupleReveal,
-  addEpisodeCustomMoment,
-  removeEpisodeCustomMoment,
   publishEpisodeResults,
   releaseDraftCoupleAction,
   startEpisodeCorrection,
@@ -194,12 +192,6 @@ function nightPreview(row: CoupleRow, coupleId: string): string | null {
   const [night] = collapseToNights(dances);
   const basis = night.scaledScore === night.totalScore ? "" : ` → ${formatPoints(night.scaledScore)}`;
   return `${night.totalScore}/${night.maxScore}${basis}`;
-}
-
-function isPerfectScore(dance: RowDance, judgeCount: number): boolean {
-  const entered = Object.values(dance.scores).filter((v) => v !== "");
-  if (entered.length === 0 || entered.length < judgeCount) return false;
-  return entered.every((v) => Number(v) === 10);
 }
 
 function buildRowsFromDraft(
@@ -403,7 +395,6 @@ export function ResultsForm({
     danceStyles.find((s) => s.name.trim().toLowerCase() === "freestyle")?.id ?? danceStyles[0]?.id ?? "";
 
   const [rows, setRows] = useState<Record<string, CoupleRow>>({});
-  const [customMoments, setCustomMoments] = useState<DraftState["customMoments"]>([]);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
 
@@ -456,9 +447,6 @@ export function ResultsForm({
   const [draftSpecial, setDraftSpecial] = useState<SpecialDance | null>(null);
   // Couples whose last edit was refused because they were posted in between.
   const [postedSkipNotice, setPostedSkipNotice] = useState<string[]>([]);
-  const [customMomentLabel, setCustomMomentLabel] = useState("");
-  const [customMomentCoupleId, setCustomMomentCoupleId] = useState("");
-  const [addingCustomMoment, setAddingCustomMoment] = useState(false);
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushDraftRef = useRef<() => Promise<{ error: string | null }>>(async () => ({ error: null }));
@@ -541,7 +529,6 @@ export function ResultsForm({
         seedingEpisodeId.current = selectedEpisode.id;
         setSeedingCorrection(true);
         setRows({});
-        setCustomMoments([]);
         setHasDraft(false);
         setError(null);
         draftSaveQueue.current.reset();
@@ -561,7 +548,6 @@ export function ResultsForm({
     seedingEpisodeId.current = null;
     setSeedingCorrection(false);
     setRows(buildRowsFromDraft(draft, episodeCouples, expectedDanceCount, persistedTeamByCouple));
-    setCustomMoments(draft?.customMoments ?? []);
     setDraftSavedAt(draft?.updatedAt ?? null);
     setHasDraft(draft?.hasDraft ?? false);
     setError(null);
@@ -1196,45 +1182,6 @@ export function ResultsForm({
     });
   }
 
-  async function handleAddCustomMoment() {
-    try {
-      if (!selectedEpisode || !customMomentLabel.trim()) return;
-      setAddingCustomMoment(true);
-      const result = await addEpisodeCustomMoment({
-        episodeId: selectedEpisode.id,
-        coupleId: customMomentCoupleId || null,
-        label: customMomentLabel.trim(),
-      });
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setCustomMoments((prev) => [
-          ...prev,
-          { id: result.id!, coupleId: customMomentCoupleId || null, label: customMomentLabel.trim() },
-        ]);
-        setCustomMomentLabel("");
-        setCustomMomentCoupleId("");
-      }
-      setAddingCustomMoment(false);
-    } catch {
-      setError("Could not confirm the update. Please refresh and try again.");
-    } finally {
-      setAddingCustomMoment(false);
-    }
-  }
-
-  async function handleRemoveCustomMoment(momentId: string) {
-    try {
-      const result = await removeEpisodeCustomMoment(selectedEpisode!.id, momentId);
-      if (result.error) setError(result.error);
-      else setCustomMoments((prev) => prev.filter((m) => m.id !== momentId));
-    } catch {
-      setError("Could not confirm the update. Please refresh and try again.");
-    } finally {
-
-    }
-  }
-
   const judgeDisplayNames = buildPeopleDisplayNames(judges);
   function judgesForDance(dance: RowDance) {
     const scoredIds = Object.entries(dance.scores)
@@ -1257,21 +1204,6 @@ export function ResultsForm({
     })
   );
   const danceStyleItems = Object.fromEntries(danceStyles.map((d) => [d.id, d.name]));
-
-  // Perfect Score / Judges' Save pills, computed from current row state —
-  // no new storage, matches the plan's "computed at render time" call.
-  const perfectScorePills: { coupleId: string; danceStyleId: string }[] = [];
-  const judgesSavePills: string[] = [];
-  for (const c of episodeCouples) {
-    const row = rows[c.id];
-    if (!row) continue;
-    if (row.savedByJudges) judgesSavePills.push(c.id);
-    for (const d of row.dances) {
-      if (d.danceStyleId && isPerfectScore(d, judgesForDance(d).length)) {
-        perfectScorePills.push({ coupleId: c.id, danceStyleId: d.danceStyleId });
-      }
-    }
-  }
 
   const eliminationOrder = allCouplesWithStatus
     .filter((c) => c.elimination_week !== null || c.status === "winner" || c.status === "runner_up" || c.status === "third_place")
@@ -2346,109 +2278,6 @@ export function ResultsForm({
             </DialogContent>
           </Dialog>
 
-          <Card>
-            <Accordion defaultValue={[]}>
-              <AccordionItem value="special-moments">
-                <AccordionTrigger className="px-(--card-spacing) pt-(--card-spacing) hover:no-underline">
-                  <CardHeader className="flex-1 p-0">
-                    <CardTitle>Special Moments</CardTitle>
-                    <CardDescription>Perfect scores and Judges&apos; Save are detected automatically.</CardDescription>
-                  </CardHeader>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <CardContent className="flex flex-col gap-3">
-                    <div className="flex flex-wrap gap-2">
-                      {perfectScorePills.map((p, i) => {
-                        const couple = namedCouple(p.coupleId);
-                        return (
-                          <Badge key={i} variant="secondary">
-                            ⭐ Perfect Score — {couple ? <CoupleName {...coupleParts(couple)} /> : null}
-                          </Badge>
-                        );
-                      })}
-                      {judgesSavePills.map((coupleId) => {
-                        const couple = namedCouple(coupleId);
-                        return (
-                          <Badge key={coupleId} variant="secondary">
-                            🛡️ Judges&apos; Save — {couple ? <CoupleName {...coupleParts(couple)} /> : null}
-                          </Badge>
-                        );
-                      })}
-                      {customMoments.map((m) => (
-                        <Badge key={m.id} variant="outline" className="gap-1.5">
-                          {m.label}
-                          {m.coupleId && (
-                            <>
-                              {" — "}
-                              {(() => {
-                                const c = namedCouple(m.coupleId);
-                                return c ? <CoupleName {...coupleParts(c)} /> : null;
-                              })()}
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            aria-label="Remove"
-                            className="ml-1 text-muted-foreground hover:text-foreground"
-                            onClick={() => handleRemoveCustomMoment(m.id)}
-                          >
-                            ×
-                          </button>
-                        </Badge>
-                      ))}
-                      {perfectScorePills.length === 0 &&
-                        judgesSavePills.length === 0 &&
-                        customMoments.length === 0 && (
-                          <p className="text-sm text-muted-foreground">Nothing yet this week.</p>
-                        )}
-                    </div>
-
-                    <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
-                      <div className="flex flex-col gap-1">
-                        <Label className="text-xs text-muted-foreground">Custom Event</Label>
-                        <Input
-                          className="w-48"
-                          placeholder="e.g. Dance-off win"
-                          value={customMomentLabel}
-                          onChange={(e) => setCustomMomentLabel(e.target.value)}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <Label className="text-xs text-muted-foreground">Couple (Optional)</Label>
-                        <Select
-                          items={{
-                            "": "—",
-                            ...Object.fromEntries(episodeCouples.map((c) => [c.id, coupleNameNode(coupleParts(c))])),
-                          }}
-                          value={customMomentCoupleId}
-                          onValueChange={(v) => setCustomMomentCoupleId(v ?? "")}
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="">—</SelectItem>
-                            {episodeCouples.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {coupleNameNode(coupleParts(c))}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={handleAddCustomMoment}
-                        disabled={!customMomentLabel.trim() || addingCustomMoment}
-                      >
-                        + Add Custom Event
-                      </Button>
-                    </div>
-                  </CardContent>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </Card>
 
           {published && canPublish && (
             <div className={`fixed inset-x-0 z-30 ${BOTTOM_NAV_STACK_ABOVE}`}>

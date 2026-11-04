@@ -10,8 +10,6 @@ import {
 } from "@/lib/results";
 import {
   saveDraftResults,
-  addDraftCustomMoment,
-  removeDraftCustomMoment,
   releaseDraftCouple,
   withdrawDraftCouple,
   startCorrection,
@@ -157,28 +155,6 @@ export async function undoTeamScores(input: { episodeId: string; teamId: string 
   if (access.error) return { error: access.error };
 
   const result = await undoTeamReveal(createAdminClient(), input, access.userId);
-  if (!result.error) revalidatePath("/admin/results", "layout");
-  return result;
-}
-
-export async function addEpisodeCustomMoment(input: {
-  episodeId: string;
-  coupleId: string | null;
-  label: string;
-}): Promise<{ error: string | null; id?: string }> {
-  const access = await requireProposeAccess();
-  if (access.error) return { error: access.error };
-
-  const result = await addDraftCustomMoment(createAdminClient(), { ...input, createdBy: access.userId });
-  if (!result.error) revalidatePath("/admin/results", "layout");
-  return result;
-}
-
-export async function removeEpisodeCustomMoment(episodeId: string, momentId: string): Promise<{ error: string | null }> {
-  const access = await requireProposeAccess();
-  if (access.error) return { error: access.error };
-
-  const result = await removeDraftCustomMoment(createAdminClient(), episodeId, momentId, access.userId);
   if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }

@@ -49,7 +49,6 @@ export type DraftEntryState = {
   bonusNote: string | null;
 };
 
-export type DraftCustomMoment = { id: string; coupleId: string | null; label: string };
 
 export type DraftState = {
   correctionToken?: string | null;
@@ -59,7 +58,6 @@ export type DraftState = {
   updatedAt: string | null;
   dances: DraftDanceState[];
   entries: DraftEntryState[];
-  customMoments: DraftCustomMoment[];
   inJeopardyCoupleIds: string[];
 };
 
@@ -70,7 +68,6 @@ const EMPTY_DRAFT_STATE: DraftState = {
   updatedAt: null,
   dances: [],
   entries: [],
-  customMoments: [],
   inJeopardyCoupleIds: [],
 };
 
@@ -118,13 +115,12 @@ export async function loadDraftForEpisode(
         .select("id, couple_id, dance_style_id, song_title, draft_judge_scores(judge_id, score)")
         .eq("episode_id", episodeId),
       admin.from("draft_episode_results").select("*").eq("episode_id", episodeId),
-      admin.from("draft_episode_custom_moments").select("id, couple_id, label").eq("episode_id", episodeId),
       admin.from("draft_episode_in_jeopardy_couples").select("couple_id").eq("episode_id", episodeId),
     ]);
 
   const failed = reads.find((result) => result.error);
   if (failed?.error) throw new Error("Could not load the complete episode draft. Please try again.");
-  const [{ data: override }, { data: draftDances }, { data: draftResults }, { data: customMoments }, { data: jeopardy }] = reads;
+  const [{ data: override }, { data: draftDances }, { data: draftResults }, { data: jeopardy }] = reads;
   if (!override) return EMPTY_DRAFT_STATE;
 
   return {
@@ -148,21 +144,8 @@ export async function loadDraftForEpisode(
       bonusPoints: r.bonus_points,
       bonusNote: r.bonus_note,
     })),
-    customMoments: (customMoments ?? []).map((m) => ({ id: m.id, coupleId: m.couple_id, label: m.label })),
     inJeopardyCoupleIds: (jeopardy ?? []).map((row) => row.couple_id),
   };
-}
-
-export async function addDraftCustomMoment(admin: SupabaseClient<Database>, input: { episodeId: string; coupleId: string | null; label: string; createdBy: string }): Promise<{ error: string | null; id?: string }> {
-  // Generated RPC args are typed non-null, but SQL takes null for an unused argument.
-  const { data, error } = await admin.rpc("mutate_draft_moment", { p_episode_id: input.episodeId, p_actor_id: input.createdBy, p_moment_id: null as unknown as string, p_couple_id: input.coupleId as string, p_label: input.label, p_remove: false });
-  return { error: error?.message ?? null, id: data ?? undefined };
-}
-
-export async function removeDraftCustomMoment(admin: SupabaseClient<Database>, episodeId: string, momentId: string, actorId: string): Promise<{ error: string | null }> {
-  // Generated RPC args are typed non-null, but SQL takes null for an unused argument.
-  const { error } = await admin.rpc("mutate_draft_moment", { p_episode_id: episodeId, p_actor_id: actorId, p_moment_id: momentId, p_couple_id: null as unknown as string, p_label: null as unknown as string, p_remove: true });
-  return { error: error?.message ?? null };
 }
 
 export type SeasonSettingsInput = {

@@ -11,12 +11,16 @@ special-dance draft release, Results scores under the total (`40 + 40`), and
 struck-through eliminated couples on Home's Dance Card.
 
 Decided by Kylie (2026-11-03), not built yet:
-- Retire Special Moments' custom events (label-only, no reader anywhere).
-  Decide whether the Perfect Score / Judges' Save pills move or go.
 - Unused setup fields with no reader: Artist, Theme / Source, Extra Details,
   per-couple Result. Cut or keep is still Kylie's call.
 
 Cleanups:
+- Special Moments is retired from the app (no card, no custom events). Drop
+  `draft_episode_custom_moments`, `episode_custom_moments` and
+  `mutate_draft_moment` the next time `commit_episode_publication`,
+  `commit_episode_reveal`, `commit_team_reveal` and the snapshot are
+  rewritten (they lock, install and snapshot those tables); not worth a
+  rewrite of their own.
 - Drop `episode_teams.mark_max` and `panel_judge_ids` together with every SQL
   and TS reader (`special_dance_panel`, `materialize_team_scores`,
   `save_special_dance`, `episode-publication.ts`, `SpecialDance`), then

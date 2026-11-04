@@ -8,7 +8,7 @@ describe("viewer result payloads", () => {
       hasDraft: true, updatedAt: null, guestJudgeName: "Secret guest", judgesSaveAvailable: false,
       dances: [{ id: "dance", coupleId: "couple", danceStyleId: "style", songTitle: "Unreleased song", judgeScores: [{ judgeId: "judge", score: 9 }] }],
       entries: [{ coupleId: "couple", outcome: "eliminated", savedByJudges: false, hadImmunity: false, bonusPoints: 7, bonusNote: "Secret bonus" }],
-      customMoments: [{ id: "moment", coupleId: "couple", label: "Secret moment" }], inJeopardyCoupleIds: ["couple"],
+      inJeopardyCoupleIds: ["couple"],
     };
     expect(summarizeDrafts({ episode: draft })).toEqual({ episode: { hasDraft: true, entryCount: 1, draftedCoupleIds: ["couple"] } });
     expect(JSON.stringify(summarizeDrafts({ episode: draft }))).not.toMatch(/Secret|eliminated|judgeScores|Unreleased/);
