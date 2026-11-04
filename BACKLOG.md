@@ -26,10 +26,6 @@ Decided by Kylie (2026-11-03), not built yet:
 - Unused setup fields with no reader: Artist, Theme / Source, Extra Details,
   per-couple Result. Cut or keep is still Kylie's call.
 
-Open questions for Kylie:
-- Show bonus points sit in the night's numerator, so the same +3 is worth 3 on
-  a one-dance night (30/30 + 3 → 33) but 1.5 on a two-dance night (60/60 + 3 →
-  31.5). Keep that, or convert bonus points at a fixed rate?
 
 Still to check:
 - Browser check still owed for the special-dance save rework (`e3e0ea3`):

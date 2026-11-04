@@ -112,6 +112,8 @@ Deliberate omissions and naming calls. Code can't record an absence, so these co
 
 - **Curtain Call's top scorer follows the show's own leaderboard** (Kylie, 2026-11-03): a couple's raw total that night across every dance, special dances and show bonus points included (`sumDanceScoresByCouple`). Don't exclude bonus points or partial-cast specials from it.
 
+- **Show bonus points count against the night's marks, not at a fixed rate** (Kylie, 2026-11-04): a Points-mode dance's points go in the night's numerator only (`collapseToNights`), so +3 makes a 30/30 night 33 but a 60/60 night 31.5, the same share of the night they are on the show's own leaderboard. Going over 30 is fine; the category weight still applies.
+
 - **Dance Card is not copyable across leagues** (drafts are per-league); only Curtain Call and Grand Finale are.
 - **No light/dark toggle** — one fixed look by choice. No theme redesign is planned either. `globals.css` pins Tailwind's `dark:` variant to always apply (`@custom-variant dark`) and sets `color-scheme: dark`, so the phone's own appearance setting changes nothing.
 - **"Bracket"** in Your Season Bracket is deliberate: a full outcome prediction submitted up front and locked, like a March Madness bracket, even though it's one order rather than matchups.
