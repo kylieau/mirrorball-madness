@@ -18,6 +18,15 @@ All live on `main` (`885b87c`) with their SQL applied and verified:
 - trimmed setup fields: no Artist or Theme / Source; suggestions Captain,
   Host, Live Performer, Mentor and Winner, Loser, Immune.
 
+Checked 2026-11-04:
+- Every published episode but E02 still holds a correction seed (written
+  seconds after publish, when Enter Results reopens the week), identical to
+  its live own rows. Harmless: fans read drafts only for unpublished
+  episodes, and Scores and Schedule show Published regardless.
+- A couple's judge boxes stay disabled until the dance has a style (marks
+  typed first were silently skipped by the draft save). Browser-checked on
+  E10 at 360px with POSTs aborted.
+
 Cleanups:
 - `episode_teams.song_source`, `theme_label` and `songs[].artist` are no
   longer edited or shown (Artist and Theme / Source were cut 2026-11-04).
@@ -37,9 +46,8 @@ Cleanups:
   small score boxes and a "tonight's guest" caption. Production runs
   `special`, so it is only the fresh-project fallback; delete it rather than
   restyle it.
-- Marks typed on a couple's dance with no dance style picked are never saved
-  (the payload skips styleless dances). Pre-existing; maybe make the style
-  required before the boxes take input.
+- The dance style list has no Charleston (or Hustle, Lindy Hop); add any a
+  week needs before it airs, or its couples can't be scored.
 
 Still to see on a real night (E10, Tuesday 2026-11-10, 8pm ET), none browser-checked:
 - Special-dance card: a typed mark survives switching away and back; an
@@ -54,9 +62,6 @@ Still to see on a real night (E10, Tuesday 2026-11-10, 8pm ET), none browser-che
   by a contributor on air. PGlite rehearses this; the page has not seen it.
 
 Still to check:
-- E07 and E08 each still hold 10 `draft_dance_scores` rows after publish, and
-  E09 holds 8, likely correction seeds from reopening the week (and, before
-  the polish SQL, special-dance saves). Confirm that's harmless.
 - Known limit: when a draft week has a sibling night that is already
   published, draft-night standings replace that week's stored survival and
   Curtain Call points with the judges-only draft computation.

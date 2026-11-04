@@ -1726,8 +1726,11 @@ export function ResultsForm({
                 judges={judgesForDance(d).map((j) => ({ id: j.id, name: judgeDisplayNames.get(j.id) ?? j.name }))}
                 values={d.scores}
                 subject={formatCoupleName(coupleParts(c))}
+                disabled={!d.danceStyleId}
                 onChange={(judgeId, value) => updateDance(c.id, d.key, { scores: { ...d.scores, [judgeId]: value } })}
               />
+              {/* A draft save skips a dance with no style, so marks typed first would be lost. */}
+              {!d.danceStyleId && <p className="text-xs text-muted-foreground">Pick a dance style to enter scores.</p>}
             </div>
           ))}
           {!entity && team && row.outcome !== "bye" && !row.dances.some((d) => isTeamDanceRow(team, d)) && renderTeamDanceRow(team, null)}
