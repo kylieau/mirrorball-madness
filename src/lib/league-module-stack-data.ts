@@ -7,6 +7,8 @@ import { danceCardRosterNames, type ModuleStackInput } from "@/lib/league-triage
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { loadAllCouples } from "@/lib/viewer-season-data";
 
+const OUT_STATUSES = new Set(["eliminated", "withdrawn"]);
+
 // The viewer's own per-module state for each league, batched into one query per table.
 // spoilerCutoffWeek is the latest week the viewer may see results for; every
 // eliminated couple beyond it is treated as still competing, so "next elim"
@@ -69,7 +71,7 @@ export async function loadModuleStackInputs(
           danceCard: {
             on: s.danceCardOn,
             draftStatus: draftStatusByLeague.get(s.id) ?? "not_started",
-            rosterNames: danceCardRosterNames(
+            roster: danceCardRosterNames(
               (slots ?? [])
                 .filter(
                   (slot): slot is typeof slot & { couple_id: string } =>
@@ -81,6 +83,13 @@ export async function loadModuleStackInputs(
                 id: c.id,
                 celebrityName: c.celebrity?.name ?? "Unknown",
                 proName: c.pro?.name ?? "Unknown",
+                out: OUT_STATUSES.has(
+                  spoilerSafeCoupleStatus(
+                    { status: c.status, eliminationWeek: c.elimination_week },
+                    context.spoilerCutoffWeek,
+                    context.finaleWeekNumber
+                  )
+                ),
               }))
             ),
           },

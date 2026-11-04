@@ -17,7 +17,7 @@ const c = (celebrity: string, pro: string): CoupleNameParts => ({ celebrity, pro
 const joined = (parts: CoupleNameParts) => `${parts.celebrity} & ${parts.pro}`;
 const base: ModuleStackInput = {
   curtainCall: { on: true, state: "open", afterWeek: 2, lockAt: LOCK, eliminatedName: null, topScorerName: null },
-  danceCard: { on: true, draftStatus: "completed", rosterNames: [c("Ava", "Val"), c("Jess", "Alan")] },
+  danceCard: { on: true, draftStatus: "completed", roster: [{ couple: c("Ava", "Val"), out: false }, { couple: c("Jess", "Alan"), out: false }] },
   grandFinale: { on: true, open: true, locked: false, deadlineAt: LOCK, hasPrediction: false, nextElimName: null },
 };
 // Rows as the card reads them: text, then the couple (celebrity in bold).
@@ -53,8 +53,8 @@ describe("buildModuleStack", () => {
         { text: "High: ", couple: c("Jess", "Alan") },
       ],
       [
-        { text: "", couple: c("Ava", "Val") },
-        { text: "", couple: c("Jess", "Alan") },
+        { text: "", couple: c("Ava", "Val"), struck: false },
+        { text: "", couple: c("Jess", "Alan"), struck: false },
       ],
       [{ text: "Next elim: ", couple: c("Priya", "Sasha") }],
     ]);
@@ -116,8 +116,8 @@ describe("buildModuleStack", () => {
   });
 
   describe("Dance Card", () => {
-    const line = (draftStatus: string, rosterNames: CoupleNameParts[] = []) =>
-      flat(buildModuleStack({ ...base, danceCard: { on: true, draftStatus, rosterNames } })[1]);
+    const line = (draftStatus: string, couples: CoupleNameParts[] = []) =>
+      flat(buildModuleStack({ ...base, danceCard: { on: true, draftStatus, roster: couples.map((couple) => ({ couple, out: false })) } })[1]);
 
     it("reports draft status, then each couple on its own line", () => {
       expect(line("not_started")).toMatchObject({ lines: ["Draft not started"], locked: false });
@@ -127,6 +127,15 @@ describe("buildModuleStack", () => {
         lines: ["Tatyana & Jan", "Jordan S. & Alan", "Sarah Jane & Hailey"],
         locked: true,
       });
+    });
+
+    it("strikes a couple that is out, keeping it in its place", () => {
+      const roster = [
+        { couple: c("Tatyana", "Jan"), out: false },
+        { couple: c("Julia", "Ezra"), out: true },
+      ];
+      const rows = buildModuleStack({ ...base, danceCard: { on: true, draftStatus: "completed", roster } })[1].lines;
+      expect(rows.map((row) => [row.couple?.celebrity, row.struck])).toEqual([["Tatyana", false], ["Julia", true]]);
     });
   });
 
@@ -155,12 +164,16 @@ describe("buildModuleStack", () => {
 });
 
 describe("danceCardRosterNames", () => {
-  const names = (...args: Parameters<typeof danceCardRosterNames>) => danceCardRosterNames(...args).map(joined);
+  const names = (...args: Parameters<typeof danceCardRosterNames>) => danceCardRosterNames(...args).map((r) => joined(r.couple));
   const couples = [
-    { id: "1", celebrityName: "Tatyana Ali", proName: "Jan Ravnik" },
-    { id: "2", celebrityName: "Jordan Smith", proName: "Alan Bersten" },
-    { id: "3", celebrityName: "Jordan Chiles", proName: "Val Chmerkovskiy" },
+    { id: "1", celebrityName: "Tatyana Ali", proName: "Jan Ravnik", out: false },
+    { id: "2", celebrityName: "Jordan Smith", proName: "Alan Bersten", out: false },
+    { id: "3", celebrityName: "Jordan Chiles", proName: "Val Chmerkovskiy", out: true },
   ];
+
+  it("carries whether each couple is out", () => {
+    expect(danceCardRosterNames(["1", "3"], couples).map((r) => r.out)).toEqual([false, true]);
+  });
 
   it("uses first names for both partners, in slot order", () => {
     expect(names(["3", "1"], couples)).toEqual(["Jordan C. & Val", "Tatyana & Jan"]);
@@ -172,7 +185,7 @@ describe("danceCardRosterNames", () => {
 
   it("keeps a compound first name together", () => {
     expect(
-      names(["4"], [{ id: "4", celebrityName: "Sarah Jane Nader", proName: "Hailey Bills" }])
+      names(["4"], [{ id: "4", celebrityName: "Sarah Jane Nader", proName: "Hailey Bills", out: false }])
     ).toEqual(["Sarah Jane & Hailey"]);
   });
 

@@ -18,7 +18,7 @@ export type ModuleStackInput = {
     eliminatedName: CoupleNameParts | null;
     topScorerName: CoupleNameParts | null;
   };
-  danceCard: { on: boolean; draftStatus: string; rosterNames: CoupleNameParts[] };
+  danceCard: { on: boolean; draftStatus: string; roster: RosterCouple[] };
   grandFinale: {
     on: boolean;
     open: boolean;
@@ -29,10 +29,14 @@ export type ModuleStackInput = {
   };
 };
 
+// A Dance Card couple and whether it is out of the competition (eliminated
+// or withdrawn) as far as the viewer has watched.
+export type RosterCouple = { couple: CoupleNameParts; out: boolean };
+
 // One visual row: plain text, then a couple the card renders as
 // "Tatyana & Jan" with the celebrity in bold ("Home: " + couple). Rows
-// without a couple have couple null.
-export type StackRow = { text: string; couple: CoupleNameParts | null };
+// without a couple have couple null. A struck row is a couple that is out.
+export type StackRow = { text: string; couple: CoupleNameParts | null; struck?: boolean };
 
 const plain = (text: string): StackRow => ({ text, couple: null });
 const named = (text: string, couple: CoupleNameParts): StackRow => ({ text, couple });
@@ -56,14 +60,15 @@ type LineBody = Pick<ModuleLine, "lines" | "tone" | "locked" | "locksAt"> & { ne
 // app uses — last initial only when that helper finds a collision in this pool.
 export function danceCardRosterNames(
   coupleIds: readonly string[],
-  couples: readonly { id: string; celebrityName: string; proName: string }[]
-): CoupleNameParts[] {
+  couples: readonly { id: string; celebrityName: string; proName: string; out: boolean }[]
+): RosterCouple[] {
   const display = buildCoupleDisplayNames(
     couples.map((c) => ({ id: c.id, celebrity_name: c.celebrityName, pro_name: c.proName }))
   );
+  const outIds = new Set(couples.filter((c) => c.out).map((c) => c.id));
   return coupleIds.flatMap((id) => {
     const parts = display.get(id);
-    return parts ? [parts] : [];
+    return parts ? [{ couple: parts, out: outIds.has(id) }] : [];
   });
 }
 
@@ -102,8 +107,8 @@ export function buildModuleStack(input: ModuleStackInput): ModuleLine[] {
         ? [plain("Draft not started")]
         : dc.draftStatus === "in_progress"
           ? [plain("Draft in progress")]
-          : dc.rosterNames.length
-            ? dc.rosterNames.map((couple) => named("", couple))
+          : dc.roster.length
+            ? dc.roster.map(({ couple, out }) => ({ ...named("", couple), struck: out }))
             : [plain("No couples")];
     return { lines, tone: "normal", locked: dc.draftStatus === "completed", locksAt: null };
   })();

@@ -172,13 +172,13 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
 
 function StackRowText({ row }: { row: StackRow }) {
   return (
-    <>
+    <span className={cn(row.struck && "line-through")}>
       {row.text}
       {row.couple && (
         <>
           <span className="font-semibold">{row.couple.celebrity}</span> &amp; {row.couple.pro}
         </>
       )}
-    </>
+    </span>
   );
 }
