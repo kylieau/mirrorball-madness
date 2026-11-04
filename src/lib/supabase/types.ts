@@ -2743,15 +2743,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      set_special_draft_release: {
-        Args: {
-          p_actor_id: string
-          p_episode_id: string
-          p_release: boolean
-          p_team_id: string
-        }
-        Returns: undefined
-      }
       set_draft_order: {
         Args: { p_league_id: string; p_ordered_user_ids: string[] }
         Returns: undefined
@@ -2766,6 +2757,15 @@ export type Database = {
       }
       set_results_contributor: {
         Args: { p_enabled: boolean; p_user_id: string }
+        Returns: undefined
+      }
+      set_special_draft_release: {
+        Args: {
+          p_actor_id: string
+          p_episode_id: string
+          p_release: boolean
+          p_team_id: string
+        }
         Returns: undefined
       }
       special_dance_blocker: {

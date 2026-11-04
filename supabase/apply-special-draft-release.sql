@@ -1,3 +1,5 @@
+-- Applied live 2026-11-04 (table, policy, grants and both functions verified).
+--
 -- Draft release for special dances: a contributor (propose tier) releases a
 -- fully scored special dance before it is posted, the same way a couple's
 -- drafted dance is released, and fans who unlocked that week's drafts see it.

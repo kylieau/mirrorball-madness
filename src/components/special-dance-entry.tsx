@@ -181,7 +181,6 @@ export function SpecialDanceEntry({
   specialMode,
   judges,
   judgeNames,
-  guestJudgeIds,
   nightJudgeIds,
   danceStyles,
   participants,
@@ -212,7 +211,6 @@ export function SpecialDanceEntry({
   specialMode: boolean;
   judges: ScoringJudge[];
   judgeNames: Map<string, string>;
-  guestJudgeIds: ReadonlySet<string>;
   nightJudgeIds: string[];
   danceStyles: { id: string; name: string }[];
   participants: SpecialDanceParticipant[];
@@ -799,7 +797,7 @@ export function SpecialDanceEntry({
           <fieldset disabled={inputsDisabled || busy} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
             <div className="rounded-lg bg-muted/50 p-1.5">
               <JudgeScoreRow
-                judges={panelJudges.map((j) => ({ id: j.id, name: judgeNames.get(j.id) ?? j.name, guest: guestJudgeIds.has(j.id) }))}
+                judges={panelJudges.map((j) => ({ id: j.id, name: judgeNames.get(j.id) ?? j.name }))}
                 values={markInputs}
                 subject={displayName}
                 disabled={posted}

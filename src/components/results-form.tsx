@@ -1236,7 +1236,6 @@ export function ResultsForm({
   }
 
   const judgeDisplayNames = buildPeopleDisplayNames(judges);
-  const nightGuestIds = new Set(guestJudgesByEpisode[selectedEpisodeId] ?? []);
   function judgesForDance(dance: RowDance) {
     const scoredIds = Object.entries(dance.scores)
       .filter(([, v]) => v.trim() !== "")
@@ -1669,7 +1668,6 @@ export function ResultsForm({
         specialMode={special}
         judges={nightJudges}
         judgeNames={judgeDisplayNames}
-        guestJudgeIds={new Set(guestJudgesByEpisode[selectedEpisode?.id ?? ""] ?? [])}
         nightJudgeIds={nightJudgeIds}
         danceStyles={danceStyles}
         participants={specialParticipants()}
@@ -1791,7 +1789,7 @@ export function ResultsForm({
                 </Button>
               </div>
               <JudgeScoreRow
-                judges={judgesForDance(d).map((j) => ({ id: j.id, name: judgeDisplayNames.get(j.id) ?? j.name, guest: nightGuestIds.has(j.id) }))}
+                judges={judgesForDance(d).map((j) => ({ id: j.id, name: judgeDisplayNames.get(j.id) ?? j.name }))}
                 values={d.scores}
                 subject={formatCoupleName(coupleParts(c))}
                 onChange={(judgeId, value) => updateDance(c.id, d.key, { scores: { ...d.scores, [judgeId]: value } })}
