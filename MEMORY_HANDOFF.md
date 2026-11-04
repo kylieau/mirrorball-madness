@@ -1,23 +1,19 @@
-# Session Handoff — 2026-11-04 (after E09, before E10)
+# Session Handoff — 2026-11-04 (prep for E10, Grammy Night)
 
 ## 1. Current State
 
-**`main` is at `488a45d`, pushed and deploying.** Nothing of ours is uncommitted. E09 (Week 8) was published 2026-11-03 06:55Z. E10 (Week 9, Grammy Night) airs Tuesday 2026-11-10, 8pm ET and has no data yet.
+**`main` is at `885b87c`, pushed and deploying.** Nothing of ours is uncommitted. E09 (Week 8) was published 2026-11-03. E10 (Week 9, Grammy Night) airs **Tuesday 2026-11-10, 8pm ET** (`airs_at` 01:00Z Nov 11). It's set to one dance per couple, single elimination, no guest judge yet. A dance-off is likely.
 
-Shipped to `main` today, each reviewed by Codex and the advisor:
-- **Special-dance saves held by the page** (`e3e0ea3`): typed marks/points live in `results-form.tsx` (`specialEdits`, its own `DraftSaveQueue`), so switching entries never drops an edit. Draft merges keep posted special rows.
-- **One judge-score row, whole marks 1–10** (`c75bc96`, `40320b5`): `JudgeScoreRow` is shared by couples and specials, on one line with names shrinking to fit, no guest marker. `src/lib/judge-marks.ts` holds the rule. A couple with an invalid mark is held out of the draft save by name while the others save. Specials have no "Out of" or per-dance panel.
-- **Special-dance draft release** (`d877f8c`, `f2ce70b`): Save as Draft Score / Drafted · Withdraw on a special's card (propose tier). Fans who unlocked the week see it. `draftDanceScores` / `unpostedDraftDances` carry it through every reader.
-- **Results cards** (`774a1a7`): dance lines carry no scores. A multi-dance card shows `40 + 40` (bonus as `+3 bonus`) under the total, with no "out of".
-- **Home Dance Card** (`488a45d`): eliminated/withdrawn roster couples are struck through, spoiler-safe.
-
-Live database, all verified 2026-11-04 with the Management API (read-only token):
-- `apply-draft-release-own-rows.sql`
-- `apply-special-dances-polish.sql` (grokbot's earlier "applied" was wrong; Kylie ran it today)
-- `apply-whole-judge-marks.sql`
-- `apply-special-draft-release.sql`
-
-Types regenerated from live and committed.
+Shipped today, each reviewed by Codex (and the advisor on the bigger ones), all SQL applied by Kylie and verified live through the Management API:
+- **Special-dance saves held by the page** (`e3e0ea3`).
+- **One judge-score row, whole marks 1–10** (`c75bc96`, `40320b5`): `JudgeScoreRow` on one line, names shrink to fit, no guest marker. `apply-whole-judge-marks.sql`.
+- **Special-dance draft release** (`d877f8c`, `f2ce70b`). `apply-special-draft-release.sql`.
+- **Results cards** (`774a1a7`, `ff00999`): parts under the total (`40 + 40`, `+3 bonus`), no "out of", a dance-off loser's 0 left out.
+- **Home Dance Card** (`488a45d`): eliminated/withdrawn couples struck through, spoiler-safe.
+- **Special Moments retired** (`aba19a9`): no card, no custom events.
+- **Contributors set up special dances** (`5c2b29b`, `dd49f25`). Unpublished week and unposted dance only; the published check runs under the episode lock. `apply-contributor-special-setup.sql`.
+- **Setup fields trimmed** (`5c2b29b`): no Artist or Theme / Source (the source goes in the song title); Extra Details suggests Captain, Host, Live Performer, Mentor; Result suggests Winner, Loser, Immune.
+- Also live: `apply-draft-release-own-rows.sql` and `apply-special-dances-polish.sql`. Types regenerated.
 
 ## 2. Changes Made
 
@@ -26,37 +22,40 @@ All committed and on `main`. This sync touches only `MEMORY_HANDOFF.md` and `BAC
 **Not ours; leave unstaged:** `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile.codex`, `.devcontainer/devcontainer-lock.json`, `.agents/`, `AGENTS.md`, `ios/App/App.xcodeproj/project.pbxproj`, `supabase/queries/*.sql`.
 
 ## 3. Key Decisions
-- **Settled by Kylie 2026-11-03/04, recorded in CLAUDE.md:**
-  - whole marks 1–10 only, for couples and specials;
-  - special dances always use the night's judges, out of 10;
-  - Curtain Call's top scorer follows the show's leaderboard, bonus points included;
-  - show bonus points count against the night's marks, not at a fixed rate (+3 → 33 on 30/30, 31.5 on 60/60);
-  - Results show no "/80";
-  - the score row has no Guest label;
-  - special dances release as drafts like couples.
-- **Special dances are entities, never couples.** A couple's draft never holds special rows; a released special has no live rows, so its members never join `releasedCoupleIdsByEpisode`.
-- **`SUPABASE_ACCESS_TOKEN` works again** (Database: Read only). Use `POST /v1/projects/wssbwgtsejamlbvfofvu/database/query/read-only` to read function bodies and constraints, and `npx supabase gen types` after schema changes.
-- **Browser checks against production:**
-  - throwaway contributor account, cleaned up in `finally`;
-  - `page.route` aborts every POST, and the count of `next-action` requests is the evidence nothing saved;
-  - never create special dances or releases on a real episode.
+- **Grammy Night entry:**
+  - each dance-off heat is its own Dance-Off special, Points per Couple: winner +3 (or +2 if a guest makes it out of 40), loser **0**, never blank, since a blank blocks Finish Week;
+  - the immune couple's automatic bonus is an Immunity special with only that couple;
+  - never use Finish Week's Fantasy Bonus for show points;
+  - the Finish Week Immunity checkbox is a record only.
+- **Settled by Kylie 2026-11-03/04,** recorded in CLAUDE.md:
+  - whole marks 1–10;
+  - the night's judges, out of 10;
+  - top scorer follows the show's leaderboard;
+  - bonus points count against the night's marks;
+  - no "/80" on Results;
+  - no Guest label;
+  - no Special Moments card;
+  - no Artist or Theme / Source fields.
+- **Special dances are entities, never couples.** A released special has no live rows, so its members never join `releasedCoupleIdsByEpisode`.
+- **`SUPABASE_ACCESS_TOKEN` works** (Database: Read only). Use `POST /v1/projects/wssbwgtsejamlbvfofvu/database/query/read-only` (put the query in a JSON file) for function bodies, constraints and counts, and `npx supabase gen types` after schema changes. To change a live function, read it with `pg_get_functiondef` and edit only what changes.
+- **Browser checks against production:** use a throwaway contributor, cleaned up in `finally`. `page.route` aborts every POST, and the `next-action` count proves nothing saved. Never create special dances or releases on a real episode.
 - **Unchanged:**
-  - Deploys: a push to `main` needs Kylie's explicit yes in that turn (handoff syncs excepted).
-  - SQL: handed over as `.sql` files Kylie runs, rehearsed in PGlite. Never ask for the DB password.
-  - Production deletions: guarded `.sql` with exact-count `raise exception`.
-  - Data: throwaway accounts only, and never fake releases or `dance_scores`.
-  - Git: stage by name, attribution `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-  - Processes: never `pkill -f`.
-  - Builds: `rm -rf .next` before `npm run dev` after a `next build` (stale chunk 500s). A `next/font` build error is a network flake; retry.
+  - a push to `main` needs Kylie's yes in that turn (handoff syncs excepted);
+  - SQL goes to Kylie as `.sql` files, rehearsed in PGlite;
+  - never ask for the DB password;
+  - throwaway accounts only;
+  - stage by name;
+  - attribution `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`;
+  - never `pkill -f`;
+  - `rm -rf .next` before `npm run dev` after a build;
+  - a `next/font` build error is a network flake, so retry.
 
 ## 4. Backlog & Next Steps
 See BACKLOG "Special dances follow-ups — 2026-11-04":
-- what to watch on E10 (none of the special-dance card or Home strike was browser-checked);
-- retiring Special Moments' custom events;
-- the unused setup fields (Kylie's call);
-- dropping `mark_max` / `panel_judge_ids`;
-- deleting `TeamEntry`.
+- what to watch on E10, none of it browser-checked;
+- the cleanups: drop `mark_max` / `panel_judge_ids` / `song_source` / `theme_label`, retire the custom-moment tables when the publish RPCs are next rewritten, delete `TeamEntry`;
+- styleless marks never saving.
 
-Next: Kylie confirms the Vercel deploy of `488a45d` is Ready and spot-checks Results (Week 8) and Home. Then, between show nights, pick up retiring Special Moments' custom events.
+Next: Kylie confirms the Vercel deploy of `885b87c` is Ready. On E10 night, enter dance-offs as above, then run the runbook step 8 checks for E10 with the service role after publish.
 
 Next command: none pending.

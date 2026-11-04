@@ -4,11 +4,19 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Special dances follow-ups — 2026-11-04
 
-All live on `main` (`488a45d`) with their SQL applied and verified: the
-page-held special-dance saves, whole marks 1–10 in one `JudgeScoreRow` (names
-shrink to fit one line, no guest marker), the night's judges out of 10,
-special-dance draft release, Results scores under the total (`40 + 40`), and
-struck-through eliminated couples on Home's Dance Card.
+All live on `main` (`885b87c`) with their SQL applied and verified:
+- the page-held special-dance saves;
+- whole marks 1–10 in one `JudgeScoreRow` (names shrink to fit one line, no
+  guest marker);
+- the night's judges, out of 10;
+- special-dance draft release;
+- Results scores under the total (`40 + 40`, a dance-off loser's 0 left out);
+- struck-through eliminated couples on Home's Dance Card;
+- Special Moments retired;
+- contributor setup of special dances (an unpublished week, an unposted
+  dance);
+- trimmed setup fields: no Artist or Theme / Source; suggestions Captain,
+  Host, Live Performer, Mentor and Winner, Loser, Immune.
 
 Cleanups:
 - `episode_teams.song_source`, `theme_label` and `songs[].artist` are no
@@ -41,6 +49,9 @@ Still to see on a real night (E10, Tuesday 2026-11-10, 8pm ET), none browser-che
 - Home Dance Card strike on a roster with an eliminated couple (no test
   league has one; Kylie's real leagues do).
 - A four-judge (guest) night's score row at 360px.
+- Dance-offs as Points per Couple specials (one per heat, loser entered as
+  0) and the immune couple's bonus as a one-couple Immunity special, created
+  by a contributor on air. PGlite rehearses this; the page has not seen it.
 
 Still to check:
 - E07 and E08 each still hold 10 `draft_dance_scores` rows after publish, and
