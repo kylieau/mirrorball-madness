@@ -1,3 +1,5 @@
+-- Applied live 2026-11-04 (both functions verified).
+--
 -- Contributors (propose tier) set up and remove special dances, so a
 -- dance-off can be created live on show night by whoever is entering scores.
 -- A published week and an already posted dance stay site-admin only (the
