@@ -2,40 +2,47 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
-## Special dances follow-ups — 2026-11-03
+## Special dances follow-ups — 2026-11-04
 
-Shipped to `main` 2026-11-04 (`bffd9aa`):
-one `JudgeScoreRow` for couples and special dances, whole marks 1–10 on the
-page, in the server actions and in `supabase/apply-whole-judge-marks.sql`
-(applied live 2026-11-04 after the deploy), and no "Out of" or per-dance panel.
-Follow-ups from it:
+All live on `main` (`488a45d`) with their SQL applied and verified: the
+page-held special-dance saves, whole marks 1–10 in one `JudgeScoreRow` (names
+shrink to fit one line, no guest marker), the night's judges out of 10,
+special-dance draft release, Results scores under the total (`40 + 40`), and
+struck-through eliminated couples on Home's Dance Card.
+
+Decided by Kylie (2026-11-03), not built yet:
+- Retire Special Moments' custom events (label-only, no reader anywhere).
+  Decide whether the Perfect Score / Judges' Save pills move or go.
+- Unused setup fields with no reader: Artist, Theme / Source, Extra Details,
+  per-couple Result. Cut or keep is still Kylie's call.
+
+Cleanups:
 - Drop `episode_teams.mark_max` and `panel_judge_ids` together with every SQL
   and TS reader (`special_dance_panel`, `materialize_team_scores`,
   `save_special_dance`, `episode-publication.ts`, `SpecialDance`), then
-  regenerate the types; not in a show week.
+  regenerate the types; not in a show week. Both are pinned to 10 / null by
+  `episode_teams_night_panel` meanwhile.
 - `TeamEntry` (`team-entry.tsx`, inferred-teams fallback) still has its own
   small score boxes and a "tonight's guest" caption. Production runs
   `special`, so it is only the fresh-project fallback; delete it rather than
   restyle it.
+- Marks typed on a couple's dance with no dance style picked are never saved
+  (the payload skips styleless dances). Pre-existing; maybe make the style
+  required before the boxes take input.
 
-Decided by Kylie (2026-11-03), not built yet:
-- Retire Special Moments' custom events (label-only, no reader anywhere). Decide
-  whether the Perfect Score / Judges' Save pills move or go.
-- Special dances get draft release like a couple's dance (propose tier, fans
-  see it once they unlock drafts), instead of admin-only posting.
-- Unused setup fields with no reader: Artist, Theme / Source, Extra Details,
-  per-couple Result. Cut or keep is still Kylie's call.
-
+Still to see on a real night (E10, Monday 2026-11-10 ET), none browser-checked:
+- Special-dance card: a typed mark survives switching away and back; an
+  invalid mark blocks Finish Week by name; Save as Draft Score → Drafted ·
+  Withdraw; a released special shows on Home / Standings for viewers who
+  chose Stay Updated, and its posted rows replace it.
+- Home Dance Card strike on a roster with an eliminated couple (no test
+  league has one; Kylie's real leagues do).
+- A four-judge (guest) night's score row at 360px.
 
 Still to check:
-- Browser check still owed for the special-dance save rework (`e3e0ea3`):
-  type a mark and switch away at once, then reopen (mark still there); an
-  invalid mark refuses Finish Week by name; deleting a dance with unsaved marks
-  doesn't leave Finish Week blocked; with a couple's draft released, posting
-  its special dance still counts on Standings.
 - E07 and E08 each still hold 10 `draft_dance_scores` rows after publish, and
-  E09 holds 8, likely correction seeds from reopening the week. Confirm that's
-  harmless.
+  E09 holds 8, likely correction seeds from reopening the week (and, before
+  the polish SQL, special-dance saves). Confirm that's harmless.
 - Known limit: when a draft week has a sibling night that is already
   published, draft-night standings replace that week's stored survival and
   Curtain Call points with the judges-only draft computation.
