@@ -139,7 +139,8 @@ export async function loadScoreHistory(
       couple_id: dance.coupleId,
       total_score: dance.total,
       scaled_score: dance.scaled,
-      max_score: null,
+      max_score: dance.maxScore,
+      team_id: dance.teamId,
     })) ?? []),
   ];
   const weeks: HistoryWeekData[] = allowedWeeks.map((week) => {

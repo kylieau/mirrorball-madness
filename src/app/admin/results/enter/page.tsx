@@ -69,6 +69,7 @@ export default async function EnterResultsPage({
         draftsByEpisode={data.draftsByEpisode}
         revealedByEpisode={data.revealedByEpisode}
         releasedCoupleIdsByEpisode={data.releasedCoupleIdsByEpisode}
+        releasedTeamIdsByEpisode={data.releasedTeamIdsByEpisode}
         forceSelectEpisodeId={data.episodes.some((row) => row.id === episode && (accountSettingsData.isSuperAdmin || !row.results_published_at)) ? episode : null}
         participantsByEpisode={data.participantsByEpisode}
         guestJudgesByEpisode={data.guestJudgesByEpisode}

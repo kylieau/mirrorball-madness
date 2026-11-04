@@ -192,7 +192,7 @@ describe("buildLiveAirChrome", () => {
     },
   ];
   const draftContext = {
-    release: { weekId: "w", weekNumber: 3, episodeIds: ["e"], releasedCoupleIdsByEpisode: { e: ["c"] } },
+    release: { weekId: "w", weekNumber: 3, episodeIds: ["e"], releasedCoupleIdsByEpisode: { e: ["c"] }, releasedTeamIdsByEpisode: {} },
     latestRelease: "Ezra & Daniella",
     unlockedWeek: 0,
     night: null,

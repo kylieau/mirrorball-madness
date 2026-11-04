@@ -87,7 +87,7 @@ export default async function Home() {
   const draftEpisodeIds = new Set(draftNight?.episodeIds ?? []);
   if (visibleEpisodeIds.length > 0 || draftEpisodeIds.size > 0) {
     // team_id and max_score are selected only once their migrations are applied.
-    const teamsMode = visibleEpisodeIds.length > 0 ? await loadTeamsMode(supabase) : "inferred";
+    const teamsMode = await loadTeamsMode(supabase);
     const [{ data: danceScoreRows }, { data: episodeResults }, specialDanceLabels, couples] = await Promise.all([
       visibleEpisodeIds.length > 0
         ? supabase
@@ -98,7 +98,7 @@ export default async function Home() {
       visibleEpisodeIds.length > 0
         ? supabase.from("episode_results").select("episode_id, couple_id, outcome").in("episode_id", visibleEpisodeIds)
         : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
-      loadSpecialDanceLabels(supabase, visibleEpisodeIds, teamsMode),
+      loadSpecialDanceLabels(supabase, [...visibleEpisodeIds, ...draftEpisodeIds], teamsMode),
       loadAllCouples(supabase),
     ]);
     const danceScores = (danceScoreRows ?? []) as unknown as ActivityDanceRow[];
@@ -128,12 +128,21 @@ export default async function Home() {
         for (const dance of draftNight.dances) {
           const parts = displayNames.get(dance.coupleId);
           if (parts) {
-            week.scores.push({
-              celebrity: parts.celebrity,
-              danceStyle: dance.danceStyle,
-              total: dance.total,
-              at: dance.at,
-            });
+            week.scores.push(
+              activityScore(
+                {
+                  episode_id: dance.episodeId,
+                  couple_id: dance.coupleId,
+                  total_score: dance.total,
+                  created_at: dance.at,
+                  dance_styles: { name: dance.danceStyle },
+                  team_id: dance.teamId,
+                  max_score: dance.maxScore,
+                },
+                parts.celebrity,
+                specialDanceLabels
+              )
+            );
           }
         }
       }

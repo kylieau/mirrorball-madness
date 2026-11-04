@@ -878,6 +878,49 @@ export type Database = {
           },
         ]
       }
+      draft_special_releases: {
+        Row: {
+          episode_id: string
+          released_at: string
+          released_by: string | null
+          team_id: string
+        }
+        Insert: {
+          episode_id: string
+          released_at?: string
+          released_by?: string | null
+          team_id: string
+        }
+        Update: {
+          episode_id?: string
+          released_at?: string
+          released_by?: string | null
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_special_releases_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_special_releases_released_by_fkey"
+            columns: ["released_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_special_releases_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "episode_teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       episode_custom_moments: {
         Row: {
           couple_id: string | null
@@ -2700,6 +2743,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_special_draft_release: {
+        Args: {
+          p_actor_id: string
+          p_episode_id: string
+          p_release: boolean
+          p_team_id: string
+        }
+        Returns: undefined
+      }
       set_draft_order: {
         Args: { p_league_id: string; p_ordered_user_ids: string[] }
         Returns: undefined
@@ -3000,6 +3052,21 @@ export type Database = {
           dance_style_name: string
           episode_id: string
           scaled_score: number
+          total_score: number
+          week_id: string
+          week_number: number
+        }[]
+      }
+      visible_draft_special_scores: {
+        Args: never
+        Returns: {
+          couple_id: string
+          created_at: string
+          dance_style_name: string
+          episode_id: string
+          max_score: number
+          scaled_score: number
+          team_id: string
           total_score: number
           week_id: string
           week_number: number

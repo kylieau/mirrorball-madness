@@ -266,6 +266,8 @@ export const TEAM_TABLES_MISSING_MESSAGE =
   "Team Dances need the database update (supabase/apply-team-dance-entity.sql) before teams can be saved.";
 export const SPECIAL_DANCES_MISSING_MESSAGE =
   "Special Dances need the database update (supabase/apply-special-dances.sql) before this can be saved.";
+export const SPECIAL_DRAFT_RELEASE_MISSING_MESSAGE =
+  "Releasing a special dance as a draft needs the database update (supabase/apply-special-draft-release.sql).";
 
 function translateError(error: { code?: string | null; message: string }, missingMessage: string): string {
   return isMissingSchemaError(error) ? missingMessage : error.message;
@@ -318,6 +320,22 @@ export async function saveTeamMarks(
   });
   if (error) return { error: translateError(error, TEAM_TABLES_MISSING_MESSAGE) };
   return { error: null };
+}
+
+// Propose tier, like a couple's draft release: fans who unlocked the week's
+// drafts see a fully scored, unposted special dance before it is posted.
+export async function setSpecialDraftRelease(
+  admin: SupabaseClient<Database>,
+  input: { episodeId: string; teamId: string; release: boolean },
+  actorId: string
+): Promise<{ error: string | null }> {
+  const { error } = await admin.rpc("set_special_draft_release", {
+    p_episode_id: input.episodeId,
+    p_team_id: input.teamId,
+    p_actor_id: actorId,
+    p_release: input.release,
+  });
+  return { error: error ? translateError(error, SPECIAL_DRAFT_RELEASE_MISSING_MESSAGE) : null };
 }
 
 // Propose tier. Each participant's points and result in a Points-mode dance;

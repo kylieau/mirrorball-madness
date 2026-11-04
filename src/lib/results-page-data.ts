@@ -85,6 +85,9 @@ export type ResultsPageData = {
   // Couples released from the draft to Spoiler-Free fans (draft_couple_releases),
   // per episode -- per couple, not a whole-episode flag.
   releasedCoupleIdsByEpisode: Record<string, string[]>;
+  // Special dances released the same way (draft_special_releases); empty
+  // before supabase/apply-special-draft-release.sql is applied.
+  releasedTeamIdsByEpisode: Record<string, string[]>;
   publishedByNames: Record<string, string>;
   season: {
     id: string;
@@ -134,6 +137,7 @@ export async function loadResultsPageData(
     { data: episodeGuestJudges },
     { data: inJeopardyRows },
     { data: draftReleases },
+    { data: specialReleases },
   ] = await Promise.all([
     supabase
       .from("couples")
@@ -175,6 +179,7 @@ export async function loadResultsPageData(
     // unpublished episodes anyway (deleteAllDraftRows clears it on publish),
     // so it stays small; filtered to this season's episode ids below.
     admin.from("draft_couple_releases").select("episode_id, couple_id"),
+    admin.from("draft_special_releases").select("episode_id, team_id"),
   ]);
 
   const flatten = (rows: typeof activeCouplesRaw) =>
@@ -279,6 +284,11 @@ export async function loadResultsPageData(
     if (!seasonEpisodeIds.has(row.episode_id)) continue;
     (releasedCoupleIdsByEpisode[row.episode_id] ??= []).push(row.couple_id);
   }
+  const releasedTeamIdsByEpisode: Record<string, string[]> = {};
+  for (const row of specialReleases ?? []) {
+    if (!seasonEpisodeIds.has(row.episode_id)) continue;
+    (releasedTeamIdsByEpisode[row.episode_id] ??= []).push(row.team_id);
+  }
 
   return {
     activeCouples,
@@ -301,6 +311,7 @@ export async function loadResultsPageData(
     teamScoresByTeam: teams.scoresByTeam,
     teamLiveByTeam,
     releasedCoupleIdsByEpisode,
+    releasedTeamIdsByEpisode,
     publishedByNames,
     season,
     participantsByEpisode,

@@ -12,6 +12,7 @@ import {
   releaseDraftCoupleAction,
   startEpisodeCorrection,
   withdrawDraftCoupleAction,
+  setSpecialDraftReleaseAction,
   saveSpecialDanceAction,
   saveSpecialDancePointsAction,
   deleteSpecialDanceAction,
@@ -284,6 +285,7 @@ export function ResultsForm({
   draftsByEpisode,
   revealedByEpisode,
   releasedCoupleIdsByEpisode,
+  releasedTeamIdsByEpisode,
   forceSelectEpisodeId,
   participantsByEpisode,
   guestJudgesByEpisode,
@@ -310,6 +312,7 @@ export function ResultsForm({
   draftsByEpisode: Record<string, DraftState>;
   revealedByEpisode: Record<string, Record<string, string>>;
   releasedCoupleIdsByEpisode: Record<string, string[]>;
+  releasedTeamIdsByEpisode: Record<string, string[]>;
   // From /admin/results/enter?episode= (Scores' "Continue in Enter Results"),
   // to open already pointed at that episode.
   forceSelectEpisodeId?: string | null;
@@ -408,6 +411,10 @@ export function ResultsForm({
   const [publishing, setPublishing] = useState(false);
   const [releasing, setReleasing] = useState(false);
   const [releasedCoupleIds, setReleasedCoupleIds] = useState<Set<string>>(new Set());
+  const [releasedTeamIds, setReleasedTeamIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setReleasedTeamIds(new Set(releasedTeamIdsByEpisode[selectedEpisode?.id ?? ""] ?? []));
+  }, [selectedEpisode?.id, releasedTeamIdsByEpisode]);
   const [error, setError] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState(false);
   const [seedingCorrection, setSeedingCorrection] = useState(false);
@@ -1011,6 +1018,26 @@ export function ResultsForm({
     } finally {
       setReleasing(false);
     }
+  }
+
+  // Flushes typed marks or points first, so the release reads what is on screen.
+  async function handleSpecialDraftRelease(teamId: string, release: boolean): Promise<{ error: string | null }> {
+    if (!selectedEpisode) return { error: null };
+    if (release) {
+      const saved = await flushSpecialSavesRef.current();
+      if (saved.error) return saved;
+    }
+    const result = await setSpecialDraftReleaseAction({ episodeId: selectedEpisode.id, teamId, release });
+    if (!result.error) {
+      setReleasedTeamIds((prev) => {
+        const next = new Set(prev);
+        if (release) next.add(teamId);
+        else next.delete(teamId);
+        return next;
+      });
+      router.refresh();
+    }
+    return result;
   }
 
   async function handleWithdrawDraftCouple(coupleId: string) {
@@ -1668,6 +1695,9 @@ export function ResultsForm({
         onFlushScores={() => flushSpecialSavesRef.current()}
         onPost={handlePostTeam}
         onUndo={handleUndoTeam}
+        canRelease={special && !published}
+        released={releasedTeamIds.has(view.dance.id)}
+        onRelease={handleSpecialDraftRelease}
       />
     );
   }

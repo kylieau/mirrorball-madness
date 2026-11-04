@@ -204,6 +204,9 @@ export function SpecialDanceEntry({
   onFlushScores,
   onPost,
   onUndo,
+  canRelease,
+  released,
+  onRelease,
 }: {
   view: SpecialDanceView;
   specialMode: boolean;
@@ -233,6 +236,11 @@ export function SpecialDanceEntry({
   onFlushScores: () => Promise<{ error: string | null }>;
   onPost: (teamId: string) => Promise<{ error: string | null }>;
   onUndo: (teamId: string) => Promise<{ error: string | null }>;
+  // Propose tier on an unpublished night: release the dance as a draft score
+  // before it is posted, like a couple's own dance.
+  canRelease: boolean;
+  released: boolean;
+  onRelease: (teamId: string, release: boolean) => Promise<{ error: string | null }>;
 }) {
   const { dance, eligible, skipped, live } = view;
   const isNew = dance.id === NEW_SPECIAL_ID;
@@ -244,6 +252,7 @@ export function SpecialDanceEntry({
   const [pointInputs, setPointInputs] = useState<Record<string, string>>(() => unsaved?.points ?? pointsToInputs(view.scores));
   const [results, setResults] = useState<Record<string, string>>(() => unsaved?.results ?? resultsToInputs(view.scores));
   const [posting, setPosting] = useState(false);
+  const [releasing, setReleasing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSecondStyle, setShowSecondStyle] = useState(dance.secondDanceStyleId != null);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -317,6 +326,14 @@ export function SpecialDanceEntry({
     setError(null);
     const outcome = await onPost(dance.id);
     setPosting(false);
+    if (outcome.error) setError(outcome.error);
+  }
+
+  async function setReleased(release: boolean) {
+    setReleasing(true);
+    setError(null);
+    const outcome = await onRelease(dance.id, release);
+    setReleasing(false);
     if (outcome.error) setError(outcome.error);
   }
 
@@ -908,10 +925,26 @@ export function SpecialDanceEntry({
         </div>
       )}
 
-      {canPost && !isNew && (scoringMode === "points" || panelOk) && (
+      {(canPost || (canRelease && !posted)) && !isNew && (scoringMode === "points" || panelOk) && (
         <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
           <div className="flex flex-wrap items-center gap-2">
-            {posted ? (
+            {canRelease && !posted && (released ? (
+              <>
+                <Badge>Drafted</Badge>
+                <Button variant="ghost" className="text-danger-text" disabled={busy || releasing} onClick={() => void setReleased(false)}>
+                  Withdraw
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                disabled={busy || releasing || posting || !complete || eligible.length === 0 || invalidMarkIds.length > 0}
+                onClick={() => void setReleased(true)}
+              >
+                {releasing ? "Saving…" : "Save as Draft Score"}
+              </Button>
+            ))}
+            {!canPost ? null : posted ? (
               <>
                 <Button
                   variant="ghost"
@@ -948,7 +981,9 @@ export function SpecialDanceEntry({
           <p className="text-[11px] text-muted-foreground">
             {posted
               ? "This score is live for every eligible participant. Each couple's own dance posts separately."
-              : "Posts this score to every eligible participant, whether or not their own dance is posted yet."}
+              : canPost
+                ? "Posts this score to every eligible participant, whether or not their own dance is posted yet."
+                : "Fans who unlocked this week's drafts see it as a draft score until a site admin publishes it."}
           </p>
         </div>
       )}

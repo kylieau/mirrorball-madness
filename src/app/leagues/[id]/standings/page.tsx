@@ -4,7 +4,7 @@ import { CouplesLeaderboard } from "@/components/couples-leaderboard";
 import { LeaguePageShell } from "@/components/league-page-shell";
 import { loadLeaguePageBase } from "@/lib/league-page-data";
 import { getStandingMessage } from "@/lib/standings-message";
-import { replaceWeekDanceScores } from "@/lib/draft-scores";
+import { draftDanceScores, replaceWeekDanceScores } from "@/lib/draft-scores";
 import { scoringModule } from "@/lib/scoring-modules";
 import { buildCouplesLeaderboard } from "@/lib/couples-leaderboard";
 import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
@@ -188,13 +188,7 @@ export default async function LeagueStandingsPage({
           weeks: replaceWeekDanceScores(await loadCoupleWeekResults(supabase, visibleDanceWeeks), draftNight && draftNight.dances.length > 0
             ? {
                 weekNumber: draftNight.weekNumber,
-                danceScores: draftNight.dances.map((dance) => ({
-                  episodeId: dance.episodeId,
-                  coupleId: dance.coupleId,
-                  totalScore: dance.total,
-                  scaledScore: dance.scaled,
-                  maxScore: null,
-                })),
+                danceScores: draftDanceScores(draftNight.dances),
               }
             : null),
           couples: seasonCouplesSpoilerSafe,

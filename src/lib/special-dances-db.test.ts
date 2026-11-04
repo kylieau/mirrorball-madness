@@ -426,3 +426,129 @@ describe("special dances in PostgreSQL", () => {
     }
   });
 });
+
+describe("special dance draft release in PostgreSQL", () => {
+  type VisibleRow = { team_id: string; couple_id: string; dance_style_name: string; total: number; scaled: number; max: number; week_number: number };
+  const releaseSql = readFileSync("supabase/apply-special-draft-release.sql", "utf8");
+  const viewer = outsider;
+
+  beforeAll(async () => {
+    db = await freshDb(true);
+    await db.exec(releaseSql);
+    await db.exec(releaseSql);
+  }, 60000);
+  afterAll(async () => {
+    await db?.close();
+  });
+  beforeEach(async () => {
+    await seedSeason();
+    await unlockDrafts(8);
+  });
+
+  async function unlockDrafts(weekNumber: number) {
+    await db.query(
+      `insert into public.spoiler_watch_progress(user_id, season_id, last_watched_week, draft_unlocked_week) values ($1, $2, $3, $3)
+       on conflict (user_id, season_id) do update set last_watched_week = excluded.last_watched_week, draft_unlocked_week = excluded.draft_unlocked_week`,
+      [viewer, season, weekNumber]
+    );
+  }
+  async function asViewer<T>(sql: string): Promise<T[]> {
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [viewer]);
+    await db.exec("set role authenticated");
+    try {
+      return (await db.query<T>(sql)).rows;
+    } finally {
+      await db.exec("reset role");
+      await db.query("select set_config('request.jwt.claim.sub', '', false)");
+    }
+  }
+  async function visible(): Promise<VisibleRow[]> {
+    return asViewer<VisibleRow>(
+      `select team_id, couple_id, dance_style_name, total_score::float as total, scaled_score::float as scaled, max_score::float as max, week_number
+       from public.visible_draft_special_scores() order by couple_id`
+    );
+  }
+  async function release(teamId: string, on = true, actor = friend) {
+    await db.query("select public.set_special_draft_release($1, $2, $3, $4)", [episode, teamId, actor, on]);
+  }
+  async function liveTeamRows(teamId: string) {
+    return (await db.query<{ couple_id: string; total: number; scaled: number; max: number }>(
+      "select couple_id, total_score::float as total, scaled_score::float as scaled, max_score::float as max from public.dance_scores where team_id = $1 order by couple_id",
+      [teamId]
+    )).rows;
+  }
+
+  it("shows a released marks dance exactly as posting writes it, then hands over to the posted rows", async () => {
+    const relay = await saveSpecial({ danceType: "Relay", name: "Relay", memberCoupleIds: [amber, julia, connor], danceStyleId: contemporary });
+    await saveMarks(relay, [9, 8, 9]);
+    await expect(release(relay)).rejects.toThrow(/Relay has 3 of 4 marks/);
+    await saveMarks(relay, [9, 8, 9, 10]);
+    await release(relay);
+    const drafted = await visible();
+    expect(drafted).toEqual([amber, julia, connor].sort().map((couple_id) => ({
+      team_id: relay, couple_id, dance_style_name: "Contemporary", total: 36, scaled: 27, max: 40, week_number: 8,
+    })));
+    await revealTeam(relay);
+    expect(await visible()).toEqual([]);
+    expect(await liveTeamRows(relay)).toEqual(drafted.map(({ couple_id, total, scaled, max }) => ({ couple_id, total, scaled, max })));
+    await expect(release(relay)).rejects.toThrow(/Relay is already posted/);
+  });
+
+  it("releases a points dance without its result text, only once every participant has points", async () => {
+    const danceOff = await saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [amber, julia], scoringMode: "points" });
+    await savePoints(danceOff, [{ coupleId: amber, points: 3, result: "Winner" }]);
+    await expect(release(danceOff)).rejects.toThrow(/Dance-Off has points for 1 of 2 couples/);
+    await savePoints(danceOff, [{ coupleId: amber, points: 3, result: "Winner" }, { coupleId: julia, points: 0, result: "Loser" }]);
+    await release(danceOff);
+    const rows = await asViewer<Record<string, unknown>>("select * from public.visible_draft_special_scores() order by couple_id");
+    expect(rows.map((r) => [r.couple_id, Number(r.total_score), Number(r.scaled_score), Number(r.max_score)])).toEqual([[amber, 3, 0, 0], [julia, 0, 0, 0]]);
+    expect(JSON.stringify(rows)).not.toMatch(/Winner|Loser/);
+  });
+
+  it("shows a release only to a viewer who unlocked that week, while the dance stays fully scored", async () => {
+    const relay = await saveSpecial({ danceType: "Relay", name: "Relay", memberCoupleIds: [amber, julia] });
+    await saveMarks(relay, [9, 9, 9, 9]);
+    await release(relay);
+    expect(await asViewer("select team_id from public.draft_special_releases")).toEqual([{ team_id: relay }]);
+    await unlockDrafts(7);
+    expect(await visible()).toEqual([]);
+    await unlockDrafts(8);
+    expect(await visible()).toHaveLength(2);
+    await saveMarks(relay, [9, 9, 9]);
+    expect(await visible()).toEqual([]);
+    await db.exec("set role anon");
+    try {
+      await expect(db.query("select * from public.visible_draft_special_scores()")).rejects.toThrow(/permission denied/i);
+      await expect(db.query("select * from public.draft_special_releases")).rejects.toThrow(/permission denied/i);
+    } finally {
+      await db.exec("reset role");
+    }
+    await db.exec("set role authenticated");
+    try {
+      await expect(db.query("select public.set_special_draft_release($1, $2, $3, true)", [episode, relay, friend])).rejects.toThrow(/permission denied/i);
+    } finally {
+      await db.exec("reset role");
+    }
+  });
+
+  it("refuses a non-contributor, withdraws, and drops the release with the dance or the published week", async () => {
+    const relay = await saveSpecial({ danceType: "Relay", name: "Relay", memberCoupleIds: [amber, julia] });
+    await saveMarks(relay, [9, 9, 9, 9]);
+    await expect(release(relay, true, outsider)).rejects.toThrow(/Not authorized/);
+    await release(relay);
+    await release(relay, false);
+    expect(await visible()).toEqual([]);
+    await release(relay);
+    await db.query("select public.delete_special_dance($1, $2, $3)", [episode, relay, admin]);
+    expect((await db.query("select * from public.draft_special_releases")).rows).toEqual([]);
+
+    const trio = await saveSpecial({ danceType: "Trio", name: "Trio", memberCoupleIds: [amber, julia] });
+    await saveMarks(trio, [8, 8, 8, 8]);
+    await release(trio);
+    await ownDances([tatyana, maura, amber, julia, connor, ezra]);
+    for (const couple of [tatyana, maura, amber, julia, connor, ezra]) await revealCouple(couple);
+    await finishWeek();
+    expect(await visible()).toEqual([]);
+    await expect(release(trio)).rejects.toThrow(/Only a site admin can correct published results/);
+  });
+});

@@ -44,6 +44,26 @@ describe("findDraftRelease", () => {
       weekNumber: 2,
       episodeIds: ["e2", "e2b"],
       releasedCoupleIdsByEpisode: { e2: ["c1", "c2"], e2b: ["c3"] },
+      releasedTeamIdsByEpisode: {},
+    });
+  });
+
+  it("counts a night whose only release is a special dance, keeping its members out of the couple map", () => {
+    const release = findDraftRelease(
+      [
+        { id: "e2", week_id: "w2", results_published_at: null },
+        { id: "e3", week_id: "w3", results_published_at: null },
+      ],
+      weeks,
+      new Map([["e3", ["c1"]]]),
+      new Map([["e2", ["team1"]]])
+    );
+    expect(release).toEqual({
+      weekId: "w2",
+      weekNumber: 2,
+      episodeIds: ["e2"],
+      releasedCoupleIdsByEpisode: {},
+      releasedTeamIdsByEpisode: { e2: ["team1"] },
     });
   });
 
@@ -193,6 +213,13 @@ describe("replaceWeekDanceScores", () => {
     ]);
   });
 
+  it("keeps a member's live own dance beside a released special dance's draft row", () => {
+    const own = { episodeId: "ep1", coupleId: "c1", totalScore: 24, scaledScore: 24, maxScore: null, teamId: null };
+    const special = { episodeId: "ep1", coupleId: "c1", totalScore: 36, scaledScore: 27, maxScore: 40, teamId: "t1" };
+    const [week] = replaceWeekDanceScores([{ weekNumber: 3, danceScores: [own] }], { weekNumber: 3, danceScores: [special] });
+    expect(week.danceScores).toEqual([own, special]);
+  });
+
   it("merges live and released-draft rows by night and couple, never by couple alone", () => {
     const live = (episodeId: string, coupleId: string, score: number) => ({ episodeId, coupleId, totalScore: score, scaledScore: score, maxScore: null });
     const weeks = replaceWeekDanceScores(
@@ -247,7 +274,10 @@ describe("draftNightDanceScores", () => {
   it("adds the week's live rows to the released drafts, dropping only a released couple's own live rows", () => {
     const night = {
       releasedCoupleIdsByEpisode: { ep1: ["c1"] },
-      dances: [{ episodeId: "ep1", coupleId: "c1", total: 27, scaled: 27 }],
+      dances: [
+        { episodeId: "ep1", coupleId: "c1", teamId: null, danceStyle: "Jive", total: 27, scaled: 27, maxScore: null, at: "t" },
+        { episodeId: "ep1", coupleId: "c2", teamId: "t2", danceStyle: "Freestyle", total: 3, scaled: 0, maxScore: 0, at: "t" },
+      ],
       liveDances: [
         { episodeId: "ep1", coupleId: "c1", totalScore: 20, scaledScore: 20, maxScore: null, teamId: null },
         { episodeId: "ep1", coupleId: "c1", totalScore: 36, scaledScore: 27, maxScore: 40, teamId: "t1" },
@@ -257,7 +287,10 @@ describe("draftNightDanceScores", () => {
     expect(draftNightDanceScores(night)).toEqual([
       { episodeId: "ep1", coupleId: "c1", totalScore: 36, scaledScore: 27, maxScore: 40, teamId: "t1" },
       { episodeId: "ep1", coupleId: "c2", totalScore: 24, scaledScore: 24, maxScore: null, teamId: null },
-      { episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27, maxScore: null },
+      { episodeId: "ep1", coupleId: "c1", totalScore: 27, scaledScore: 27, maxScore: null, teamId: null },
+      // A released special dance's points row keeps max 0, so the night math
+      // reads it as bonus points, and does not drop c2's own live row.
+      { episodeId: "ep1", coupleId: "c2", totalScore: 3, scaledScore: 0, maxScore: 0, teamId: "t2" },
     ]);
   });
 });
@@ -291,14 +324,20 @@ describe("draftReleaseLabel", () => {
   it("names the latest couple by first names and counts released over couples dancing that week", () => {
     // c3 went out before week 3; c4 went out in week 3 itself, so still danced.
     expect(
-      draftReleaseLabel({ latestCoupleId: "c1", releasedCoupleIds: ["c2", "c1", "c1"], weekNumber: 3, seasonCouples })
+      draftReleaseLabel({ latest: { coupleId: "c1" }, releasedCoupleIds: ["c2", "c1", "c1"], weekNumber: 3, seasonCouples })
     ).toBe("Ciara & Brandon · 2/3");
   });
 
   it("adds a last initial when two first names clash", () => {
     const clash = [...seasonCouples, couple("c5", "Ciara Wilson", "Val Chmerkovskiy")];
-    expect(draftReleaseLabel({ latestCoupleId: "c1", releasedCoupleIds: ["c1"], weekNumber: 1, seasonCouples: clash })).toBe(
+    expect(draftReleaseLabel({ latest: { coupleId: "c1" }, releasedCoupleIds: ["c1"], weekNumber: 1, seasonCouples: clash })).toBe(
       "Ciara M. & Brandon · 1/5"
+    );
+  });
+
+  it("names a special dance released last by its name", () => {
+    expect(draftReleaseLabel({ latest: { specialName: "Slaytopia" }, releasedCoupleIds: ["c1", "c2"], weekNumber: 3, seasonCouples })).toBe(
+      "Slaytopia · 2/3"
     );
   });
 });
@@ -315,6 +354,21 @@ describe("draftManagerScoresForNight", () => {
     ];
     expect(draftManagerScoresForNight(settings, slots, night)).toEqual([
       { managerId: "b", rosterPoints: 22.5, totalPoints: 22.5 },
+    ]);
+  });
+
+  it("counts a released points dance as bonus on top of a released own dance, once", () => {
+    const danceScores = draftNightDanceScores({
+      releasedCoupleIdsByEpisode: { ep1: ["c1"] },
+      dances: [
+        { episodeId: "ep1", coupleId: "c1", teamId: null, danceStyle: "Jive", total: 24, scaled: 24, maxScore: null, at: "t" },
+        { episodeId: "ep1", coupleId: "c1", teamId: "t1", danceStyle: "Freestyle", total: 3, scaled: 0, maxScore: 0, at: "t" },
+      ],
+      liveDances: [],
+    });
+    // 24/30 own plus 3 bonus points is 27/30.
+    expect(draftManagerScoresForNight(settings, [{ manager_id: "a", couple_id: "c1", start_week: 1, end_week: null }], { weekNumber: 4, danceScores })).toEqual([
+      { managerId: "a", rosterPoints: 27, totalPoints: 27 },
     ]);
   });
 

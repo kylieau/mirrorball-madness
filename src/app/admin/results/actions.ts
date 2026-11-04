@@ -23,7 +23,7 @@ import {
 import { publishEpisodeAtomically } from "@/lib/episode-publication";
 import { revealCouple, revealTeam, undoReveal, undoTeamReveal } from "@/lib/results-reveal";
 import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
-import { deleteSpecialDance, saveSpecialDance, saveSpecialDancePoints, saveTeamMarks } from "@/lib/episode-teams";
+import { deleteSpecialDance, saveSpecialDance, saveSpecialDancePoints, saveTeamMarks, setSpecialDraftRelease } from "@/lib/episode-teams";
 import type { SpecialDanceScore, SpecialDanceSetupInput, TeamMark } from "@/lib/team-dances";
 
 // Both checks return userId alongside error so callers that need to stamp
@@ -198,6 +198,15 @@ export async function withdrawDraftCoupleAction(episodeId: string, coupleId: str
   if (access.error) return { error: access.error };
 
   const result = await withdrawDraftCouple(createAdminClient(), episodeId, coupleId, access.userId);
+  if (!result.error) revalidatePath("/", "layout");
+  return result;
+}
+
+export async function setSpecialDraftReleaseAction(input: { episodeId: string; teamId: string; release: boolean }): Promise<{ error: string | null }> {
+  const access = await requireProposeAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await setSpecialDraftRelease(createAdminClient(), input, access.userId);
   if (!result.error) revalidatePath("/", "layout");
   return result;
 }
