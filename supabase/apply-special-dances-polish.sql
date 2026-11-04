@@ -1,7 +1,5 @@
--- NOT YET APPLIED live (checked 2026-11-04 against the live function bodies).
--- Safe to run between show nights: function bodies and one trigger only, and
--- the app works against either version. Run it before
--- apply-whole-judge-marks.sql, which supersedes its save_team_marks and
+-- Applied live 2026-11-04 (verified from the live function bodies).
+-- apply-whole-judge-marks.sql supersedes its save_team_marks and
 -- check_team_mark but not its save_special_dance_points.
 --
 -- What this changes (no Week 8 row rewrites, no table drops):

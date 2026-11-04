@@ -32,10 +32,6 @@ Open questions for Kylie:
   31.5). Keep that, or convert bonus points at a fixed rate?
 
 Still to check:
-- `apply-special-dances-polish.sql` is not applied live (read from the live
-  function bodies 2026-11-04; grokbot's report was wrong). Until Kylie runs it,
-  saving special-dance marks or points still creates a week draft and a 0 mark
-  is accepted.
 - Browser check still owed for the special-dance save rework (`e3e0ea3`):
   type a mark and switch away at once, then reopen (mark still there); an
   invalid mark refuses Finish Week by name; deleting a dance with unsaved marks
