@@ -2,13 +2,15 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { markInputError } from "@/lib/judge-marks";
+import { JUDGE_MARK_MESSAGE, markInputError } from "@/lib/judge-marks";
 import { MARK_MAX } from "@/lib/scoring";
 
 export type ScoreRowJudge = { id: string; name: string; guest: boolean };
 
 // One dance's judge boxes on Enter Results, the same for a couple's own dance
-// and a special dance. A guest is named as one in words, not colour alone.
+// and a special dance: every judge and the total on one line. A guest is
+// named as one in words, not colour alone, and an invalid box is outlined
+// with the rule stated once under the row, since a box is too narrow for it.
 export function JudgeScoreRow({
   judges,
   values,
@@ -27,41 +29,44 @@ export function JudgeScoreRow({
     const raw = (values[j.id] ?? "").trim();
     return raw !== "" && markInputError(raw) == null ? sum + Number(raw) : sum;
   }, 0);
+  const invalid = judges.some((j) => markInputError(values[j.id] ?? "") != null);
   return (
-    <div className="grid grid-cols-2 gap-2 min-[420px]:flex min-[420px]:flex-wrap min-[420px]:items-end">
-      {judges.map((j) => {
-        const fieldError = markInputError(values[j.id] ?? "");
-        return (
-          <div key={j.id} className="flex min-w-0 flex-col gap-1 min-[420px]:min-w-28">
-            <Label className="text-xs text-muted-foreground">
-              {j.name}
-              {j.guest && <span className="text-accent"> · Guest</span>}
-            </Label>
-            <Input
-              inputMode="numeric"
-              aria-label={`${j.name} score for ${subject}`}
-              aria-invalid={fieldError != null}
-              className={`h-11 w-full min-w-14 px-2 text-center text-sm min-[420px]:w-16 ${fieldError ? "border-destructive" : ""}`}
-              placeholder="—"
-              value={values[j.id] ?? ""}
-              disabled={disabled}
-              onChange={(e) => onChange(j.id, e.target.value)}
-            />
-            {fieldError && (
-              <p role="alert" className="text-xs leading-snug text-danger-text">
-                {fieldError}
-              </p>
-            )}
-          </div>
-        );
-      })}
-      <div className="col-span-2 flex flex-col gap-1 min-[420px]:col-span-1">
-        <Label className="text-xs text-muted-foreground">Total</Label>
-        <p className="flex h-11 items-center px-1 text-base font-medium">
-          {total}
-          <span className="ml-0.5 text-sm font-normal text-muted-foreground">/{judges.length * MARK_MAX}</span>
-        </p>
+    <div className="flex flex-col gap-1">
+      <div className="grid auto-cols-[minmax(0,1fr)] grid-flow-col gap-1.5">
+        {judges.map((j) => {
+          const fieldError = markInputError(values[j.id] ?? "") != null;
+          return (
+            <div key={j.id} className="flex min-w-0 flex-col justify-end gap-1">
+              <Label className="flex min-w-0 flex-col items-start gap-0 text-xs leading-tight text-muted-foreground">
+                <span className="max-w-full break-words">{j.name}</span>
+                {j.guest && <span className="text-accent">Guest</span>}
+              </Label>
+              <Input
+                inputMode="numeric"
+                aria-label={`${j.name}${j.guest ? " (guest)" : ""} score for ${subject}`}
+                aria-invalid={fieldError}
+                className={`h-11 w-full min-w-0 px-1 text-center text-sm ${fieldError ? "border-destructive" : ""}`}
+                placeholder="—"
+                value={values[j.id] ?? ""}
+                disabled={disabled}
+                onChange={(e) => onChange(j.id, e.target.value)}
+              />
+            </div>
+          );
+        })}
+        <div className="flex min-w-0 flex-col justify-end gap-1">
+          <Label className="text-xs leading-tight text-muted-foreground">Total</Label>
+          <p className="flex h-11 items-center justify-center whitespace-nowrap text-base font-medium">
+            {total}
+            <span className="text-sm font-normal text-muted-foreground">/{judges.length * MARK_MAX}</span>
+          </p>
+        </div>
       </div>
+      {invalid && (
+        <p role="alert" className="text-xs leading-snug text-danger-text">
+          {JUDGE_MARK_MESSAGE}
+        </p>
+      )}
     </div>
   );
 }
