@@ -1,6 +1,7 @@
 -- Contributors (propose tier) set up and remove special dances, so a
 -- dance-off can be created live on show night by whoever is entering scores.
--- A published week stays site-admin only, as for correcting results.
+-- A published week and an already posted dance stay site-admin only (the
+-- published check runs under the episode lock, so it cannot race a publish).
 --
 -- Both bodies are the live definitions (read 2026-11-04 with
 -- pg_get_functiondef) with only the permission check changed. Function bodies
@@ -21,14 +22,20 @@ declare
 begin
   select * into actor from public.profiles where id = p_actor_id;
   if not coalesce(actor.is_super_admin or actor.can_propose_results, false) then raise exception 'Not authorized to enter results'; end if;
-  if not actor.is_super_admin and exists (select 1 from public.episodes where id = p_episode_id and results_published_at is not null) then
+  select * into strict ep from public.episodes where id = p_episode_id for update;
+  -- Checked under the episode lock, so a save racing a publish sees it.
+  if not actor.is_super_admin and ep.results_published_at is not null then
     raise exception 'Only a site admin can change special dances on a published week';
   end if;
-  select * into strict ep from public.episodes where id = p_episode_id for update;
   if p_dance is null or jsonb_typeof(p_dance) <> 'object' then raise exception 'A special dance must be an object'; end if;
   if nullif(p_dance->>'id', '') is not null then
     select * into existing from public.episode_teams where id = (p_dance->>'id')::uuid and episode_id = ep.id for update;
     if existing.id is null then raise exception 'That special dance is no longer on this episode. Reload and try again.'; end if;
+    -- A posted dance's style and song rewrite its live rows, which only a
+    -- site admin may change.
+    if existing.posted_at is not null and not actor.is_super_admin then
+      raise exception 'Only a site admin can change % once it is posted', public.special_dance_label(existing);
+    end if;
   end if;
   select id into v_freestyle from public.dance_styles where lower(name) = 'freestyle' order by created_at limit 1;
 
@@ -208,10 +215,11 @@ declare team public.episode_teams; actor public.profiles;
 begin
   select * into actor from public.profiles where id = p_actor_id;
   if not coalesce(actor.is_super_admin or actor.can_propose_results, false) then raise exception 'Not authorized to enter results'; end if;
+  perform 1 from public.episodes where id = p_episode_id for update;
+  -- Read after the lock, so a removal racing a publish sees it.
   if not actor.is_super_admin and exists (select 1 from public.episodes where id = p_episode_id and results_published_at is not null) then
     raise exception 'Only a site admin can change special dances on a published week';
   end if;
-  perform 1 from public.episodes where id = p_episode_id for update;
   select * into team from public.episode_teams where id = p_team_id and episode_id = p_episode_id for update;
   if team.id is null then raise exception 'That special dance is no longer on this episode'; end if;
   if team.posted_at is not null or exists (select 1 from public.dance_scores where team_id = team.id) then

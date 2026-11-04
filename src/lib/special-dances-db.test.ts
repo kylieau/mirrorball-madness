@@ -558,6 +558,11 @@ describe("special dance draft release in PostgreSQL", () => {
     await saveSpecial({ id: danceOff, memberCoupleIds: [amber, connor] }, friend);
     await expect(db.query("select public.delete_special_dance($1, $2, $3)", [episode, danceOff, outsider])).rejects.toThrow(/Not authorized/);
     await db.query("select public.delete_special_dance($1, $2, $3)", [episode, danceOff, friend]);
+    const posted = await saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [amber, julia], scoringMode: "points" }, friend);
+    await savePoints(posted, [{ coupleId: amber, points: 3 }, { coupleId: julia, points: 0 }]);
+    await revealTeam(posted);
+    await expect(saveSpecial({ id: posted, songs: [{ title: "Hey Ya!" }] }, friend)).rejects.toThrow(/Only a site admin can change Dance-Off once it is posted/);
+    await saveSpecial({ id: posted, songs: [{ title: "Hey Ya!" }] }, admin);
     await db.exec(`update public.episodes set results_published_at = now() where id = '${episode}'`);
     await expect(saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [amber, julia], scoringMode: "points" }, friend)).rejects.toThrow(
       /Only a site admin can change special dances on a published week/

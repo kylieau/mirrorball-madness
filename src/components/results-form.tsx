@@ -1614,7 +1614,7 @@ export function ResultsForm({
         }}
         weekNumber={selectedWeek?.week_number ?? null}
         canPost={canPublish && !published}
-        canSetup={canSetupSpecials}
+        canSetup={canSetupSpecials && (canPublish || !view.dance.postedAt)}
         inputsDisabled={published && !canPublish}
         busy={teamBusy || savingDraft || revealBusy || publishing || releasing}
         nowMs={nowMs}
@@ -2141,7 +2141,7 @@ export function ResultsForm({
                 </p>
               ) : (
                 <>
-                  {renderCouplePicker(inProgressCouples, byCoupleSelectedId, setByCoupleSelectedId, published ? [] : openPickerTeams, { allowAdd: !published && special && canPublish })}
+                  {renderCouplePicker(inProgressCouples, byCoupleSelectedId, setByCoupleSelectedId, published ? [] : openPickerTeams, { allowAdd: !published })}
                   {isTeamNight && pickerTeams.length === 0 && !special && (
                     <p className="text-xs text-muted-foreground">
                       No teams yet. Give each team&apos;s couples the same Freestyle and song in their second slot and the team appears here as its own entry.
