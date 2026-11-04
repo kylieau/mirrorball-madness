@@ -88,12 +88,13 @@ export async function saveEpisodeDraft(
 }
 
 // Special dance setup (type, participants, style, songs, scoring, details) is
-// season-wide structural config, like the schedule: admin only.
+// propose tier, so whoever is entering scores live can create a dance-off as
+// it airs. The RPC keeps a published week site-admin only.
 export async function saveSpecialDanceAction(input: {
   episodeId: string;
   dance: SpecialDanceSetupInput;
 }): Promise<{ error: string | null; result?: { id: string } }> {
-  const access = await requireAdminAccess();
+  const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
   const result = await saveSpecialDance(createAdminClient(), input, access.userId);
@@ -102,7 +103,7 @@ export async function saveSpecialDanceAction(input: {
 }
 
 export async function deleteSpecialDanceAction(input: { episodeId: string; teamId: string }): Promise<{ error: string | null }> {
-  const access = await requireAdminAccess();
+  const access = await requireProposeAccess();
   if (access.error) return { error: access.error };
 
   const result = await deleteSpecialDance(createAdminClient(), input, access.userId);

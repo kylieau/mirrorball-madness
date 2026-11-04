@@ -10,11 +10,10 @@ shrink to fit one line, no guest marker), the night's judges out of 10,
 special-dance draft release, Results scores under the total (`40 + 40`), and
 struck-through eliminated couples on Home's Dance Card.
 
-Decided by Kylie (2026-11-03), not built yet:
-- Unused setup fields with no reader: Artist, Theme / Source, Extra Details,
-  per-couple Result. Cut or keep is still Kylie's call.
-
 Cleanups:
+- `episode_teams.song_source`, `theme_label` and `songs[].artist` are no
+  longer edited or shown (Artist and Theme / Source were cut 2026-11-04).
+  Drop them with the `mark_max` / `panel_judge_ids` cleanup below.
 - Special Moments is retired from the app (no card, no custom events). Drop
   `draft_episode_custom_moments`, `episode_custom_moments` and
   `mutate_draft_moment` the next time `commit_episode_publication`,

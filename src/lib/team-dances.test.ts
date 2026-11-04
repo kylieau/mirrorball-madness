@@ -362,15 +362,15 @@ describe("recentSuggestions", () => {
 });
 
 describe("specialDanceSummary and legacyTeamDefaults", () => {
-  it("reads as style, songs, source, and details", () => {
+  it("reads as style, songs and details, with no separate artist or source", () => {
     const styles = new Map([["freestyle", "Freestyle"], ["jive", "Jive"]]);
-    expect(specialDanceSummary(team, styles)).toBe('Freestyle · "Zoo" · Zootopia 2 · Captain Tatyana · Host Alfonso Ribeiro');
+    expect(specialDanceSummary(team, styles)).toBe('Freestyle · "Zoo" · Captain Tatyana · Host Alfonso Ribeiro');
     expect(
       specialDanceSummary(
-        { ...team, secondDanceStyleId: "jive", songs: [{ title: "Zoo", artist: "Shakira" }, { title: "Try Everything", artist: null }], songSource: null, details: [] },
+        { ...team, secondDanceStyleId: "jive", songs: [{ title: "Zoo (Zootopia 2)", artist: "Shakira" }, { title: "Try Everything", artist: null }], details: [] },
         styles
       )
-    ).toBe('Freestyle & Jive · "Zoo" by Shakira · "Try Everything"');
+    ).toBe('Freestyle & Jive · "Zoo (Zootopia 2)" · "Try Everything"');
   });
 
   it("fills a pre-migration team row as a Team Dance by marks out of 10 with Captain and Host as details", () => {

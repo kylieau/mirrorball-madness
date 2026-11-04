@@ -39,7 +39,6 @@ import {
   SPECIAL_DANCE_MAX_SONGS,
   SPECIAL_DANCE_MIN_JUDGES,
   SPECIAL_DANCE_MAX_JUDGES,
-  THEME_LABELS,
   automaticSpecialDanceName,
   addableSpecialDanceParticipants,
   isValidPanelSize,
@@ -578,7 +577,7 @@ export function SpecialDanceEntry({
               <div key={i} className="flex items-center gap-1.5">
                 <Input
                   value={song.title}
-                  placeholder={i === 0 ? "Song title" : `Song ${i + 1}`}
+                  placeholder={i === 0 ? "Song (Source)" : `Song ${i + 1} (Source)`}
                   onChange={(e) =>
                     patchSetup({
                       songs: setup.songs.map((s, j) => (j === i ? { ...s, title: e.target.value } : s)),
@@ -632,19 +631,6 @@ export function SpecialDanceEntry({
             <AccordionItem value="more">
               <AccordionTrigger>More Details</AccordionTrigger>
               <AccordionContent className="flex flex-col gap-3">
-                {setup.songs.map((song, i) => (
-                  <div key={`artist-${i}`} className="flex flex-col gap-1">
-                    <Label className="text-xs">Artist{setup.songs.length > 1 ? ` · ${song.title || `Song ${i + 1}`}` : ""}</Label>
-                    <Input
-                      value={song.artist ?? ""}
-                      onChange={(e) =>
-                        patchSetup({
-                          songs: setup.songs.map((s, j) => (j === i ? { ...s, artist: e.target.value || null } : s)),
-                        })
-                      }
-                    />
-                  </div>
-                ))}
                 <div className="flex flex-col gap-1">
                   <Label className="text-xs">Team Name</Label>
                   <Input
@@ -653,28 +639,6 @@ export function SpecialDanceEntry({
                     onChange={(e) => patchSetup({ name: e.target.value })}
                   />
                   <p className="text-[11px] text-muted-foreground">Blank uses the Dance Type, numbered when there is more than one.</p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs">Theme / Source</Label>
-                  <div className="flex gap-1.5">
-                    <Select
-                      items={Object.fromEntries(THEME_LABELS.map((l) => [l, l]))}
-                      value={setup.themeLabel}
-                      onValueChange={(v) => patchSetup({ themeLabel: v })}
-                    >
-                      <SelectTrigger className="w-28">
-                        <SelectValue placeholder="Label" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {THEME_LABELS.map((l) => (
-                          <SelectItem key={l} value={l}>
-                            {l}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input value={setup.songSource ?? ""} onChange={(e) => patchSetup({ songSource: e.target.value || null })} placeholder="Zootopia 2" />
-                  </div>
                 </div>
                 {setup.scoringMode === "points" && setup.memberCoupleIds.length > 0 && (
                   <p className="text-[11px] text-muted-foreground">

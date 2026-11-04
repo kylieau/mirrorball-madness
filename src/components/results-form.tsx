@@ -1182,6 +1182,8 @@ export function ResultsForm({
     });
   }
 
+  // Contributors set up special dances too; a published week is admin only.
+  const canSetupSpecials = canPublish || !published;
   const judgeDisplayNames = buildPeopleDisplayNames(judges);
   function judgesForDance(dance: RowDance) {
     const scoredIds = Object.entries(dance.scores)
@@ -1476,7 +1478,7 @@ export function ResultsForm({
     return coupleParts(namedCouple(coupleId) ?? { id: coupleId, celebrity_name: "?", pro_name: "?" }).celebrity;
   }
   function renderCouplePicker(list: Couple[], selectedId: string, onSelect: (id: string) => void, teams: PickerTeam[] = [], opts: { allowAdd?: boolean } = {}) {
-    const allowAdd = Boolean(opts.allowAdd && special && canPublish);
+    const allowAdd = Boolean(opts.allowAdd && special && canSetupSpecials);
     const listedTeams = [...teams.filter((t) => t.dance.id !== NEW_SPECIAL_ID)].sort((a, b) => {
       const byName = (a.dance.name || "").localeCompare(b.dance.name || "", undefined, { sensitivity: "base" });
       return byName !== 0 ? byName : teams.indexOf(a) - teams.indexOf(b);
@@ -1612,7 +1614,7 @@ export function ResultsForm({
         }}
         weekNumber={selectedWeek?.week_number ?? null}
         canPost={canPublish && !published}
-        canSetup={canPublish}
+        canSetup={canSetupSpecials}
         inputsDisabled={published && !canPublish}
         busy={teamBusy || savingDraft || revealBusy || publishing || releasing}
         nowMs={nowMs}
@@ -2129,7 +2131,7 @@ export function ResultsForm({
                 ) : (
                   renderCouplePicker(publishedCouples, publishedSelectedId, setPublishedSelectedId, published ? pickerTeams : postedPickerTeams)
                 )
-              ) : inProgressCouples.length === 0 && (published || (openPickerTeams.length === 0 && !(special && canPublish))) ? (
+              ) : inProgressCouples.length === 0 && (published || (openPickerTeams.length === 0 && !(special && canSetupSpecials))) ? (
                 <p className="text-sm text-muted-foreground">
                   {episodeCouples.length === 0
                     ? "No couples to check for this episode."

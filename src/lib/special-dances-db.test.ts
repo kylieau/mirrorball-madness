@@ -456,6 +456,7 @@ describe("special dance draft release in PostgreSQL", () => {
     db = await freshDb(true);
     await db.exec(releaseSql);
     await db.exec(releaseSql);
+    for (let i = 0; i < 2; i++) await db.exec(readFileSync("supabase/apply-contributor-special-setup.sql", "utf8"));
   }, 60000);
   afterAll(async () => {
     await db?.close();
@@ -549,6 +550,18 @@ describe("special dance draft release in PostgreSQL", () => {
     } finally {
       await db.exec("reset role");
     }
+  });
+
+  it("lets a contributor set up and remove a special dance on an unpublished week only", async () => {
+    await expect(saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [amber, julia], scoringMode: "points" }, outsider)).rejects.toThrow(/Not authorized/);
+    const danceOff = await saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [amber, julia], scoringMode: "points" }, friend);
+    await saveSpecial({ id: danceOff, memberCoupleIds: [amber, connor] }, friend);
+    await expect(db.query("select public.delete_special_dance($1, $2, $3)", [episode, danceOff, outsider])).rejects.toThrow(/Not authorized/);
+    await db.query("select public.delete_special_dance($1, $2, $3)", [episode, danceOff, friend]);
+    await db.exec(`update public.episodes set results_published_at = now() where id = '${episode}'`);
+    await expect(saveSpecial({ danceType: "Dance-Off", memberCoupleIds: [amber, julia], scoringMode: "points" }, friend)).rejects.toThrow(
+      /Only a site admin can change special dances on a published week/
+    );
   });
 
   it("refuses a non-contributor, withdraws, and drops the release with the dance or the published week", async () => {

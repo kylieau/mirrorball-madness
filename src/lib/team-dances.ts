@@ -24,9 +24,12 @@ export const DANCE_TYPE_SUGGESTIONS = [
   "Immunity",
   "Other",
 ] as const;
-export const DETAIL_LABEL_SUGGESTIONS = ["Host", "Captain", "Live Performer", "Dedicated To", "Third Dancer", "Coached By"] as const;
-export const THEME_LABELS = ["Film", "Show", "Musical", "Album", "Person", "Era", "Other"] as const;
-export const RESULT_SUGGESTIONS = ["Winner", "Loser", "Immune", "1st", "2nd", "3rd", "4th", "5th"] as const;
+// The details that recur across special dances: who picked a team, a host or
+// live act joining it, and a mentor coaching it.
+export const DETAIL_LABEL_SUGGESTIONS = ["Captain", "Host", "Live Performer", "Mentor"] as const;
+// Placings are left out: marathon couples share tiers, and the points already
+// order them.
+export const RESULT_SUGGESTIONS = ["Winner", "Loser", "Immune"] as const;
 
 export type SpecialDanceScoringMode = "marks" | "points";
 export type SpecialDanceSong = { title: string; artist: string | null };
@@ -582,17 +585,17 @@ export function recentSuggestions(builtIn: readonly string[], used: { value: str
   return result;
 }
 
-// Read-state summary: `Freestyle · "Zoo" · Zootopia 2 · Host Alfonso Ribeiro`.
+// Read-state summary: `Freestyle · "Zoo (Zootopia 2)" · Host Alfonso Ribeiro`.
+// A song's source rides in its title, as on couples' songs.
 export function specialDanceSummary(
-  dance: Pick<SpecialDance, "songs" | "songSource" | "details" | "danceStyleId" | "secondDanceStyleId">,
+  dance: Pick<SpecialDance, "songs" | "details" | "danceStyleId" | "secondDanceStyleId">,
   styleNames: ReadonlyMap<string, string>
 ): string {
   const parts: string[] = [];
   const style = styleNames.get(dance.danceStyleId);
   const second = dance.secondDanceStyleId ? styleNames.get(dance.secondDanceStyleId) : null;
   if (style) parts.push(second ? `${style} & ${second}` : style);
-  for (const song of dance.songs) parts.push(song.artist ? `"${song.title}" by ${song.artist}` : `"${song.title}"`);
-  if (dance.songSource) parts.push(dance.songSource);
+  for (const song of dance.songs) parts.push(`"${song.title}"`);
   for (const detail of dance.details) if (detail.value.trim()) parts.push(`${detail.label} ${detail.value}`);
   return parts.join(" · ");
 }
