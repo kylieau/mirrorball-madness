@@ -1025,6 +1025,45 @@ export type Database = {
           },
         ]
       }
+      episode_round_exceptions: {
+        Row: {
+          bonus_points: number | null
+          couple_id: string
+          created_at: string
+          created_by: string | null
+          episode_id: string
+          id: string
+          kind: string
+          note: string | null
+          round_id: string
+          updated_at: string
+        }
+        Insert: {
+          bonus_points?: number | null
+          couple_id: string
+          created_at?: string
+          created_by?: string | null
+          episode_id: string
+          id?: string
+          kind: string
+          note?: string | null
+          round_id: string
+          updated_at?: string
+        }
+        Update: {
+          bonus_points?: number | null
+          couple_id?: string
+          created_at?: string
+          created_by?: string | null
+          episode_id?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          round_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       episode_round_types: {
         Row: {
           created_at: string
@@ -1057,6 +1096,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      episode_rounds: {
+        Row: {
+          bonus_points: number | null
+          created_at: string
+          episode_id: string
+          id: string
+          kind: string
+          position: number
+          round_type: string
+          scoring: string
+          unit_count: number
+          updated_at: string
+        }
+        Insert: {
+          bonus_points?: number | null
+          created_at?: string
+          episode_id: string
+          id?: string
+          kind: string
+          position: number
+          round_type: string
+          scoring: string
+          unit_count?: number
+          updated_at?: string
+        }
+        Update: {
+          bonus_points?: number | null
+          created_at?: string
+          episode_id?: string
+          id?: string
+          kind?: string
+          position?: number
+          round_type?: string
+          scoring?: string
+          unit_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      episode_team_couple_marks: {
+        Row: {
+          couple_id: string
+          judge_id: string
+          score: number
+          team_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          couple_id: string
+          judge_id: string
+          score: number
+          team_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          couple_id?: string
+          judge_id?: string
+          score?: number
+          team_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       episode_team_marks: {
         Row: {
@@ -1200,12 +1305,14 @@ export type Database = {
           dance_type: string
           details: Json
           episode_id: string
+          heat_number: number | null
           host_name: string | null
           id: string
           name: string
           name_is_auto: boolean
           posted_at: string | null
           posted_by: string | null
+          round_id: string | null
           scoring_mode: string
           second_dance_style_id: string | null
           song_title: string | null
@@ -1220,12 +1327,14 @@ export type Database = {
           dance_type?: string
           details?: Json
           episode_id: string
+          heat_number?: number | null
           host_name?: string | null
           id?: string
           name: string
           name_is_auto?: boolean
           posted_at?: string | null
           posted_by?: string | null
+          round_id?: string | null
           scoring_mode?: string
           second_dance_style_id?: string | null
           song_title?: string | null
@@ -1240,12 +1349,14 @@ export type Database = {
           dance_type?: string
           details?: Json
           episode_id?: string
+          heat_number?: number | null
           host_name?: string | null
           id?: string
           name?: string
           name_is_auto?: boolean
           posted_at?: string | null
           posted_by?: string | null
+          round_id?: string | null
           scoring_mode?: string
           second_dance_style_id?: string | null
           song_title?: string | null
@@ -2575,9 +2686,29 @@ export type Database = {
       }
       save_episode_draft: { Args: { p_input: Json }; Returns: undefined }
       save_episode_draft_checked: { Args: { p_input: Json }; Returns: Json }
+      save_episode_rounds: {
+        Args: {
+          p_actor_id: string
+          p_episode_id: string
+          p_rounds: Json
+        }
+        Returns: Json
+      }
       save_episode_teams: {
         Args: { p_actor_id: string; p_episode_id: string; p_teams: Json }
         Returns: Json
+      }
+      save_round_exception: {
+        Args: {
+          p_actor_id: string
+          p_bonus: number
+          p_couple_id: string
+          p_episode_id: string
+          p_kind: string
+          p_note: string
+          p_round_ids: string[]
+        }
+        Returns: undefined
       }
       save_special_dance: {
         Args: { p_actor_id: string; p_dance: Json; p_episode_id: string }
@@ -2588,6 +2719,16 @@ export type Database = {
           p_actor_id: string
           p_episode_id: string
           p_scores: Json
+          p_team_id: string
+        }
+        Returns: undefined
+      }
+      save_team_couple_marks: {
+        Args: {
+          p_actor_id: string
+          p_couple_id: string
+          p_episode_id: string
+          p_marks: Json
           p_team_id: string
         }
         Returns: undefined
@@ -2636,6 +2777,15 @@ export type Database = {
       }
       set_results_contributor: {
         Args: { p_enabled: boolean; p_user_id: string }
+        Returns: undefined
+      }
+      set_round_bonus: {
+        Args: {
+          p_actor_id: string
+          p_bonus: number
+          p_episode_id: string
+          p_round_id: string
+        }
         Returns: undefined
       }
       set_special_draft_release: {

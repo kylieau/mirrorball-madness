@@ -43,6 +43,8 @@ export type PublicationSnapshot = {
   teams?: SnapshotTeam[];
   teamMembers?: Pick<Row<"episode_team_members">, "team_id" | "couple_id">[];
   teamMarks?: Pick<Row<"episode_team_marks">, "team_id" | "judge_id" | "score">[];
+  // Present once supabase/apply-episode-rounds.sql is applied.
+  teamCoupleMarks?: Pick<Row<"episode_team_couple_marks">, "team_id" | "couple_id" | "judge_id" | "score">[];
   // Present once supabase/apply-special-dances.sql is applied: the Points
   // rows, the standing panel, and this night's guests, so a special dance's
   // completeness is judged against the same panel the SQL uses.
@@ -50,10 +52,11 @@ export type PublicationSnapshot = {
   judges?: { id: string }[];
   guestJudges?: Pick<Row<"episode_guest_judges">, "episode_id" | "judge_id">[];
 };
-// Plans carry planVersion 2 once readers know max_score; the SQL refuses an
-// unversioned plan for an episode with a Points-mode special dance, because
-// older code would pay its rows as if they had no marks.
-export const PLAN_VERSION = 2;
+// Plans carry planVersion 2 once readers know max_score, and 3 once they score
+// a heat couple by couple; the SQL refuses an older plan for an episode with
+// a Points-mode (2) or couple-by-couple (3) special dance, because older code
+// would pay those rows wrongly.
+export const PLAN_VERSION = 3;
 export type PublicationPlan = {
   planVersion: number;
   coupleUpdates: Pick<Row<"couples">, "id" | "status" | "elimination_week">[];
@@ -93,7 +96,8 @@ function specialDancePanelIds(snapshot: PublicationSnapshot, episodeId: string):
 
 // What each special dance of the episode pays: one row per eligible member,
 // exactly as materialize_team_scores() writes it. A Marks dance pays its
-// total over panel × 10; a Points dance pays its points as a
+// total over panel × 10 to every member, a couple-by-couple dance each
+// member's own marks over panel × 10, and a Points dance its points as a
 // 0-max row. Throws while a dance with members is incomplete (a judge on its
 // panel without a mark, a participant without points), so a week can never
 // finish with a half-scored special dance.
@@ -135,8 +139,25 @@ export function teamScoreRows(
       }
       continue;
     }
-    const marks = (snapshot.teamMarks ?? []).filter((m) => m.team_id === team.id);
     const panel = specialDancePanelIds(snapshot, episodeId);
+    if (team.scoring_mode === "couple_marks" && panel) {
+      if (!isValidPanelSize(panel.length))
+        throw new Error(
+          `${label} needs ${SPECIAL_DANCE_MIN_JUDGES} to ${SPECIAL_DANCE_MAX_JUDGES} judges and has ${panel.length}. Fix its panel before finishing the week.`
+        );
+      const coupleMarks = (snapshot.teamCoupleMarks ?? []).filter((m) => m.team_id === team.id && panel.includes(m.judge_id));
+      const marksFor = (coupleId: string) => coupleMarks.filter((m) => m.couple_id === coupleId);
+      const done = eligible.reduce((sum, coupleId) => sum + marksFor(coupleId).length, 0);
+      if (eligible.length === 0 || done !== eligible.length * panel.length)
+        throw new Error(`${label} has ${done} of ${eligible.length * panel.length} marks. Score it or remove it before finishing the week.`);
+      for (const couple_id of eligible) {
+        const scores = marksFor(couple_id).map((m) => Number(m.score));
+        const total = scores.reduce((sum, v) => sum + v, 0);
+        rows.push({ episode_id: episodeId, couple_id, total_score: total, scaled_score: scaledJudgesScore(scores, MARK_MAX), max_score: panel.length * MARK_MAX, team_id: team.id });
+      }
+      continue;
+    }
+    const marks = (snapshot.teamMarks ?? []).filter((m) => m.team_id === team.id);
     if (panel === null && marks.length !== LEGACY_TEAM_PANEL_SIZE)
       throw new Error(`${label} has ${marks.length} of four marks. Score it or remove it before finishing the week.`);
     const marked = panel ? panel.filter((judgeId) => marks.some((m) => m.judge_id === judgeId)) : marks.map((m) => m.judge_id);
