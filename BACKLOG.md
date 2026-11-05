@@ -2,6 +2,58 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Long special-dance names — inventory 2026-11-05
+
+Kylie wants long dance names fixed everywhere. Every place a special dance
+adds to a displayed name (360px behaviour inferred from CSS, not rendered):
+
+Fans (guests too where noted):
+- Results card lines, `night-dance-lines.ts` `styleLabel`/`danceLine`:
+  `Team Dance · Slaytopia · Zoo (Zootopia 2)`; legacy `Freestyle (Team) · …`;
+  a lone bonus `Dance-Off · +3`; an immunity row reads only `Immunity`
+  (loses the round). Wraps; the card has no `min-w-0`. Guests too.
+- Couple history (`/couples/[id]`): same label, song on its own line; Best
+  tile sub-label wraps to three lines for a team. Guests too.
+- Home Recent Activity: `Harry earned +3 with Dance-Off Immunity`,
+  `… in the Dance-Off`; judged specials say only the style (`scored 36 on
+  their Freestyle`).
+- Spoiler-Free / draft strip: `Latest: Dance-Off Immunity · 6/16`, truncated.
+
+Contributors and admins (Enter Results):
+- Couple picker Special Dances band: name + Dance Type badge + Posted, first
+  names under it; the menu doesn't wrap and clips sideways.
+- Round picker: `Dance-Off 2 · Harry and Maura · Posted` (members truncate).
+- Placeholder heat: `Dance-Off 2 isn't set up yet.` / `Set Up Dance-Off 2`.
+- Round tabs and notes: `Round 2 · Bottom-Two Dance-Off`, the elimination
+  round note.
+- Member card lines: `Team Dance · Slaytopia` + `Open →`, then
+  `Freestyle · Zoo (Zootopia 2) · Posted`.
+- Night Summary (card and Leaderboard): `Individual 28 + Slaytopia 36 +
+  Dance-Off 3` (name for a team, type otherwise).
+- Finish Week: `Slaytopia and Dance-Off Immunity are not fully scored…`.
+- Special dance entry: header name + badges, read summary
+  `Freestyle · "Zoo (Zootopia 2)" · Host Alfonso Ribeiro`, Dance Type input
+  and suggestions, `… already in another Team Dance tonight.`,
+  `Fix the judges' marks on Dance-Off Immunity first.`
+- Scores and Schedule badges: the round type (`Team Dance`).
+- Edit Episode: round names, heat headings, `Named Dance-Off 1 to
+  Dance-Off 3 on Enter Results.`, `Harry is in Dance-Off 1 and Dance-Off 2.`
+
+Errors from SQL (`special_dance_label` = `Team Slaytopia` for a team, else
+the name) and Finish Week blockers (`episode-publication.ts` duplicates it):
+`Un-post Team Slaytopia before …`, `Team Slaytopia has 0 of 4 marks. Score
+it or remove it before finishing the week.`, `Dance-Off 2 is already set up.
+Reload and try again.`
+
+One dance, several names: `Team Slaytopia` (SQL errors), `Team Dance ·
+Slaytopia` (Results, member cards, couple history), `Slaytopia` (Night
+Summary), `Dance-Off` vs `Dance-Off 1` vs `Immunity` vs `Dance-Off
+Immunity`. The builders: `night-dance-lines.ts` `styleLabel`,
+`results-form.tsx` (picker, member card, night summary), `home-activity.ts`,
+`team-dances.ts` `automaticSpecialDanceName` / `specialDanceSummary`,
+`episode-rounds.ts` `heatName`, SQL `special_dance_label` /
+`round_heat_name`, `episode-publication.ts`.
+
 ## Couple history — 2026-11-05
 
 Built: `/couples/[id]` (see CLAUDE.md "Couple history"), linked from Results
