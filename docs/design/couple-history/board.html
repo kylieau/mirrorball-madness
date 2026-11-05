@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Couple history · options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Libre+Caslon+Text:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="mock.css" />
+<style>
+  .board { display: flex; gap: 36px; padding: 28px; align-items: flex-start; }
+  .col { width: 390px; flex-shrink: 0; }
+  .board-title { font-family: var(--heading); font-size: 28px; padding: 28px 28px 0; margin: 0; }
+  .board-sub { padding: 6px 28px 0; color: var(--muted-fg); max-width: 1100px; margin: 0; }
+</style>
+</head>
+<body>
+<h1 class="board-title">Couple history: three forms</h1>
+<p class="board-sub">Mocks, not production UI. Couples are real, but the scores, songs and league details are made up. Tapping a couple opens its season: newest week first, every dance with its song and marks, the night's score and what happened.</p>
+
+<div class="board">
+
+<!-- A · Bottom sheet over Results -->
+<div class="col">
+  <p class="cap">A · Bottom sheet</p>
+  <p class="capsub">Opens over whatever page you tapped from, and swipes away. Shown over Results while Week 9 is still posting (scores only, no outcome yet).</p>
+  <div class="phone" id="shot-a">
+    <div class="topbar"><div class="wordmark"><div class="orb"></div>Mirrorball Madness</div><div class="avatar">K</div></div>
+    <div class="page">
+      <div class="h1">Results</div>
+      <div class="card">
+        <div class="result-row tap-hint"><div class="name"><strong>Amber</strong> &amp; Pasha</div><div class="score">26</div></div>
+        <div class="result-row"><div class="name"><strong>Ezra</strong> &amp; Daniella</div><div class="score">24</div></div>
+        <div class="result-row"><div class="name"><strong>Harry</strong> &amp; Jenna</div><div class="score">27</div></div>
+      </div>
+    </div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="sheet-head">
+        <div class="close">×</div>
+        <div class="couple-title">Amber <span>&amp; Pasha</span></div>
+        <div class="status-line"><span class="badge b-gold">Still Dancing</span><span class="xs muted">9 weeks · 11 dances</span></div>
+      </div>
+      <div class="sheet-body">
+        <div class="stats">
+          <div class="stat"><div class="k">Average</div><div class="v">25.4</div><div class="s">per night, /30</div></div>
+          <div class="stat"><div class="k">Best</div><div class="v">28</div><div class="s">Jive · Wk 8</div></div>
+          <div class="stat"><div class="k">Jeopardy</div><div class="v">1×</div><div class="s">Week 6</div></div>
+        </div>
+
+        <div class="week">
+          <div class="week-head"><div class="t">Week 9 <span>· Grammy Night</span></div><span class="badge b-muted">Posting Live</span></div>
+          <div class="dance"><div class="what"><div class="style">Rumba</div><div class="song">"Golden Hour"</div></div><div class="pts">26<small>/30</small></div></div>
+        </div>
+
+        <div class="week">
+          <div class="week-head"><div class="t">Week 8 <span>· Disney Night</span></div><span class="badge b-safe">Safe</span></div>
+          <div class="dance"><div class="what"><div class="style">Jive</div><div class="song">"I Wan'na Be Like You"</div></div><div class="pts">28<small>/30</small></div></div>
+          <div class="dance"><div class="what"><div class="style">Team Dance · Slaytopia</div><div class="song">Freestyle · "Zoo"</div></div><div class="pts">27<small>/30</small></div></div>
+          <div class="night"><span>Night</span><span>55/60 → <b>27.50</b></span></div>
+        </div>
+
+        <div class="week">
+          <div class="week-head"><div class="t">Week 7 <span>· Dedication Night</span></div><span class="badge b-safe">Safe</span></div>
+          <div class="dance"><div class="what"><div class="style">Viennese Waltz</div><div class="song">"You Are the Reason"</div></div><div class="pts">26<small>/30</small></div></div>
+        </div>
+
+        <div class="week">
+          <div class="week-head"><div class="t">Week 6 <span>· Hair Metal Night</span></div><span class="badge b-safe">Safe</span><span class="badge b-jeop">In Jeopardy</span></div>
+          <div class="dance"><div class="what"><div class="style">Paso Doble</div><div class="song">"Livin' on a Prayer"</div></div><div class="pts">22<small>/30</small></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- A2 · Same sheet, Spoiler-Free and behind -->
+<div class="col">
+  <p class="cap">A · Spoiler-Free, watched through Week 6</p>
+  <p class="capsub">The sheet stops at your watched week, and the header status is as of that week. Weeks you haven't watched sit behind one Mark Watched row (the same sheet the strip opens).</p>
+  <div class="phone" id="shot-a2">
+    <div class="topbar"><div class="wordmark"><div class="orb"></div>Mirrorball Madness</div><div class="avatar">K</div></div>
+    <div class="page">
+      <div class="h1">Standings</div>
+      <div class="card" style="height:220px"></div>
+    </div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="sheet-head">
+        <div class="close">×</div>
+        <div class="couple-title">Julia <span>&amp; Ezra</span></div>
+        <div class="status-line"><span class="badge b-gold">Still Dancing</span><span class="xs muted">as of Week 6</span></div>
+      </div>
+      <div class="sheet-body">
+        <div class="locked">
+          <div class="t"><b>Weeks 7–8</b> <span class="muted">aren't watched yet.</span></div>
+          <span class="pill">Mark Watched</span>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">Average</div><div class="v">23.8</div><div class="s">through Wk 6</div></div>
+          <div class="stat"><div class="k">Best</div><div class="v">27</div><div class="s">Tango · Wk 5</div></div>
+          <div class="stat"><div class="k">Jeopardy</div><div class="v">2×</div><div class="s">Wks 3, 6</div></div>
+        </div>
+        <div class="week">
+          <div class="week-head"><div class="t">Week 6 <span>· Hair Metal Night</span></div><span class="badge b-safe">Safe</span><span class="badge b-jeop">In Jeopardy</span></div>
+          <div class="dance"><div class="what"><div class="style">Cha Cha</div><div class="song">"Pour Some Sugar on Me"</div></div><div class="pts">23<small>/30</small></div></div>
+        </div>
+        <div class="week">
+          <div class="week-head"><div class="t">Week 5 <span>· Movie Night</span></div><span class="badge b-safe">Safe</span></div>
+          <div class="dance"><div class="what"><div class="style">Argentine Tango</div><div class="song">"Roxanne" (Moulin Rouge!)</div></div><div class="pts">27<small>/30</small></div></div>
+        </div>
+        <div class="week">
+          <div class="week-head"><div class="t">Week 4 <span>· Halloween</span></div><span class="badge b-safe">Safe</span></div>
+          <div class="dance"><div class="what"><div class="style">Contemporary</div><div class="song">"Bury a Friend"</div></div><div class="pts">24<small>/30</small></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- B · Full page -->
+<div class="col">
+  <p class="cap">B · Its own page</p>
+  <p class="capsub">A full page at /couples/…, with a back link to wherever you came from. It has room for each judge's marks and an In Your Leagues card (a later step). Opening it from inside another sheet, like Recast, still works.</p>
+  <div class="phone" id="shot-b">
+    <div class="topbar"><div class="wordmark"><div class="orb"></div>Mirrorball Madness</div><div class="avatar">K</div></div>
+    <div class="page">
+      <div class="back">← Standings</div>
+      <div>
+        <div class="couple-title" style="font-size:28px">Amber <span>&amp; Pasha</span></div>
+        <div class="status-line"><span class="badge b-gold">Still Dancing</span><span class="xs muted">9 weeks · 11 dances</span></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="k">Average</div><div class="v">25.4</div><div class="s">per night, /30</div></div>
+        <div class="stat"><div class="k">Best</div><div class="v">28</div><div class="s">Jive · Wk 8</div></div>
+        <div class="stat"><div class="k">Jeopardy</div><div class="v">1×</div><div class="s">Week 6</div></div>
+      </div>
+      <div class="league">
+        <div class="section-k">In Your Leagues</div>
+        <div class="row"><span>Pen &amp; Paso (Doble) · your roster<span class="you">You</span></span><b>182.50</b></div>
+        <div class="row"><span class="muted">#supportSWEKylie · Ro's roster</span><b class="muted">164.00</b></div>
+        <div class="xs muted">Judges' points while on that roster.</div>
+      </div>
+      <div class="week">
+        <div class="week-head"><div class="t">Week 8 <span>· Disney Night</span></div><span class="badge b-safe">Safe</span></div>
+        <div class="dance"><div class="what"><div class="style">Jive</div><div class="song">"I Wan'na Be Like You"</div><div class="marks">Carrie Ann <b>9</b> · Derek <b>10</b> · Bruno <b>9</b></div></div><div class="pts">28<small>/30</small></div></div>
+        <div class="dance"><div class="what"><div class="style">Team Dance · Slaytopia</div><div class="song">Freestyle · "Zoo"</div><div class="marks">Carrie Ann <b>9</b> · Derek <b>9</b> · Bruno <b>9</b></div></div><div class="pts">27<small>/30</small></div></div>
+        <div class="night"><span>Night</span><span>55/60 → <b>27.50</b></span></div>
+      </div>
+      <div class="week">
+        <div class="week-head"><div class="t">Week 7 <span>· Dedication Night</span></div><span class="badge b-safe">Safe</span></div>
+        <div class="dance"><div class="what"><div class="style">Viennese Waltz</div><div class="song">"You Are the Reason"</div><div class="marks">Carrie Ann <b>9</b> · Derek <b>8</b> · Bruno <b>9</b></div></div><div class="pts">26<small>/30</small></div></div>
+      </div>
+    </div>
+    <div class="tabbar"><span>Home</span><span>Results</span><span>Picks</span><span class="on">Standings</span></div>
+  </div>
+</div>
+
+<!-- C · In place on the Couples Leaderboard -->
+<div class="col">
+  <p class="cap">C · Expand in place (Couples Leaderboard only)</p>
+  <p class="capsub">The row opens under itself, like Score History: last few weeks, then Full History → into A or B. It only works where there's a list, so A or B is still needed everywhere else.</p>
+  <div class="phone" id="shot-c">
+    <div class="topbar"><div class="wordmark"><div class="orb"></div>Mirrorball Madness</div><div class="avatar">K</div></div>
+    <div class="page">
+      <div class="h1" style="font-size:20px;color:var(--accent)">Couples Leaderboard</div>
+      <div class="card" style="overflow:hidden">
+        <div class="lb-head"><span></span><span></span><span style="text-align:right">Judges</span><span style="text-align:right">Bonuses</span><span style="text-align:right">Total</span></div>
+        <div class="lb-row"><span class="rk">1</span><span><strong>Harry</strong> <span class="muted">&amp; Jenna</span><br /><span class="xs muted">Ro</span></span><span class="n">196.00</span><span class="n">24.00</span><span class="n tot">220.00</span></div>
+        <div class="lb-row lb-open"><span class="rk" style="color:var(--accent)">2</span><span><strong>Amber</strong> <span class="muted">&amp; Pasha</span><br /><span class="xs muted">Kylie <span class="you">You</span></span></span><span class="n">182.50</span><span class="n">24.00</span><span class="n tot">206.50</span></div>
+        <div class="lb-detail">
+          <div class="mini"><span class="w">Week 8</span><span class="d">Jive 28 · Team Dance 27</span><span class="p">27.50</span></div>
+          <div class="mini"><span class="w">Week 7</span><span class="d">Viennese Waltz 26</span><span class="p">26.00</span></div>
+          <div class="mini"><span class="w">Week 6</span><span class="d">Paso Doble 22 <span class="badge b-jeop" style="height:16px;font-size:10px">In Jeopardy</span></span><span class="p">22.00</span></div>
+          <div style="text-align:right"><span class="link">Full History →</span></div>
+        </div>
+        <div class="lb-row"><span class="rk">3</span><span><strong>Ezra</strong> <span class="muted">&amp; Daniella</span><br /><span class="xs muted">Pat</span></span><span class="n">171.00</span><span class="n">24.00</span><span class="n tot">195.00</span></div>
+        <div class="lb-row" style="opacity:.5"><span class="rk">4</span><span><strong>Julia</strong> <span class="muted">&amp; Ezra</span><br /><span class="xs muted">Lee &amp; Sam</span></span><span class="n">160.00</span><span class="n">21.00</span><span class="n tot">181.00</span></div>
+      </div>
+    </div>
+    <div class="tabbar"><span>Home</span><span>Results</span><span>Picks</span><span class="on">Standings</span></div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
