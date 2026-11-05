@@ -6,7 +6,9 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 Live: `apply-episode-rounds.sql` applied and verified (E09 Round 1 + Team
 Dance with Wildcats and Slaytopia; E10 Round 1 + Dance-Off, 3 heats by
-Winner's Bonus); app `14bac98`; types regenerated. Render-checked at 390px
+Winner's Bonus); app `5e904be` (UI pass `330143e`: app chips, type scale,
+labels, neutral badges; rounds as underlined Tabs `5e904be`); types
+regenerated. Render-checked at 390px
 with a throwaway site admin and every write blocked: Enter Results' Rounds
 switch, Round 1 card with its Dance-Off line, Mark an Exception panel,
 Dance-Off tab (Winner's Bonus, heat picker, Not in This Round), Edit Episode
@@ -29,6 +31,14 @@ Still to see with a real write (rehearsed in PGlite only):
   own rounds).
 - Fallback: redeploying `b3ab890` works against this SQL while no heat is
   scored by Judges' Marks per couple.
+- At 360px a special dance's Points rows (name, points box, Result picker)
+  wrap onto two lines. It's the shared special-dance layout, left alone in
+  the UI pass; tighten it for every special dance at once, not per round.
+- The base-nova `Tabs` "line" variant (`src/components/ui/tabs.tsx`, CLI
+  generated) pins the list to `h-8` and draws its underline 5px below the
+  tab; the round tabs override both (`group-data-horizontal/tabs:h-auto`,
+  `...:after:bottom-0`). Any other two-line or scrolling tab strip needs the
+  same.
 
 ## Special dances follow-ups — 2026-11-04
 
