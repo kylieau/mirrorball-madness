@@ -3057,6 +3057,17 @@ export type Database = {
           week_number: number
         }[]
       }
+      visible_draft_lineup: {
+        Args: never
+        Returns: {
+          couple_id: string
+          created_at: string
+          dance_style_name: string
+          episode_id: string
+          song_title: string
+          week_id: string
+        }[]
+      }
       visible_draft_special_scores: {
         Args: never
         Returns: {

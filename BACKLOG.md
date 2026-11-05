@@ -27,6 +27,15 @@ Checked 2026-11-04:
   typed first were silently skipped by the draft save). Browser-checked on
   E10 at 360px with POSTs aborted.
 
+Lineup and overtakes (2026-11-05), browser-checked in a scratch league:
+- The lineup's spoiler gate (hidden while an earlier week is unwatched) is
+  unit-tested only; check it with a Spoiler-Free viewer who is a week behind.
+- Special dances are not in the lineup yet (Kylie: fine, they show once
+  posted).
+- Overtakes are net per week, recomputed on load; a swap and swap-back
+  within one night leaves no line. A true event feed would need a stored
+  ledger (the settled "no persisted ledger" call for Score History).
+
 Cleanups:
 - `episode_teams.song_source`, `theme_label` and `songs[].artist` are no
   longer edited or shown (Artist and Theme / Source were cut 2026-11-04).

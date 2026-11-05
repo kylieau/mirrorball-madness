@@ -23,6 +23,7 @@ import { nextPredictedElimination } from "@/lib/grand-finale-pins";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
+import { loadDraftLineup, weekLineup, type DraftLineupRow } from "@/lib/draft-lineup";
 import { loadAllCouples, loadTeamsMode, loadViewerMemberships, loadViewerSeason } from "@/lib/viewer-season-data";
 import {
   adjacentThisWeekWeeks,
@@ -144,6 +145,7 @@ export default async function ThisWeekPage({
     { data: grandFinaleRows },
     { data: episodeRoundTypes },
     specialDanceLabels,
+    draftLineupRows,
   ] = await Promise.all([
     showResults && selectedEpisodeIds.length > 0
       ? supabase
@@ -182,6 +184,7 @@ export default async function ThisWeekPage({
       ? supabase.from("episode_round_types").select("episode_id, round_types(name)").in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] }),
     showResults ? loadSpecialDanceLabels(supabase, selectedEpisodeIds, teamsMode) : Promise.resolve({}),
+    selectedMode === "peek" ? loadDraftLineup(supabase) : Promise.resolve([] as DraftLineupRow[]),
   ]);
 
   const flatCouples = allCouples.map((c) => ({
@@ -190,6 +193,15 @@ export default async function ThisWeekPage({
     pro_name: c.pro?.name ?? "Unknown",
   }));
   const coupleDisplayNames = buildCoupleDisplayNames(flatCouples);
+  const lineup =
+    selectedMode === "peek" && selectedWeek
+      ? [...weekLineup(draftLineupRows, selectedWeek, completedWeeks, cutoff.allowedEpisodeIds)]
+          .flatMap(([coupleId, dances]) => {
+            const parts = coupleDisplayNames.get(coupleId);
+            return parts ? [{ coupleId, parts, dances }] : [];
+          })
+          .sort((a, b) => a.parts.celebrity.localeCompare(b.parts.celebrity))
+      : [];
 
   // Which of the viewer's own leagues have each couple on their Dance Card
   // roster right now, plus which leagues they picked this couple as this
@@ -313,7 +325,7 @@ export default async function ThisWeekPage({
               />
             </div>
           )}
-          <ThisWeekThemePeek theme={selectedWeek.theme} />
+          <ThisWeekThemePeek theme={selectedWeek.theme} lineup={lineup} />
         </div>
       ) : (
         <WeeklyResultsView

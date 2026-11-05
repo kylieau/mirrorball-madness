@@ -9,6 +9,7 @@ import { RosterCard } from "@/components/roster-card";
 import { DanceCardLeagueList, type DanceCardLeagueEntry } from "@/components/dance-card-league-list";
 import { CurtainCallCard } from "@/components/curtain-call-card";
 import { PickEmBox } from "@/components/pick-em-box";
+import { loadDraftLineup, weekLineup, type DraftLineupRow } from "@/lib/draft-lineup";
 import { PastPicksRecap } from "@/components/past-picks-card";
 import { CurtainCallLeagueList, type CurtainCallLeagueEntry } from "@/components/curtain-call-league-list";
 import { GrandFinaleBox } from "@/components/grand-finale-box";
@@ -245,6 +246,7 @@ export default async function LeaguePicksPage({
     { data: lateRows },
     { data: allGrandFinalePicks },
     otherLeaguePicks,
+    draftLineupRows,
   ] = await Promise.all([
     curtainCallWeekId && isLocked
       ? supabase
@@ -271,7 +273,11 @@ export default async function LeaguePicksPage({
       includeGrandFinale: grandFinaleOn && !grandFinaleLocked,
       now: new Date(),
     }),
+    curtainCallMode === "picks" && curtainCallWeekId && !isLocked ? loadDraftLineup(supabase) : Promise.resolve([] as DraftLineupRow[]),
   ]);
+  const pickLineup = upcomingEpisode
+    ? Object.fromEntries(weekLineup(draftLineupRows, upcomingEpisode, completedEpisodes, cutoff.allowedEpisodeIds))
+    : {};
 
   const { data: ownPrediction } = await ownPredictionPending;
   const curtainCallPicksEntries: CurtainCallLeagueEntry[] = (allPredictions ?? [])
@@ -623,6 +629,7 @@ export default async function LeaguePicksPage({
                   categoryWeight={scoringSettings?.eliminations_category_weight ?? 1}
                   nearMissEnabled={scoringSettings?.curtain_call_near_miss_enabled !== false}
                   coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
+                  lineup={pickLineup}
                   existingPrediction={ownPrediction}
                   isLocked={isLocked}
                   isDoubleElimination={upcomingEpisode.is_double_elimination_week}

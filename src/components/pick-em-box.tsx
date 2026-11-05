@@ -37,6 +37,7 @@ function CoupleSelect({
   onChange,
   couples,
   nameFor,
+  lineup,
   excludeId,
 }: {
   id: string;
@@ -45,6 +46,7 @@ function CoupleSelect({
   onChange: (coupleId: string) => void;
   couples: Couple[];
   nameFor: (coupleId: string) => ReactNode;
+  lineup: Record<string, string[]>;
   excludeId?: string;
 }) {
   const options = couples.filter((c) => c.id !== excludeId);
@@ -66,7 +68,15 @@ function CoupleSelect({
           <SelectItem value="">{CHOOSE_COUPLE}</SelectItem>
           {options.map((c) => (
             <SelectItem key={c.id} value={c.id}>
-              {nameFor(c.id)}
+              {/* Only in the open list: the closed trigger reads the name from items. */}
+              <span className="flex flex-col">
+                <span>{nameFor(c.id)}</span>
+                {(lineup[c.id] ?? []).map((dance, i) => (
+                  <span key={i} className="text-xs whitespace-normal text-muted-foreground">
+                    {dance}
+                  </span>
+                ))}
+              </span>
             </SelectItem>
           ))}
         </SelectContent>
@@ -86,6 +96,7 @@ export function PickEmBox({
   categoryWeight = 1,
   nearMissEnabled = true,
   coupleDisplayNames,
+  lineup,
   existingPrediction,
   isLocked,
   isDoubleElimination,
@@ -105,6 +116,8 @@ export function PickEmBox({
   categoryWeight?: number;
   nearMissEnabled?: boolean;
   coupleDisplayNames: Record<string, CoupleNameParts>;
+  // This week's announced dances per couple, shown in the dropdowns.
+  lineup: Record<string, string[]>;
   existingPrediction: {
     predicted_eliminated_couple_id: string | null;
     predicted_eliminated_couple_id_2: string | null;
@@ -269,6 +282,7 @@ export function PickEmBox({
                     onChange={(v) => handleEliminatedChange(1, v)}
                     couples={activeCouples}
                     nameFor={nameFor}
+                    lineup={lineup}
                     excludeId={eliminatedId2 || undefined}
                   />
                   <CoupleSelect
@@ -278,6 +292,7 @@ export function PickEmBox({
                     onChange={(v) => handleEliminatedChange(2, v)}
                     couples={activeCouples}
                     nameFor={nameFor}
+                    lineup={lineup}
                     excludeId={eliminatedId || undefined}
                   />
                 </>
@@ -289,6 +304,7 @@ export function PickEmBox({
                   onChange={setEliminatedId}
                   couples={activeCouples}
                   nameFor={nameFor}
+                  lineup={lineup}
                 />
               )}
               <p className="text-xs text-muted-foreground">{topScorerPreview}</p>
@@ -299,6 +315,7 @@ export function PickEmBox({
                 onChange={setTopScorerId}
                 couples={activeCouples}
                 nameFor={nameFor}
+                lineup={lineup}
               />
               <AlsoSaveTo
                 destinations={otherLeagues}

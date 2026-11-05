@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CoupleName } from "@/components/couple-name";
+import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
 
 function ArrowSlot({
@@ -77,15 +79,41 @@ export function EpisodeCarousel({
   );
 }
 
-export function ThisWeekThemePeek({ theme }: { theme: string | null }) {
+export function ThisWeekThemePeek({
+  theme,
+  lineup = [],
+}: {
+  theme: string | null;
+  // The week's announced dances, once Enter Results has them.
+  lineup?: { coupleId: string; parts: CoupleNameParts; dances: string[] }[];
+}) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Results aren&apos;t in yet</CardTitle>
         <CardDescription>
-          {theme ? `${theme}. ` : ""}Dances, scores, and who went home land here after the show.
+          {theme ? `${theme}. ` : ""}
+          {lineup.length > 0 ? "Scores and who went home" : "Dances, scores, and who went home"} land here after the show.
         </CardDescription>
       </CardHeader>
+      {lineup.length > 0 && (
+        <CardContent>
+          <ul className="flex flex-col gap-2.5">
+            {lineup.map((entry) => (
+              <li key={entry.coupleId} className="flex flex-col text-sm">
+                <span>
+                  <CoupleName {...entry.parts} />
+                </span>
+                {entry.dances.map((dance, i) => (
+                  <span key={i} className="text-xs text-muted-foreground">
+                    {dance}
+                  </span>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      )}
     </Card>
   );
 }
