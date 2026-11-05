@@ -2,6 +2,29 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Couple history — 2026-11-05
+
+Built: `/couples/[id]` (see CLAUDE.md "Couple history"), linked from Results
+cards, Couples Leaderboard rows and Your Fantasy Roster. Browser-checked at
+390/360px in a scratch league with writes blocked: caught up, Spoiler-Free
+watched through Week 6 (Julia & Ezra read Still Dancing, Weeks 7–8 held
+back) and as a guest (published weeks, no judge marks).
+
+Next slices, in order:
+- League context: whose roster each week (`roster_slots` timeline, not just
+  the current owner), the viewer's Curtain Call / Grand Finale picks of them,
+  fantasy judges points on that roster (`judgePointsThroughWeek`).
+- More tap targets: Home Recent Activity couple names (carry couple ids
+  through `buildRecentActivity`), the triage card stack, League at a Glance,
+  Grand Finale lists, draft room / Recast (beside their existing controls),
+  the Results Eliminated banner.
+- Released drafts for viewers who unlocked them (Results doesn't show them
+  either today).
+- Not yet seen on a revealing night: the Posting Live week for a Stay
+  Updated viewer.
+- `notFound()` answers 200 because the route has a `loading.tsx` (streaming
+  starts first); the not-found UI still shows.
+
 ## Episode rounds — 2026-11-05
 
 Live: `apply-episode-rounds.sql` applied and verified (E09 Round 1 + Team

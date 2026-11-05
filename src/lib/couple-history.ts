@@ -1,0 +1,139 @@
+import { collapseToNights, type DanceScore } from "./scoring";
+import { mergeCoupleOutcomes } from "./competition-week";
+import { nightDanceLabel, type NightDance, type SpecialDanceLabelInput } from "./night-dance-lines";
+
+// A week the viewer may see. "scores" is a week still being revealed: its
+// posted dances show, its outcome does not.
+export type CoupleHistoryWeekInput = {
+  weekNumber: number;
+  theme: string | null;
+  episodeIds: string[];
+  mode: "results" | "scores";
+};
+
+export type CoupleHistoryDanceRow = NightDance & { id: string; scaledScore: number };
+
+export type CoupleHistoryDance = {
+  id: string;
+  label: string;
+  song: string | null;
+  total: number;
+  // A bonus round paid in points (max_score 0), shown signed.
+  bonus: boolean;
+  marks: { judge: string; score: number }[];
+};
+
+export type CoupleHistoryNight = {
+  episodeId: string;
+  dances: CoupleHistoryDance[];
+  // Only on a night with more than one row, where the dance totals alone
+  // don't say what the night paid: all marks over all marks possible, then
+  // the night on the 30 basis (collapseToNights).
+  combined: { total: number; max: number; scaled: number } | null;
+  scaled: number;
+};
+
+export type CoupleHistoryWeek = {
+  weekNumber: number;
+  theme: string | null;
+  mode: "results" | "scores";
+  outcome: string | null;
+  inJeopardy: boolean;
+  nights: CoupleHistoryNight[];
+};
+
+export type CoupleHistory = {
+  weeks: CoupleHistoryWeek[];
+  danceCount: number;
+  average: number | null;
+  best: { scaled: number; weekNumber: number } | null;
+  jeopardyWeeks: number[];
+};
+
+// One couple's season as far as the viewer may see it, newest week first.
+// Rows outside the given weeks are dropped, and a week still being revealed
+// carries no outcome or In Jeopardy, so a caller can't leak either by
+// passing extra rows.
+export function buildCoupleHistory(input: {
+  coupleId: string;
+  weeks: CoupleHistoryWeekInput[];
+  dances: CoupleHistoryDanceRow[];
+  // Every couple's rows on the same episodes: a night's usual panel (for a
+  // legacy or bonus-only night) comes from the whole episode, as in scoring.
+  episodeDances: DanceScore[];
+  marks: { danceId: string; judge: string; score: number }[];
+  outcomes: { episode_id: string; couple_id: string; outcome: string }[];
+  inJeopardyEpisodeIds: ReadonlySet<string>;
+  teamDanceEpisodes: ReadonlySet<string>;
+  labels: ReadonlyMap<string, SpecialDanceLabelInput>;
+}): CoupleHistory {
+  const marksByDance = new Map<string, { judge: string; score: number }[]>();
+  for (const mark of input.marks) {
+    marksByDance.set(mark.danceId, [...(marksByDance.get(mark.danceId) ?? []), { judge: mark.judge, score: mark.score }]);
+  }
+
+  const nightByEpisode = new Map(
+    collapseToNights(input.episodeDances)
+      .filter((night) => night.coupleId === input.coupleId)
+      .map((night) => [night.episodeId, night])
+  );
+
+  const weeks: CoupleHistoryWeek[] = [];
+  for (const week of [...input.weeks].sort((a, b) => b.weekNumber - a.weekNumber)) {
+    const episodeIds = new Set(week.episodeIds);
+    const nights = week.episodeIds.flatMap((episodeId): CoupleHistoryNight[] => {
+      const rows = input.dances
+        .filter((dance) => dance.episodeId === episodeId)
+        .sort((a, b) => Number(a.maxScore === 0) - Number(b.maxScore === 0) || Number(!!a.teamId) - Number(!!b.teamId));
+      const night = nightByEpisode.get(episodeId);
+      if (rows.length === 0 || !night) return [];
+      return [
+        {
+          episodeId,
+          dances: rows.map((row) => ({
+            id: row.id,
+            label: nightDanceLabel(row, input.teamDanceEpisodes, input.labels),
+            song: row.song?.trim() || null,
+            total: row.totalScore,
+            bonus: row.maxScore === 0 && !!row.teamId,
+            marks: [...(marksByDance.get(row.id) ?? [])].sort((a, b) => a.judge.localeCompare(b.judge)),
+          })),
+          combined: rows.length > 1 ? { total: night.totalScore, max: night.maxScore, scaled: night.scaledScore } : null,
+          scaled: night.scaledScore,
+        },
+      ];
+    });
+    const results = week.mode === "results";
+    const [merged] = results ? mergeCoupleOutcomes(input.outcomes.filter((o) => episodeIds.has(o.episode_id))) : [];
+    if (nights.length === 0 && !merged) continue;
+    weeks.push({
+      weekNumber: week.weekNumber,
+      theme: week.theme,
+      mode: week.mode,
+      outcome: merged?.outcome ?? null,
+      inJeopardy: results && week.episodeIds.some((id) => input.inJeopardyEpisodeIds.has(id)),
+      nights,
+    });
+  }
+
+  const nights = weeks.flatMap((week) => week.nights.map((night) => ({ weekNumber: week.weekNumber, scaled: night.scaled })));
+  const best = nights.reduce<{ scaled: number; weekNumber: number } | null>(
+    (top, night) => (!top || night.scaled > top.scaled ? night : top),
+    null
+  );
+  return {
+    weeks,
+    danceCount: weeks.reduce((sum, week) => sum + week.nights.reduce((n, night) => n + night.dances.filter((d) => !d.bonus).length, 0), 0),
+    average: nights.length > 0 ? nights.reduce((sum, night) => sum + night.scaled, 0) / nights.length : null,
+    best,
+    jeopardyWeeks: weeks.filter((week) => week.inJeopardy).map((week) => week.weekNumber).sort((a, b) => a - b),
+  };
+}
+
+// The weeks a Spoiler-Free viewer has not marked watched, from the season's
+// completed weeks alone, so every couple shows the same range whatever weeks
+// they danced.
+export function unwatchedRange(lastWatchedWeek: number, latestCompletedWeek: number | null): { from: number; to: number } | null {
+  if (latestCompletedWeek === null || latestCompletedWeek <= lastWatchedWeek) return null;
+  return { from: lastWatchedWeek + 1, to: latestCompletedWeek };
+}

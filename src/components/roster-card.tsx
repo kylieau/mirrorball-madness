@@ -1,11 +1,13 @@
 import { formatPoints, formatSignedPoints } from "@/lib/format-points";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { cn } from "cn";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName } from "@/components/couple-name";
 import type { RosterWeeklyTag } from "@/lib/roster-weekly-points";
 import { IN_JEOPARDY_BADGE, showInJeopardyBadge } from "@/lib/results-outcome";
+import { coupleHistoryHref } from "@/lib/couple-history-link";
 
 type RosterCouple = CoupleNameParts & {
   coupleId: string;
@@ -29,12 +31,14 @@ export function RosterCard({
   weekBonusPoints = 0,
   carousel,
   leagueSection,
+  historyFrom,
 }: {
   couples: RosterCouple[];
   totalPoints: number;
   weekBonusPoints?: number;
   carousel?: ReactNode;
   leagueSection?: ReactNode;
+  historyFrom: string;
 }) {
   return (
     <Card>
@@ -49,10 +53,11 @@ export function RosterCard({
         {couples.map((c) => {
           const tag = TAG_INFO[c.tag];
           return (
-            <div
+            <Link
               key={c.coupleId}
+              href={coupleHistoryHref(c.coupleId, historyFrom)}
               className={cn(
-                "flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3.5 py-3",
+                "flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3.5 py-3 transition-colors hover:border-primary/60 active:bg-muted/40",
                 c.tag === "eliminated" && "opacity-60"
               )}
             >
@@ -86,7 +91,7 @@ export function RosterCard({
                   "this wk"
                 )}
               </div>
-            </div>
+            </Link>
           );
         })}
         {weekBonusPoints > 0 && (

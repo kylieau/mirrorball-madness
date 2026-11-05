@@ -108,6 +108,7 @@ export async function GuestResults({
               couples={flatCouples}
               coupleDisplayNames={coupleDisplayNames}
               pendingReveal={null}
+              historyFrom={selectedWeek ? thisWeekHref(selectedWeek.id) : "/this-week"}
             />
           )}
         </div>

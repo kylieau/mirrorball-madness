@@ -686,6 +686,7 @@ export default async function LeaguePicksPage({
                 couples={rosterCouples}
                 totalPoints={yourRosterWeekTotalPoints}
                 weekBonusPoints={yourRosterWeekBonusPoints}
+                historyFrom={`/leagues/${id}/picks`}
                 carousel={
                   yourRosterWeek ? (
                     <EpisodeCarousel

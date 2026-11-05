@@ -65,6 +65,16 @@ function styleLabel(dance: NightDance, team: boolean, labels: ReadonlyMap<string
   return `${dance.style}${team ? " (Team)" : ""}`;
 }
 
+// One dance's name as fans read it ("Jive", "Team Dance · Slaytopia",
+// "Dance-Off"), without its song or score.
+export function nightDanceLabel(
+  dance: NightDance,
+  teamDanceEpisodes: ReadonlySet<string>,
+  labels: ReadonlyMap<string, SpecialDanceLabelInput>
+): string {
+  return styleLabel(dance, isTeamDance(dance.style, teamDanceEpisodes.has(dance.episodeId)), labels);
+}
+
 function danceLine(dance: NightDance, team: boolean, labels: ReadonlyMap<string, SpecialDanceLabelInput>, alone: boolean): string {
   const label = styleLabel(dance, isTeamDance(dance.style, team), labels);
   // A lone bonus round keeps its points in its line ("Dance-Off · +3"), since

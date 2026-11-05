@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { ScrollFade } from "@/components/scroll-fade";
 import { cn } from "cn";
 import { YouPill } from "@/components/you-pill";
 import { formatPoints } from "@/lib/format-points";
+import { coupleHistoryHref } from "@/lib/couple-history-link";
 
 export type CoupleLeaderboardRow = {
   coupleId: string;
@@ -17,7 +19,7 @@ export type CoupleLeaderboardRow = {
 
 const COLUMNS = "grid grid-cols-[1.25rem_minmax(0,1fr)_3.25rem_3.25rem_4rem] items-center gap-x-2";
 
-export function CouplesLeaderboard({ rows }: { rows: CoupleLeaderboardRow[] }) {
+export function CouplesLeaderboard({ rows, historyFrom }: { rows: CoupleLeaderboardRow[]; historyFrom: string }) {
   return (
     <section id="couples" className="mt-4 scroll-mt-4">
       <h2 className="font-heading text-lg font-semibold text-accent">Couples Leaderboard</h2>
@@ -39,39 +41,41 @@ export function CouplesLeaderboard({ rows }: { rows: CoupleLeaderboardRow[] }) {
         </div>
         <ol className="divide-y divide-border">
           {rows.map((row, i) => (
-            <li
-              key={row.coupleId}
-              className={cn(
-                COLUMNS,
-                "relative px-3.5 py-2.5",
-                row.isViewer && "bg-primary/10 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-accent",
-                row.eliminated && "opacity-50"
-              )}
-            >
-              <span
-                className={cn("text-center font-rank text-sm font-bold", row.isViewer ? "text-accent" : "text-muted-foreground")}
+            <li key={row.coupleId}>
+              <Link
+                href={coupleHistoryHref(row.coupleId, historyFrom)}
+                className={cn(
+                  COLUMNS,
+                  "relative px-3.5 py-2.5 transition-colors hover:bg-muted/40",
+                  row.isViewer && "bg-primary/10 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-accent",
+                  row.eliminated && "opacity-50"
+                )}
               >
-                {i + 1}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm">
-                  <strong className="font-semibold text-foreground">{row.celebrity}</strong>{" "}
-                  <span className="text-muted-foreground">&amp; {row.pro}</span>
+                <span
+                  className={cn("text-center font-rank text-sm font-bold", row.isViewer ? "text-accent" : "text-muted-foreground")}
+                >
+                  {i + 1}
                 </span>
-                <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                  {row.ownerName ?? "Undrafted"}
-                  {row.isViewer && <YouPill />}
+                <span className="min-w-0">
+                  <span className="block text-sm">
+                    <strong className="font-semibold text-foreground">{row.celebrity}</strong>{" "}
+                    <span className="text-muted-foreground">&amp; {row.pro}</span>
+                  </span>
+                  <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                    {row.ownerName ?? "Undrafted"}
+                    {row.isViewer && <YouPill />}
+                  </span>
                 </span>
-              </span>
-              <span className="text-right font-heading text-sm font-semibold tabular-nums text-muted-foreground">
-                {formatPoints(row.judgesPoints)}
-              </span>
-              <span className="text-right font-heading text-sm font-semibold tabular-nums text-muted-foreground">
-                {formatPoints(row.bonusPoints)}
-              </span>
-              <span className="border-l border-border pl-2 text-right font-heading text-base font-semibold tabular-nums">
-                {formatPoints(row.totalPoints)}
-              </span>
+                <span className="text-right font-heading text-sm font-semibold tabular-nums text-muted-foreground">
+                  {formatPoints(row.judgesPoints)}
+                </span>
+                <span className="text-right font-heading text-sm font-semibold tabular-nums text-muted-foreground">
+                  {formatPoints(row.bonusPoints)}
+                </span>
+                <span className="border-l border-border pl-2 text-right font-heading text-base font-semibold tabular-nums">
+                  {formatPoints(row.totalPoints)}
+                </span>
+              </Link>
             </li>
           ))}
         </ol>

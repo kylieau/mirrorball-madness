@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatSignedPoints } from "@/lib/format-points";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CoupleName } from "@/components/couple-name";
@@ -7,6 +8,7 @@ import { formatEpisodeCasual } from "@/lib/format-week";
 import { mergeCoupleOutcomes } from "@/lib/competition-week";
 import { coupleDanceLines, type SpecialDanceLabelInput } from "@/lib/night-dance-lines";
 import { fanOutcomeBadge, showInJeopardyBadge, IN_JEOPARDY_BADGE } from "@/lib/results-outcome";
+import { coupleHistoryHref } from "@/lib/couple-history-link";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -53,6 +55,7 @@ export function WeeklyResultsView({
   scoresOnly = false,
   teamDanceEpisodeIds,
   specialDanceLabels,
+  historyFrom,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
@@ -83,6 +86,7 @@ export function WeeklyResultsView({
   teamDanceEpisodeIds?: string[];
   // Name, type and scoring mode by special dance id for rows tagged team_id.
   specialDanceLabels?: Record<string, SpecialDanceLabelInput>;
+  historyFrom: string;
 }) {
   const inJeopardy = new Set(inJeopardyCoupleIds ?? []);
   const teamDanceEpisodes = new Set(teamDanceEpisodeIds ?? []);
@@ -200,10 +204,11 @@ export function WeeklyResultsView({
           const tag = fanOutcomeBadge(r.outcome);
           const inJeopardyBadge = showInJeopardyBadge(r.outcome, inJeopardy.has(r.couple_id));
           return (
-            <div
+            <Link
               key={r.couple_id}
+              href={coupleHistoryHref(r.couple_id, historyFrom)}
               className={cn(
-                "flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3.5 py-3",
+                "flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3.5 py-3 transition-colors hover:border-primary/60 active:bg-muted/40",
                 r.outcome === "eliminated" && "opacity-60"
               )}
             >
@@ -248,7 +253,7 @@ export function WeeklyResultsView({
                   </span>
                 )}
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

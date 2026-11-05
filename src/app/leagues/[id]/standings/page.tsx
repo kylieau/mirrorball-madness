@@ -221,7 +221,7 @@ export default async function LeagueStandingsPage({
         standingMessage={standingMessage}
         moduleTotals={moduleTotalsByManager}
       />
-      {couplesLeaderboard && <CouplesLeaderboard rows={couplesLeaderboard} />}
+      {couplesLeaderboard && <CouplesLeaderboard rows={couplesLeaderboard} historyFrom={`/leagues/${id}/standings`} />}
     </LeaguePageShell>
   );
 }

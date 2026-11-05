@@ -322,6 +322,7 @@ export default async function ThisWeekPage({
                 couples={flatCouples}
                 coupleDisplayNames={Object.fromEntries(coupleDisplayNames)}
                 pendingReveal={pendingReveal}
+                historyFrom="/this-week"
               />
             </div>
           )}
@@ -351,6 +352,7 @@ export default async function ThisWeekPage({
           scoresOnly={selectedMode === "scores"}
           teamDanceEpisodeIds={[...teamDanceEpisodeIds(episodeRoundTypes ?? [])]}
           specialDanceLabels={specialDanceLabels}
+          historyFrom={selectedWeek ? thisWeekHref(selectedWeek.id) : "/this-week"}
         />
       )}
     </div>
