@@ -28,8 +28,8 @@ Checked 2026-11-04:
   E10 at 360px with POSTs aborted.
 
 Lineup and overtakes (2026-11-05), browser-checked in a scratch league:
-- The lineup's spoiler gate (hidden while an earlier week is unwatched) is
-  unit-tested only; check it with a Spoiler-Free viewer who is a week behind.
+- Spoiler gate browser-checked: a Spoiler-Free viewer with nothing watched
+  sees neither the Results lineup nor the Picks dance lines.
 - Special dances are not in the lineup yet (Kylie: fine, they show once
   posted).
 - Overtakes are net per week, recomputed on load; a swap and swap-back
@@ -66,6 +66,9 @@ Still to see on a real night (E10, Tuesday 2026-11-10, 8pm ET), none browser-che
 - Home Dance Card strike on a roster with an eliminated couple (no test
   league has one; Kylie's real leagues do).
 - A four-judge (guest) night's score row at 360px.
+- A Stay Updated viewer's overtake lines on Home and the Results lineup card
+  changing over the 20-second refreshes as couples post (the card gives way
+  to scores once the first couple posts).
 - Dance-offs as Points per Couple specials (one per heat, loser entered as
   0) and the immune couple's bonus as a one-couple Immunity special, created
   by a contributor on air. PGlite rehearses this; the page has not seen it.
