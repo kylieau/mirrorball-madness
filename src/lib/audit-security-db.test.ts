@@ -206,13 +206,5 @@ describe("audit security and draft lifecycle in PostgreSQL",()=>{
     expect(result.revision).toBe(settings.revision+1);
   });
 
-  it("returns real custom-event ids and prevents non-admin published correction writes",async()=>{
-    const moment=(await db.query<{id:string}>("select public.mutate_draft_moment($1,$2,null,null,'Synthetic event',false) as id",[episode,admin])).rows[0].id;
-    expect(moment).toMatch(/^[0-9a-f-]{36}$/);
-    await db.query("select public.mutate_draft_moment($1,$2,$3,null,null,true)",[episode,admin,moment]);
-    expect((await snapshot()).draftMoments).toHaveLength(0);
-    await db.exec(`update public.profiles set can_propose_results=true where id='${manager}';update public.episodes set results_published_at=now(),status='completed' where id='${episode}';`);
-    await expect(db.query("select public.mutate_draft_moment($1,$2,null,null,'Forbidden correction',false)",[episode,manager])).rejects.toThrow(/Only a site admin/);
-  });
 
 });

@@ -3,6 +3,7 @@ import type { Database, Json } from "./supabase/types";
 import { buildWeeklyScoreRows, type WeeklyScoreRow } from "./weekly-score-rows";
 import {
   inJeopardyIdsToPersist,
+  MARK_MAX,
   RESOLVING_OUTCOMES,
   scaledJudgesScore,
   type Outcome,
@@ -15,7 +16,7 @@ type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tab
 // the special-dance columns arrive with apply-special-dances.sql and read as
 // a Team Dance scored by marks out of 10 on the night's panel until then.
 type SnapshotTeam = Pick<Row<"episode_teams">, "id" | "episode_id" | "name" | "dance_style_id" | "song_title" | "posted_at"> &
-  Partial<Pick<Row<"episode_teams">, "dance_type" | "scoring_mode" | "mark_max" | "panel_judge_ids">>;
+  Partial<Pick<Row<"episode_teams">, "dance_type" | "scoring_mode">>;
 export type PublicationSnapshot = {
   _revision?: string;
   weeklyScores?: WeeklyScoreRow[];
@@ -37,7 +38,6 @@ export type PublicationSnapshot = {
   draftJudges: Row<"draft_judge_scores">[];
   draftResults: Row<"draft_episode_results">[];
   draftJeopardy: Row<"draft_episode_in_jeopardy_couples">[];
-  draftMoments: Row<"draft_episode_custom_moments">[];
   // Present once supabase/apply-team-dance-entity.sql is applied.
   participants?: Row<"episode_participants">[];
   teams?: SnapshotTeam[];
@@ -81,11 +81,10 @@ export function isTeamRow(row: { team_id?: string | null }): boolean {
 // same message the commit would raise.
 const LEGACY_TEAM_PANEL_SIZE = 4;
 
-// The judges whose marks a special dance takes: its own panel when one was
-// chosen, else the standing panel plus this night's guests. Mirrors
-// special_dance_panel(). Null for a snapshot taken before the migration.
-function specialDancePanelIds(snapshot: PublicationSnapshot, episodeId: string, team: SnapshotTeam): string[] | null {
-  if (team.panel_judge_ids) return team.panel_judge_ids;
+// The judges whose marks a special dance takes: the standing panel plus this
+// night's guests. Mirrors special_dance_panel(). Null for a snapshot taken
+// before the migration.
+function specialDancePanelIds(snapshot: PublicationSnapshot, episodeId: string): string[] | null {
   if (!snapshot.judges || !snapshot.guestJudges) return null;
   const panel = new Set(snapshot.judges.map((j) => j.id));
   for (const guest of snapshot.guestJudges) if (guest.episode_id === episodeId) panel.add(guest.judge_id);
@@ -94,7 +93,7 @@ function specialDancePanelIds(snapshot: PublicationSnapshot, episodeId: string, 
 
 // What each special dance of the episode pays: one row per eligible member,
 // exactly as materialize_team_scores() writes it. A Marks dance pays its
-// total over panel × per-judge max; a Points dance pays its points as a
+// total over panel × 10; a Points dance pays its points as a
 // 0-max row. Throws while a dance with members is incomplete (a judge on its
 // panel without a mark, a participant without points), so a week can never
 // finish with a half-scored special dance.
@@ -137,7 +136,7 @@ export function teamScoreRows(
       continue;
     }
     const marks = (snapshot.teamMarks ?? []).filter((m) => m.team_id === team.id);
-    const panel = specialDancePanelIds(snapshot, episodeId, team);
+    const panel = specialDancePanelIds(snapshot, episodeId);
     if (panel === null && marks.length !== LEGACY_TEAM_PANEL_SIZE)
       throw new Error(`${label} has ${marks.length} of four marks. Score it or remove it before finishing the week.`);
     const marked = panel ? panel.filter((judgeId) => marks.some((m) => m.judge_id === judgeId)) : marks.map((m) => m.judge_id);
@@ -147,12 +146,11 @@ export function teamScoreRows(
       );
     if (panel && marked.length !== panel.length)
       throw new Error(`${label} has ${marked.length} of ${panel.length} marks. Score it or remove it before finishing the week.`);
-    const markMax = team.mark_max == null ? 10 : Number(team.mark_max);
     const scores = marked.map((judgeId) => Number(marks.find((m) => m.judge_id === judgeId)!.score));
     const total = scores.reduce((sum, v) => sum + v, 0);
-    const max_score = marked.length * markMax;
+    const max_score = marked.length * MARK_MAX;
     for (const couple_id of eligible) {
-      rows.push({ episode_id: episodeId, couple_id, total_score: total, scaled_score: scaledJudgesScore(scores, markMax), max_score, team_id: team.id });
+      rows.push({ episode_id: episodeId, couple_id, total_score: total, scaled_score: scaledJudgesScore(scores, MARK_MAX), max_score, team_id: team.id });
     }
   }
   return rows;

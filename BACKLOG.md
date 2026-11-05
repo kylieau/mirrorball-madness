@@ -36,27 +36,21 @@ Lineup and overtakes (2026-11-05), browser-checked in a scratch league:
   within one night leaves no line. A true event feed would need a stored
   ledger (the settled "no persisted ledger" call for Score History).
 
-Cleanups:
-- `episode_teams.song_source`, `theme_label` and `songs[].artist` are no
-  longer edited or shown (Artist and Theme / Source were cut 2026-11-04).
-  Drop them with the `mark_max` / `panel_judge_ids` cleanup below.
-- Special Moments is retired from the app (no card, no custom events). Drop
-  `draft_episode_custom_moments`, `episode_custom_moments` and
-  `mutate_draft_moment` the next time `commit_episode_publication`,
-  `commit_episode_reveal`, `commit_team_reveal` and the snapshot are
-  rewritten (they lock, install and snapshot those tables); not worth a
-  rewrite of their own.
-- Drop `episode_teams.mark_max` and `panel_judge_ids` together with every SQL
-  and TS reader (`special_dance_panel`, `materialize_team_scores`,
-  `save_special_dance`, `episode-publication.ts`, `SpecialDance`), then
-  regenerate the types; not in a show week. Both are pinned to 10 / null by
-  `episode_teams_night_panel` meanwhile.
-- `TeamEntry` (`team-entry.tsx`, inferred-teams fallback) still has its own
-  small score boxes and a "tonight's guest" caption. Production runs
-  `special`, so it is only the fresh-project fallback; delete it rather than
-  restyle it.
-- The dance style list has no Charleston (or Hustle, Lindy Hop); add any a
-  week needs before it airs, or its couples can't be scored.
+Cleanups (2026-11-05):
+- Done in the app: `TeamEntry` and the inferred-teams fallback are deleted
+  (`TeamsMode` "inferred" is now "none"), and nothing reads `mark_max`,
+  `panel_judge_ids`, `song_source`, `theme_label`, `songs[].artist` or the
+  custom-moment tables.
+- To apply once that deploy is Ready: `supabase/apply-retire-special-leftovers.sql`
+  drops those columns, both custom-moment tables and `mutate_draft_moment`,
+  and replaces nine functions from their live definitions (the publish,
+  reveal, snapshot, seed and recompute RPCs plus `save_special_dance`,
+  `special_dance_panel`, `materialize_team_scores`). Rehearsed on a PGlite
+  stack whose function bodies matched live exactly. After applying,
+  regenerate the types and mark it applied here and in CLAUDE.md.
+- Dance styles checked 2026-11-05: E10's seven prefilled dances all use
+  existing styles. A missing one (Charleston, Hustle, Lindy Hop) is added in
+  Show Settings, no SQL.
 
 Still to see on a real night (E10, Tuesday 2026-11-10, 8pm ET), none browser-checked:
 - Special-dance card: a typed mark survives switching away and back; an
@@ -80,8 +74,6 @@ Still to check:
 
 ## E08 night follow-ups — 2026-10-27
 
-- `docs/audit-release-runbook.md` says E08 has no guest judges; Shirley Ballas
-  judged it. Fix that line (needs a push).
 - League Settings' "Lock Week N Picks Now?" dialog (`pickLockFlip` `lock_now`)
   is unit-tested but not seen in a browser. Check it on a league whose current
   week is still open.

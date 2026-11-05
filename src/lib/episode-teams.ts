@@ -18,10 +18,10 @@ import {
 // "special": supabase/apply-special-dances.sql is applied (episode_teams has
 // scoring_mode, dance_scores has max_score). "entity": only
 // apply-team-dance-entity.sql is (dance_scores has team_id, the team tables
-// and marks exist). "inferred": neither, so teams are read off the couples'
-// slot-2 rows and nothing selects team_id. Deploying the code before either
-// SQL therefore never 400s a page.
-export type TeamsMode = "special" | "entity" | "inferred";
+// and marks exist). "none": neither, so there are no special dances and
+// nothing selects team_id. Deploying the code before either SQL therefore
+// never 400s a page.
+export type TeamsMode = "special" | "entity" | "none";
 
 export type EpisodeTeamsLoad = {
   mode: TeamsMode;
@@ -66,7 +66,7 @@ export async function detectSpecialDances(client: SupabaseClient<Database>): Pro
 // All three probes together, so a page pays one round trip for the answer.
 export async function detectTeamsMode(client: SupabaseClient<Database>): Promise<TeamsMode> {
   const [entity, special] = await Promise.all([detectTeamEntity(client), detectSpecialDances(client)]);
-  if (!entity) return "inferred";
+  if (!entity) return "none";
   return special ? "special" : "entity";
 }
 
@@ -75,7 +75,7 @@ export async function detectTeamsMode(client: SupabaseClient<Database>): Promise
 // once the special-dances migration is. Selecting either earlier would 400
 // the page, so every loader builds its list here.
 export function danceScoreColumns(mode: TeamsMode, base: string, opts: { teamId?: boolean } = {}): string {
-  const extra = [opts.teamId && mode !== "inferred" ? "team_id" : null, mode === "special" ? "max_score" : null];
+  const extra = [opts.teamId && mode !== "none" ? "team_id" : null, mode === "special" ? "max_score" : null];
   return [base, ...extra.filter((column): column is string => column !== null)].join(", ");
 }
 
@@ -85,16 +85,15 @@ export function danceMaxScore(row: { max_score?: number | string | null }): numb
   return row.max_score == null ? null : Number(row.max_score);
 }
 
-const BASE_TEAM_COLUMNS = "id, episode_id, name, song_title, song_source, dance_style_id, captain_couple_id, host_name, sort_order, posted_at";
+const BASE_TEAM_COLUMNS = "id, episode_id, name, song_title, dance_style_id, captain_couple_id, host_name, sort_order, posted_at";
 const SPECIAL_TEAM_COLUMNS =
-  ", dance_type, scoring_mode, mark_max, panel_judge_ids, second_dance_style_id, songs, theme_label, details, name_is_auto, updated_at";
+  ", dance_type, scoring_mode, second_dance_style_id, songs, details, name_is_auto, updated_at";
 
 type TeamRow = {
   id: string;
   episode_id: string;
   name: string;
   song_title: string | null;
-  song_source: string | null;
   dance_style_id: string;
   captain_couple_id: string | null;
   host_name: string | null;
@@ -102,11 +101,8 @@ type TeamRow = {
   posted_at: string | null;
   dance_type?: string;
   scoring_mode?: string;
-  mark_max?: number | string;
-  panel_judge_ids?: string[] | null;
   second_dance_style_id?: string | null;
   songs?: Json;
-  theme_label?: string | null;
   details?: Json;
   name_is_auto?: boolean;
   updated_at?: string;
@@ -117,8 +113,7 @@ function parseSongs(value: Json | undefined): SpecialDanceSong[] | null {
   return value.flatMap((song) => {
     if (!song || typeof song !== "object" || Array.isArray(song)) return [];
     const title = typeof song.title === "string" ? song.title : "";
-    if (!title.trim()) return [];
-    return [{ title, artist: typeof song.artist === "string" && song.artist.trim() ? song.artist : null }];
+    return title.trim() ? [{ title }] : [];
   });
 }
 
@@ -147,34 +142,29 @@ export function specialDanceFromRow(row: TeamRow, memberCoupleIds: string[], cap
     nameIsAuto: row.name_is_auto ?? legacy.nameIsAuto,
     danceType: row.dance_type?.trim() || legacy.danceType,
     scoringMode: row.scoring_mode === "points" ? "points" : "marks",
-    markMax: row.mark_max == null ? legacy.markMax : Number(row.mark_max),
-    panelJudgeIds: row.panel_judge_ids ?? null,
     danceStyleId: row.dance_style_id,
     secondDanceStyleId: row.second_dance_style_id ?? null,
     songs: parseSongs(row.songs) ?? legacy.songs,
     songTitle: row.song_title,
-    songSource: row.song_source,
-    themeLabel: row.theme_label ?? null,
     details: parseDetails(row.details) ?? legacy.details,
     captainCoupleId: row.captain_couple_id,
     hostName: row.host_name,
     sortOrder: row.sort_order,
     memberCoupleIds,
-    inferred: false,
     postedAt: row.posted_at,
     updatedAt: row.updated_at ?? null,
   };
 }
 
 // Callers probe with detectTeamsMode first; a missing-schema error here
-// still degrades to the inferred mode instead of failing the page. In entity
+// still degrades to no special dances instead of failing the page. In entity
 // mode only the original columns are selected and every dance reads as a
 // Team Dance scored by marks out of 10 on the night's panel.
 export async function loadEpisodeTeams(
   client: SupabaseClient<Database>,
   admin: SupabaseClient<Database>,
   episodeIds: string[],
-  mode: Exclude<TeamsMode, "inferred"> = "entity"
+  mode: Exclude<TeamsMode, "none"> = "entity"
 ): Promise<EpisodeTeamsLoad> {
   if (episodeIds.length === 0) return EMPTY_TEAMS_LOAD(mode);
   const [teams, members] = await Promise.all([
@@ -191,7 +181,7 @@ export async function loadEpisodeTeams(
   ]);
   const failed = teams.error ?? members.error;
   if (failed) {
-    if (isMissingSchemaError(failed)) return EMPTY_TEAMS_LOAD("inferred");
+    if (isMissingSchemaError(failed)) return EMPTY_TEAMS_LOAD("none");
     throw new Error("Could not load the episode teams. Please try again.");
   }
   const teamRows = (teams.data ?? []) as unknown as TeamRow[];
@@ -241,14 +231,13 @@ export type SpecialDanceLabel = { name: string; danceType: string; scoringMode: 
 
 // Names and types for fan labels: authenticated viewers read every special
 // dance, guests only those of published episodes (RLS). Empty when the
-// migration is not applied, when the heuristic label stands in; in entity
-// mode every entry reads as a Team Dance.
+// migration is not applied; in entity mode every entry reads as a Team Dance.
 export async function loadSpecialDanceLabels(
   client: SupabaseClient<Database>,
   episodeIds: string[],
   mode: TeamsMode
 ): Promise<Record<string, SpecialDanceLabel>> {
-  if (episodeIds.length === 0 || mode === "inferred") return {};
+  if (episodeIds.length === 0 || mode === "none") return {};
   const { data, error } = await client
     .from("episode_teams")
     .select(`id, name${mode === "special" ? ", dance_type, scoring_mode" : ""}`)

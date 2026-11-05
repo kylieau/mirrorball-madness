@@ -46,7 +46,7 @@ export async function GuestResults({
   const selectedEpisodeIds = selectedWeek?.episodes.map((episode) => episode.id) ?? [];
 
   // team_id and max_score are selected only once their migrations are applied.
-  const teamsMode = showResults && selectedEpisodeIds.length > 0 ? await loadTeamsMode(supabase) : "inferred";
+  const teamsMode = showResults && selectedEpisodeIds.length > 0 ? await loadTeamsMode(supabase) : "none";
   const [{ data: danceScores }, { data: episodeResults }, { data: inJeopardyRows }, specialDanceLabels] = await Promise.all([
     showResults && selectedEpisodeIds.length > 0
       ? supabase

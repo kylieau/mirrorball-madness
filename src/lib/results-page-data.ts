@@ -68,12 +68,9 @@ export type ResultsPageData = {
   // with their latest post time (drives Posted rows and the undo window). A
   // team's row for a couple never makes them posted.
   revealedByEpisode: Record<string, Record<string, string>>;
-  // Those same couples' live own dance rows (style + song), for the inferred
-  // fallback's posted-member states.
-  revealedDancesByEpisode: Record<string, Record<string, { danceStyleId: string; songTitle: string | null; totalScore: number }[]>>;
   // "special" once supabase/apply-special-dances.sql is applied, "entity"
-  // with only supabase/apply-team-dance-entity.sql, else "inferred" (teams
-  // read off the couples' slot-2 rows, no team_id selected).
+  // with only supabase/apply-team-dance-entity.sql, else "none" (no special
+  // dances, no team_id selected).
   teamsMode: TeamsMode;
   teamsByEpisode: Record<string, SpecialDance[]>;
   teamMarksByTeam: Record<string, TeamMark[]>;
@@ -209,8 +206,8 @@ export async function loadResultsPageData(
   // round-tripping).
   const [draftEntries, teams] = await Promise.all([
     Promise.all((episodes ?? []).map(async (e) => [e.id, await loadDraftForEpisode(admin, e.id)] as const)),
-    teamsMode === "inferred"
-      ? Promise.resolve(EMPTY_TEAMS_LOAD("inferred"))
+    teamsMode === "none"
+      ? Promise.resolve(EMPTY_TEAMS_LOAD("none"))
       : loadEpisodeTeams(supabase, admin, (episodes ?? []).map((e) => e.id), teamsMode),
   ]);
   const liveRows = ((danceScores ?? []) as unknown as ResultsPageData["danceScores"]).map((row) => ({
@@ -224,7 +221,6 @@ export async function loadResultsPageData(
     (episodes ?? []).filter((e) => !e.results_published_at).map((e) => e.id)
   );
   const revealedByEpisode: Record<string, Record<string, string>> = {};
-  const revealedDancesByEpisode: ResultsPageData["revealedDancesByEpisode"] = {};
   const teamLiveByTeam: ResultsPageData["teamLiveByTeam"] = {};
   for (const row of liveRows) {
     if (row.team_id) {
@@ -236,11 +232,6 @@ export async function loadResultsPageData(
     if (!unpublishedEpisodeIds.has(row.episode_id)) continue;
     const byCouple = (revealedByEpisode[row.episode_id] ??= {});
     if (!byCouple[row.couple_id] || row.created_at > byCouple[row.couple_id]) byCouple[row.couple_id] = row.created_at;
-    ((revealedDancesByEpisode[row.episode_id] ??= {})[row.couple_id] ??= []).push({
-      danceStyleId: row.dance_style_id,
-      songTitle: row.song_title,
-      totalScore: Number(row.total_score),
-    });
   }
 
   const publisherIds = [
@@ -304,7 +295,6 @@ export async function loadResultsPageData(
     episodeResults: episodeResults ?? [],
     draftsByEpisode,
     revealedByEpisode,
-    revealedDancesByEpisode,
     teamsMode: teams.mode,
     teamsByEpisode: teams.teamsByEpisode,
     teamMarksByTeam: teams.marksByTeam,

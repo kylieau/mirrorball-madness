@@ -3,15 +3,14 @@ import { isValidMark } from "./judge-marks";
 import { collapseToNights, MARK_MAX, scaledJudgesScore } from "./scoring";
 
 // A special dance takes marks from the night's judges: the standing panel plus
-// that episode's guests, 2 to 4 of them. The SQL checks the same bounds
-// (episode_teams_special_checks, save_team_marks).
+// that episode's guests, 2 to 4 of them, each out of 10. The SQL checks the
+// same bounds (save_team_marks).
 export const SPECIAL_DANCE_MIN_JUDGES = 2;
 export const SPECIAL_DANCE_MAX_JUDGES = 4;
 export const SPECIAL_DANCE_MAX_SONGS = 4;
 export const SPECIAL_DANCE_MAX_DETAILS = 12;
 export const SPECIAL_DANCE_POINTS_LIMIT = 100;
 export const DEFAULT_DANCE_TYPE = "Team Dance";
-export const DEFAULT_MARK_MAX = MARK_MAX;
 
 export const DANCE_TYPE_SUGGESTIONS = [
   "Team Dance",
@@ -32,7 +31,7 @@ export const DETAIL_LABEL_SUGGESTIONS = ["Captain", "Host", "Live Performer", "M
 export const RESULT_SUGGESTIONS = ["Winner", "Loser", "Immune"] as const;
 
 export type SpecialDanceScoringMode = "marks" | "points";
-export type SpecialDanceSong = { title: string; artist: string | null };
+export type SpecialDanceSong = { title: string };
 export type SpecialDanceDetail = { label: string; value: string; coupleId: string | null };
 
 // One special dance of an episode: a team dance, dance-off, marathon, relay,
@@ -45,30 +44,17 @@ export type SpecialDance = {
   nameIsAuto: boolean;
   danceType: string;
   scoringMode: SpecialDanceScoringMode;
-  // Stored, but the app no longer sets either: every dance is out of 10 on
-  // the night's panel (null), which episode_teams_night_panel pins. The
-  // publication math still reads them, so they go together (BACKLOG).
-  markMax: number;
-  panelJudgeIds: string[] | null;
   danceStyleId: string;
   secondDanceStyleId: string | null;
   songs: SpecialDanceSong[];
   // Mirror of songs[0].title, kept for older readers.
   songTitle: string | null;
-  // Theme/Source: the free text plus its label (Film, Show, Musical, ...).
-  songSource: string | null;
-  themeLabel: string | null;
   details: SpecialDanceDetail[];
   // Mirrors of the Captain and Host details, kept for older readers.
   captainCoupleId: string | null;
   hostName: string | null;
   sortOrder: number;
   memberCoupleIds: string[];
-  // Inferred teams are read off the couples' own slot-2 rows (a shared
-  // Freestyle and song on a Team Dance night) -- the fallback before
-  // supabase/apply-team-dance-entity.sql is applied. They have no captain or
-  // host and are named after their song.
-  inferred: boolean;
   // When the dance's score went live (entity model), else null.
   postedAt: string | null;
   updatedAt: string | null;
@@ -79,48 +65,12 @@ export type TeamMark = { judgeId: string; score: number };
 // (episode_team_scores, service-only until posted).
 export type SpecialDanceScore = { coupleId: string; points: number | null; result: string | null };
 
-type DanceSignature = { danceStyleId: string; songTitle: string | null };
-
 export function isHalfStep(value: number): boolean {
   return Number.isFinite(value) && value * 2 === Math.trunc(value * 2);
 }
 
 export function isValidPoints(points: number): boolean {
   return isHalfStep(points) && Math.abs(points) <= SPECIAL_DANCE_POINTS_LIMIT;
-}
-
-// The judges whose marks a special dance takes: its own panel when one was
-// chosen, else the night's. Mirrors special_dance_panel() in SQL.
-export function specialDancePanel(dance: Pick<SpecialDance, "panelJudgeIds">, nightJudgeIds: string[]): string[] {
-  return dance.panelJudgeIds ?? nightJudgeIds;
-}
-
-// Case- and whitespace-insensitive, the same key team_song_key() uses in SQL.
-export function songKey(song: string | null | undefined): string {
-  return (song ?? "").trim().toLowerCase();
-}
-
-// A member's team dance is whichever draft row carries the team's style and
-// song -- never "the second slot". Mirrors the signature the inferred
-// fallback applies.
-export function isTeamDanceRow(team: DanceSignature, dance: DanceSignature): boolean {
-  return dance.danceStyleId === team.danceStyleId && songKey(dance.songTitle) === songKey(team.songTitle);
-}
-
-export const INFERRED_TEAM_PREFIX = "inferred:";
-
-// Names for teams read off the draft, keyed by songKey(). A saved team
-// (supabase/apply-team-dance-entity.sql) carries its own name; without one this is
-// the only place a name can live, and an unknown song names the team after
-// itself.
-export const KNOWN_TEAM_NAMES_BY_SONG: Record<string, string> = {
-  zoo: "Slaytopia",
-  "we're all in this together": "Wildcats",
-  "we’re all in this together": "Wildcats",
-};
-
-export function inferredTeamName(songTitle: string | null): string {
-  return KNOWN_TEAM_NAMES_BY_SONG[songKey(songTitle)] ?? songTitle?.trim() ?? DEFAULT_DANCE_TYPE;
 }
 
 // The columns a special dance row carries before apply-special-dances.sql
@@ -132,7 +82,7 @@ export function legacyTeamDefaults(team: {
   captainName?: string | null;
 }): Pick<
   SpecialDance,
-  "nameIsAuto" | "danceType" | "scoringMode" | "markMax" | "panelJudgeIds" | "secondDanceStyleId" | "songs" | "themeLabel" | "details" | "updatedAt"
+  "nameIsAuto" | "danceType" | "scoringMode" | "secondDanceStyleId" | "songs" | "details" | "updatedAt"
 > {
   const details: SpecialDanceDetail[] = [];
   if (team.captainCoupleId) details.push({ label: "Captain", value: team.captainName ?? "", coupleId: team.captainCoupleId });
@@ -141,61 +91,11 @@ export function legacyTeamDefaults(team: {
     nameIsAuto: false,
     danceType: DEFAULT_DANCE_TYPE,
     scoringMode: "marks",
-    markMax: DEFAULT_MARK_MAX,
-    panelJudgeIds: null,
     secondDanceStyleId: null,
-    songs: team.songTitle ? [{ title: team.songTitle, artist: null }] : [],
-    themeLabel: null,
+    songs: team.songTitle ? [{ title: team.songTitle }] : [],
     details,
     updatedAt: null,
   };
-}
-
-// Teams read off the draft itself: on a Team Dance night, two or more couples
-// whose rows share a Freestyle and the same song are one team. This is what
-// the live Week 8 data looked like before the entity migration (every
-// couple's second slot held the team's Freestyle and song), so it needs no
-// migration. A row's style must be one of `teamStyleIds` (styles named like
-// Freestyle).
-export function inferTeamsFromRows(
-  episodeId: string,
-  couples: { coupleId: string; dances: DanceSignature[] }[],
-  teamStyleIds: ReadonlySet<string>
-): SpecialDance[] {
-  const groups = new Map<string, { danceStyleId: string; songTitle: string | null; memberCoupleIds: string[] }>();
-  for (const couple of couples) {
-    const seen = new Set<string>();
-    for (const dance of couple.dances) {
-      if (!teamStyleIds.has(dance.danceStyleId)) continue;
-      const key = `${dance.danceStyleId}|${songKey(dance.songTitle)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const group = groups.get(key) ?? { danceStyleId: dance.danceStyleId, songTitle: dance.songTitle?.trim() || null, memberCoupleIds: [] };
-      group.memberCoupleIds.push(couple.coupleId);
-      groups.set(key, group);
-    }
-  }
-  return [...groups.entries()]
-    .filter(([, group]) => group.memberCoupleIds.length >= 2)
-    .map(([key, group], index) => ({
-      id: `${INFERRED_TEAM_PREFIX}${key}`,
-      episodeId,
-      name: inferredTeamName(group.songTitle),
-      songTitle: group.songTitle,
-      songSource: null,
-      danceStyleId: group.danceStyleId,
-      captainCoupleId: null,
-      hostName: null,
-      sortOrder: index + 1,
-      memberCoupleIds: group.memberCoupleIds,
-      inferred: true,
-      postedAt: null,
-      ...legacyTeamDefaults({ songTitle: group.songTitle, captainCoupleId: null, hostName: null }),
-    }));
-}
-
-export function isTeamStyleName(name: string): boolean {
-  return /freestyle/i.test(name);
 }
 
 export type ParsedTeamMarks = {
@@ -262,10 +162,10 @@ export function sameTeamMarks(a: TeamMark[] | null, b: TeamMark[] | null): boole
   return b.every((m) => byJudge.get(m.judgeId) === m.score);
 }
 
-// Mirrors special_dance_complete(): a Marks dance has a mark from every judge
-// on its panel; a Points dance has points for every eligible participant.
+// Mirrors special_dance_complete(): a Marks dance has a mark from every one of
+// the night's judges; a Points dance has points for every eligible participant.
 export function specialDanceComplete(
-  dance: Pick<SpecialDance, "scoringMode" | "panelJudgeIds">,
+  dance: Pick<SpecialDance, "scoringMode">,
   input: { marks: TeamMark[]; scores: SpecialDanceScore[]; eligibleCoupleIds: string[]; nightJudgeIds: string[] }
 ): boolean {
   if (dance.scoringMode === "points") {
@@ -274,13 +174,13 @@ export function specialDanceComplete(
       input.eligibleCoupleIds.every((coupleId) => input.scores.some((s) => s.coupleId === coupleId && s.points !== null))
     );
   }
-  const panel = specialDancePanel(dance, input.nightJudgeIds);
-  return isValidPanelSize(panel.length) && panel.every((judgeId) => input.marks.some((m) => m.judgeId === judgeId));
+  const judgeIds = input.nightJudgeIds;
+  return isValidPanelSize(judgeIds.length) && judgeIds.every((judgeId) => input.marks.some((m) => m.judgeId === judgeId));
 }
 
 // The picker's status pill: how far along a special dance's scoring is.
 export function specialDanceProgress(
-  dance: Pick<SpecialDance, "scoringMode" | "panelJudgeIds" | "postedAt">,
+  dance: Pick<SpecialDance, "scoringMode" | "postedAt">,
   input: { marks: TeamMark[]; scores: SpecialDanceScore[]; eligibleCoupleIds: string[]; nightJudgeIds: string[] }
 ): { done: number; total: number; complete: boolean; label: string } {
   if (dance.scoringMode === "points") {
@@ -288,12 +188,10 @@ export function specialDanceProgress(
     const total = input.eligibleCoupleIds.length;
     return { done, total, complete: specialDanceComplete(dance, input), label: dance.postedAt ? "Posted" : `${done} of ${total} points` };
   }
-  const panel = specialDancePanel(dance, input.nightJudgeIds);
-  const done = panel.filter((judgeId) => input.marks.some((m) => m.judgeId === judgeId)).length;
-  return { done, total: panel.length, complete: specialDanceComplete(dance, input), label: dance.postedAt ? "Posted" : `${done} of ${panel.length} judges` };
+  const judgeIds = input.nightJudgeIds;
+  const done = judgeIds.filter((judgeId) => input.marks.some((m) => m.judgeId === judgeId)).length;
+  return { done, total: judgeIds.length, complete: specialDanceComplete(dance, input), label: dance.postedAt ? "Posted" : `${done} of ${judgeIds.length} judges` };
 }
-
-export type MemberDanceRow = DanceSignature & { scores: Record<string, string> };
 
 export type TeamEligibilityInput = {
   coupleId: string;
@@ -329,7 +227,7 @@ export function addableSpecialDanceParticipants<T extends { id: string; status: 
 
 // Mirrors team_eligible_members(): on the team, in tonight's cast, not
 // withdrawn, Did Not Dance, or eliminated before this week. Shared by the
-// publication and team-post planners and by the team entry's member list.
+// publication and team-post planners and by the special dance's member list.
 export function eligibleTeamMembers(
   team: Pick<SpecialDance, "memberCoupleIds">,
   members: TeamEligibilityInput[],
@@ -351,103 +249,11 @@ export function eligibleTeamMembers(
   return { eligible, skipped };
 }
 
-export type TeamMemberInput = {
-  coupleId: string;
-  status: string;
-  eliminationWeek: number | null;
-  // The draft outcome row for this episode, when one exists.
-  outcome: string | null;
-  dances: MemberDanceRow[];
-  posted: boolean;
-  // The couple's live dance rows while the episode is unpublished.
-  liveDances: (DanceSignature & { totalScore: number })[];
-};
-
-export type TeamMemberState =
-  | "will_apply"
-  | "applied"
-  | "posted_applied"
-  | "posted_waiting"
-  | "skipped"
-  | "collision";
-
-export type TeamMemberPlan = {
-  coupleId: string;
-  state: TeamMemberState;
-  // For skipped: why. For collision: how many non-team dances were found.
-  reason: "withdrawn" | "bye" | "eliminated" | "not_performing" | null;
-  otherDances: number;
-  appliedMarks: TeamMark[] | null;
-  // The total of the team dance that is live for a posted member, so the
-  // card can tell when the team was re-scored after they were posted.
-  liveTeamTotal: number | null;
-};
-
-function marksFromRow(row: MemberDanceRow, judgeIds: string[]): TeamMark[] | null {
-  const marks: TeamMark[] = [];
-  for (const judgeId of judgeIds) {
-    const raw = (row.scores[judgeId] ?? "").trim();
-    if (raw === "") return null;
-    const score = Number(raw);
-    if (!Number.isFinite(score)) return null;
-    marks.push({ judgeId, score });
-  }
-  return isValidPanelSize(marks.length) ? marks : null;
-}
-
-// Client-side preview of what the inferred fallback does for each member
-// (marks written into the team row of every member's draft). The draft save
-// is authoritative; this keeps the "Applies to N of M" list honest before
-// and after the call.
-export function teamApplyPlan(
-  team: SpecialDance,
-  members: TeamMemberInput[],
-  opts: { weekNumber: number | null; participantIds: string[]; judgeIds: string[] }
-): TeamMemberPlan[] {
-  const restricted = opts.participantIds.length > 0;
-  const performing = new Set(opts.participantIds);
-  return team.memberCoupleIds.flatMap((coupleId) => {
-    const member = members.find((m) => m.coupleId === coupleId);
-    if (!member) return [];
-    const liveTeamTotal = member.posted ? (member.liveDances.find((d) => isTeamDanceRow(team, d))?.totalScore ?? null) : null;
-    const base = { coupleId, reason: null, otherDances: 0, appliedMarks: null, liveTeamTotal } satisfies Omit<TeamMemberPlan, "state">;
-    if (member.outcome === "bye") return [{ ...base, state: "skipped", reason: "bye" } as TeamMemberPlan];
-    if (member.outcome === "withdrawn" || member.status === "withdrawn")
-      return [{ ...base, state: "skipped", reason: "withdrawn" } as TeamMemberPlan];
-    if (eliminatedBeforeWeek(member, opts.weekNumber))
-      return [{ ...base, state: "skipped", reason: "eliminated" } as TeamMemberPlan];
-    if (restricted && !performing.has(coupleId))
-      return [{ ...base, state: "skipped", reason: "not_performing" } as TeamMemberPlan];
-    const real = member.dances.filter((d) => d.danceStyleId);
-    const teamRows = real.filter((d) => isTeamDanceRow(team, d));
-    const otherDances = real.length - teamRows.length;
-    if (teamRows.length === 0) {
-      if (otherDances !== 1) return [{ ...base, state: "collision", otherDances } as TeamMemberPlan];
-      return [{ ...base, state: member.posted ? "posted_waiting" : "will_apply", otherDances } as TeamMemberPlan];
-    }
-    if (teamRows.length > 1) return [{ ...base, state: "collision", otherDances } as TeamMemberPlan];
-    const appliedMarks = marksFromRow(teamRows[0], opts.judgeIds);
-    if (member.posted) {
-      return [{ ...base, state: liveTeamTotal == null ? "posted_waiting" : "posted_applied", otherDances, appliedMarks } as TeamMemberPlan];
-    }
-    return [{ ...base, state: appliedMarks ? "applied" : "will_apply", otherDances, appliedMarks } as TeamMemberPlan];
-  });
-}
-
-// The marks the team already carries in members' drafts, plus whether every
-// member agrees (a disagreement means someone's row was edited by hand).
-export function appliedTeamMarks(plan: TeamMemberPlan[]): { marks: TeamMark[] | null; mismatch: boolean } {
-  const sets = plan.map((p) => p.appliedMarks).filter((m): m is TeamMark[] => m != null);
-  if (sets.length === 0) return { marks: null, mismatch: false };
-  return { marks: sets[0], mismatch: sets.some((m) => !sameTeamMarks(m, sets[0])) };
-}
-
 // One dance of a couple's night, as the Leaderboard view knows it: the
 // couple's own dance (label null), a special dance scored by marks, or a
 // bonus round scored in points (marks empty, points set).
 export type NightSummaryDance = {
   marks: number[];
-  markMax?: number;
   points?: number | null;
   // The special dance's name for a marks row, its Dance Type for a points
   // row; null for the couple's own dance.
@@ -474,9 +280,8 @@ export type NightSummaryRow = {
 // 0-max row. Shared with the per-couple night preview on Enter Results.
 export function nightSummaryDanceScore(episodeId: string, coupleId: string, dance: NightSummaryDance) {
   if (dance.points != null) return { episodeId, coupleId, totalScore: dance.points, scaledScore: 0, maxScore: 0 };
-  const markMax = dance.markMax ?? DEFAULT_MARK_MAX;
   const totalScore = dance.marks.reduce((sum, n) => sum + n, 0);
-  return { episodeId, coupleId, totalScore, scaledScore: scaledJudgesScore(dance.marks, markMax), maxScore: dance.marks.length * markMax };
+  return { episodeId, coupleId, totalScore, scaledScore: scaledJudgesScore(dance.marks, MARK_MAX), maxScore: dance.marks.length * MARK_MAX };
 }
 
 // Frame 08: Individual + Team + Dance-Off = Night out of the marks possible,
@@ -521,8 +326,6 @@ export type SpecialDanceSetupInput = {
   secondDanceStyleId: string | null;
   songs: SpecialDanceSong[];
   scoringMode: SpecialDanceScoringMode;
-  songSource: string | null;
-  themeLabel: string | null;
   details: SpecialDanceDetail[];
   sortOrder: number;
 };

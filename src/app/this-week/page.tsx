@@ -136,7 +136,7 @@ export default async function ThisWeekPage({
 
   // team_id and max_score are selected only once their migrations are
   // applied, so a deploy ahead of the SQL can never 400 this page.
-  const teamsMode = showResults && selectedEpisodeIds.length > 0 ? await loadTeamsMode(supabase) : "inferred";
+  const teamsMode = showResults && selectedEpisodeIds.length > 0 ? await loadTeamsMode(supabase) : "none";
   const [
     { data: danceScores },
     { data: episodeResults },

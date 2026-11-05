@@ -1,14 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  appliedTeamMarks,
   automaticSpecialDanceName,
   oxfordJoin,
   buildNightSummary,
   eligibleTeamMembers,
-  inferTeamsFromRows,
   isHalfStep,
-  isTeamDanceRow,
-  isTeamStyleName,
   isValidPoints,
   legacyTeamDefaults,
   parseSpecialPoints,
@@ -18,13 +14,11 @@ import {
   specialDanceComplete,
   specialDanceProgress,
   specialDanceSummary,
-  teamApplyPlan,
   addableSpecialDanceParticipants,
   eliminatedBeforeWeek,
   validateSpecialDanceSetup,
   type SpecialDance,
   type SpecialDanceSetupInput,
-  type TeamMemberInput,
 } from "./team-dances";
 
 const judges = ["carrie", "derek", "bruno", "cynthia"];
@@ -35,14 +29,10 @@ const team: SpecialDance = {
   nameIsAuto: false,
   danceType: "Team Dance",
   scoringMode: "marks",
-  markMax: 10,
-  panelJudgeIds: null,
   danceStyleId: "freestyle",
   secondDanceStyleId: null,
-  songs: [{ title: "Zoo", artist: null }],
+  songs: [{ title: "Zoo" }],
   songTitle: "Zoo",
-  songSource: "Zootopia 2",
-  themeLabel: "Film",
   details: [
     { label: "Captain", value: "Tatyana", coupleId: "tatyana" },
     { label: "Host", value: "Alfonso Ribeiro", coupleId: null },
@@ -51,23 +41,10 @@ const team: SpecialDance = {
   hostName: "Alfonso Ribeiro",
   sortOrder: 1,
   memberCoupleIds: ["tatyana", "maura", "amber", "julia"],
-  inferred: false,
   postedAt: null,
   updatedAt: null,
 };
 const nine = Object.fromEntries(judges.map((j) => [j, "9"]));
-const member = (coupleId: string, overrides: Partial<TeamMemberInput> = {}): TeamMemberInput => ({
-  coupleId,
-  status: "active",
-  eliminationWeek: null,
-  outcome: "safe",
-  dances: [{ danceStyleId: "contemporary", songTitle: "Easy as Life", scores: { carrie: "8", derek: "8", bruno: "9", cynthia: "8" } }],
-  posted: false,
-  liveDances: [],
-  ...overrides,
-});
-const opts = { weekNumber: 8, participantIds: [], judgeIds: judges };
-
 describe("mark and point ranges", () => {
   it("accepts half steps only", () => {
     expect(isHalfStep(7.5)).toBe(true);
@@ -117,12 +94,11 @@ describe("specialDanceComplete and specialDanceProgress", () => {
   const night = ["carrie", "derek", "bruno"];
   const marks = (ids: string[]) => ids.map((judgeId) => ({ judgeId, score: 9 }));
 
-  it("judges a Marks dance against its own panel, else the night's", () => {
+  it("judges a Marks dance against the night's judges, 2 to 4 of them", () => {
     const input = { marks: marks(night), scores: [], eligibleCoupleIds: ["a"], nightJudgeIds: night };
     expect(specialDanceComplete(team, input)).toBe(true);
     expect(specialDanceComplete(team, { ...input, marks: marks(night.slice(0, 2)) })).toBe(false);
-    expect(specialDanceComplete({ ...team, panelJudgeIds: ["carrie", "derek"] }, { ...input, marks: marks(["carrie", "derek"]) })).toBe(true);
-    expect(specialDanceComplete({ ...team, panelJudgeIds: ["carrie"] }, { ...input, marks: marks(["carrie"]) })).toBe(false);
+    expect(specialDanceComplete(team, { ...input, marks: marks(["carrie"]), nightJudgeIds: ["carrie"] })).toBe(false);
     expect(specialDanceProgress(team, { ...input, marks: marks(night.slice(0, 2)) })).toMatchObject({ done: 2, total: 3, complete: false, label: "2 of 3 judges" });
     expect(specialDanceProgress({ ...team, postedAt: "2026-11-04T01:00:00Z" }, input).label).toBe("Posted");
   });
@@ -138,83 +114,6 @@ describe("specialDanceComplete and specialDanceProgress", () => {
     expect(specialDanceProgress(danceOff, input)).toMatchObject({ done: 1, total: 2, label: "1 of 2 points" });
     expect(specialDanceComplete(danceOff, { ...input, scores: [scores[0], { coupleId: "b", points: 0, result: "Loser" }] })).toBe(true);
     expect(specialDanceComplete(danceOff, { ...input, eligibleCoupleIds: [] })).toBe(false);
-  });
-});
-
-describe("isTeamDanceRow", () => {
-  it("matches the team's style and song, ignoring case, surrounding whitespace and null vs empty", () => {
-    expect(isTeamDanceRow(team, { danceStyleId: "freestyle", songTitle: " zoo " })).toBe(true);
-    expect(isTeamDanceRow(team, { danceStyleId: "freestyle", songTitle: "Try Everything" })).toBe(false);
-    expect(isTeamDanceRow(team, { danceStyleId: "contemporary", songTitle: "Zoo" })).toBe(false);
-    expect(isTeamDanceRow({ ...team, songTitle: null }, { danceStyleId: "freestyle", songTitle: "" })).toBe(true);
-  });
-});
-
-describe("teamApplyPlan", () => {
-  it("mirrors the RPC: applies to members with exactly one other dance, skips withdrawn and bye, flags collisions", () => {
-    const plan = teamApplyPlan(
-      team,
-      [
-        member("tatyana"),
-        member("maura", { outcome: "bye" }),
-        member("amber", { status: "withdrawn" }),
-        member("julia", { dances: [] }),
-      ],
-      opts
-    );
-    expect(plan.map((p) => [p.coupleId, p.state, p.reason])).toEqual([
-      ["tatyana", "will_apply", null],
-      ["maura", "skipped", "bye"],
-      ["amber", "skipped", "withdrawn"],
-      ["julia", "collision", null],
-    ]);
-    expect(plan[3].otherDances).toBe(0);
-  });
-
-  it("skips a couple eliminated before this week but not one eliminated on the night itself", () => {
-    const plan = teamApplyPlan(
-      team,
-      [
-        member("tatyana", { status: "eliminated", eliminationWeek: 7 }),
-        member("maura", { status: "eliminated", eliminationWeek: 8 }),
-      ],
-      opts
-    );
-    expect(plan.map((p) => p.state)).toEqual(["skipped", "will_apply"]);
-  });
-
-  it("honours a restricted Who's Performing list", () => {
-    const plan = teamApplyPlan(team, [member("tatyana"), member("maura")], { ...opts, participantIds: ["tatyana"] });
-    expect(plan.map((p) => [p.state, p.reason])).toEqual([["will_apply", null], ["skipped", "not_performing"]]);
-  });
-
-  it("reads applied marks from the team row and tells a posted member with the team dance live from one without", () => {
-    const teamRow = { danceStyleId: "freestyle", songTitle: "Zoo", scores: nine };
-    const plan = teamApplyPlan(
-      team,
-      [
-        member("tatyana", { dances: [...member("x").dances, teamRow] }),
-        member("maura", { posted: true }),
-        member("amber", { posted: true, dances: [...member("x").dances, teamRow], liveDances: [{ danceStyleId: "contemporary", songTitle: "Easy as Life", totalScore: 33 }] }),
-        member("julia", {
-          posted: true,
-          dances: [...member("x").dances, teamRow],
-          liveDances: [{ danceStyleId: "contemporary", songTitle: "Easy as Life", totalScore: 33 }, { danceStyleId: "freestyle", songTitle: "Zoo", totalScore: 36 }],
-        }),
-      ],
-      opts
-    );
-    expect(plan.map((p) => p.state)).toEqual(["applied", "posted_waiting", "posted_waiting", "posted_applied"]);
-    expect(plan[3].liveTeamTotal).toBe(36);
-    expect(appliedTeamMarks(plan)).toEqual({ marks: judges.map((judgeId) => ({ judgeId, score: 9 })), mismatch: false });
-    const edited = { ...teamRow, scores: { ...nine, derek: "8" } };
-    expect(appliedTeamMarks(teamApplyPlan(team, [member("tatyana", { dances: [...member("x").dances, teamRow] }), member("maura", { dances: [...member("x").dances, edited] })], opts)).mismatch).toBe(true);
-  });
-
-  it("treats a second team-signature row as a collision instead of guessing", () => {
-    const teamRow = { danceStyleId: "freestyle", songTitle: "Zoo", scores: nine };
-    const plan = teamApplyPlan(team, [member("tatyana", { dances: [...member("x").dances, teamRow, teamRow] })], opts);
-    expect(plan[0].state).toBe("collision");
   });
 });
 
@@ -280,13 +179,13 @@ describe("buildNightSummary", () => {
     expect(perfect.danceCardPreview).toBe(33);
   });
 
-  it("scores a special dance on its own per-judge max and ranks the bonus into the top-scorer bands", () => {
+  it("scores a special dance out of 10 a judge and ranks the bonus into the top-scorer bands", () => {
     const rows = buildNightSummary([
-      { coupleId: "a", dances: [{ marks: [8, 8, 8], label: null }, { marks: [8, 7.5, 8], markMax: 8, label: "Relay" }] },
+      { coupleId: "a", dances: [{ marks: [8, 8, 8], label: null }, { marks: [8, 7, 8], label: "Relay" }] },
       { coupleId: "b", dances: [{ marks: [8, 8, 8], label: null }, { marks: [], points: 2, label: "Dance-Off" }] },
     ]);
     expect(rows.map((r) => [r.coupleId, r.nightTotal, r.maxPossible, r.tag])).toEqual([
-      ["a", 47.5, 54, "top"],
+      ["a", 47, 60, "top"],
       ["b", 26, 30, null],
     ]);
   });
@@ -300,10 +199,8 @@ describe("validateSpecialDanceSetup", () => {
     memberCoupleIds: ["a", "b"],
     danceStyleId: "freestyle",
     secondDanceStyleId: null,
-    songs: [{ title: "Zoo", artist: null }],
+    songs: [{ title: "Zoo" }],
     scoringMode: "marks",
-    songSource: null,
-    themeLabel: null,
     details: [],
     sortOrder: 1,
     ...overrides,
@@ -318,7 +215,7 @@ describe("validateSpecialDanceSetup", () => {
     expect(validateSpecialDanceSetup(setup({ name: "wildcats" }), others)).toMatch(/already called/);
     expect(validateSpecialDanceSetup(setup({ id: "wildcats", name: "Wildcats" }), others)).toBeNull();
     expect(validateSpecialDanceSetup(setup({ name: "" }), others)).toBeNull();
-    expect(validateSpecialDanceSetup(setup({ songs: Array(5).fill({ title: "x", artist: null }) }), others)).toMatch(/up to 4 songs/);
+    expect(validateSpecialDanceSetup(setup({ songs: Array(5).fill({ title: "x" }) }), others)).toMatch(/up to 4 songs/);
     expect(validateSpecialDanceSetup(setup({ details: [{ label: " ", value: "x", coupleId: null }] }), others)).toMatch(/needs a label/);
   });
 });
@@ -362,70 +259,30 @@ describe("recentSuggestions", () => {
 });
 
 describe("specialDanceSummary and legacyTeamDefaults", () => {
-  it("reads as style, songs and details, with no separate artist or source", () => {
+  it("reads as style, songs and details", () => {
     const styles = new Map([["freestyle", "Freestyle"], ["jive", "Jive"]]);
     expect(specialDanceSummary(team, styles)).toBe('Freestyle · "Zoo" · Captain Tatyana · Host Alfonso Ribeiro');
     expect(
       specialDanceSummary(
-        { ...team, secondDanceStyleId: "jive", songs: [{ title: "Zoo (Zootopia 2)", artist: "Shakira" }, { title: "Try Everything", artist: null }], details: [] },
+        { ...team, secondDanceStyleId: "jive", songs: [{ title: "Zoo (Zootopia 2)" }, { title: "Try Everything" }], details: [] },
         styles
       )
     ).toBe('Freestyle & Jive · "Zoo (Zootopia 2)" · "Try Everything"');
   });
 
-  it("fills a pre-migration team row as a Team Dance by marks out of 10 with Captain and Host as details", () => {
+  it("fills a pre-migration team row as a Team Dance by marks with Captain and Host as details", () => {
     expect(legacyTeamDefaults({ songTitle: "Zoo", captainCoupleId: "tatyana", hostName: "Alfonso Ribeiro", captainName: "Tatyana" })).toEqual({
       nameIsAuto: false,
       danceType: "Team Dance",
       scoringMode: "marks",
-      markMax: 10,
-      panelJudgeIds: null,
       secondDanceStyleId: null,
-      songs: [{ title: "Zoo", artist: null }],
-      themeLabel: null,
+      songs: [{ title: "Zoo" }],
       details: [
         { label: "Captain", value: "Tatyana", coupleId: "tatyana" },
         { label: "Host", value: "Alfonso Ribeiro", coupleId: null },
       ],
       updatedAt: null,
     });
-  });
-});
-
-describe("inferTeamsFromRows", () => {
-  const styles = new Set(["freestyle"]);
-  const row = (danceStyleId: string, songTitle: string | null) => ({ danceStyleId, songTitle });
-  it("reads the live Week 8 shape: couples whose second slot shares a Freestyle and song form a team", () => {
-    const teams = inferTeamsFromRows(
-      "ep",
-      [
-        { coupleId: "tatyana", dances: [row("contemporary", "Easy as Life"), row("freestyle", "Zoo")] },
-        { coupleId: "maura", dances: [row("jive", "Hakuna Matata"), row("freestyle", "zoo ")] },
-        { coupleId: "connor", dances: [row("freestyle", "We're All in This Together"), row("quickstep", "Go the Distance")] },
-        { coupleId: "ezra", dances: [row("freestyle", "We're All in This Together")] },
-        { coupleId: "harry", dances: [row("freestyle", "Solo Freestyle")] },
-        { coupleId: "jenna", dances: [row("waltz", "Zoo")] },
-      ],
-      styles
-    );
-    expect(teams.map((t) => [t.name, t.songTitle, t.memberCoupleIds, t.inferred, t.captainCoupleId])).toEqual([
-      ["Slaytopia", "Zoo", ["tatyana", "maura"], true, null],
-      ["Wildcats", "We're All in This Together", ["connor", "ezra"], true, null],
-    ]);
-    expect(teams[0].id).toMatch(/^inferred:/);
-    expect(teams[0]).toMatchObject({ danceStyleId: "freestyle", danceType: "Team Dance", scoringMode: "marks", markMax: 10, songs: [{ title: "Zoo", artist: null }] });
-  });
-
-  it("names an unknown song's team after the song", () => {
-    const [team] = inferTeamsFromRows("ep", [{ coupleId: "a", dances: [row("freestyle", "Try Everything")] }, { coupleId: "b", dances: [row("freestyle", "Try Everything")] }], styles);
-    expect(team.name).toBe("Try Everything");
-  });
-
-  it("ignores styles that are not team styles and needs two couples", () => {
-    expect(inferTeamsFromRows("ep", [{ coupleId: "a", dances: [row("freestyle", "Zoo")] }], styles)).toEqual([]);
-    expect(inferTeamsFromRows("ep", [{ coupleId: "a", dances: [row("waltz", "Zoo")] }, { coupleId: "b", dances: [row("waltz", "Zoo")] }], styles)).toEqual([]);
-    expect(isTeamStyleName("Team Freestyle")).toBe(true);
-    expect(isTeamStyleName("Waltz")).toBe(false);
   });
 });
 

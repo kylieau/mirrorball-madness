@@ -25,7 +25,6 @@ describe("buildPublicationPlan", () => {
       draftJudges: draftDances.flatMap((d, i) => d.marks.map((score, j) => ({ draft_dance_score_id: `d${i}`, judge_id: `j${j}`, score }))),
       draftResults: [{ episode_id: "ep", couple_id: "amber", outcome: "safe" }],
       draftJeopardy: [],
-      draftMoments: [],
     } as unknown as PublicationSnapshot;
   }
 

@@ -50,8 +50,8 @@ describe("detectTeamEntity and detectTeamsMode", () => {
     expect(await detectTeamEntity(clientWith({ dance_scores: { data: null, error: { code: "500", message: "boom" } } }).client)).toBe(false);
   });
 
-  it("reads inferred, entity, or special from what the schema can select", async () => {
-    expect(await detectTeamsMode(clientWith({ dance_scores: { data: null, error: missingColumn } }).client)).toBe("inferred");
+  it("reads none, entity, or special from what the schema can select", async () => {
+    expect(await detectTeamsMode(clientWith({ dance_scores: { data: null, error: missingColumn } }).client)).toBe("none");
     expect(
       await detectTeamsMode(
         clientWith({
@@ -82,7 +82,7 @@ describe("detectTeamEntity and detectTeamsMode", () => {
   });
 
   it("builds each reader's select list from the mode", () => {
-    expect(danceScoreColumns("inferred", "id, total_score", { teamId: true })).toBe("id, total_score");
+    expect(danceScoreColumns("none", "id, total_score", { teamId: true })).toBe("id, total_score");
     expect(danceScoreColumns("entity", "id, total_score", { teamId: true })).toBe("id, total_score, team_id");
     expect(danceScoreColumns("special", "id, total_score", { teamId: true })).toBe("id, total_score, team_id, max_score");
     expect(danceScoreColumns("special", "id, total_score")).toBe("id, total_score, max_score");
@@ -94,9 +94,9 @@ describe("detectTeamEntity and detectTeamsMode", () => {
 });
 
 describe("loadEpisodeTeams", () => {
-  it("falls back to the inferred mode instead of throwing when the tables are missing", async () => {
+  it("falls back to no special dances instead of throwing when the tables are missing", async () => {
     const { client } = clientWith({ episode_teams: { data: null, error: missingTable }, episode_team_members: { data: null, error: missingTable } });
-    expect(await loadEpisodeTeams(client, client, ["ep"])).toEqual({ mode: "inferred", teamsByEpisode: {}, marksByTeam: {}, scoresByTeam: {} });
+    expect(await loadEpisodeTeams(client, client, ["ep"])).toEqual({ mode: "none", teamsByEpisode: {}, marksByTeam: {}, scoresByTeam: {} });
   });
 
   it("surfaces every other read error", async () => {
@@ -108,8 +108,8 @@ describe("loadEpisodeTeams", () => {
     const { client } = clientWith({
       episode_teams: {
         data: [
-          { id: "t1", episode_id: "ep", name: "Slaytopia", song_title: "Zoo", song_source: null, dance_style_id: "fs", captain_couple_id: "a", host_name: null, sort_order: 1, posted_at: "2026-11-03T02:00:00Z" },
-          { id: "t2", episode_id: "ep", name: "Wildcats", song_title: null, song_source: null, dance_style_id: "fs", captain_couple_id: null, host_name: "Julianne", sort_order: 2, posted_at: null },
+          { id: "t1", episode_id: "ep", name: "Slaytopia", song_title: "Zoo", dance_style_id: "fs", captain_couple_id: "a", host_name: null, sort_order: 1, posted_at: "2026-11-03T02:00:00Z" },
+          { id: "t2", episode_id: "ep", name: "Wildcats", song_title: null, dance_style_id: "fs", captain_couple_id: null, host_name: "Julianne", sort_order: 2, posted_at: null },
         ],
         error: null,
       },
@@ -118,16 +118,14 @@ describe("loadEpisodeTeams", () => {
     const { client: admin, from: adminFrom } = clientWith({ episode_team_marks: { data: [{ team_id: "t1", judge_id: "j1", score: "9" }, { team_id: "t1", judge_id: "j2", score: 8 }], error: null } });
     const loaded = await loadEpisodeTeams(client, admin, ["ep"]);
     expect(loaded.mode).toBe("entity");
-    expect(loaded.teamsByEpisode.ep.map((t) => [t.name, t.memberCoupleIds, t.postedAt, t.inferred])).toEqual([
-      ["Slaytopia", ["a", "b"], "2026-11-03T02:00:00Z", false],
-      ["Wildcats", ["c"], null, false],
+    expect(loaded.teamsByEpisode.ep.map((t) => [t.name, t.memberCoupleIds, t.postedAt])).toEqual([
+      ["Slaytopia", ["a", "b"], "2026-11-03T02:00:00Z"],
+      ["Wildcats", ["c"], null],
     ]);
     expect(loaded.teamsByEpisode.ep[0]).toMatchObject({
       danceType: "Team Dance",
       scoringMode: "marks",
-      markMax: 10,
-      panelJudgeIds: null,
-      songs: [{ title: "Zoo", artist: null }],
+      songs: [{ title: "Zoo" }],
       details: [{ label: "Captain", value: "", coupleId: "a" }],
     });
     expect(loaded.teamsByEpisode.ep[1].details).toEqual([{ label: "Host", value: "Julianne", coupleId: null }]);
@@ -141,14 +139,14 @@ describe("loadEpisodeTeams", () => {
       episode_teams: {
         data: [
           {
-            id: "d1", episode_id: "ep", name: "Dance-Off", song_title: "Zoo", song_source: "Zootopia 2", dance_style_id: "fs", captain_couple_id: null, host_name: null, sort_order: 1, posted_at: null,
-            dance_type: "Dance-Off", scoring_mode: "points", mark_max: "10", panel_judge_ids: null, second_dance_style_id: "jive",
-            songs: [{ title: "Zoo", artist: "Shakira" }, { title: "", artist: null }], theme_label: "Film",
+            id: "d1", episode_id: "ep", name: "Dance-Off", song_title: "Zoo", dance_style_id: "fs", captain_couple_id: null, host_name: null, sort_order: 1, posted_at: null,
+            dance_type: "Dance-Off", scoring_mode: "points", second_dance_style_id: "jive",
+            songs: [{ title: "Zoo", artist: "Shakira" }, { title: "" }],
             details: [{ label: "Host", value: "Alfonso", coupleId: null }, { label: "", value: "x" }], name_is_auto: true, updated_at: "2026-11-05T00:00:00Z",
           },
           {
-            id: "t1", episode_id: "ep", name: "Relay", song_title: null, song_source: null, dance_style_id: "fs", captain_couple_id: null, host_name: null, sort_order: 2, posted_at: null,
-            dance_type: "Relay", scoring_mode: "marks", mark_max: 8, panel_judge_ids: ["j1", "j2"], second_dance_style_id: null, songs: [], theme_label: null, details: [], name_is_auto: true, updated_at: "2026-11-05T00:00:00Z",
+            id: "t1", episode_id: "ep", name: "Relay", song_title: null, dance_style_id: "fs", captain_couple_id: null, host_name: null, sort_order: 2, posted_at: null,
+            dance_type: "Relay", scoring_mode: "marks", second_dance_style_id: null, songs: [], details: [], name_is_auto: true, updated_at: "2026-11-05T00:00:00Z",
           },
         ],
         error: null,
@@ -168,12 +166,11 @@ describe("loadEpisodeTeams", () => {
       nameIsAuto: true,
       memberCoupleIds: ["a", "b"],
       secondDanceStyleId: "jive",
-      songs: [{ title: "Zoo", artist: "Shakira" }],
-      themeLabel: "Film",
+      songs: [{ title: "Zoo" }],
       details: [{ label: "Host", value: "Alfonso", coupleId: null }],
       updatedAt: "2026-11-05T00:00:00Z",
     });
-    expect(relay).toMatchObject({ scoringMode: "marks", markMax: 8, panelJudgeIds: ["j1", "j2"], songs: [], details: [] });
+    expect(relay).toMatchObject({ scoringMode: "marks", songs: [], details: [] });
     expect(loaded.marksByTeam).toEqual({ t1: [{ judgeId: "j1", score: 7.5 }] });
     expect(loaded.scoresByTeam).toEqual({
       d1: [
@@ -204,7 +201,7 @@ describe("loadSpecialDanceLabels", () => {
     ).toEqual({ d1: { name: "Dance-Off 2", danceType: "Dance-Off", scoringMode: "points" } });
     expect(await loadSpecialDanceLabels(clientWith({ episode_teams: { data: null, error: missingTable } }).client, ["ep"], "entity")).toEqual({});
     const { client, from } = clientWith({});
-    expect(await loadSpecialDanceLabels(client, ["ep"], "inferred")).toEqual({});
+    expect(await loadSpecialDanceLabels(client, ["ep"], "none")).toEqual({});
     expect(await loadSpecialDanceLabels(client, [], "special")).toEqual({});
     expect(from).not.toHaveBeenCalled();
   });
@@ -230,7 +227,7 @@ describe("saveSpecialDance and saveSpecialDancePoints", () => {
     const { client } = clientWith({}, rpc);
     const dance = {
       id: null, danceType: "Dance-Off", name: "", memberCoupleIds: ["a"], danceStyleId: null, secondDanceStyleId: null, songs: [],
-      scoringMode: "points" as const, songSource: null, themeLabel: null, details: [], sortOrder: 1,
+      scoringMode: "points" as const, details: [], sortOrder: 1,
     };
     expect((await saveSpecialDance(client, { episodeId: "ep", dance }, "admin")).error).toMatch(/apply-special-dances\.sql/);
     expect(rpc).toHaveBeenCalledWith("save_special_dance", { p_episode_id: "ep", p_actor_id: "admin", p_dance: dance });

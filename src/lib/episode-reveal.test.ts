@@ -28,7 +28,6 @@ function snapshot(opts: {
     draftJudges: [8, 8, 9, 8].map((score, i) => ({ draft_dance_score_id: "d1", judge_id: `j${i}`, score })),
     draftResults: [{ episode_id: "ep", couple_id: "amber", outcome: "safe" }, { episode_id: "ep", couple_id: "julia", outcome: "safe" }],
     draftJeopardy: [],
-    draftMoments: [],
     participants: [],
     teams: [{ id: "t", episode_id: "ep", name: "Slaytopia", song_title: "Zoo", dance_style_id: "fs", captain_couple_id: null, host_name: null, sort_order: 1, posted_at: null }],
     teamMembers: [{ team_id: "t", episode_id: "ep", couple_id: "amber" }, { team_id: "t", episode_id: "ep", couple_id: "julia" }],

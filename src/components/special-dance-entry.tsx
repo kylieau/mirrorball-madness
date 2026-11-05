@@ -30,7 +30,6 @@ import { undoSecondsLeft } from "@/lib/reveal-state";
 import { NEW_SPECIAL_ID } from "@/lib/results-draft-input";
 import {
   DEFAULT_DANCE_TYPE,
-  DEFAULT_MARK_MAX,
   DETAIL_LABEL_SUGGESTIONS,
   DANCE_TYPE_SUGGESTIONS,
   RESULT_SUGGESTIONS,
@@ -46,7 +45,6 @@ import {
   parseSpecialPoints,
   parseTeamMarks,
   specialDanceComplete,
-  specialDancePanel,
   specialDanceProgress,
   specialDanceSummary,
   teamMarksTotal,
@@ -129,10 +127,8 @@ function setupFromDance(dance: SpecialDance): SpecialDanceSetupInput {
     memberCoupleIds: dance.memberCoupleIds,
     danceStyleId: dance.danceStyleId,
     secondDanceStyleId: dance.secondDanceStyleId,
-    songs: dance.songs.length > 0 ? dance.songs : [{ title: dance.songTitle ?? "", artist: null }],
+    songs: dance.songs.length > 0 ? dance.songs : [{ title: dance.songTitle ?? "" }],
     scoringMode: dance.scoringMode,
-    songSource: dance.songSource,
-    themeLabel: dance.themeLabel,
     details: dance.details,
     sortOrder: dance.sortOrder,
   };
@@ -146,20 +142,15 @@ export function blankSpecialDance(episodeId: string, styleId: string): SpecialDa
     nameIsAuto: true,
     danceType: "",
     scoringMode: "marks",
-    markMax: DEFAULT_MARK_MAX,
-    panelJudgeIds: null,
     danceStyleId: styleId,
     secondDanceStyleId: null,
-    songs: [{ title: "", artist: null }],
+    songs: [{ title: "" }],
     songTitle: null,
-    songSource: null,
-    themeLabel: null,
     details: [],
     captainCoupleId: null,
     hostName: null,
     sortOrder: 0,
     memberCoupleIds: [],
-    inferred: false,
     postedAt: null,
     updatedAt: null,
   };
@@ -273,7 +264,7 @@ export function SpecialDanceEntry({
   }, [savedScoresKey, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scoringMode = editing ? setup.scoringMode : dance.scoringMode;
-  const panelIds = specialDancePanel(dance, nightJudgeIds);
+  const panelIds = nightJudgeIds;
   const panelJudges = panelIds.map((id) => judges.find((j) => j.id === id)).filter((j): j is ScoringJudge => !!j);
   const panelOk = specialMode ? isValidPanelSize(panelIds.length) : nightJudgeIds.length === SPECIAL_DANCE_MAX_JUDGES;
   const invalidMarkIds = panelIds.filter((id) => markInputError(markInputs[id] ?? "") != null);
@@ -335,11 +326,11 @@ export function SpecialDanceEntry({
   }
 
   const complete = specialDanceComplete(
-    { scoringMode, panelJudgeIds: dance.panelJudgeIds },
+    { scoringMode },
     { marks: view.marks, scores: view.scores, eligibleCoupleIds: eligible, nightJudgeIds }
   );
   const progress = specialDanceProgress(
-    { scoringMode, panelJudgeIds: dance.panelJudgeIds, postedAt: dance.postedAt },
+    { scoringMode, postedAt: dance.postedAt },
     { marks: view.marks, scores: view.scores, eligibleCoupleIds: eligible, nightJudgeIds }
   );
   const savedTotal = scoringMode === "marks" && view.marks.length === panelIds.length ? teamMarksTotal(view.marks) : null;
@@ -598,7 +589,7 @@ export function SpecialDanceEntry({
               </div>
             ))}
             {setup.songs.length < SPECIAL_DANCE_MAX_SONGS && (
-              <Button type="button" size="xs" variant="ghost" className="self-start" onClick={() => patchSetup({ songs: [...setup.songs, { title: "", artist: null }] })}>
+              <Button type="button" size="xs" variant="ghost" className="self-start" onClick={() => patchSetup({ songs: [...setup.songs, { title: "" }] })}>
                 + Add Another Song
               </Button>
             )}
