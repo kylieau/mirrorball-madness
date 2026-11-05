@@ -137,7 +137,11 @@ export function CoupleHistoryView({ page }: { page: CoupleHistoryPage }) {
       {history.average !== null && history.best && (
         <div className="grid grid-cols-3 gap-2">
           <Stat label="Average" value={history.average.toFixed(1)} sub="per night, of 30" />
-          <Stat label="Best" value={nightScore(history.best.scaled)} sub={`${formatEpisodeCasual(history.best.weekNumber)}, of 30`} />
+          <Stat
+            label="Best"
+            value={`${nightScore(history.best.total)}/${history.best.possible}`}
+            sub={`${history.best.label} · ${formatEpisodeCasual(history.best.weekNumber)}`}
+          />
           <Stat
             label="In Jeopardy"
             value={`${jeopardy.length}×`}

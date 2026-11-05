@@ -47,8 +47,24 @@ describe("buildCoupleHistory", () => {
     expect(history.weeks.map((w) => w.weekNumber)).toEqual([7, 6]);
     expect(history.weeks.flatMap((w) => w.nights.flatMap((n) => n.dances.map((d) => d.id)))).toEqual(["d7", "d6"]);
     expect(history.danceCount).toBe(2);
-    expect(history.best).toEqual({ scaled: 26, weekNumber: 7 });
+    expect(history.best).toEqual({ total: 26, possible: 30, label: "Jive", weekNumber: 7 });
     expect(history.average).toBe(24);
+  });
+
+  it("ranks Best by share of the marks possible, never a bonus round", () => {
+    const history = buildCoupleHistory({
+      ...base,
+      weeks: [
+        { weekNumber: 8, theme: null, episodeIds: ["e8"], mode: "results" },
+        { weekNumber: 2, theme: null, episodeIds: ["e2"], mode: "results" },
+      ],
+      dances: [
+        dance({ id: "four", episodeId: "e8", style: "Contemporary", totalScore: 38, scaledScore: 28.5 }),
+        dance({ id: "off", episodeId: "e8", totalScore: 3, scaledScore: 3, maxScore: 0, teamId: "t1" }),
+        dance({ id: "perfect", episodeId: "e2", style: "Tango", totalScore: 30, scaledScore: 30 }),
+      ],
+    });
+    expect(history.best).toEqual({ total: 30, possible: 30, label: "Tango", weekNumber: 2 });
   });
 
   it("gives a week still being revealed no outcome or In Jeopardy", () => {
