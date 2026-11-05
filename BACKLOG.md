@@ -25,15 +25,16 @@ Still to see with a real write (rehearsed in PGlite only):
   with the Dance-Off round.
 - Schedule's save is two steps: the episode saves, then the plan; a refused
   plan (a heat with scores) shows its own message after the episode saved.
-- Home reads "Harry earned +3 in the Immunity" for an immune bonus.
+- Home now reads "Harry earned +3 with Dance-Off Immunity" for an immune
+  bonus (the immunity row's name); not yet seen with a posted row.
 - A Not Dancing exception on Round 1 only, on a night with a second own
   round, still maps the couple's rows by order (edge; no S35 night has two
   own rounds).
 - Fallback: redeploying `b3ab890` works against this SQL while no heat is
   scored by Judges' Marks per couple.
-- At 360px a special dance's Points rows (name, points box, Result picker)
-  wrap onto two lines. It's the shared special-dance layout, left alone in
-  the UI pass; tighten it for every special dance at once, not per round.
+- Done 2026-11-05: a special dance's Points rows keep the points box and
+  Result picker on one line at 360px; the name wraps inside its own column
+  (render-checked on E10's Dance-Off tab with writes blocked).
 - The base-nova `Tabs` "line" variant (`src/components/ui/tabs.tsx`, CLI
   generated) pins the list to `h-8` and draws its underline 5px below the
   tab; the round tabs override both (`group-data-horizontal/tabs:h-auto`,

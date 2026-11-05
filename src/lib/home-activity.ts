@@ -4,11 +4,13 @@ import { ordinal } from "./ordinal";
 export type ActivityScore = {
   celebrity: string;
   // The dance style for a judged dance; the special dance's type ("Dance-Off")
-  // for a bonus round paid in points.
+  // for a bonus round paid in points, or its name for an immunity row
+  // ("Dance-Off Immunity").
   danceStyle: string;
   total: number;
   at: string;
   bonus?: boolean;
+  immunity?: boolean;
 };
 
 export type ActivityRankMove = { league: string; mover: string; passed: string[]; place: number };
@@ -32,16 +34,20 @@ export type ActivityDanceRow = {
 };
 
 // A posted row as an activity entry: a bonus round paid in points names its
-// special dance's type; every judged dance keeps its style.
+// special dance's type (an immunity row its name, which carries the round);
+// every judged dance keeps its style.
 export function activityScore(
   row: ActivityDanceRow,
   celebrity: string,
-  specialDanceLabels: Record<string, { danceType: string }>
+  specialDanceLabels: Record<string, { name: string; danceType: string }>
 ): ActivityScore {
   const total = Number(row.total_score);
   if (row.max_score != null && Number(row.max_score) === 0) {
-    const label = row.team_id ? specialDanceLabels[row.team_id]?.danceType : undefined;
-    return { celebrity, danceStyle: label?.trim() || "Bonus", total, at: row.created_at, bonus: true };
+    const label = row.team_id ? specialDanceLabels[row.team_id] : undefined;
+    if (label?.danceType === "Immunity") {
+      return { celebrity, danceStyle: label.name.trim() || "Immunity", total, at: row.created_at, bonus: true, immunity: true };
+    }
+    return { celebrity, danceStyle: label?.danceType.trim() || "Bonus", total, at: row.created_at, bonus: true };
   }
   return { celebrity, danceStyle: row.dance_styles?.name ?? "Unknown dance", total, at: row.created_at };
 }
@@ -87,7 +93,7 @@ export function buildRecentActivity({
                 { text: s.celebrity, kind: "couple" },
                 { text: " earned " },
                 { text: signedTotal(s.total), kind: "score" },
-                { text: ` in the ${s.danceStyle}` },
+                { text: s.immunity ? ` with ${s.danceStyle}` : ` in the ${s.danceStyle}` },
               ]
             : [
                 { text: s.celebrity, kind: "couple" },

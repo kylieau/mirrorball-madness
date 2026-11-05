@@ -106,8 +106,8 @@ describe("activityScore", () => {
 
   it("keeps a judged dance on its style and names a Points row after its special dance's type", () => {
     expect(activityScore(row, "Julia", {})).toEqual({ celebrity: "Julia", danceStyle: "Freestyle", total: 36, at: row.created_at });
-    expect(activityScore({ ...row, team_id: "t1", max_score: "40" }, "Julia", { t1: { danceType: "Team Dance" } })).toMatchObject({ danceStyle: "Freestyle" });
-    expect(activityScore({ ...row, total_score: 3, team_id: "d1", max_score: 0 }, "Julia", { d1: { danceType: "Dance-Off" } })).toEqual({
+    expect(activityScore({ ...row, team_id: "t1", max_score: "40" }, "Julia", { t1: { name: "Slaytopia", danceType: "Team Dance" } })).toMatchObject({ danceStyle: "Freestyle" });
+    expect(activityScore({ ...row, total_score: 3, team_id: "d1", max_score: 0 }, "Julia", { d1: { name: "Dance-Off 1", danceType: "Dance-Off" } })).toEqual({
       celebrity: "Julia",
       danceStyle: "Dance-Off",
       total: 3,
@@ -115,5 +115,14 @@ describe("activityScore", () => {
       bonus: true,
     });
     expect(activityScore({ ...row, total_score: 3, team_id: "d1", max_score: 0 }, "Julia", {}).danceStyle).toBe("Bonus");
+  });
+
+  it("names an immunity row after the round and reads it as earned with", () => {
+    const immune = activityScore({ ...row, total_score: 3, team_id: "i1", max_score: 0 }, "Harry", {
+      i1: { name: "Dance-Off Immunity", danceType: "Immunity" },
+    });
+    expect(immune).toMatchObject({ danceStyle: "Dance-Off Immunity", immunity: true });
+    const lines = buildRecentActivity({ weeks: [week(9, { scores: [immune] })], westWeek: null, extraLines: [] });
+    expect(lines.map(plain)).toEqual(["Harry earned +3 with Dance-Off Immunity"]);
   });
 });

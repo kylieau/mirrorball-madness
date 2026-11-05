@@ -867,12 +867,12 @@ export function SpecialDanceEntry({
           {eligible.map((coupleId) => {
             const person = participants.find((p) => p.id === coupleId);
             return (
-              <div key={coupleId} className="flex flex-wrap items-center gap-1.5">
-                <span className="min-w-24 flex-1 text-sm">{coupleName(coupleId)}</span>
+              <div key={coupleId} className="flex items-center gap-1.5">
+                <span className="min-w-0 flex-1 text-sm break-words">{coupleName(coupleId)}</span>
                 <Input
                   inputMode="decimal"
                   aria-label={`Points for ${person?.celebrity ?? "this couple"}`}
-                  className={`h-8 w-16 px-1.5 text-center text-xs ${parsedPoints.invalidCoupleIds.includes(coupleId) ? "border-destructive" : ""}`}
+                  className={`h-8 w-14 shrink-0 px-1.5 text-center text-xs ${parsedPoints.invalidCoupleIds.includes(coupleId) ? "border-destructive" : ""}`}
                   placeholder="—"
                   value={pointInputs[coupleId] ?? ""}
                   onChange={(e) => {
@@ -894,7 +894,7 @@ export function SpecialDanceEntry({
                     editScores({ marks: markInputs, coupleMarks: coupleMarkInputs, points, results: next });
                   }}
                 >
-                  <SelectTrigger className="h-8 w-28 text-xs">
+                  <SelectTrigger className="h-8 w-24 shrink-0 text-xs">
                     <SelectValue placeholder="Result" />
                   </SelectTrigger>
                   <SelectContent>
