@@ -23,6 +23,7 @@ import {
 } from "@/app/admin/results/actions";
 import { CirclePauseIcon, PlusIcon } from "lucide-react";
 import { JudgeScoreRow } from "@/components/judge-score-row";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RoundExceptionPanel, type ExceptionChoice } from "@/components/round-exception-panel";
 import {
   EXCEPTION_LABEL,
@@ -31,6 +32,7 @@ import {
   heatName,
   ownSlotIndex,
   roundImmunity,
+  roundShortName,
   roundTabLabel,
   roundUnits,
   rowAfterException,
@@ -455,6 +457,13 @@ export function ResultsForm({
   // "band:<roundId>"), so an Undo that fails says so there.
   const [exceptionErrorAt, setExceptionErrorAt] = useState<string | null>(null);
   const [bonusInput, setBonusInput] = useState("");
+  // Keeps the active round's tab in view when the strip scrolls sideways.
+  const roundTabsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = roundTabsRef.current;
+    const tab = strip?.querySelector<HTMLElement>("[data-active]");
+    if (strip && tab) strip.scrollLeft = tab.offsetLeft - (strip.clientWidth - tab.clientWidth) / 2;
+  }, [activeRound?.id]);
   const [bonusError, setBonusError] = useState<string | null>(null);
   useEffect(() => {
     setBonusInput(activeRound?.bonusPoints != null ? String(activeRound.bonusPoints) : "");
@@ -2204,30 +2213,33 @@ export function ResultsForm({
                 </div>
               </div>
               {activeRound && (
-                <div role="group" aria-labelledby="rounds-switch-label" className="flex flex-col gap-1.5 pt-1">
-                  <span id="rounds-switch-label" className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Rounds
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {rounds.map((r) => (
-                      <Button
-                        key={r.id}
-                        size="sm"
-                        variant={r.id === activeRound.id ? "default" : "outline"}
-                        aria-pressed={r.id === activeRound.id}
-                        onClick={() => {
-                          setSelectedRoundId(r.id);
-                          setShowLeaderboard(false);
-                          setExceptionFor(null);
-                          setBandCoupleId(null);
-                          setDraftSpecial(null);
-                        }}
-                      >
-                        {roundTabLabel(r)}
-                      </Button>
-                    ))}
+                // Rounds are where you are in the night (tabs); the chips below
+                // filter that round. No round reads active over the Leaderboard.
+                <Tabs
+                  value={showLeaderboard ? "" : activeRound.id}
+                  onValueChange={(value) => {
+                    setSelectedRoundId(String(value));
+                    setShowLeaderboard(false);
+                    setExceptionFor(null);
+                    setBandCoupleId(null);
+                    setDraftSpecial(null);
+                  }}
+                >
+                  <div ref={roundTabsRef} className="relative overflow-x-auto border-b border-border">
+                    <TabsList variant="line" aria-label="Rounds" className="w-max gap-0 p-0 group-data-horizontal/tabs:h-auto">
+                      {rounds.map((r) => (
+                        <TabsTrigger
+                          key={r.id}
+                          value={r.id}
+                          className="min-h-11 flex-none flex-col items-start gap-0 rounded-none px-3 py-1.5 text-left group-data-horizontal/tabs:after:inset-x-3 group-data-horizontal/tabs:after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary data-active:text-accent data-active:after:opacity-100 dark:data-active:text-accent"
+                        >
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Round {r.position}</span>
+                          <span className="text-sm font-medium">{roundShortName(r)}</span>
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
                   </div>
-                </div>
+                </Tabs>
               )}
               <div className="flex gap-2 pt-1">
                 <Button

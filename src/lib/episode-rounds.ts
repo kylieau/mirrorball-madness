@@ -97,8 +97,13 @@ export function ownSlotIndex(rounds: EpisodeRound[], roundId: string): number {
   return own.findIndex((r) => r.id === roundId);
 }
 
+// "Individual" for Round 1, else the round's own name.
+export function roundShortName(round: Pick<EpisodeRound, "roundType">): string {
+  return round.roundType === INDIVIDUAL_DANCE ? "Individual" : round.roundType;
+}
+
 export function roundTabLabel(round: Pick<EpisodeRound, "position" | "roundType">): string {
-  return `${round.position} · ${round.roundType === INDIVIDUAL_DANCE ? "Individual" : round.roundType}`;
+  return `${round.position} · ${roundShortName(round)}`;
 }
 
 export type RoundUnit = { heatNumber: number; name: string; dance: SpecialDance | null };
