@@ -447,8 +447,10 @@ export function ResultsForm({
     setExceptions(roundExceptionsByEpisode[selectedEpisode?.id ?? ""] ?? []);
   }, [selectedEpisode?.id, roundExceptionsByEpisode]);
   const outOfActiveRound = new Set(activeRound ? exceptionsFor(activeRound.id, exceptions).map((x) => x.coupleId) : []);
-  // The couple whose Mark an Exception panel is open, and the band's pick.
+  // The couple whose Mark an Exception panel is open on their card, and the
+  // couple picked in a round's Not in This Round band: one panel at a time.
   const [exceptionFor, setExceptionFor] = useState<string | null>(null);
+  const [bandCoupleId, setBandCoupleId] = useState<string | null>(null);
   const [exceptionSaving, setExceptionSaving] = useState(false);
   const [exceptionError, setExceptionError] = useState<string | null>(null);
   const [bonusInput, setBonusInput] = useState("");
@@ -526,6 +528,7 @@ export function ResultsForm({
       setDraftedSelectedId("");
       setSelectedRoundId(null);
       setExceptionFor(null);
+      setBandCoupleId(null);
       setShowLeaderboard(false);
       setUnlockedForCorrectionCoupleIds(new Set());
       setCoupleViewMode(selectedEpisode.results_published_at != null ? "published" : "inProgress");
@@ -880,6 +883,7 @@ export function ResultsForm({
         };
       });
       setExceptionFor(null);
+      setBandCoupleId(null);
       router.refresh();
     } catch {
       setExceptionError("Could not confirm the update. Please refresh and try again.");
@@ -1478,8 +1482,13 @@ export function ResultsForm({
 
   function openTeamEntry(teamId: string) {
     setShowLeaderboard(false);
+    setDraftSpecial(null);
+    setExceptionFor(null);
     const value = teamPickValue(teamId);
-    const postedDance = persistedTeams.find((t) => t.id === teamId)?.postedAt != null;
+    const dance = persistedTeams.find((t) => t.id === teamId);
+    // A planned heat lives on its round's tab.
+    if (dance?.roundId) setSelectedRoundId(dance.roundId);
+    const postedDance = dance?.postedAt != null;
     if (published || postedDance) {
       setCoupleViewMode("published");
       setPublishedSelectedId(value);
@@ -1516,7 +1525,7 @@ export function ResultsForm({
     const list = exceptionsFor(round.id, exceptions);
     const canMark = !published || canPublish;
     const markable = episodeCouples.filter((c) => !list.some((x) => x.coupleId === c.id));
-    const picking = exceptionFor != null && markable.some((c) => c.id === exceptionFor) && exceptionFor.length > 0;
+    const picking = bandCoupleId != null && markable.some((c) => c.id === bandCoupleId) ? bandCoupleId : null;
     if (list.length === 0 && !canMark) return null;
     return (
       <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-border p-2.5">
@@ -1553,10 +1562,11 @@ export function ResultsForm({
           <>
             <Select
               items={Object.fromEntries(markable.map((c) => [c.id, formatCoupleName(coupleParts(c))]))}
-              value={picking ? exceptionFor : null}
+              value={picking}
               onValueChange={(v) => {
                 setExceptionError(null);
-                setExceptionFor(v ?? null);
+                setExceptionFor(null);
+                setBandCoupleId(v ?? null);
               }}
             >
               <SelectTrigger className="w-full" aria-label="Mark a couple out of this round">
@@ -1570,16 +1580,16 @@ export function ResultsForm({
                 ))}
               </SelectContent>
             </Select>
-            {picking && exceptionFor && (
+            {picking && (
               <RoundExceptionPanel
-                key={`${round.id}-${exceptionFor}`}
-                coupleName={formatCoupleName(coupleParts(namedCouple(exceptionFor)!))}
+                key={`${round.id}-${picking}`}
+                coupleName={formatCoupleName(coupleParts(namedCouple(picking)!))}
                 rounds={rounds}
                 round={round}
                 saving={exceptionSaving}
                 error={exceptionError}
-                onCancel={() => setExceptionFor(null)}
-                onSave={(choice) => void handleRoundException(exceptionFor, choice)}
+                onCancel={() => setBandCoupleId(null)}
+                onSave={(choice) => void handleRoundException(picking, choice)}
               />
             )}
           </>
@@ -1855,6 +1865,7 @@ export function ResultsForm({
                   className="-ml-2 self-start text-muted-foreground"
                   onClick={() => {
                     setExceptionError(null);
+                    setBandCoupleId(null);
                     setExceptionFor(c.id);
                   }}
                 >
@@ -2177,6 +2188,7 @@ export function ResultsForm({
                           setSelectedRoundId(r.id);
                           setShowLeaderboard(false);
                           setExceptionFor(null);
+                          setBandCoupleId(null);
                           setDraftSpecial(null);
                         }}
                       >
