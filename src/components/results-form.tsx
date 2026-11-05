@@ -86,7 +86,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { BOTTOM_NAV_STACK_ABOVE } from "@/components/bottom-nav";
 import { DraftSaveQueue } from "@/lib/draft-save-queue";
 import { couplesRevealState, undoSecondsLeft } from "@/lib/reveal-state";
 import { isValidMark } from "@/lib/judge-marks";
@@ -2499,8 +2498,9 @@ export function ResultsForm({
 
 
           {published && canPublish && (
-            <div className={`fixed inset-x-0 z-30 ${BOTTOM_NAV_STACK_ABOVE}`}>
-              <div className="mx-auto flex w-full max-w-(--frame-width) flex-col gap-2 border-t border-border bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            // Admin pages have no tab bar, so the bar sits on the bottom edge.
+            <div className="fixed inset-x-0 bottom-0 z-30">
+              <div className="mx-auto flex w-full max-w-(--frame-width) flex-col gap-2 border-t border-border bg-background px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between">
                 <p className="hidden text-xs text-muted-foreground sm:block">
                   Publishing updates Results & Standings across every league immediately.
                 </p>
