@@ -1,4 +1,5 @@
 import { formatEpisodeCasual } from "./format-week";
+import { ordinal } from "./ordinal";
 
 export type ActivityScore = {
   celebrity: string;
@@ -10,10 +11,13 @@ export type ActivityScore = {
   bonus?: boolean;
 };
 
+export type ActivityRankMove = { league: string; mover: string; passed: string[]; place: number };
+
 export type ActivityWeek = {
   weekNumber: number;
   eliminated: string[];
   scores: ActivityScore[];
+  rankMoves?: ActivityRankMove[];
 };
 
 export type ActivityDanceRow = {
@@ -47,7 +51,9 @@ export type ActivityLine = { key: string; segments: ActivitySegment[]; weekLabel
 
 // Weeks arrive already limited to what the viewer may see. `westWeek` is the
 // week whose West feed is still airing: who went home stays behind a single
-// "results are in" line until that window ends, while posted scores still show.
+// "results are in" line until that window ends, and so do that week's
+// overtakes (published points carry survival and Curtain Call), while posted
+// scores still show.
 export function buildRecentActivity({
   weeks,
   westWeek,
@@ -66,6 +72,9 @@ export function buildRecentActivity({
     } else {
       week.eliminated.forEach((name, i) =>
         lines.push({ key: `w${week.weekNumber}-elim-${i}`, segments: [{ text: name, kind: "couple" }, { text: " eliminated" }], weekLabel })
+      );
+      (week.rankMoves ?? []).forEach((move, i) =>
+        lines.push({ key: `w${week.weekNumber}-rank-${i}`, segments: rankMoveSegments(move), weekLabel })
       );
     }
     [...week.scores]
@@ -91,6 +100,20 @@ export function buildRecentActivity({
       );
   }
   return lines;
+}
+
+function rankMoveSegments(move: ActivityRankMove): ActivitySegment[] {
+  const passed = move.passed.flatMap((name, i): ActivitySegment[] => [
+    ...(i === 0 ? [] : [{ text: i === move.passed.length - 1 ? " and " : ", " }]),
+    { text: name, kind: "manager" },
+  ]);
+  return [
+    { text: move.mover, kind: "manager" },
+    { text: " overtook " },
+    ...passed,
+    { text: ` for ${ordinal(move.place)} in ` },
+    { text: move.league, kind: "league" },
+  ];
 }
 
 // Bonus points are a raw judges' unit, not fantasy points, so they keep the

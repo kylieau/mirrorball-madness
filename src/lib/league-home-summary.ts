@@ -6,6 +6,8 @@ import { draftWeekManagerScores } from "@/lib/draft-scores";
 import type { CurtainCallState } from "@/lib/league-triage";
 import type { DanceScore } from "@/lib/scoring";
 import { slotActiveInWeek } from "@/lib/roster-couple-points";
+import { weeklyRankMoves } from "@/lib/league-rank-moves";
+import { formatManagerName } from "@/lib/manager-display";
 
 export type LeagueHomeSummary = {
   id: string;
@@ -26,7 +28,8 @@ export type LeagueHomeSummary = {
   };
   grandFinale: { open: boolean; locked: boolean; deadlineAt: string | null; hasPrediction: boolean };
   recentJoins: { name: string; joinedAt: string }[];
-  tookLead: boolean;
+  // The viewer's own team reads as "You" / "you".
+  rankMoves: { weekNumber: number; mover: string; passed: string[]; place: number }[];
 };
 
 // Shared by Home (`/`, every league at once) and the per-league switcher sheet
@@ -45,12 +48,10 @@ export async function computeLeagueHomeSummary(
   // spoiler cutoff so rank/points here never account for a week the
   // viewer hasn't marked as watched yet.
   allowedWeekIds: Set<string> | null = null,
-  // The week being revealed is not yet a completed week, so a "previous rank"
-  // must leave it out the same way it leaves out the latest completed one.
-  revealingWeekId: string | null = null,
   // Released draft this viewer unlocked. Replaces that week's stored total
   // (a partial live reveal) with judges points from the full draft.
-  draftNight: { weekId: string; weekNumber: number; dances: DanceScore[] } | null = null
+  draftNight: { weekId: string; weekNumber: number; dances: DanceScore[] } | null = null,
+  weekNumberById: Map<string, number> = new Map()
 ): Promise<LeagueHomeSummary> {
   const [{ data: scoringSettings }, { data: members }, { data: scores }] = await Promise.all([
     supabase
@@ -62,7 +63,9 @@ export async function computeLeagueHomeSummary(
       .single(),
     supabase
       .from("league_members")
-      .select("user_id, co_manager_id, joined_at, profiles!league_members_user_id_fkey(display_name)")
+      .select(
+        "user_id, co_manager_id, joined_at, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
+      )
       .eq("league_id", league.id),
 supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points").eq("league_id", league.id),
   ]);
@@ -136,40 +139,44 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
   }
   const draftWeekId = draftTotals ? draftNight!.weekId : null;
 
-  // The week the "change" compares against: the draft the viewer unlocked,
-  // else the one being revealed, else the latest completed.
-  const focusWeekId = draftWeekId ?? revealingWeekId ?? latestCompletedWeekId;
-
-  const pointsByManager = new Map<string, number>();
-  const previousPointsByManager = new Map<string, number>();
+  const pointsByWeek = new Map<string, Map<string, number>>();
   for (const row of scores ?? []) {
     if (draftWeekId && row.week_id === draftWeekId) continue;
     if (allowedWeekIds && !allowedWeekIds.has(row.week_id)) continue;
-    pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
-    if (row.week_id !== focusWeekId) {
-      previousPointsByManager.set(row.manager_id, (previousPointsByManager.get(row.manager_id) ?? 0) + row.total_points);
-    }
+    const week = pointsByWeek.get(row.week_id) ?? new Map<string, number>();
+    week.set(row.manager_id, (week.get(row.manager_id) ?? 0) + row.total_points);
+    pointsByWeek.set(row.week_id, week);
   }
-  if (draftTotals) {
-    for (const [managerId, points] of draftTotals) {
-      pointsByManager.set(managerId, (pointsByManager.get(managerId) ?? 0) + points);
-    }
+  if (draftTotals) pointsByWeek.set(draftWeekId!, draftTotals);
+  const pointsByManager = new Map<string, number>();
+  for (const week of pointsByWeek.values()) {
+    for (const [managerId, points] of week) pointsByManager.set(managerId, (pointsByManager.get(managerId) ?? 0) + points);
   }
-  const standings = (members ?? []).map((m) => ({
-    managerId: m.user_id,
-    points: pointsByManager.get(m.user_id) ?? 0,
-    previousPoints: previousPointsByManager.get(m.user_id) ?? 0,
-  }));
+  const standings = (members ?? []).map((m) => ({ managerId: m.user_id, points: pointsByManager.get(m.user_id) ?? 0 }));
   const rank = Math.max(
     1,
     [...standings].sort((a, b) => b.points - a.points).findIndex((s) => s.managerId === myTeamId) + 1
   );
-  const previousRank = focusWeekId
-    ? Math.max(
-        1,
-        [...standings].sort((a, b) => b.previousPoints - a.previousPoints).findIndex((s) => s.managerId === myTeamId) + 1
-      )
-    : null;
+
+  const managerName = new Map(
+    (members ?? []).map((m) => [
+      m.user_id,
+      formatManagerName({ displayName: m.profiles?.display_name ?? "Someone", coManagerDisplayName: m.co_manager?.display_name }),
+    ])
+  );
+  const nameFor = (managerId: string, you: string) => (managerId === myTeamId ? you : managerName.get(managerId)!);
+  const rankMoves = weeklyRankMoves(
+    standings.map((s) => s.managerId),
+    [...pointsByWeek].flatMap(([weekId, points]) => {
+      const weekNumber = weekNumberById.get(weekId);
+      return weekNumber == null ? [] : [{ weekNumber, points }];
+    })
+  ).map((move) => ({
+    weekNumber: move.weekNumber,
+    mover: nameFor(move.managerId, "You"),
+    passed: move.passedIds.map((id) => nameFor(id, "you")),
+    place: move.place,
+  }));
 
   const grandFinaleDeadline = grandFinaleDeadlineData ?? null;
   const grandFinaleLocked = !!grandFinaleDeadline && new Date() >= new Date(grandFinaleDeadline);
@@ -217,6 +224,6 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
     recentJoins: (members ?? [])
       .filter((m) => !isOwnMembership(m, userId) && new Date(m.joined_at).getTime() >= joinCutoffMs)
       .map((m) => ({ name: m.profiles?.display_name ?? "Someone", joinedAt: m.joined_at })),
-    tookLead: previousRank !== null && rank === 1 && previousRank !== 1,
+    rankMoves,
   };
 }

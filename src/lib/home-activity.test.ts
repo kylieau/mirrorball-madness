@@ -48,13 +48,39 @@ describe("buildRecentActivity", () => {
   it("collapses the West-airing week's eliminations to one line and keeps its score posts", () => {
     const lines = buildRecentActivity({
       weeks: [
-        week(2, { eliminated: ["A & B"], scores: [{ celebrity: "Ava", danceStyle: "Waltz", total: 24, at: "2026-09-23T00:05:00Z" }] }),
+        week(2, {
+          eliminated: ["A & B"],
+          scores: [{ celebrity: "Ava", danceStyle: "Waltz", total: 24, at: "2026-09-23T00:05:00Z" }],
+          rankMoves: [{ league: "Alpha", mover: "Kim", passed: ["you"], place: 1 }],
+        }),
         week(1, { eliminated: ["C & D"] }),
       ],
       westWeek: 2,
       extraLines: [],
     });
     expect(lines.map(plain)).toEqual(["Week 2 results are in", "Ava scored 24 on their Waltz", "C & D eliminated"]);
+  });
+
+  it("lists a week's overtakes after its eliminations and before its scores", () => {
+    const lines = buildRecentActivity({
+      weeks: [
+        week(9, {
+          scores: [{ celebrity: "Amber", danceStyle: "Paso Doble", total: 27, at: "2026-11-11T01:20:00Z" }],
+          rankMoves: [
+            { league: "Alpha", mover: "You", passed: ["Kim"], place: 2 },
+            { league: "Beta", mover: "Lee & Sam", passed: ["Pat", "Ro", "you"], place: 1 },
+          ],
+        }),
+      ],
+      westWeek: null,
+      extraLines: [],
+    });
+    expect(lines.map(plain)).toEqual([
+      "You overtook Kim for 2nd in Alpha",
+      "Lee & Sam overtook Pat, Ro and you for 1st in Beta",
+      "Amber scored 27 on their Paso Doble",
+    ]);
+    expect(lines[1].segments.filter((seg) => seg.kind === "manager").map((seg) => seg.text)).toEqual(["Lee & Sam", "Pat", "Ro", "you"]);
   });
 
   it("reads a bonus round in points as earned, signed, in the special dance", () => {

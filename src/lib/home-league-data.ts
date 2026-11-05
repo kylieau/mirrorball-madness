@@ -45,7 +45,6 @@ export async function loadHomeLeagueData(
     loadRevealingWeek(supabase, groupedWeeks, cutoffPending),
     draftContextPending,
   ]);
-  const revealingWeek = revealing && revealingVisible ? revealing.week : null;
   const draftNight = draftContext.night
     ? {
         weekId: draftContext.night.weekId,
@@ -63,6 +62,7 @@ export async function loadHomeLeagueData(
       : 0;
 
   const joinCutoffMs = Date.now() - RECENT_JOIN_WINDOW_MS;
+  const weekNumberById = new Map(groupedWeeks.map((week) => [week.id, week.week_number]));
   const summaries = await Promise.all(
     leagueRefs.map((league) =>
       computeLeagueHomeSummary(
@@ -74,8 +74,8 @@ export async function loadHomeLeagueData(
         latestCompletedResultsPublishedAt,
         joinCutoffMs,
         scoredIds,
-        revealingWeek?.id ?? null,
-        draftNight
+        draftNight,
+        weekNumberById
       )
     )
   );

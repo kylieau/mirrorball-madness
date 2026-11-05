@@ -149,6 +149,13 @@ export default async function Home() {
     }
   }
 
+  for (const summary of summaries) {
+    for (const { weekNumber, ...move } of summary.rankMoves) {
+      const week = activityWeeks.get(weekNumber);
+      if (week) (week.rankMoves ??= []).push({ league: summary.name, ...move });
+    }
+  }
+
   const bannerWeeks = toBannerWeeks(groupedWeeks);
   const { strip: spoilerFreeStrip, prompt: livePrompt, refreshWindows } = buildLiveAirChrome({
     spoilerFreeMode: accountSettingsData.spoilerFreeMode,
@@ -192,10 +199,6 @@ export default async function Home() {
     weeks: [...activityWeeks.values()],
     westWeek: westWindow ? episodeBannerState!.weekNumber : null,
     extraLines: [
-      ...summaries.filter((s) => s.tookLead).map((s) => [
-        { text: s.name, kind: "league" as const },
-        { text: ": you took the points lead" },
-      ]),
       ...summaries
         .flatMap((s) => s.recentJoins.map((j) => ({ ...j, leagueName: s.name })))
         .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
