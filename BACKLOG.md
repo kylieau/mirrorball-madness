@@ -41,13 +41,10 @@ Cleanups (2026-11-05):
   (`TeamsMode` "inferred" is now "none"), and nothing reads `mark_max`,
   `panel_judge_ids`, `song_source`, `theme_label`, `songs[].artist` or the
   custom-moment tables.
-- To apply once that deploy is Ready: `supabase/apply-retire-special-leftovers.sql`
-  drops those columns, both custom-moment tables and `mutate_draft_moment`,
-  and replaces nine functions from their live definitions (the publish,
-  reveal, snapshot, seed and recompute RPCs plus `save_special_dance`,
-  `special_dance_panel`, `materialize_team_scores`). Rehearsed on a PGlite
-  stack whose function bodies matched live exactly. After applying,
-  regenerate the types and mark it applied here and in CLAUDE.md.
+- `supabase/apply-retire-special-leftovers.sql` applied live 2026-11-05 and
+  verified: columns, custom-moment tables and `mutate_draft_moment` gone, all
+  nine functions identical to the file with service-only grants, E10's
+  snapshot reads; types regenerated.
 - Dance styles checked 2026-11-05: E10's seven prefilled dances all use
   existing styles. A missing one (Charleston, Hustle, Lindy Hop) is added in
   Show Settings, no SQL.

@@ -570,55 +570,6 @@ export type Database = {
           },
         ]
       }
-      draft_episode_custom_moments: {
-        Row: {
-          couple_id: string | null
-          created_at: string
-          created_by: string | null
-          episode_id: string
-          id: string
-          label: string
-        }
-        Insert: {
-          couple_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          episode_id: string
-          id?: string
-          label: string
-        }
-        Update: {
-          couple_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          episode_id?: string
-          id?: string
-          label?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "draft_episode_custom_moments_couple_id_fkey"
-            columns: ["couple_id"]
-            isOneToOne: false
-            referencedRelation: "couples"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "draft_episode_custom_moments_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "draft_episode_custom_moments_episode_id_fkey"
-            columns: ["episode_id"]
-            isOneToOne: false
-            referencedRelation: "episodes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       draft_episode_in_jeopardy_couples: {
         Row: {
           couple_id: string
@@ -917,55 +868,6 @@ export type Database = {
             columns: ["team_id"]
             isOneToOne: true
             referencedRelation: "episode_teams"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      episode_custom_moments: {
-        Row: {
-          couple_id: string | null
-          created_at: string
-          created_by: string | null
-          episode_id: string
-          id: string
-          label: string
-        }
-        Insert: {
-          couple_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          episode_id: string
-          id?: string
-          label: string
-        }
-        Update: {
-          couple_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          episode_id?: string
-          id?: string
-          label?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "episode_custom_moments_couple_id_fkey"
-            columns: ["couple_id"]
-            isOneToOne: false
-            referencedRelation: "couples"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "episode_custom_moments_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "episode_custom_moments_episode_id_fkey"
-            columns: ["episode_id"]
-            isOneToOne: false
-            referencedRelation: "episodes"
             referencedColumns: ["id"]
           },
         ]
@@ -1300,19 +1202,15 @@ export type Database = {
           episode_id: string
           host_name: string | null
           id: string
-          mark_max: number
           name: string
           name_is_auto: boolean
-          panel_judge_ids: string[] | null
           posted_at: string | null
           posted_by: string | null
           scoring_mode: string
           second_dance_style_id: string | null
-          song_source: string | null
           song_title: string | null
           songs: Json
           sort_order: number
-          theme_label: string | null
           updated_at: string
         }
         Insert: {
@@ -1324,19 +1222,15 @@ export type Database = {
           episode_id: string
           host_name?: string | null
           id?: string
-          mark_max?: number
           name: string
           name_is_auto?: boolean
-          panel_judge_ids?: string[] | null
           posted_at?: string | null
           posted_by?: string | null
           scoring_mode?: string
           second_dance_style_id?: string | null
-          song_source?: string | null
           song_title?: string | null
           songs?: Json
           sort_order?: number
-          theme_label?: string | null
           updated_at?: string
         }
         Update: {
@@ -1348,19 +1242,15 @@ export type Database = {
           episode_id?: string
           host_name?: string | null
           id?: string
-          mark_max?: number
           name?: string
           name_is_auto?: boolean
-          panel_judge_ids?: string[] | null
           posted_at?: string | null
           posted_by?: string | null
           scoring_mode?: string
           second_dance_style_id?: string | null
-          song_source?: string | null
           song_title?: string | null
           songs?: Json
           sort_order?: number
-          theme_label?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2575,17 +2465,6 @@ export type Database = {
       materialize_team_scores: {
         Args: { p_episode_id: string; p_team_id: string }
         Returns: undefined
-      }
-      mutate_draft_moment: {
-        Args: {
-          p_actor_id: string
-          p_couple_id: string
-          p_episode_id: string
-          p_label: string
-          p_moment_id: string
-          p_remove: boolean
-        }
-        Returns: string
       }
       my_co_manager_invite_code: {
         Args: { p_league_id: string }
