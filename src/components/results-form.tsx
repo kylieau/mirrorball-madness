@@ -21,8 +21,7 @@ import {
   revealTeamScores,
   undoTeamScores,
 } from "@/app/admin/results/actions";
-import { CirclePauseIcon } from "lucide-react";
-import { cn } from "cn";
+import { CirclePauseIcon, PlusIcon } from "lucide-react";
 import { JudgeScoreRow } from "@/components/judge-score-row";
 import { RoundExceptionPanel, type ExceptionChoice } from "@/components/round-exception-panel";
 import {
@@ -453,6 +452,9 @@ export function ResultsForm({
   const [bandCoupleId, setBandCoupleId] = useState<string | null>(null);
   const [exceptionSaving, setExceptionSaving] = useState(false);
   const [exceptionError, setExceptionError] = useState<string | null>(null);
+  // Where the last exception change came from ("card:<coupleId>" or
+  // "band:<roundId>"), so an Undo that fails says so there.
+  const [exceptionErrorAt, setExceptionErrorAt] = useState<string | null>(null);
   const [bonusInput, setBonusInput] = useState("");
   const [bonusError, setBonusError] = useState<string | null>(null);
   useEffect(() => {
@@ -854,11 +856,13 @@ export function ResultsForm({
   // has moved the couple's outcome; the row then follows what it wrote.
   async function handleRoundException(
     coupleId: string,
-    change: { roundIds: string[]; kind: ExceptionChoice["kind"] | null; note: string | null; bonusPoints: number | null }
+    change: { roundIds: string[]; kind: ExceptionChoice["kind"] | null; note: string | null; bonusPoints: number | null },
+    source: string
   ) {
     if (!selectedEpisode) return;
     setExceptionSaving(true);
     setExceptionError(null);
+    setExceptionErrorAt(source);
     try {
       const flushed = await flushDraft();
       if (flushed.error) {
@@ -1505,51 +1509,54 @@ export function ResultsForm({
     });
   }
 
-  // "Round 2 · Heat 1 of 3" and the round's bonus, for a heat, team or
-  // immunity row of the plan.
+  // "Heat 1 of 3" (the Rounds switch already names the round) and the
+  // round's bonus, for a heat, team or immunity row of the plan.
   function roundContext(dance: SpecialDance) {
     const round = dance.roundId ? rounds.find((r) => r.id === dance.roundId) : undefined;
     if (!round) return null;
     const immunity = dance.heatNumber == null;
     return {
-      label: immunity
-        ? `Round ${round.position} · Immune Bonus`
-        : `Round ${round.position} · ${unitNoun(round, false)} ${dance.heatNumber} of ${round.unitCount}`,
+      label: immunity ? "Immune Bonus" : `${unitNoun(round, false)} ${dance.heatNumber} of ${round.unitCount}`,
       winnerBonus: round.scoring === "fixed_bonus" ? round.bonusPoints : null,
       immunity,
     };
   }
 
-  // Who is out of a round, with Undo, and Mark a Couple for anyone else.
+  // Who is out of a round, with Undo. On a special round, Mark a Couple picks
+  // anyone else; an own round's couples are marked from their own cards, so
+  // there the band only lists who is out.
   function renderNotInRound(round: EpisodeRound) {
     const list = exceptionsFor(round.id, exceptions);
     const canMark = !published || canPublish;
+    const canAdd = canMark && round.kind === "special";
     const markable = episodeCouples.filter((c) => !list.some((x) => x.coupleId === c.id));
-    const picking = bandCoupleId != null && markable.some((c) => c.id === bandCoupleId) ? bandCoupleId : null;
-    if (list.length === 0 && !canMark) return null;
+    const picking = bandCoupleId && markable.some((c) => c.id === bandCoupleId) ? bandCoupleId : null;
+    const source = `band:${round.id}`;
+    if (list.length === 0 && !canAdd) return null;
     return (
-      <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-border p-2.5">
-        <p className="text-[11px] font-bold tracking-[0.12em] text-muted-foreground">NOT IN THIS ROUND</p>
+      <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Not in This Round</p>
         {list.length === 0 && <p className="text-xs text-muted-foreground">Everyone has a slot in this round.</p>}
         {list.map((x) => {
           const couple = namedCouple(x.coupleId);
           return (
             <div key={x.coupleId} className="flex min-h-11 items-center justify-between gap-2 border-t border-border/50 first-of-type:border-0">
               <div className="min-w-0">
-                <p className="text-[13px]">{couple ? <CoupleName {...coupleParts(couple)} /> : "A couple"}</p>
+                <p className="text-sm">{couple ? <CoupleName {...coupleParts(couple)} /> : "A couple"}</p>
                 {x.note && <p className="truncate text-xs text-muted-foreground">{x.note}</p>}
               </div>
-              <div className="flex items-center gap-1">
-                <Badge variant={x.kind === "immune" ? "default" : "secondary"}>
+              <div className="flex shrink-0 items-center gap-1">
+                <Badge variant="outline">
                   {EXCEPTION_LABEL[x.kind]}
                   {x.kind === "immune" && x.bonusPoints != null ? ` · +${x.bonusPoints}` : ""}
                 </Badge>
                 {canMark && (
                   <Button
+                    size="sm"
                     variant="ghost"
                     className="text-accent"
                     disabled={exceptionSaving}
-                    onClick={() => void handleRoundException(x.coupleId, { roundIds: [round.id], kind: null, note: null, bonusPoints: null })}
+                    onClick={() => void handleRoundException(x.coupleId, { roundIds: [round.id], kind: null, note: null, bonusPoints: null }, source)}
                   >
                     Undo
                   </Button>
@@ -1558,19 +1565,37 @@ export function ResultsForm({
             </div>
           );
         })}
-        {canMark && markable.length > 0 && (
+        {exceptionError && exceptionErrorAt === source && !picking && (
+          <p role="alert" className="text-xs text-danger-text">
+            {exceptionError}
+          </p>
+        )}
+        {canAdd && markable.length > 0 && (bandCoupleId === null ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="self-start text-accent"
+            onClick={() => {
+              setExceptionError(null);
+              setExceptionFor(null);
+              setBandCoupleId("");
+            }}
+          >
+            <PlusIcon className="size-4" />
+            Mark a Couple
+          </Button>
+        ) : (
           <>
             <Select
               items={Object.fromEntries(markable.map((c) => [c.id, formatCoupleName(coupleParts(c))]))}
               value={picking}
               onValueChange={(v) => {
                 setExceptionError(null);
-                setExceptionFor(null);
-                setBandCoupleId(v ?? null);
+                setBandCoupleId(v ?? "");
               }}
             >
-              <SelectTrigger className="w-full" aria-label="Mark a couple out of this round">
-                <SelectValue placeholder="Mark a Couple" />
+              <SelectTrigger className="h-8 w-full text-xs" aria-label="Couple to mark">
+                <SelectValue placeholder="Pick a Couple" />
               </SelectTrigger>
               <SelectContent>
                 {markable.map((c) => (
@@ -1580,20 +1605,24 @@ export function ResultsForm({
                 ))}
               </SelectContent>
             </Select>
-            {picking && (
+            {picking ? (
               <RoundExceptionPanel
                 key={`${round.id}-${picking}`}
                 coupleName={formatCoupleName(coupleParts(namedCouple(picking)!))}
                 rounds={rounds}
                 round={round}
                 saving={exceptionSaving}
-                error={exceptionError}
+                error={exceptionErrorAt === source ? exceptionError : null}
                 onCancel={() => setBandCoupleId(null)}
-                onSave={(choice) => void handleRoundException(picking, choice)}
+                onSave={(choice) => void handleRoundException(picking, choice, source)}
               />
+            ) : (
+              <Button size="sm" variant="ghost" className="self-start" onClick={() => setBandCoupleId(null)}>
+                Cancel
+              </Button>
             )}
           </>
-        )}
+        ))}
       </div>
     );
   }
@@ -1627,13 +1656,10 @@ export function ResultsForm({
       const name = entry.dance?.name ?? entry.unit?.name ?? "";
       const members = entry.dance ? oxfordJoin(entry.dance.memberCoupleIds.map(firstName)) : "Not set up yet";
       return (
-        <span className="flex flex-col">
-          <span className="flex flex-wrap items-center gap-1.5">
-            <strong>{name}</strong>
-            {entry.dance?.heatNumber == null && entry.dance && <Badge variant="secondary">Immune Bonus</Badge>}
-            {entry.dance?.postedAt && <span className="text-muted-foreground">Posted</span>}
-          </span>
-          <span className="text-xs text-muted-foreground">{members}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <strong className="shrink-0">{name}</strong>
+          <span className="truncate text-muted-foreground">· {members}</span>
+          {entry.dance?.postedAt && <span className="shrink-0 text-muted-foreground">· Posted</span>}
         </span>
       );
     };
@@ -1663,7 +1689,7 @@ export function ResultsForm({
           <SelectContent>
             <SelectGroup>
               <SelectLabel>
-                Round {round.position} · {round.roundType} · {round.unitCount} {round.unitCount === 1 ? unitNoun(round, false) : unitNoun(round)}
+                {round.unitCount} {round.unitCount === 1 ? unitNoun(round, false) : unitNoun(round)}
               </SelectLabel>
               {entries.map((e) => (
                 <SelectItem key={e.value} value={e.value}>
@@ -1828,17 +1854,18 @@ export function ResultsForm({
               return (
                 <div key={x.roundId} className="flex min-h-11 items-center justify-between gap-2 rounded-lg bg-muted/40 px-2.5 py-1.5">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold text-muted-foreground">{round ? roundTabLabel(round) : "Round"}</p>
+                    <p className="text-xs font-semibold text-muted-foreground">{round ? roundTabLabel(round) : "Round"}</p>
                     {x.note && <p className="truncate text-xs text-muted-foreground">{x.note}</p>}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Badge variant={x.kind === "immune" ? "default" : "secondary"}>{EXCEPTION_LABEL[x.kind]}</Badge>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Badge variant="outline">{EXCEPTION_LABEL[x.kind]}</Badge>
                     {(!published || canPublish) && (
                       <Button
+                        size="sm"
                         variant="ghost"
                         className="text-accent"
                         disabled={exceptionSaving}
-                        onClick={() => void handleRoundException(c.id, { roundIds: [x.roundId], kind: null, note: null, bonusPoints: null })}
+                        onClick={() => void handleRoundException(c.id, { roundIds: [x.roundId], kind: null, note: null, bonusPoints: null }, `card:${c.id}`)}
                       >
                         Undo
                       </Button>
@@ -1847,6 +1874,11 @@ export function ResultsForm({
                 </div>
               );
             })}
+            {exceptionError && exceptionErrorAt === `card:${c.id}` && exceptionFor !== c.id && (
+              <p role="alert" className="text-xs text-danger-text">
+                {exceptionError}
+              </p>
+            )}
             {(!published || canPublish) &&
               !showLeaderboard &&
               (exceptionFor === c.id ? (
@@ -1855,14 +1887,15 @@ export function ResultsForm({
                   rounds={rounds}
                   round={activeRound ?? rounds[0]}
                   saving={exceptionSaving}
-                  error={exceptionError}
+                  error={exceptionErrorAt === `card:${c.id}` ? exceptionError : null}
                   onCancel={() => setExceptionFor(null)}
-                  onSave={(choice) => void handleRoundException(c.id, choice)}
+                  onSave={(choice) => void handleRoundException(c.id, choice, `card:${c.id}`)}
                 />
               ) : (
                 <Button
+                  size="sm"
                   variant="ghost"
-                  className="-ml-2 self-start text-muted-foreground"
+                  className="self-start text-accent"
                   onClick={() => {
                     setExceptionError(null);
                     setBandCoupleId(null);
@@ -2172,18 +2205,17 @@ export function ResultsForm({
                 </div>
               </div>
               {activeRound && (
-                <div className="flex flex-col gap-1.5 pt-1">
-                  <span className="text-[11px] font-bold tracking-[0.12em] text-muted-foreground">ROUNDS</span>
-                  <div className="grid auto-cols-fr grid-flow-col gap-1 rounded-lg bg-muted/60 p-1">
+                <div role="group" aria-labelledby="rounds-switch-label" className="flex flex-col gap-1.5 pt-1">
+                  <span id="rounds-switch-label" className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Rounds
+                  </span>
+                  <div className="flex flex-wrap gap-2">
                     {rounds.map((r) => (
-                      <button
+                      <Button
                         key={r.id}
-                        type="button"
+                        size="sm"
+                        variant={r.id === activeRound.id ? "default" : "outline"}
                         aria-pressed={r.id === activeRound.id}
-                        className={cn(
-                          "min-h-11 rounded-md px-2 text-[13px] leading-tight font-medium",
-                          r.id === activeRound.id ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground"
-                        )}
                         onClick={() => {
                           setSelectedRoundId(r.id);
                           setShowLeaderboard(false);
@@ -2193,7 +2225,7 @@ export function ResultsForm({
                         }}
                       >
                         {roundTabLabel(r)}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -2293,18 +2325,19 @@ export function ResultsForm({
               ) : activeRound?.kind === "special" ? (
                 <>
                   {activeRound.scoring === "fixed_bonus" && (!published || canPublish) && (
-                    <div className="flex flex-col gap-1">
-                      <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <span className="font-medium">Winner&apos;s Bonus</span>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="round-winner-bonus">Winner&apos;s Bonus</Label>
+                      <div className="flex items-center gap-2">
                         <Input
+                          id="round-winner-bonus"
                           inputMode="decimal"
-                          aria-label="Winner's bonus"
-                          className="w-20 text-center"
+                          className="h-8 w-20 text-center text-xs"
                           placeholder="—"
+                          aria-invalid={bonusError != null}
                           value={bonusInput}
                           onChange={(e) => setBonusInput(e.target.value)}
                         />
-                        <span className="text-muted-foreground">pts</span>
+                        <span className="text-sm text-muted-foreground">pts</span>
                         <Button
                           size="sm"
                           variant="outline"

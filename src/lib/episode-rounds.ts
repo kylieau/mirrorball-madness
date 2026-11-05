@@ -238,7 +238,7 @@ export function pairingChecks(input: {
     checks.push({
       tone: "ok",
       message: `Everyone is placed: ${new Set(placed).size} couples in ${filled} ${filled === 1 ? noun : `${noun}s`}${
-        immune.length > 0 ? `, and ${oxfordJoin(immune)} ${immune.length === 1 ? "is" : "are"} Immune` : ""
+        immune.length > 0 ? `, and ${oxfordJoin(immune)} ${immune.length === 1 && !immune[0].includes("&") ? "is" : "are"} Immune` : ""
       }.`,
     });
   }

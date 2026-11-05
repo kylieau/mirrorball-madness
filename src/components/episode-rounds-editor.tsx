@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { LockIcon, MinusIcon, PlusIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,7 @@ import {
 type Couple = { id: string; name: string };
 
 const NO_COUPLE = "none";
+const BONUS_MESSAGE = "Use −100 to 100, in steps of 0.5.";
 const KIND_BADGE: Record<RoundDraft["kind"], string> = { own: "Every Couple", special: "Special", none: "Elimination Only" };
 const CHECK_TONE: Record<PairingCheck["tone"], string> = {
   danger: "border-destructive/50 bg-destructive/10 text-danger-text",
@@ -38,9 +39,17 @@ const CHECK_TONE: Record<PairingCheck["tone"], string> = {
   muted: "border-border bg-muted/40 text-muted-foreground",
   ok: "border-emerald/40 bg-emerald/10 text-emerald-text",
 };
+const MICRO_LABEL = "px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground";
 
 function isHeadToHead(draft: Pick<RoundDraft, "roundType" | "scoring">): boolean {
   return /dance-?off/i.test(draft.roundType) && draft.scoring !== "ranked_points";
+}
+
+function parseBonus(raw: string): { value: number | null; invalid: boolean } {
+  const trimmed = raw.trim();
+  if (trimmed === "") return { value: null, invalid: false };
+  const value = Number(trimmed);
+  return { value, invalid: Number.isNaN(value) || Math.abs(value) > 100 || value * 2 !== Math.trunc(value * 2) };
 }
 
 // Edit Episode → Dance Rounds For This Episode. Round 1 (the Individual
@@ -83,17 +92,16 @@ export function EpisodeRoundsEditor({
 
   function optionRow(option: RoundOption) {
     return (
-      <button
+      <Button
         key={`${option.kind}-${option.roundType}`}
         type="button"
-        className="flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-accent/15"
+        variant="ghost"
+        className="h-auto w-full flex-col items-start gap-0 py-1.5 text-left whitespace-normal"
         onClick={() => addRound(option)}
       >
-        <span className="min-w-0 flex-1">
-          <span className="block text-[13px] font-semibold">{option.roundType}</span>
-          <span className="block text-[11px] leading-snug text-muted-foreground">{option.description}</span>
-        </span>
-      </button>
+        <span className="text-sm font-semibold">{option.roundType}</span>
+        <span className="text-xs font-normal text-muted-foreground">{option.description}</span>
+      </Button>
     );
   }
 
@@ -133,6 +141,7 @@ export function EpisodeRoundsEditor({
           type="button"
           variant="outline"
           className="w-full border-dashed border-primary/60 text-accent"
+          aria-expanded={picking}
           onClick={() => setPicking((open) => !open)}
         >
           <PlusIcon className="size-4" />
@@ -145,6 +154,7 @@ export function EpisodeRoundsEditor({
             <SearchIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
             <Input
               autoFocus
+              aria-label="Search or type a round"
               className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
               placeholder="Search or Type a Round"
               value={search}
@@ -154,22 +164,16 @@ export function EpisodeRoundsEditor({
           </div>
           {typed && !known && (
             <>
-              <p className="px-2 pt-2 pb-1 text-[11px] font-bold tracking-[0.12em] text-muted-foreground">ADD &ldquo;{typed.toUpperCase()}&rdquo;</p>
+              <p className={MICRO_LABEL}>Add &ldquo;{typed}&rdquo;</p>
               {optionRow({ roundType: typed, kind: "own", description: "Every couple dances their own", scoring: "marks", unitCount: 0 })}
               {optionRow({ roundType: typed, kind: "special", description: "A special dance in heats or groups", scoring: "fixed_bonus", unitCount: 1 })}
             </>
           )}
-          {OWN_ROUND_OPTIONS.some(matches) && (
-            <p className="px-2 pt-2 pb-1 text-[11px] font-bold tracking-[0.12em] text-muted-foreground">EVERY COUPLE DANCES THEIR OWN</p>
-          )}
+          {OWN_ROUND_OPTIONS.some(matches) && <p className={MICRO_LABEL}>Every couple dances their own</p>}
           {OWN_ROUND_OPTIONS.filter(matches).map(optionRow)}
-          {SPECIAL_ROUND_OPTIONS.some(matches) && (
-            <p className="px-2 pt-2 pb-1 text-[11px] font-bold tracking-[0.12em] text-muted-foreground">SPECIAL DANCES · GROUPS AND HEATS</p>
-          )}
+          {SPECIAL_ROUND_OPTIONS.some(matches) && <p className={MICRO_LABEL}>Special dances · groups and heats</p>}
           {SPECIAL_ROUND_OPTIONS.filter(matches).map(optionRow)}
-          {ELIMINATION_ROUND_OPTIONS.some(matches) && (
-            <p className="px-2 pt-2 pb-1 text-[11px] font-bold tracking-[0.12em] text-muted-foreground">NO POINTS · ELIMINATION ONLY</p>
-          )}
+          {ELIMINATION_ROUND_OPTIONS.some(matches) && <p className={MICRO_LABEL}>No points · elimination only</p>}
           {ELIMINATION_ROUND_OPTIONS.filter(matches).map(optionRow)}
         </div>
       )}
@@ -206,26 +210,30 @@ function RoundCard({
   onMarking: (open: boolean) => void;
   onException: (coupleId: string, exception: { kind: ExceptionKind; note: string | null; bonusPoints: number | null } | null) => void;
 }) {
+  const id = useId();
   const locked = position === 1;
   const special = draft.kind === "special";
   const noun = unitNoun(draft);
+  const singular = unitNoun(draft, false).toLowerCase();
+  const [bonusText, setBonusText] = useState(draft.bonusPoints != null ? String(draft.bonusPoints) : "");
+  const bonus = parseBonus(bonusText);
   const checks =
     special && draft.units
       ? pairingChecks({ round: draft, units: draft.units, exceptions: draft.exceptions, castIds: couples.map((c) => c.id), name: nameOf })
       : [];
 
   return (
-    <div className={cn("flex flex-col gap-3 rounded-xl border p-3", special ? "border-primary/50 bg-primary/[0.04]" : "border-border bg-card/60")}>
+    <div className={cn("flex flex-col gap-4 rounded-xl border px-4 py-3", special ? "border-primary/50 bg-primary/[0.04]" : "border-border bg-card/60")}>
       <div className="flex items-center gap-2">
         <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-sm font-semibold text-primary-foreground">
           {position}
         </span>
-        <p className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-          <span className="font-heading text-[15px] font-semibold">{draft.roundType || "New Round"}</span>
-          <Badge variant={special ? "default" : "secondary"}>{KIND_BADGE[draft.kind]}</Badge>
+        <p className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-heading text-base font-semibold">{draft.roundType || "New Round"}</span>
+          <Badge variant="secondary">{KIND_BADGE[draft.kind]}</Badge>
         </p>
         {locked ? (
-          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
             <LockIcon aria-hidden className="size-3.5" />
             Always On
           </span>
@@ -237,13 +245,13 @@ function RoundCard({
       </div>
 
       {removing && (
-        <div className="flex flex-col gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-2.5">
-          <p className="text-[13px]">
+        <div className="flex flex-col gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+          <p className="text-sm">
             Remove Round {position}
-            {special ? ` and its ${draft.unitCount} ${draft.unitCount === 1 ? noun.toLowerCase().replace(/s$/, "") : noun.toLowerCase()}` : ""}?
-            {draft.exceptions.length > 0 ? " Its exceptions go with it." : ""} A {noun.toLowerCase().replace(/s$/, "")} that already has scores
-            stops the save; clear it on Enter Results first.
+            {special ? ` and its ${draft.unitCount} ${draft.unitCount === 1 ? singular : noun.toLowerCase()}` : ""}?
+            {draft.exceptions.length > 0 ? " Its exceptions go with it." : ""}
           </p>
+          {special && <p className="text-xs text-muted-foreground">A {singular} that already has scores stops the save; clear it on Enter Results first.</p>}
           <div className="flex gap-2">
             <Button type="button" variant="destructive" onClick={onRemove}>
               Remove Round
@@ -258,29 +266,26 @@ function RoundCard({
       {locked ? (
         <p className="text-xs text-muted-foreground">Every couple dances their own. Style and song are typed on Enter Results, and save as you type.</p>
       ) : (
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-xs">Round Name</Label>
-          <Input value={draft.roundType} maxLength={40} onChange={(e) => onPatch((d) => ({ ...d, roundType: e.target.value }))} />
-          {draft.kind === "own" && (
-            <p className="text-xs text-muted-foreground">Adds a dance to every couple on Enter Results. Style and song are typed there.</p>
-          )}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`${id}-name`}>Round Name</Label>
+          <Input id={`${id}-name`} value={draft.roundType} maxLength={40} onChange={(e) => onPatch((d) => ({ ...d, roundType: e.target.value }))} />
+          {draft.kind === "own" && <p className="text-xs text-muted-foreground">Adds a dance to every couple on Enter Results. Style and song are typed there.</p>}
           {draft.kind === "none" && <p className="text-xs text-muted-foreground">Decides the elimination only. Nothing is scored.</p>}
         </div>
       )}
 
       {special && (
         <>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Scoring</span>
-            <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted/60 p-1">
+          <div role="group" aria-labelledby={`${id}-scoring`} className="flex flex-col gap-2">
+            <Label id={`${id}-scoring`}>Scoring</Label>
+            <div className="flex flex-wrap gap-2">
               {SPECIAL_SCORING_OPTIONS.map((option) => (
-                <button
+                <Button
                   key={option.scoring}
                   type="button"
-                  className={cn(
-                    "min-h-11 rounded-md px-2 text-[13px] font-medium",
-                    draft.scoring === option.scoring ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground"
-                  )}
+                  size="sm"
+                  variant={draft.scoring === option.scoring ? "default" : "outline"}
+                  aria-pressed={draft.scoring === option.scoring}
                   onClick={() =>
                     onPatch((d) => ({
                       ...d,
@@ -290,75 +295,84 @@ function RoundCard({
                   }
                 >
                   {option.label}
-                </button>
+                </Button>
               ))}
             </div>
             <p className="text-xs text-muted-foreground">{SPECIAL_SCORING_OPTIONS.find((o) => o.scoring === draft.scoring)?.help}</p>
-            {draft.scoring === "fixed_bonus" && (
+          </div>
+
+          {draft.scoring === "fixed_bonus" && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`${id}-bonus`}>Winner&apos;s Bonus</Label>
               <div className="flex items-center gap-2">
-                <Label htmlFor={`bonus-${draft.key}`} className="text-xs">
-                  Winner&apos;s Bonus (pts)
-                </Label>
                 <Input
-                  id={`bonus-${draft.key}`}
+                  id={`${id}-bonus`}
                   inputMode="decimal"
                   className="w-20 text-center"
                   placeholder="—"
-                  value={draft.bonusPoints ?? ""}
+                  aria-invalid={bonus.invalid}
+                  aria-describedby={`${id}-bonus-help`}
+                  value={bonusText}
                   onChange={(e) => {
-                    const raw = e.target.value.trim();
-                    onPatch((d) => ({ ...d, bonusPoints: raw === "" || Number.isNaN(Number(raw)) ? null : Number(raw) }));
+                    setBonusText(e.target.value);
+                    const next = parseBonus(e.target.value);
+                    if (!next.invalid) onPatch((d) => ({ ...d, bonusPoints: next.value }));
                   }}
                 />
-                <span className="text-xs text-muted-foreground">Optional · Can Be Set on the Night</span>
+                <span className="text-sm text-muted-foreground">pts</span>
               </div>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">{noun}</span>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  aria-label={`Fewer ${noun.toLowerCase()}`}
-                  disabled={draft.unitCount <= 1}
-                  onClick={() => onPatch((d) => resizeUnits(d, d.unitCount - 1))}
-                >
-                  <MinusIcon className="size-4" />
-                </Button>
-                <span className="inline-flex h-11 w-12 items-center justify-center rounded-lg border border-input font-heading text-lg font-semibold">
-                  {draft.unitCount}
-                </span>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  aria-label={`More ${noun.toLowerCase()}`}
-                  disabled={draft.unitCount >= MAX_UNITS}
-                  onClick={() => onPatch((d) => resizeUnits(d, d.unitCount + 1))}
-                >
-                  <PlusIcon className="size-4" />
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {draft.units
-                  ? draft.unitCount > 1
-                    ? `Named ${heatName(draft.roundType, 1, draft.unitCount)} to ${heatName(draft.roundType, draft.unitCount, draft.unitCount)} on Enter Results.`
-                    : `Named ${draft.roundType.trim() || "after the round"} on Enter Results.`
-                  : "Team names and members are set inline in each team's panel on Enter Results."}
-              </p>
+              {bonus.invalid ? (
+                <p id={`${id}-bonus-help`} role="alert" className="text-xs text-danger-text">
+                  {BONUS_MESSAGE}
+                </p>
+              ) : (
+                <p id={`${id}-bonus-help`} className="text-xs text-muted-foreground">
+                  Optional. Can be set on the night, once the show announces it.
+                </p>
+              )}
             </div>
+          )}
+
+          <div role="group" aria-labelledby={`${id}-units`} className="flex flex-col gap-2">
+            <Label id={`${id}-units`}>{noun}</Label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label={`Fewer ${noun.toLowerCase()}`}
+                disabled={draft.unitCount <= 1}
+                onClick={() => onPatch((d) => resizeUnits(d, d.unitCount - 1))}
+              >
+                <MinusIcon className="size-4" />
+              </Button>
+              <span aria-live="polite" className="inline-flex h-8 w-10 items-center justify-center rounded-lg border border-input text-sm font-semibold">
+                {draft.unitCount}
+              </span>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label={`More ${noun.toLowerCase()}`}
+                disabled={draft.unitCount >= MAX_UNITS}
+                onClick={() => onPatch((d) => resizeUnits(d, d.unitCount + 1))}
+              >
+                <PlusIcon className="size-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {draft.units
+                ? draft.unitCount > 1
+                  ? `Named ${heatName(draft.roundType, 1, draft.unitCount)} to ${heatName(draft.roundType, draft.unitCount, draft.unitCount)} on Enter Results.`
+                  : `Named ${draft.roundType.trim() || "after the round"} on Enter Results.`
+                : "Team names and members are set in each team's panel on Enter Results."}
+            </p>
           </div>
 
           {draft.units && (
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium">{isHeadToHead(draft) ? "Pairings" : "Participants"}</span>
-                <span className="text-xs text-muted-foreground">Optional · Can Be Set on the Night</span>
-              </div>
+              <Label>{isHeadToHead(draft) ? "Pairings" : "Participants"}</Label>
+              <p className="-mt-1 text-xs text-muted-foreground">Optional. Can be set on the night, when they&apos;re announced.</p>
               {draft.units.map((unit, i) => (
                 <UnitMembers
                   key={i}
@@ -375,19 +389,20 @@ function RoundCard({
       )}
 
       {draft.kind !== "none" && (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium">Exceptions</span>
-            <span className="text-xs text-muted-foreground">{published ? "Change in a Correction" : "Optional"}</span>
-          </div>
-          {draft.exceptions.length === 0 && <p className="text-xs italic text-muted-foreground">None. Every couple has a slot.</p>}
+        <div className="flex flex-col gap-2">
+          <Label>Exceptions</Label>
+          {draft.exceptions.length === 0 && (
+            <p className="-mt-1 text-xs text-muted-foreground">
+              {published ? "None. Exceptions on a published week change in a correction on Enter Results." : "None. Every couple has a slot."}
+            </p>
+          )}
           {draft.exceptions.map((x) => (
             <div key={x.coupleId} className="flex min-h-11 items-center gap-2 rounded-lg bg-muted/40 py-1 pr-1 pl-3">
-              <span className="min-w-0 flex-1 text-[13px]">
+              <span className="min-w-0 flex-1 text-sm">
                 <span className="block truncate">{nameOf(x.coupleId)}</span>
                 {x.note && <span className="block truncate text-xs text-muted-foreground">{x.note}</span>}
               </span>
-              <Badge variant={x.kind === "immune" ? "default" : "secondary"}>
+              <Badge variant="outline">
                 {EXCEPTION_LABEL[x.kind]}
                 {x.kind === "immune" && x.bonusPoints != null ? ` · +${x.bonusPoints}` : ""}
               </Badge>
@@ -407,7 +422,7 @@ function RoundCard({
                 onSave={(coupleId, exception) => onException(coupleId, exception)}
               />
             ) : (
-              <Button type="button" variant="outline" className="w-full" onClick={() => onMarking(true)}>
+              <Button type="button" size="sm" variant="ghost" className="self-start text-accent" onClick={() => onMarking(true)}>
                 <PlusIcon className="size-4" />
                 Mark a Couple
               </Button>
@@ -415,11 +430,19 @@ function RoundCard({
         </div>
       )}
 
-      {checks.map((check) => (
-        <p key={check.message} className={cn("rounded-lg border px-3 py-2 text-xs leading-snug", CHECK_TONE[check.tone])}>
-          {check.message}
-        </p>
-      ))}
+      {checks.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {checks.map((check) => (
+            <p
+              key={check.message}
+              role={check.tone === "danger" ? "alert" : undefined}
+              className={cn("rounded-lg border px-3 py-2 text-xs leading-snug", CHECK_TONE[check.tone])}
+            >
+              {check.message}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -465,16 +488,16 @@ function UnitMembers({
     return (
       <div className="flex flex-col gap-1">
         <span className="text-xs font-semibold text-accent">{label}</span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {slot(0)}
-          <span className="text-xs font-bold text-muted-foreground">vs</span>
+          <span className="text-xs font-semibold text-muted-foreground">vs</span>
           {slot(1)}
         </div>
       </div>
     );
   }
   return (
-    <div className="flex flex-col gap-1">
+    <div role="group" aria-label={label} className="flex flex-col gap-1">
       <span className="text-xs font-semibold text-accent">{label}</span>
       <div className="flex flex-wrap gap-1">
         {couples.map((c) => {
@@ -486,7 +509,7 @@ function UnitMembers({
               size="xs"
               variant={on ? "default" : "outline"}
               aria-pressed={on}
-              onClick={() => onChange(on ? members.filter((id) => id !== c.id) : [...members, c.id])}
+              onClick={() => onChange(on ? members.filter((cid) => cid !== c.id) : [...members, c.id])}
             >
               {c.name}
             </Button>
@@ -508,53 +531,80 @@ function ExceptionForm({
   onCancel: () => void;
   onSave: (coupleId: string, exception: { kind: ExceptionKind; note: string | null; bonusPoints: number | null }) => void;
 }) {
+  const id = useId();
   const [coupleId, setCoupleId] = useState("");
   const [kind, setKind] = useState<ExceptionKind>(allowImmune ? "immune" : "not_dancing");
   const [note, setNote] = useState("");
-  const [bonus, setBonus] = useState("");
+  const [bonusText, setBonusText] = useState("");
   const kinds: ExceptionKind[] = allowImmune ? ["immune", "not_dancing", "withdrawn"] : ["not_dancing", "withdrawn"];
-  const bonusValue = bonus.trim() === "" ? null : Number(bonus);
-  const bonusInvalid = bonusValue != null && (Number.isNaN(bonusValue) || bonusValue * 2 !== Math.trunc(bonusValue * 2) || Math.abs(bonusValue) > 100);
+  const bonus = parseBonus(bonusText);
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg border border-ring bg-accent/5 p-2.5">
-      <Select items={Object.fromEntries(couples.map((c) => [c.id, c.name]))} value={coupleId || null} onValueChange={(v) => setCoupleId(v ?? "")}>
-        <SelectTrigger className="w-full" aria-label="Couple">
-          <SelectValue placeholder="Pick a Couple" />
-        </SelectTrigger>
-        <SelectContent>
-          {couples.map((c) => (
-            <SelectItem key={c.id} value={c.id}>
-              {c.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <div className="flex flex-wrap gap-1.5">
-        {kinds.map((k) => (
-          <Button key={k} type="button" variant={kind === k ? "default" : "outline"} className="rounded-full" onClick={() => setKind(k)}>
-            {EXCEPTION_LABEL[k]}
-          </Button>
-        ))}
+    <div className="flex flex-col gap-3 rounded-lg border border-ring bg-accent/5 p-3">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`${id}-couple`}>Couple</Label>
+        <Select items={Object.fromEntries(couples.map((c) => [c.id, c.name]))} value={coupleId || null} onValueChange={(v) => setCoupleId(v ?? "")}>
+          <SelectTrigger id={`${id}-couple`} className="w-full">
+            <SelectValue placeholder="Pick a Couple" />
+          </SelectTrigger>
+          <SelectContent>
+            {couples.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {kind === "immune"
-          ? "Skips this round. They get the round's winner's bonus unless you set their own."
-          : kind === "withdrawn"
-            ? "Out of every round tonight. Sets their outcome to Withdrawn."
-            : "Skips this round. They stay in the competition."}
-      </p>
+      <div role="group" aria-labelledby={`${id}-reason`} className="flex flex-col gap-2">
+        <Label id={`${id}-reason`}>Reason</Label>
+        <div className="flex flex-wrap gap-2">
+          {kinds.map((k) => (
+            <Button key={k} type="button" size="sm" variant={kind === k ? "default" : "outline"} aria-pressed={kind === k} onClick={() => setKind(k)}>
+              {EXCEPTION_LABEL[k]}
+            </Button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {kind === "immune"
+            ? "Skips this round. They get the round's winner's bonus unless you set their own."
+            : kind === "withdrawn"
+              ? "Out of every round tonight. Sets their outcome to Withdrawn."
+              : "Skips this round. They stay in the competition."}
+        </p>
+      </div>
       {kind === "immune" && (
-        <div className="flex items-center gap-2">
-          <Label className="text-xs">Their Bonus (pts)</Label>
-          <Input inputMode="decimal" className={cn("w-20 text-center", bonusInvalid && "border-destructive")} placeholder="Round's" value={bonus} onChange={(e) => setBonus(e.target.value)} />
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`${id}-bonus`}>Their Bonus</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id={`${id}-bonus`}
+              inputMode="decimal"
+              className="w-20 text-center"
+              placeholder="—"
+              aria-invalid={bonus.invalid}
+              value={bonusText}
+              onChange={(e) => setBonusText(e.target.value)}
+            />
+            <span className="text-sm text-muted-foreground">pts</span>
+          </div>
+          {bonus.invalid ? (
+            <p role="alert" className="text-xs text-danger-text">
+              {BONUS_MESSAGE}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Blank follows the round&apos;s winner&apos;s bonus.</p>
+          )}
         </div>
       )}
-      <Input placeholder="Note (Optional)" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`${id}-note`}>Note (Optional)</Label>
+        <Input id={`${id}-note`} maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
+      </div>
       <div className="flex gap-2">
         <Button
           type="button"
-          disabled={!coupleId || bonusInvalid}
-          onClick={() => onSave(coupleId, { kind, note: note.trim() || null, bonusPoints: kind === "immune" ? bonusValue : null })}
+          disabled={!coupleId || bonus.invalid}
+          onClick={() => onSave(coupleId, { kind, note: note.trim() || null, bonusPoints: kind === "immune" ? bonus.value : null })}
         >
           Save Exception
         </Button>
@@ -565,4 +615,3 @@ function ExceptionForm({
     </div>
   );
 }
-

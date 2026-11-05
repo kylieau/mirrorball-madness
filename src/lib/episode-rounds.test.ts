@@ -97,6 +97,8 @@ describe("pairing checks", () => {
     ]);
     expect(pairingChecks({ ...base, units: [["amber", "ezra"], ["jenna", "tatyana"], []], exceptions: [{ coupleId: "harry", kind: "immune" }] }))
       .toEqual([{ tone: "ok", message: "Everyone is placed: 4 couples in 2 heats, and Harry is Immune." }]);
+    expect(pairingChecks({ ...base, name: (id: string) => `${names[id]} & Pro`, units: [["amber", "ezra"], ["jenna", "tatyana"], []], exceptions: [{ coupleId: "harry", kind: "immune" }] })[0].message)
+      .toBe("Everyone is placed: 4 couples in 2 heats, and Harry & Pro are Immune.");
   });
 });
 

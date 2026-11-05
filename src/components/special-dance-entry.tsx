@@ -473,8 +473,11 @@ export function SpecialDanceEntry({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
           <strong>{displayName || "New Special Dance"}</strong>
-          {(dance.danceType || setup.danceType) && (
-            <Badge variant="secondary">{dance.danceType || setup.danceType}</Badge>
+          {/* In a planned round the name already carries the type ("Dance-Off 2"). */}
+          {round ? (
+            <Badge variant="secondary">{round.label}</Badge>
+          ) : (
+            (dance.danceType || setup.danceType) && <Badge variant="secondary">{dance.danceType || setup.danceType}</Badge>
           )}
         </p>
         <div className="flex items-center gap-2">
@@ -487,7 +490,6 @@ export function SpecialDanceEntry({
           )}
         </div>
       </div>
-      {round && <p className="text-[11px] text-muted-foreground">{round.label}</p>}
       {!editing && (
         <>
           <p className="mt-0.5 text-xs text-muted-foreground">
