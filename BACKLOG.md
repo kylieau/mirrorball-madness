@@ -12,10 +12,13 @@ switch, Round 1 card with its Dance-Off line, Mark an Exception panel,
 Dance-Off tab (Winner's Bonus, heat picker, Not in This Round), Edit Episode
 for E09 and E10 (pairings, checks, Add Round picker).
 
-Still to see, none exercised with a real write:
-- Saving Edit Episode (the plan RPC), marking and undoing an exception, setting
-  the Winner's Bonus, setting up a placeholder heat, a heat by Judges' Marks
-  per couple. All rehearsed in PGlite only.
+Kylie's click-through on production (2026-11-05): saving Edit Episode for E10
+with Harry & Jenna marked Immune in the Dance-Off round, and seeing them under
+Not in This Round with the Dance-Off Immunity row on Enter Results, all good.
+
+Still to see with a real write (rehearsed in PGlite only):
+- Setting the Winner's Bonus (E10 night), Undo on an exception, setting up a
+  placeholder heat, a heat by Judges' Marks per couple.
 - E10 night: the bonus filling Winner rows and the immune couple; Finish Week
   with the Dance-Off round.
 - Schedule's save is two steps: the episode saves, then the plan; a refused
