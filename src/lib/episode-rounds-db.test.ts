@@ -232,6 +232,11 @@ describe("apply-episode-rounds.sql", () => {
       ["Dance-Off 2", 2, "points", [jenna, tatyana]],
     ]);
     expect(await heats(ids[3])).toEqual([]);
+    // A contributor sets up the third heat on Enter Results; it takes its planned name.
+    const third = await saveSpecial(e11, { danceType: "Dance-Off", name: "", memberCoupleIds: [connor, maura], scoringMode: "points", roundId: ids[2], heatNumber: 3 }, friend);
+    expect((await heats(ids[2])).find((h) => h.id === third)).toMatchObject({ name: "Dance-Off 3", heat: 3 });
+    await expect(saveSpecial(e11, { danceType: "Dance-Off", memberCoupleIds: [harry], roundId: ids[2], heatNumber: 3 }, friend)).rejects.toThrow(/Dance-Off 3 is already set up/);
+    await db.query("select public.delete_special_dance($1, $2, $3)", [e11, third, admin]);
 
     // Re-pair heat 2, pair heat 3; then a scored heat refuses to go.
     const plan = (heatsList: unknown[], unitCount = 3) => [

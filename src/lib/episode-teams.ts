@@ -12,6 +12,7 @@ import {
   type SpecialDanceScore,
   type SpecialDanceSetupInput,
   type SpecialDanceSong,
+  type CoupleMarks,
   type TeamMark,
 } from "./team-dances";
 
@@ -30,9 +31,17 @@ export type EpisodeTeamsLoad = {
   marksByTeam: Record<string, TeamMark[]>;
   // The saved points and results per Points-mode dance. Service-role read.
   scoresByTeam: Record<string, SpecialDanceScore[]>;
+  // Each participant's marks in a couple-by-couple dance. Service-role read.
+  coupleMarksByTeam: Record<string, CoupleMarks>;
 };
 
-export const EMPTY_TEAMS_LOAD = (mode: TeamsMode): EpisodeTeamsLoad => ({ mode, teamsByEpisode: {}, marksByTeam: {}, scoresByTeam: {} });
+export const EMPTY_TEAMS_LOAD = (mode: TeamsMode): EpisodeTeamsLoad => ({
+  mode,
+  teamsByEpisode: {},
+  marksByTeam: {},
+  scoresByTeam: {},
+  coupleMarksByTeam: {},
+});
 
 // PostgREST reports a missing table as PGRST205 and a missing column as
 // 42703 (or PGRST204 on writes); Postgres itself says 42P01 for a table and
@@ -87,7 +96,7 @@ export function danceMaxScore(row: { max_score?: number | string | null }): numb
 
 const BASE_TEAM_COLUMNS = "id, episode_id, name, song_title, dance_style_id, captain_couple_id, host_name, sort_order, posted_at";
 const SPECIAL_TEAM_COLUMNS =
-  ", dance_type, scoring_mode, second_dance_style_id, songs, details, name_is_auto, updated_at";
+  ", dance_type, scoring_mode, second_dance_style_id, songs, details, name_is_auto, updated_at, round_id, heat_number";
 
 type TeamRow = {
   id: string;
@@ -106,6 +115,8 @@ type TeamRow = {
   details?: Json;
   name_is_auto?: boolean;
   updated_at?: string;
+  round_id?: string | null;
+  heat_number?: number | null;
 };
 
 function parseSongs(value: Json | undefined): SpecialDanceSong[] | null {
@@ -141,7 +152,7 @@ export function specialDanceFromRow(row: TeamRow, memberCoupleIds: string[], cap
     name: row.name,
     nameIsAuto: row.name_is_auto ?? legacy.nameIsAuto,
     danceType: row.dance_type?.trim() || legacy.danceType,
-    scoringMode: row.scoring_mode === "points" ? "points" : "marks",
+    scoringMode: row.scoring_mode === "points" || row.scoring_mode === "couple_marks" ? row.scoring_mode : "marks",
     danceStyleId: row.dance_style_id,
     secondDanceStyleId: row.second_dance_style_id ?? null,
     songs: parseSongs(row.songs) ?? legacy.songs,
@@ -151,6 +162,8 @@ export function specialDanceFromRow(row: TeamRow, memberCoupleIds: string[], cap
     hostName: row.host_name,
     sortOrder: row.sort_order,
     memberCoupleIds,
+    roundId: row.round_id ?? null,
+    heatNumber: row.heat_number ?? null,
     postedAt: row.posted_at,
     updatedAt: row.updated_at ?? null,
   };
@@ -186,16 +199,19 @@ export async function loadEpisodeTeams(
   }
   const teamRows = (teams.data ?? []) as unknown as TeamRow[];
   const teamIds = teamRows.map((t) => t.id);
-  const [marks, scores] =
+  const [marks, scores, coupleMarks] =
     teamIds.length > 0
       ? await Promise.all([
           admin.from("episode_team_marks").select("team_id, judge_id, score").in("team_id", teamIds),
           mode === "special"
             ? admin.from("episode_team_scores").select("team_id, couple_id, points, result").in("team_id", teamIds)
             : Promise.resolve({ data: [], error: null }),
+          mode === "special"
+            ? admin.from("episode_team_couple_marks").select("team_id, couple_id, judge_id, score").in("team_id", teamIds)
+            : Promise.resolve({ data: [], error: null }),
         ])
-      : [{ data: [], error: null }, { data: [], error: null }];
-  if (marks.error) throw new Error("Could not load the team marks. Please try again.");
+      : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
+  if (marks.error || coupleMarks.error) throw new Error("Could not load the team marks. Please try again.");
   if (scores.error) throw new Error("Could not load the special dance points. Please try again.");
   const memberRows = (members.data ?? []) as unknown as { team_id: string; couple_id: string; sort_order?: number }[];
   const membersByTeam = new Map<string, { coupleId: string; sortOrder: number }[]>();
@@ -217,6 +233,10 @@ export async function loadEpisodeTeams(
       result: row.result ?? null,
     });
   }
+  const coupleMarksByTeam: Record<string, CoupleMarks> = {};
+  for (const row of coupleMarks.data ?? []) {
+    ((coupleMarksByTeam[row.team_id] ??= {})[row.couple_id] ??= []).push({ judgeId: row.judge_id, score: Number(row.score) });
+  }
   const teamsByEpisode: Record<string, SpecialDance[]> = {};
   for (const row of teamRows) {
     const memberIds = (membersByTeam.get(row.id) ?? [])
@@ -224,7 +244,7 @@ export async function loadEpisodeTeams(
       .map((m) => m.coupleId);
     (teamsByEpisode[row.episode_id] ??= []).push(specialDanceFromRow(row, memberIds));
   }
-  return { mode, teamsByEpisode, marksByTeam, scoresByTeam };
+  return { mode, teamsByEpisode, marksByTeam, scoresByTeam, coupleMarksByTeam };
 }
 
 export type SpecialDanceLabel = { name: string; danceType: string; scoringMode: "marks" | "points" };
@@ -309,6 +329,25 @@ export async function saveTeamMarks(
   });
   if (error) return { error: translateError(error, TEAM_TABLES_MISSING_MESSAGE) };
   return { error: null };
+}
+
+// Propose tier. One participant's marks in a couple-by-couple dance; partial
+// sets save, and posting needs every eligible participant's full set.
+export async function saveTeamCoupleMarks(
+  admin: SupabaseClient<Database>,
+  input: { episodeId: string; teamId: string; coupleId: string; marks: TeamMark[] },
+  actorId: string
+): Promise<{ error: string | null }> {
+  if (input.marks.length > SPECIAL_DANCE_MAX_JUDGES) return { error: `Marks must be a list of at most ${SPECIAL_DANCE_MAX_JUDGES}.` };
+  if (input.marks.some((m) => !isValidMark(m.score))) return { error: JUDGE_MARK_MESSAGE };
+  const { error } = await admin.rpc("save_team_couple_marks", {
+    p_episode_id: input.episodeId,
+    p_team_id: input.teamId,
+    p_actor_id: actorId,
+    p_couple_id: input.coupleId,
+    p_marks: input.marks as unknown as Json,
+  });
+  return { error: error?.message ?? null };
 }
 
 // Propose tier, like a couple's draft release: fans who unlocked the week's

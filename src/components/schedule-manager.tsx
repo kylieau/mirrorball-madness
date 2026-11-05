@@ -31,6 +31,17 @@ import { exhibitionEpisodes, groupEpisodesByWeek } from "@/lib/competition-week"
 import { ChevronRightIcon, PlusIcon, XIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { DEFAULT_EPISODE_DURATION_MINUTES } from "@/lib/episode-banner";
+import { EpisodeRoundsEditor } from "@/components/episode-rounds-editor";
+import {
+  individualRoundDraft,
+  roundDraftFrom,
+  roundsPayload,
+  validateRounds,
+  type EpisodeRound,
+  type RoundDraft,
+  type RoundException,
+} from "@/lib/episode-rounds";
+import type { SpecialDance } from "@/lib/team-dances";
 
 type Episode = {
   id: string;
@@ -44,7 +55,6 @@ type Episode = {
   results_published_at: string | null;
   status: string;
 };
-type RoundType = { id: string; name: string };
 type Judge = { id: string; name: string; archivedAt: string | null };
 type CompetitionWeek = {
   id: string;
@@ -186,8 +196,10 @@ export function ScheduleManager({
   season,
   seasonCouples,
   participantsByEpisode,
-  roundTypes,
   roundTypesByEpisode,
+  roundsByEpisode,
+  roundExceptionsByEpisode,
+  teamsByEpisode,
   judges,
   guestJudgesByEpisode,
 }: {
@@ -201,8 +213,10 @@ export function ScheduleManager({
   season: Season;
   seasonCouples: Couple[];
   participantsByEpisode: Record<string, string[]>;
-  roundTypes: RoundType[];
   roundTypesByEpisode: Record<string, string[]>;
+  roundsByEpisode: Record<string, EpisodeRound[]>;
+  roundExceptionsByEpisode: Record<string, RoundException[]>;
+  teamsByEpisode: Record<string, SpecialDance[]>;
   judges: Judge[];
   guestJudgesByEpisode: Record<string, string[]>;
 }) {
@@ -236,10 +250,9 @@ export function ScheduleManager({
   const [isFinale, setIsFinale] = useState(false);
   const [isDoubleEliminationWeek, setIsDoubleEliminationWeek] = useState(false);
   const [participantCoupleIds, setParticipantCoupleIds] = useState<Set<string>>(new Set());
-  const [expectedDanceCount, setExpectedDanceCount] = useState(1);
   const [judgesSaveAvailable, setJudgesSaveAvailable] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(DEFAULT_EPISODE_DURATION_MINUTES);
-  const [roundTypeIds, setRoundTypeIds] = useState<Set<string>>(new Set());
+  const [roundDrafts, setRoundDrafts] = useState<RoundDraft[]>(() => [individualRoundDraft()]);
   const [guestJudgeNames, setGuestJudgeNames] = useState<string[]>([]);
   const [newGuestName, setNewGuestName] = useState("");
   const suggestedGuestNames = pastGuestNames.filter((name) => !guestJudgeNames.includes(name));
@@ -312,11 +325,14 @@ export function ScheduleManager({
       published,
     }).map((c) => c.id);
     setParticipantCoupleIds(new Set(defaultCheckedParticipantIds(participantsByEpisode[e.id], selectable)));
-    setExpectedDanceCount(e.expected_dance_count);
     setJudgesSaveAvailable(e.judges_save_available);
     setDurationMinutes(e.duration_minutes);
-    const assignedNames = new Set(roundTypesByEpisode[e.id] ?? []);
-    setRoundTypeIds(new Set(roundTypes.filter((rt) => assignedNames.has(rt.name)).map((rt) => rt.id)));
+    const rounds = roundsByEpisode[e.id] ?? [];
+    setRoundDrafts(
+      rounds.length > 0
+        ? rounds.map((r) => roundDraftFrom(r, teamsByEpisode[e.id] ?? [], roundExceptionsByEpisode[e.id] ?? []))
+        : [individualRoundDraft()]
+    );
     setGuestJudgeNames(guestNamesFor(e.id));
     setNewGuestName("");
     setSheetOpen(true);
@@ -336,10 +352,9 @@ export function ScheduleManager({
     setParticipantCoupleIds(
       new Set(selectableCast(seasonCouples, nextWeekNumber, { published: false }).map((c) => c.id))
     );
-    setExpectedDanceCount(1);
     setJudgesSaveAvailable(false);
     setDurationMinutes(DEFAULT_EPISODE_DURATION_MINUTES);
-    setRoundTypeIds(new Set());
+    setRoundDrafts([individualRoundDraft()]);
     setGuestJudgeNames([]);
     setNewGuestName("");
   }
@@ -356,15 +371,6 @@ export function ScheduleManager({
       const next = new Set(prev);
       if (next.has(coupleId)) next.delete(coupleId);
       else next.add(coupleId);
-      return next;
-    });
-  }
-
-  function toggleRoundType(roundTypeId: string) {
-    setRoundTypeIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(roundTypeId)) next.delete(roundTypeId);
-      else next.add(roundTypeId);
       return next;
     });
   }
@@ -387,8 +393,9 @@ export function ScheduleManager({
       setError("Competition week must be a positive integer, or blank for exhibition.");
       return;
     }
-    if (!Number.isInteger(expectedDanceCount) || expectedDanceCount < 1) {
-      setError("Dances per couple must be a positive integer.");
+    const roundsError = validateRounds(roundDrafts);
+    if (roundsError) {
+      setError(roundsError);
       return;
     }
     if (!Number.isInteger(durationMinutes) || durationMinutes < 1) {
@@ -412,9 +419,8 @@ export function ScheduleManager({
       isFinale: parsedWeekNumber != null ? isFinale : false,
       isDoubleEliminationWeek: parsedWeekNumber != null ? isDoubleEliminationWeek : false,
       participantCoupleIds: participantIdsToPersist(participantCoupleIds, selectableIds),
-      roundTypeIds: [...roundTypeIds],
       guestJudgeNames: newGuestName.trim() ? [...guestJudgeNames, newGuestName.trim()] : guestJudgeNames,
-      expectedDanceCount,
+      rounds: roundsPayload(roundDrafts),
       judgesSaveAvailable,
       durationMinutes,
     });
@@ -547,7 +553,7 @@ export function ScheduleManager({
       </Card>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="overflow-y-auto">
+        <SheetContent className="overflow-y-auto data-[side=right]:sm:max-w-md">
           <SheetHeader>
             <SheetTitle>{editingId ? "Edit Episode" : "Add Episode"}</SheetTitle>
             <SheetDescription>
@@ -611,16 +617,14 @@ export function ScheduleManager({
                 onChange={(e) => setTheme(e.target.value)}
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="danceCount">Dances (Per Couple)</Label>
-              <Input
-                id="danceCount"
-                type="number"
-                min={1}
-                value={expectedDanceCount}
-                onChange={(e) => setExpectedDanceCount(Number(e.target.value))}
-              />
-            </div>
+            <EpisodeRoundsEditor
+              drafts={roundDrafts}
+              onChange={setRoundDrafts}
+              published={editingPublished}
+              couples={selectableCouples
+                .filter((c) => participantCoupleIds.size === 0 || participantCoupleIds.has(c.id))
+                .map((c) => ({ id: c.id, name: `${c.celebrity_name} & ${c.pro_name}` }))}
+            />
             <div className="flex items-center justify-between gap-3">
               <div>
                 <Label htmlFor="judgesSaveAvailable">Judges&apos; Save Active</Label>
@@ -695,31 +699,6 @@ export function ScheduleManager({
                 value={durationMinutes}
                 onChange={(e) => setDurationMinutes(Number(e.target.value))}
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Round Types</Label>
-              <p className="text-xs text-muted-foreground">
-                Tick any formats this night uses. They apply to the whole cast, so they&apos;re set
-                here rather than on each couple.
-              </p>
-              <div className="flex flex-col gap-1 rounded-lg border border-border p-2">
-                {roundTypes.length === 0 ? (
-                  <p className="py-1 text-sm text-muted-foreground">
-                    None yet. Add round types in Show Settings.
-                  </p>
-                ) : (
-                  roundTypes.map((rt) => (
-                    <label key={rt.id} className="flex items-center gap-2 py-1 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={roundTypeIds.has(rt.id)}
-                        onChange={() => toggleRoundType(rt.id)}
-                      />
-                      {rt.name}
-                    </label>
-                  ))
-                )}
-              </div>
             </div>
             {parsedWeekNumber != null && (
               <div className="flex flex-wrap items-center gap-4">

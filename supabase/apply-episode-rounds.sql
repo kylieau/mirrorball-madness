@@ -392,23 +392,6 @@ begin
   select (d->>'coupleId')::uuid into v_captain from jsonb_array_elements(v_details) d where lower(d->>'label') = 'captain' and d->>'coupleId' is not null limit 1;
   select nullif(btrim(d->>'value'), '') into v_host from jsonb_array_elements(v_details) d where lower(d->>'label') = 'host' limit 1;
 
-  v_name := btrim(coalesce(p_dance->>'name', case when existing.name_is_auto then '' else existing.name end, ''));
-  if v_name = '' then
-    v_auto := true;
-    n := 1;
-    loop
-      v_candidate := case when n = 1 then v_type else v_type || ' ' || n end;
-      exit when not exists (select 1 from public.episode_teams t where t.episode_id = ep.id and lower(t.name) = lower(v_candidate) and t.id is distinct from existing.id);
-      n := n + 1;
-    end loop;
-    v_name := v_candidate;
-  elsif exists (select 1 from public.episode_teams t where t.episode_id = ep.id and lower(t.name) = lower(v_name) and t.id is distinct from existing.id) then
-    raise exception 'Another special dance is already called "%"', v_name;
-  end if;
-
-  v_sort := coalesce(nullif(p_dance->>'sortOrder', '')::int, existing.sort_order,
-    (select coalesce(max(sort_order), 0) + 1 from public.episode_teams where episode_id = ep.id));
-
   if p_dance ? 'roundId' then
     if nullif(p_dance->>'roundId', '') is not null then
       select * into v_round from public.episode_rounds where id = (p_dance->>'roundId')::uuid and episode_id = ep.id;
@@ -423,7 +406,30 @@ begin
   else
     v_round_id := existing.round_id;
     v_heat := existing.heat_number;
+    select * into v_round from public.episode_rounds where id = v_round_id;
   end if;
+
+  -- A blank name is the Dance Type, numbered when taken; a planned heat's is
+  -- its round's ("Dance-Off 2").
+  v_name := btrim(coalesce(p_dance->>'name', case when existing.name_is_auto then '' else existing.name end, ''));
+  if v_name = '' then
+    v_auto := true;
+    n := 1;
+    loop
+      v_candidate := case
+        when n = 1 and v_heat is not null then public.round_heat_name(v_round.round_type, v_heat, v_round.unit_count)
+        when n = 1 then v_type
+        else coalesce(public.round_heat_name(v_round.round_type, v_heat, v_round.unit_count), v_type) || ' ' || n end;
+      exit when not exists (select 1 from public.episode_teams t where t.episode_id = ep.id and lower(t.name) = lower(v_candidate) and t.id is distinct from existing.id);
+      n := n + 1;
+    end loop;
+    v_name := v_candidate;
+  elsif exists (select 1 from public.episode_teams t where t.episode_id = ep.id and lower(t.name) = lower(v_name) and t.id is distinct from existing.id) then
+    raise exception 'Another special dance is already called "%"', v_name;
+  end if;
+
+  v_sort := coalesce(nullif(p_dance->>'sortOrder', '')::int, existing.sort_order,
+    (select coalesce(max(sort_order), 0) + 1 from public.episode_teams where episode_id = ep.id));
 
   if existing.id is not null then
     select coalesce(array_agg(couple_id order by couple_id), '{}'::uuid[]) into v_old_members from public.episode_team_members where team_id = existing.id;

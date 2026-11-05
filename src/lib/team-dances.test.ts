@@ -41,6 +41,8 @@ const team: SpecialDance = {
   hostName: "Alfonso Ribeiro",
   sortOrder: 1,
   memberCoupleIds: ["tatyana", "maura", "amber", "julia"],
+  roundId: null,
+  heatNumber: null,
   postedAt: null,
   updatedAt: null,
 };
@@ -203,6 +205,8 @@ describe("validateSpecialDanceSetup", () => {
     scoringMode: "marks",
     details: [],
     sortOrder: 1,
+    roundId: null,
+    heatNumber: null,
     ...overrides,
   });
   const others = [{ id: "wildcats", name: "Wildcats" }];

@@ -30,7 +30,9 @@ export const DETAIL_LABEL_SUGGESTIONS = ["Captain", "Host", "Live Performer", "M
 // order them.
 export const RESULT_SUGGESTIONS = ["Winner", "Loser", "Immune"] as const;
 
-export type SpecialDanceScoringMode = "marks" | "points";
+// "marks": one shared set of marks; "couple_marks": each participant's own
+// marks (a heat judged couple by couple); "points": points per couple.
+export type SpecialDanceScoringMode = "marks" | "couple_marks" | "points";
 export type SpecialDanceSong = { title: string };
 export type SpecialDanceDetail = { label: string; value: string; coupleId: string | null };
 
@@ -55,12 +57,18 @@ export type SpecialDance = {
   hostName: string | null;
   sortOrder: number;
   memberCoupleIds: string[];
+  // Its round and heat (or team) number in the episode's plan; a round's
+  // immunity bonus has a round and no heat. Null for a dance outside the plan.
+  roundId: string | null;
+  heatNumber: number | null;
   // When the dance's score went live (entity model), else null.
   postedAt: string | null;
   updatedAt: string | null;
 };
 
 export type TeamMark = { judgeId: string; score: number };
+// A couple-by-couple dance's saved marks, per participant.
+export type CoupleMarks = Record<string, TeamMark[]>;
 // A participant's draft points and result in a Points-mode special dance
 // (episode_team_scores, service-only until posted).
 export type SpecialDanceScore = { coupleId: string; points: number | null; result: string | null };
@@ -162,12 +170,32 @@ export function sameTeamMarks(a: TeamMark[] | null, b: TeamMark[] | null): boole
   return b.every((m) => byJudge.get(m.judgeId) === m.score);
 }
 
+type ScoringInput = {
+  marks: TeamMark[];
+  coupleMarks?: CoupleMarks;
+  scores: SpecialDanceScore[];
+  eligibleCoupleIds: string[];
+  nightJudgeIds: string[];
+};
+
+function coupleMarksDone(input: ScoringInput): number {
+  return input.eligibleCoupleIds.reduce(
+    (sum, coupleId) => sum + input.nightJudgeIds.filter((j) => (input.coupleMarks?.[coupleId] ?? []).some((m) => m.judgeId === j)).length,
+    0
+  );
+}
+
 // Mirrors special_dance_complete(): a Marks dance has a mark from every one of
-// the night's judges; a Points dance has points for every eligible participant.
-export function specialDanceComplete(
-  dance: Pick<SpecialDance, "scoringMode">,
-  input: { marks: TeamMark[]; scores: SpecialDanceScore[]; eligibleCoupleIds: string[]; nightJudgeIds: string[] }
-): boolean {
+// the night's judges; a couple-by-couple dance has that for every eligible
+// participant; a Points dance has points for every eligible participant.
+export function specialDanceComplete(dance: Pick<SpecialDance, "scoringMode">, input: ScoringInput): boolean {
+  if (dance.scoringMode === "couple_marks") {
+    return (
+      isValidPanelSize(input.nightJudgeIds.length) &&
+      input.eligibleCoupleIds.length > 0 &&
+      coupleMarksDone(input) === input.eligibleCoupleIds.length * input.nightJudgeIds.length
+    );
+  }
   if (dance.scoringMode === "points") {
     return (
       input.eligibleCoupleIds.length > 0 &&
@@ -181,8 +209,13 @@ export function specialDanceComplete(
 // The picker's status pill: how far along a special dance's scoring is.
 export function specialDanceProgress(
   dance: Pick<SpecialDance, "scoringMode" | "postedAt">,
-  input: { marks: TeamMark[]; scores: SpecialDanceScore[]; eligibleCoupleIds: string[]; nightJudgeIds: string[] }
+  input: ScoringInput
 ): { done: number; total: number; complete: boolean; label: string } {
+  if (dance.scoringMode === "couple_marks") {
+    const done = coupleMarksDone(input);
+    const total = input.eligibleCoupleIds.length * input.nightJudgeIds.length;
+    return { done, total, complete: specialDanceComplete(dance, input), label: dance.postedAt ? "Posted" : `${done} of ${total} marks` };
+  }
   if (dance.scoringMode === "points") {
     const done = input.eligibleCoupleIds.filter((coupleId) => input.scores.some((s) => s.coupleId === coupleId && s.points !== null)).length;
     const total = input.eligibleCoupleIds.length;
@@ -328,6 +361,9 @@ export type SpecialDanceSetupInput = {
   scoringMode: SpecialDanceScoringMode;
   details: SpecialDanceDetail[];
   sortOrder: number;
+  // Kept as they are, so saving a heat's setup never moves it out of its round.
+  roundId: string | null;
+  heatNumber: number | null;
 };
 
 // Client-side mirror of save_special_dance's checks so the inline editor can

@@ -21,7 +21,16 @@ import {
 import { publishEpisodeAtomically } from "@/lib/episode-publication";
 import { revealCouple, revealTeam, undoReveal, undoTeamReveal } from "@/lib/results-reveal";
 import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
-import { deleteSpecialDance, saveSpecialDance, saveSpecialDancePoints, saveTeamMarks, setSpecialDraftRelease } from "@/lib/episode-teams";
+import {
+  deleteSpecialDance,
+  saveSpecialDance,
+  saveSpecialDancePoints,
+  saveTeamCoupleMarks,
+  saveTeamMarks,
+  setSpecialDraftRelease,
+} from "@/lib/episode-teams";
+import { saveRoundException, setRoundBonus } from "@/lib/episode-rounds-data";
+import type { ExceptionKind } from "@/lib/episode-rounds";
 import type { SpecialDanceScore, SpecialDanceSetupInput, TeamMark } from "@/lib/team-dances";
 
 // Both checks return userId alongside error so callers that need to stamp
@@ -68,7 +77,7 @@ export async function scheduleEpisode(
   const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
-  const result = await applyEpisodeSchedule(createAdminClient(), input);
+  const result = await applyEpisodeSchedule(createAdminClient(), input, access.userId);
   if (!result.error) {
     revalidatePath("/admin/results", "layout");
     revalidatePath("/admin/schedule");
@@ -122,6 +131,54 @@ export async function saveTeamMarksAction(input: {
   if (access.error) return { error: access.error };
 
   const result = await saveTeamMarks(createAdminClient(), input, access.userId);
+  if (!result.error) revalidatePath("/admin/results", "layout");
+  return result;
+}
+
+// One participant's marks in a heat judged couple by couple: same tier as
+// marks.
+export async function saveTeamCoupleMarksAction(input: {
+  episodeId: string;
+  teamId: string;
+  coupleId: string;
+  marks: TeamMark[];
+}): Promise<{ error: string | null }> {
+  const access = await requireProposeAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await saveTeamCoupleMarks(createAdminClient(), input, access.userId);
+  if (!result.error) revalidatePath("/admin/results", "layout");
+  return result;
+}
+
+// Immune, Not Dancing or Withdrawn, marked or undone on Enter Results by
+// whoever is entering scores. The RPC moves the couple's draft outcome too.
+export async function saveRoundExceptionAction(input: {
+  episodeId: string;
+  coupleId: string;
+  roundIds: string[];
+  kind: ExceptionKind | null;
+  note: string | null;
+  bonusPoints: number | null;
+}): Promise<{ error: string | null }> {
+  const access = await requireProposeAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await saveRoundException(createAdminClient(), input, access.userId);
+  if (!result.error) revalidatePath("/admin/results", "layout");
+  return result;
+}
+
+// The winner's bonus, set when the show announces it.
+export async function setRoundBonusAction(input: {
+  episodeId: string;
+  roundId: string;
+  bonusPoints: number | null;
+}): Promise<{ error: string | null }> {
+  const access = await requireProposeAccess();
+  if (access.error) return { error: access.error };
+
+  const result = await setRoundBonus(createAdminClient(), input, access.userId);
   if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }

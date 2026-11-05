@@ -79,6 +79,9 @@ export default async function EnterResultsPage({
         teamMarksByTeam={data.teamMarksByTeam}
         teamScoresByTeam={data.teamScoresByTeam}
         teamLiveByTeam={data.teamLiveByTeam}
+        teamCoupleMarksByTeam={data.teamCoupleMarksByTeam}
+        roundsByEpisode={data.roundsByEpisode}
+        roundExceptionsByEpisode={data.roundExceptionsByEpisode}
       />
     </div>
   );

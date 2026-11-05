@@ -54,6 +54,7 @@ import {
   type SpecialDanceDetail,
   type SpecialDanceScore,
   type SpecialDanceSetupInput,
+  type CoupleMarks,
   type TeamMark,
 } from "@/lib/team-dances";
 
@@ -62,6 +63,7 @@ export type SpecialDanceView = {
   styleName: string;
   secondStyleName: string | null;
   marks: TeamMark[];
+  coupleMarks: CoupleMarks;
   scores: SpecialDanceScore[];
   eligible: string[];
   skipped: { coupleId: string; reason: SkipReason }[];
@@ -72,11 +74,14 @@ export type SpecialDanceView = {
 // reopening an entry, or switching episodes, never loses or reorders an edit.
 export type SpecialScoreInputs = {
   marks: Record<string, string>;
+  // A couple-by-couple dance's boxes, per participant.
+  coupleMarks: Record<string, Record<string, string>>;
   points: Record<string, string>;
   results: Record<string, string>;
 };
 export type SpecialScoreSave =
   | { kind: "marks"; marks: TeamMark[] }
+  | { kind: "coupleMarks"; marks: CoupleMarks }
   | { kind: "points"; scores: SpecialDanceScore[] }
   | { kind: "invalid"; error: string };
 export type SpecialScoreEdit = { episodeId: string; inputs: SpecialScoreInputs; save: SpecialScoreSave };
@@ -115,6 +120,14 @@ function marksKey(marks: TeamMark[]): string {
   return marks.map((m) => `${m.judgeId}:${m.score}`).sort().join(",");
 }
 
+function coupleMarksToInputs(marks: CoupleMarks): Record<string, Record<string, string>> {
+  return Object.fromEntries(Object.entries(marks).map(([coupleId, list]) => [coupleId, marksToInputs(list)]));
+}
+
+function coupleMarksKey(marks: CoupleMarks): string {
+  return Object.entries(marks).map(([coupleId, list]) => `${coupleId}=${marksKey(list)}`).sort().join(";");
+}
+
 function scoresKey(scores: SpecialDanceScore[]): string {
   return scores.map((s) => `${s.coupleId}:${s.points ?? ""}:${s.result ?? ""}`).sort().join(",");
 }
@@ -131,17 +144,25 @@ function setupFromDance(dance: SpecialDance): SpecialDanceSetupInput {
     scoringMode: dance.scoringMode,
     details: dance.details,
     sortOrder: dance.sortOrder,
+    roundId: dance.roundId,
+    heatNumber: dance.heatNumber,
   };
 }
 
-export function blankSpecialDance(episodeId: string, styleId: string): SpecialDance {
+// A new entry; for a planned heat or team not set up yet, its round, number,
+// name, type and scoring come from the plan.
+export function blankSpecialDance(
+  episodeId: string,
+  styleId: string,
+  planned: Pick<SpecialDance, "roundId" | "heatNumber" | "name" | "danceType" | "scoringMode"> | null = null
+): SpecialDance {
   return {
     id: NEW_SPECIAL_ID,
     episodeId,
-    name: "",
+    name: planned?.name ?? "",
     nameIsAuto: true,
-    danceType: "",
-    scoringMode: "marks",
+    danceType: planned?.danceType ?? "",
+    scoringMode: planned?.scoringMode ?? "marks",
     danceStyleId: styleId,
     secondDanceStyleId: null,
     songs: [{ title: "" }],
@@ -151,6 +172,8 @@ export function blankSpecialDance(episodeId: string, styleId: string): SpecialDa
     hostName: null,
     sortOrder: 0,
     memberCoupleIds: [],
+    roundId: planned?.roundId ?? null,
+    heatNumber: planned?.heatNumber ?? null,
     postedAt: null,
     updatedAt: null,
   };
@@ -196,6 +219,7 @@ export function SpecialDanceEntry({
   canRelease,
   released,
   onRelease,
+  round = null,
 }: {
   view: SpecialDanceView;
   specialMode: boolean;
@@ -229,6 +253,10 @@ export function SpecialDanceEntry({
   canRelease: boolean;
   released: boolean;
   onRelease: (teamId: string, release: boolean) => Promise<{ error: string | null }>;
+  // A heat, team or immunity bonus of a planned round: its type and scoring
+  // come from the plan, a Winner takes the round's bonus, and an immunity
+  // row's points follow the Immune mark.
+  round?: { label: string; winnerBonus: number | null; immunity: boolean } | null;
 }) {
   const { dance, eligible, skipped, live } = view;
   const isNew = dance.id === NEW_SPECIAL_ID;
@@ -237,6 +265,9 @@ export function SpecialDanceEntry({
   const [setupError, setSetupError] = useState<string | null>(null);
   const [savingSetup, setSavingSetup] = useState(false);
   const [markInputs, setMarkInputs] = useState<Record<string, string>>(() => unsaved?.marks ?? marksToInputs(view.marks));
+  const [coupleMarkInputs, setCoupleMarkInputs] = useState<Record<string, Record<string, string>>>(
+    () => unsaved?.coupleMarks ?? coupleMarksToInputs(view.coupleMarks)
+  );
   const [pointInputs, setPointInputs] = useState<Record<string, string>>(() => unsaved?.points ?? pointsToInputs(view.scores));
   const [results, setResults] = useState<Record<string, string>>(() => unsaved?.results ?? resultsToInputs(view.scores));
   const [posting, setPosting] = useState(false);
@@ -255,6 +286,11 @@ export function SpecialDanceEntry({
     if (!dirty) setMarkInputs(marksToInputs(view.marks));
   }, [savedMarksKey, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const savedCoupleMarksKey = coupleMarksKey(view.coupleMarks);
+  useEffect(() => {
+    if (!dirty) setCoupleMarkInputs(coupleMarksToInputs(view.coupleMarks));
+  }, [savedCoupleMarksKey, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const savedScoresKey = scoresKey(view.scores);
   useEffect(() => {
     if (!dirty) {
@@ -267,8 +303,12 @@ export function SpecialDanceEntry({
   const panelIds = nightJudgeIds;
   const panelJudges = panelIds.map((id) => judges.find((j) => j.id === id)).filter((j): j is ScoringJudge => !!j);
   const panelOk = specialMode ? isValidPanelSize(panelIds.length) : nightJudgeIds.length === SPECIAL_DANCE_MAX_JUDGES;
-  const invalidMarkIds = panelIds.filter((id) => markInputError(markInputs[id] ?? "") != null);
-  const hasSavedScores = view.marks.length > 0 || view.scores.some((s) => s.points != null);
+  const invalidMarkIds =
+    scoringMode === "couple_marks"
+      ? eligible.flatMap((coupleId) => panelIds.filter((id) => markInputError(coupleMarkInputs[coupleId]?.[id] ?? "") != null))
+      : panelIds.filter((id) => markInputError(markInputs[id] ?? "") != null);
+  const hasSavedScores =
+    view.marks.length > 0 || Object.values(view.coupleMarks).some((m) => m.length > 0) || view.scores.some((s) => s.points != null);
   const posted = dance.postedAt != null;
   const scoringLocked = hasSavedScores || posted;
 
@@ -280,7 +320,16 @@ export function SpecialDanceEntry({
   // blocking until fixed.
   function editScores(next: SpecialScoreInputs) {
     let save: SpecialScoreSave;
-    if (scoringMode === "marks") {
+    if (scoringMode === "couple_marks") {
+      const invalid =
+        !panelOk || eligible.some((coupleId) => parseTeamMarks(next.coupleMarks[coupleId] ?? {}, panelIds).invalidJudgeIds.length > 0);
+      save = invalid
+        ? { kind: "invalid", error: `Fix the judges' marks on ${displayName} first.` }
+        : {
+            kind: "coupleMarks",
+            marks: Object.fromEntries(eligible.map((coupleId) => [coupleId, typedMarksFrom(next.coupleMarks[coupleId] ?? {}, panelIds)])),
+          };
+    } else if (scoringMode === "marks") {
       const invalid = !panelOk || parseTeamMarks(next.marks, panelIds).invalidJudgeIds.length > 0;
       save = invalid
         ? { kind: "invalid", error: `Fix the judges' marks on ${displayName} first.` }
@@ -325,21 +374,18 @@ export function SpecialDanceEntry({
     if (outcome.error) setError(outcome.error);
   }
 
-  const complete = specialDanceComplete(
-    { scoringMode },
-    { marks: view.marks, scores: view.scores, eligibleCoupleIds: eligible, nightJudgeIds }
-  );
-  const progress = specialDanceProgress(
-    { scoringMode, postedAt: dance.postedAt },
-    { marks: view.marks, scores: view.scores, eligibleCoupleIds: eligible, nightJudgeIds }
-  );
+  const scoringInput = { marks: view.marks, coupleMarks: view.coupleMarks, scores: view.scores, eligibleCoupleIds: eligible, nightJudgeIds };
+  const complete = specialDanceComplete({ scoringMode }, scoringInput);
+  const progress = specialDanceProgress({ scoringMode, postedAt: dance.postedAt }, scoringInput);
   const savedTotal = scoringMode === "marks" && view.marks.length === panelIds.length ? teamMarksTotal(view.marks) : null;
   const stale =
     posted &&
     live != null &&
     (scoringMode === "marks"
       ? savedTotal != null && live.total !== savedTotal
-      : eligible.some((id) => (view.scores.find((s) => s.coupleId === id)?.points ?? null) !== (live.totalByCouple[id] ?? null)));
+      : scoringMode === "couple_marks"
+        ? eligible.some((id) => teamMarksTotal(view.coupleMarks[id] ?? []) !== (live.totalByCouple[id] ?? null))
+        : eligible.some((id) => (view.scores.find((s) => s.coupleId === id)?.points ?? null) !== (live.totalByCouple[id] ?? null)));
   const undoLeft = nowMs !== null && dance.postedAt ? undoSecondsLeft(dance.postedAt, nowMs) : 0;
   const styleNames = new Map(danceStyles.map((s) => [s.id, s.name]));
   const summary = specialDanceSummary(dance, styleNames);
@@ -367,7 +413,7 @@ export function SpecialDanceEntry({
       setSetupError(invalid);
       return;
     }
-    if (setup.scoringMode === "marks" && invalidMarkIds.length > 0) {
+    if (setup.scoringMode !== "points" && invalidMarkIds.length > 0) {
       setSetupError(JUDGE_MARK_MESSAGE);
       return;
     }
@@ -401,6 +447,10 @@ export function SpecialDanceEntry({
       tone: "warn",
       text: `Can be posted once ${oxfordJoin(missingNames)}'s score is in.`,
     };
+  } else if (scoringMode === "couple_marks" && invalidMarkIds.length > 0) {
+    status = { tone: "danger", text: `${JUDGE_MARK_MESSAGE} It isn't saved until it's fixed.` };
+  } else if (scoringMode === "couple_marks" && !complete && progress.done > 0) {
+    status = { tone: "warn", text: `${progress.done} of ${progress.total} marks. Can be posted once every couple's marks are in.` };
   } else if (scoringMode === "points" && parsedPoints.invalidCoupleIds.length > 0) {
     status = { tone: "danger", text: "Points must be between −100 and 100 in steps of 0.5." };
   } else if (scoringMode === "points") {
@@ -437,6 +487,7 @@ export function SpecialDanceEntry({
           )}
         </div>
       </div>
+      {round && <p className="text-[11px] text-muted-foreground">{round.label}</p>}
       {!editing && (
         <>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -448,7 +499,7 @@ export function SpecialDanceEntry({
 
       {editing && specialMode && (
         <div className="mt-2 flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
+          <div className={round ? "hidden" : "flex flex-col gap-1.5"}>
             <Label>Dance Type</Label>
             <Input
               value={setup.danceType}
@@ -595,10 +646,10 @@ export function SpecialDanceEntry({
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className={round ? "hidden" : "flex flex-col gap-1.5"}>
             <Label>Scoring</Label>
-            <div className="flex gap-1">
-              {(["marks", "points"] as const).map((mode) => (
+            <div className="flex flex-wrap gap-1">
+              {(["marks", "couple_marks", "points"] as const).map((mode) => (
                 <Button
                   key={mode}
                   type="button"
@@ -607,7 +658,7 @@ export function SpecialDanceEntry({
                   disabled={scoringLocked}
                   onClick={() => patchSetup({ scoringMode: mode })}
                 >
-                  {mode === "marks" ? "Judges' Marks" : "Points per Couple"}
+                  {mode === "marks" ? "Judges' Marks · Shared" : mode === "couple_marks" ? "Judges' Marks · Each Couple" : "Points per Couple"}
                 </Button>
               ))}
             </div>
@@ -725,7 +776,7 @@ export function SpecialDanceEntry({
             </p>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => void handleDone()} disabled={savingSetup || busy || (setup.scoringMode === "marks" && invalidMarkIds.length > 0)}>
+            <Button onClick={() => void handleDone()} disabled={savingSetup || busy || (setup.scoringMode !== "points" && invalidMarkIds.length > 0)}>
               {savingSetup ? "Saving…" : "Done"}
             </Button>
             <Button variant="ghost" onClick={handleCancel} disabled={savingSetup}>
@@ -747,8 +798,8 @@ export function SpecialDanceEntry({
         </div>
       )}
 
-      {!isNew && scoringMode === "marks" && (
-        panelOk ? (
+      {!isNew && scoringMode !== "points" && (
+        scoringMode === "couple_marks" ? null : panelOk ? (
           <fieldset disabled={inputsDisabled || busy} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
             <div className="rounded-lg bg-muted/50 p-1.5">
               <JudgeScoreRow
@@ -759,7 +810,7 @@ export function SpecialDanceEntry({
                 onChange={(judgeId, value) => {
                   const next = { ...markInputs, [judgeId]: value };
                   setMarkInputs(next);
-                  editScores({ marks: next, points: pointInputs, results });
+                  editScores({ marks: next, coupleMarks: coupleMarkInputs, points: pointInputs, results });
                 }}
               />
             </div>
@@ -777,8 +828,40 @@ export function SpecialDanceEntry({
         )
       )}
 
+      {!isNew && scoringMode === "couple_marks" && !panelOk && (
+        <div role="alert" className="mt-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-text">
+          This dance needs {SPECIAL_DANCE_MIN_JUDGES} to {SPECIAL_DANCE_MAX_JUDGES} judges and this night has {panelIds.length}.{" "}
+          <Link href="/admin/schedule" className="font-semibold underline underline-offset-2">
+            Set the guest judge on Schedule
+          </Link>
+          .
+        </div>
+      )}
+
+      {!isNew && scoringMode === "couple_marks" && panelOk && (
+        <fieldset disabled={inputsDisabled || busy} className="mt-1.5 flex min-w-0 flex-col gap-2.5 rounded-lg bg-muted/50 p-1.5">
+          {eligible.map((coupleId) => (
+            <div key={coupleId} className="flex flex-col gap-1">
+              <p className="text-[13px]">{coupleName(coupleId)}</p>
+              <JudgeScoreRow
+                judges={panelJudges.map((j) => ({ id: j.id, name: judgeNames.get(j.id) ?? j.name }))}
+                values={coupleMarkInputs[coupleId] ?? {}}
+                subject={participants.find((p) => p.id === coupleId)?.celebrity ?? displayName}
+                disabled={posted}
+                onChange={(judgeId, value) => {
+                  const next = { ...coupleMarkInputs, [coupleId]: { ...(coupleMarkInputs[coupleId] ?? {}), [judgeId]: value } };
+                  setCoupleMarkInputs(next);
+                  editScores({ marks: markInputs, coupleMarks: next, points: pointInputs, results });
+                }}
+              />
+            </div>
+          ))}
+          {eligible.length === 0 && <p className="text-xs text-muted-foreground">No eligible participants tonight.</p>}
+        </fieldset>
+      )}
+
       {!isNew && scoringMode === "points" && (
-        <fieldset disabled={inputsDisabled || busy} className="mt-1.5 flex flex-col gap-1 rounded-lg bg-muted/50 p-1.5">
+        <fieldset disabled={inputsDisabled || busy || (round?.immunity ?? false)} className="mt-1.5 flex flex-col gap-1 rounded-lg bg-muted/50 p-1.5">
           {eligible.map((coupleId) => {
             const person = participants.find((p) => p.id === coupleId);
             return (
@@ -793,7 +876,7 @@ export function SpecialDanceEntry({
                   onChange={(e) => {
                     const next = { ...pointInputs, [coupleId]: e.target.value };
                     setPointInputs(next);
-                    editScores({ marks: markInputs, points: next, results });
+                    editScores({ marks: markInputs, coupleMarks: coupleMarkInputs, points: next, results });
                   }}
                 />
                 <Select
@@ -802,7 +885,11 @@ export function SpecialDanceEntry({
                   onValueChange={(v) => {
                     const next = { ...results, [coupleId]: v ?? "" };
                     setResults(next);
-                    editScores({ marks: markInputs, points: pointInputs, results: next });
+                    // A Winner takes the round's bonus and a Loser 0, both still editable.
+                    const fill = v === "Winner" && round?.winnerBonus != null ? String(round.winnerBonus) : v === "Loser" && round ? "0" : null;
+                    const points = fill != null ? { ...pointInputs, [coupleId]: fill } : pointInputs;
+                    if (fill != null) setPointInputs(points);
+                    editScores({ marks: markInputs, coupleMarks: coupleMarkInputs, points, results: next });
                   }}
                 >
                   <SelectTrigger className="h-8 w-28 text-xs">
@@ -820,6 +907,12 @@ export function SpecialDanceEntry({
             );
           })}
           {eligible.length === 0 && <p className="text-xs text-muted-foreground">No eligible participants tonight.</p>}
+          {round?.immunity && (
+            <p className="text-xs text-muted-foreground">Set by the Immune mark: the round&apos;s winner&apos;s bonus, or their own. Change it under Not in This Round.</p>
+          )}
+          {round?.winnerBonus != null && !round.immunity && (
+            <p className="text-xs text-muted-foreground">Winner +{round.winnerBonus}, Loser 0 (never blank).</p>
+          )}
         </fieldset>
       )}
 

@@ -4,7 +4,9 @@ import { loadResultsTaxonomy } from "@/lib/results";
 import { loadDraftForEpisode, type DraftState } from "@/lib/results-draft";
 import type { ScoringJudge } from "@/lib/scoring-judges";
 import { danceScoreColumns, detectTeamsMode, EMPTY_TEAMS_LOAD, loadEpisodeTeams, type TeamsMode } from "@/lib/episode-teams";
-import type { SpecialDance, SpecialDanceScore, TeamMark } from "@/lib/team-dances";
+import type { CoupleMarks, SpecialDance, SpecialDanceScore, TeamMark } from "@/lib/team-dances";
+import { loadEpisodeRounds } from "@/lib/episode-rounds-data";
+import type { EpisodeRound, RoundException } from "@/lib/episode-rounds";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type CoupleWithStatus = Couple & { status: string; elimination_week: number | null };
@@ -76,6 +78,11 @@ export type ResultsPageData = {
   teamMarksByTeam: Record<string, TeamMark[]>;
   // Saved points and results per Points-mode special dance (special mode).
   teamScoresByTeam: Record<string, SpecialDanceScore[]>;
+  // Each participant's saved marks in a heat judged couple by couple.
+  teamCoupleMarksByTeam: Record<string, CoupleMarks>;
+  // Each episode's planned rounds, in order, and who is out of which round.
+  roundsByEpisode: Record<string, EpisodeRound[]>;
+  roundExceptionsByEpisode: Record<string, RoundException[]>;
   // Live rows per special dance: the couples carrying it and each one's
   // total (one shared total for marks, per couple for points).
   teamLiveByTeam: Record<string, { total: number; coupleIds: string[]; totalByCouple: Record<string, number> }>;
@@ -204,11 +211,12 @@ export async function loadResultsPageData(
   // user's own, to read every scheduled episode's in-progress draft up front
   // (so the form can rehydrate immediately on episode selection instead of
   // round-tripping).
-  const [draftEntries, teams] = await Promise.all([
+  const [draftEntries, teams, plan] = await Promise.all([
     Promise.all((episodes ?? []).map(async (e) => [e.id, await loadDraftForEpisode(admin, e.id)] as const)),
     teamsMode === "none"
       ? Promise.resolve(EMPTY_TEAMS_LOAD("none"))
       : loadEpisodeTeams(supabase, admin, (episodes ?? []).map((e) => e.id), teamsMode),
+    loadEpisodeRounds(supabase, admin, (episodes ?? []).map((e) => e.id)),
   ]);
   const liveRows = ((danceScores ?? []) as unknown as ResultsPageData["danceScores"]).map((row) => ({
     ...row,
@@ -299,6 +307,9 @@ export async function loadResultsPageData(
     teamsByEpisode: teams.teamsByEpisode,
     teamMarksByTeam: teams.marksByTeam,
     teamScoresByTeam: teams.scoresByTeam,
+    teamCoupleMarksByTeam: teams.coupleMarksByTeam,
+    roundsByEpisode: plan.roundsByEpisode,
+    roundExceptionsByEpisode: plan.exceptionsByEpisode,
     teamLiveByTeam,
     releasedCoupleIdsByEpisode,
     releasedTeamIdsByEpisode,

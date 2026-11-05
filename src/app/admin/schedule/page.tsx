@@ -37,8 +37,10 @@ export default async function SchedulePage() {
         season={data.season}
         seasonCouples={data.allCouplesWithStatus}
         participantsByEpisode={data.participantsByEpisode}
-        roundTypes={data.roundTypes}
         roundTypesByEpisode={data.roundTypesByEpisode}
+        roundsByEpisode={data.roundsByEpisode}
+        roundExceptionsByEpisode={data.roundExceptionsByEpisode}
+        teamsByEpisode={data.teamsByEpisode}
         judges={data.judges}
         guestJudgesByEpisode={data.guestJudgesByEpisode}
       />

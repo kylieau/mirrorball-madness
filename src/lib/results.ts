@@ -7,6 +7,7 @@ import { participantIdsToPersist, selectableCast } from "@/lib/episode-cast";
 import { sortJudgesForDisplay } from "@/lib/couple-display";
 import { resolveGuestJudgeIds } from "@/lib/admin-people";
 import type { ScoringJudge } from "@/lib/scoring-judges";
+import type { roundsPayload } from "@/lib/episode-rounds";
 
 // Global results entry is an explicit site-admin grant, independent of league creation.
 export async function userCanProposeResults(
@@ -70,10 +71,11 @@ export type ScheduleEpisodeInput = {
   // ordinary case. Only populated for a split-broadcast episode (e.g. a
   // two-night premiere where half the cast dances each night).
   participantCoupleIds: string[];
-  roundTypeIds: string[];
   // Names, not ids, so Schedule can add a first-time guest in the same save.
   guestJudgeNames: string[];
-  expectedDanceCount: number;
+  // The night's planned rounds (roundsPayload); save_episode_rounds also sets
+  // expected_dance_count and the Round Types ticks from them.
+  rounds: ReturnType<typeof roundsPayload>;
   judgesSaveAvailable: boolean;
   durationMinutes: number;
 };
@@ -95,7 +97,8 @@ async function deleteWeekIfEmpty(
 // stays owned by publish.
 export async function applyEpisodeSchedule(
   admin: SupabaseClient<Database>,
-  input: ScheduleEpisodeInput
+  input: ScheduleEpisodeInput,
+  actorId: string
 ): Promise<{ error: string | null }> {
   const { seasonId, error: seasonErr } = await getActiveSeasonId(admin);
   if (seasonErr || !seasonId) return { error: seasonErr };
@@ -105,9 +108,6 @@ export async function applyEpisodeSchedule(
   }
   if (input.competitionWeekNumber != null && (input.competitionWeekNumber < 1 || !Number.isInteger(input.competitionWeekNumber))) {
     return { error: "Competition week must be a positive integer, or blank for exhibition." };
-  }
-  if (!Number.isInteger(input.expectedDanceCount) || input.expectedDanceCount < 1) {
-    return { error: "Dances per couple must be a positive integer." };
   }
   if (!Number.isInteger(input.durationMinutes) || input.durationMinutes < 1) {
     return { error: "Duration must be a positive number of minutes." };
@@ -152,7 +152,6 @@ export async function applyEpisodeSchedule(
     week_id: weekId,
     airs_at: input.airsAt,
     theme: input.theme,
-    expected_dance_count: input.expectedDanceCount,
     judges_save_available: input.judgesSaveAvailable,
     duration_minutes: input.durationMinutes,
   };
@@ -187,14 +186,12 @@ export async function applyEpisodeSchedule(
     if (participantsErr) return { error: participantsErr.message };
   }
 
-  const roundTypeIds = [...new Set(input.roundTypeIds)];
-  await admin.from("episode_round_types").delete().eq("episode_id", episode.id);
-  if (roundTypeIds.length > 0) {
-    const { error: roundTypesErr } = await admin.from("episode_round_types").insert(
-      roundTypeIds.map((roundTypeId) => ({ episode_id: episode.id, round_type_id: roundTypeId }))
-    );
-    if (roundTypesErr) return { error: roundTypesErr.message };
-  }
+  const { error: roundsErr } = await admin.rpc("save_episode_rounds", {
+    p_episode_id: episode.id,
+    p_actor_id: actorId,
+    p_rounds: input.rounds as unknown as Json,
+  });
+  if (roundsErr) return { error: roundsErr.message };
 
   const { ids: guestJudgeIds, error: guestsErr } = await resolveGuestJudgeIds(admin, input.guestJudgeNames);
   if (guestsErr) return { error: guestsErr };

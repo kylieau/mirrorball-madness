@@ -96,7 +96,7 @@ describe("detectTeamEntity and detectTeamsMode", () => {
 describe("loadEpisodeTeams", () => {
   it("falls back to no special dances instead of throwing when the tables are missing", async () => {
     const { client } = clientWith({ episode_teams: { data: null, error: missingTable }, episode_team_members: { data: null, error: missingTable } });
-    expect(await loadEpisodeTeams(client, client, ["ep"])).toEqual({ mode: "none", teamsByEpisode: {}, marksByTeam: {}, scoresByTeam: {} });
+    expect(await loadEpisodeTeams(client, client, ["ep"])).toEqual({ mode: "none", teamsByEpisode: {}, marksByTeam: {}, scoresByTeam: {}, coupleMarksByTeam: {} });
   });
 
   it("surfaces every other read error", async () => {
@@ -182,7 +182,7 @@ describe("loadEpisodeTeams", () => {
 
   it("asks nothing when there are no episodes", async () => {
     const { client, from } = clientWith({});
-    expect(await loadEpisodeTeams(client, client, [])).toEqual({ mode: "entity", teamsByEpisode: {}, marksByTeam: {}, scoresByTeam: {} });
+    expect(await loadEpisodeTeams(client, client, [])).toEqual({ mode: "entity", teamsByEpisode: {}, marksByTeam: {}, scoresByTeam: {}, coupleMarksByTeam: {} });
     expect(from).not.toHaveBeenCalled();
   });
 });
@@ -227,7 +227,7 @@ describe("saveSpecialDance and saveSpecialDancePoints", () => {
     const { client } = clientWith({}, rpc);
     const dance = {
       id: null, danceType: "Dance-Off", name: "", memberCoupleIds: ["a"], danceStyleId: null, secondDanceStyleId: null, songs: [],
-      scoringMode: "points" as const, details: [], sortOrder: 1,
+      scoringMode: "points" as const, details: [], sortOrder: 1, roundId: null, heatNumber: null,
     };
     expect((await saveSpecialDance(client, { episodeId: "ep", dance }, "admin")).error).toMatch(/apply-special-dances\.sql/);
     expect(rpc).toHaveBeenCalledWith("save_special_dance", { p_episode_id: "ep", p_actor_id: "admin", p_dance: dance });
