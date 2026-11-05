@@ -124,7 +124,7 @@ Before the curtain:
    their entries in League Settings → Grand Finale → Missed the lock.
 3. On a laptop, open production `/admin/results/enter?episode=` for E08 in one
    tab only. Check there are 10 couples, each with one dance row, and that the
-   judges are the standing panel (E08 has no guest judges).
+   judges are the standing panel plus E08's guest judge, Shirley Ballas.
 
 During the East broadcast (per couple, as it airs):
 4. Enter the scores, wait for "Draft saved", then **Save as Draft Score**. On a
