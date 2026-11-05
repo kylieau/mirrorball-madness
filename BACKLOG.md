@@ -2,6 +2,31 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Episode rounds — 2026-11-05
+
+Live: `apply-episode-rounds.sql` applied and verified (E09 Round 1 + Team
+Dance with Wildcats and Slaytopia; E10 Round 1 + Dance-Off, 3 heats by
+Winner's Bonus); app `14bac98`; types regenerated. Render-checked at 390px
+with a throwaway site admin and every write blocked: Enter Results' Rounds
+switch, Round 1 card with its Dance-Off line, Mark an Exception panel,
+Dance-Off tab (Winner's Bonus, heat picker, Not in This Round), Edit Episode
+for E09 and E10 (pairings, checks, Add Round picker).
+
+Still to see, none exercised with a real write:
+- Saving Edit Episode (the plan RPC), marking and undoing an exception, setting
+  the Winner's Bonus, setting up a placeholder heat, a heat by Judges' Marks
+  per couple. All rehearsed in PGlite only.
+- E10 night: the bonus filling Winner rows and the immune couple; Finish Week
+  with the Dance-Off round.
+- Schedule's save is two steps: the episode saves, then the plan; a refused
+  plan (a heat with scores) shows its own message after the episode saved.
+- Home reads "Harry earned +3 in the Immunity" for an immune bonus.
+- A Not Dancing exception on Round 1 only, on a night with a second own
+  round, still maps the couple's rows by order (edge; no S35 night has two
+  own rounds).
+- Fallback: redeploying `b3ab890` works against this SQL while no heat is
+  scored by Judges' Marks per couple.
+
 ## Special dances follow-ups — 2026-11-04
 
 All live on `main` (`885b87c`) with their SQL applied and verified:
