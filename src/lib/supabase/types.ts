@@ -1062,7 +1062,29 @@ export type Database = {
           round_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "episode_round_exceptions_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_round_exceptions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_round_exceptions_round_id_episode_id_fkey"
+            columns: ["round_id", "episode_id"]
+            isOneToOne: false
+            referencedRelation: "episode_rounds"
+            referencedColumns: ["id", "episode_id"]
+          },
+        ]
       }
       episode_round_types: {
         Row: {
@@ -1134,7 +1156,15 @@ export type Database = {
           unit_count?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "episode_rounds_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       episode_team_couple_marks: {
         Row: {
@@ -1161,7 +1191,36 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "episode_team_couple_marks_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_team_couple_marks_judge_id_fkey"
+            columns: ["judge_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_team_couple_marks_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "episode_teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_team_couple_marks_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       episode_team_marks: {
         Row: {
@@ -1391,6 +1450,13 @@ export type Database = {
             columns: ["posted_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "episode_teams_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "episode_rounds"
             referencedColumns: ["id"]
           },
           {
@@ -2303,6 +2369,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      apply_round_exception: {
+        Args: {
+          p_actor_id: string
+          p_bonus: number
+          p_couple_id: string
+          p_episode_id: string
+          p_kind: string
+          p_note: string
+          p_round_ids: string[]
+        }
+        Returns: undefined
+      }
       approve_waiver_claim: {
         Args: { p_claim_id: string }
         Returns: {
@@ -2372,6 +2450,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      couple_night_exception: {
+        Args: { p_couple_id: string; p_episode_id: string }
+        Returns: string
+      }
       create_league: {
         Args: {
           p_curtain_call_enabled?: boolean
@@ -2411,6 +2493,11 @@ export type Database = {
       }
       demote_commissioner: {
         Args: { p_league_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      drop_round_unit: { Args: { p_team_id: string }; Returns: undefined }
+      drop_round_units: {
+        Args: { p_keep: number; p_round_id: string }
         Returns: undefined
       }
       effective_grand_finale_deadline: {
@@ -2618,6 +2705,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      refresh_round_points: {
+        Args: { p_actor_id: string; p_round_id: string }
+        Returns: undefined
+      }
       reject_waiver_claim: {
         Args: { p_claim_id: string }
         Returns: {
@@ -2684,14 +2775,15 @@ export type Database = {
         Args: { p_league_id: string }
         Returns: string
       }
+      round_heat_name: {
+        Args: { p_heat: number; p_round_type: string; p_unit_count: number }
+        Returns: string
+      }
+      round_special_mode: { Args: { p_scoring: string }; Returns: string }
       save_episode_draft: { Args: { p_input: Json }; Returns: undefined }
       save_episode_draft_checked: { Args: { p_input: Json }; Returns: Json }
       save_episode_rounds: {
-        Args: {
-          p_actor_id: string
-          p_episode_id: string
-          p_rounds: Json
-        }
+        Args: { p_actor_id: string; p_episode_id: string; p_rounds: Json }
         Returns: Json
       }
       save_episode_teams: {
@@ -2905,6 +2997,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      sync_round_immunity: {
+        Args: { p_actor_id: string; p_round_id: string }
+        Returns: undefined
       }
       team_eligible_members: {
         Args: { p_episode_id: string; p_team_id: string }
