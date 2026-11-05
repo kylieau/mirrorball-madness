@@ -51,7 +51,7 @@ describe("buildCoupleHistory", () => {
     expect(history.average).toBe(24);
   });
 
-  it("ranks Best by share of the marks possible, never a bonus round", () => {
+  it("ranks Best by share of the marks possible over the couple's own dances only", () => {
     const history = buildCoupleHistory({
       ...base,
       weeks: [
@@ -61,8 +61,11 @@ describe("buildCoupleHistory", () => {
       dances: [
         dance({ id: "four", episodeId: "e8", style: "Contemporary", totalScore: 38, scaledScore: 28.5 }),
         dance({ id: "off", episodeId: "e8", totalScore: 3, scaledScore: 3, maxScore: 0, teamId: "t1" }),
+        dance({ id: "team", episodeId: "e8", style: "Freestyle", totalScore: 40, scaledScore: 30, maxScore: 40, teamId: "t2" }),
+        dance({ id: "legacy", episodeId: "e2", style: "Freestyle", totalScore: 30, scaledScore: 30 }),
         dance({ id: "perfect", episodeId: "e2", style: "Tango", totalScore: 30, scaledScore: 30 }),
       ],
+      teamDanceEpisodes: new Set(["e2"]),
     });
     expect(history.best).toEqual({ total: 30, possible: 30, label: "Tango", weekNumber: 2 });
   });

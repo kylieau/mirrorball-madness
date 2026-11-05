@@ -1,6 +1,6 @@
 import { collapseToNights, judgeCountForDance, MARK_MAX, type DanceScore } from "./scoring";
 import { mergeCoupleOutcomes } from "./competition-week";
-import { nightDanceLabel, type NightDance, type SpecialDanceLabelInput } from "./night-dance-lines";
+import { isTeamDance, nightDanceLabel, type NightDance, type SpecialDanceLabelInput } from "./night-dance-lines";
 
 // A week the viewer may see. "scores" is a week still being revealed: its
 // posted dances show, its outcome does not.
@@ -23,6 +23,9 @@ export type CoupleHistoryDance = {
   // Marks possible (judges × 10); null for a bonus round or a dance whose
   // panel can't be recovered.
   possible: number | null;
+  // The couple's own dance, not a special dance (or a pre-entity Team Dance
+  // Freestyle) whose marks they share.
+  own: boolean;
   marks: { judge: string; score: number }[];
 };
 
@@ -49,8 +52,8 @@ export type CoupleHistory = {
   weeks: CoupleHistoryWeek[];
   danceCount: number;
   average: number | null;
-  // The dance with the largest share of its marks possible, so a 30/30 beats
-  // a 38/40; bonus rounds paid in points never count.
+  // The couple's own dance with the largest share of its marks possible, so
+  // a 30/30 beats a 38/40; special dances never count (Kylie, 2026-11-05).
   best: { total: number; possible: number; label: string; weekNumber: number } | null;
   jeopardyWeeks: number[];
 };
@@ -98,6 +101,7 @@ export function buildCoupleHistory(input: {
           dances: rows.map((row) => ({
             id: row.id,
             possible: row.maxScore === 0 ? null : (row.maxScore ?? (judgeCountForDance(row) ?? 0) * MARK_MAX) || null,
+            own: !row.teamId && !isTeamDance(row.style, input.teamDanceEpisodes.has(episodeId)),
             label: nightDanceLabel(row, input.teamDanceEpisodes, input.labels),
             song: row.song?.trim() || null,
             total: row.totalScore,
@@ -126,7 +130,7 @@ export function buildCoupleHistory(input: {
   let best: CoupleHistory["best"] = null;
   for (const week of weeks) {
     for (const dance of week.nights.flatMap((night) => night.dances)) {
-      if (dance.bonus || dance.possible === null) continue;
+      if (!dance.own || dance.possible === null) continue;
       if (!best || dance.total / dance.possible > best.total / best.possible) {
         best = { total: dance.total, possible: dance.possible, label: dance.label, weekNumber: week.weekNumber };
       }
