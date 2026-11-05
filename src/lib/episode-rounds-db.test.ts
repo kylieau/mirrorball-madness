@@ -119,6 +119,26 @@ async function finishWeek(episode: string) {
   const data = await snapshot(episode);
   await db.query("select public.commit_episode_publication($1, $2, $3, $4)", [episode, admin, JSON.stringify(data), JSON.stringify(buildPublicationPlan(data, episode))]);
 }
+// The fan read on draft nights, as a signed-in viewer who unlocked drafts.
+async function unlockDrafts(weekNumber: number) {
+  await db.query(
+    `insert into public.spoiler_watch_progress(user_id, season_id, last_watched_week, draft_unlocked_week) values ($1, $2, $3, $3)
+     on conflict (user_id, season_id) do update set last_watched_week = excluded.last_watched_week, draft_unlocked_week = excluded.draft_unlocked_week`,
+    [outsider, season, weekNumber]
+  );
+}
+async function visibleDrafts() {
+  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [outsider]);
+  await db.exec("set role authenticated");
+  try {
+    return (await db.query(
+      `select team_id, couple_id, total_score::float as total, scaled_score::float as scaled, max_score::float as max
+       from public.visible_draft_special_scores() order by team_id, couple_id`)).rows;
+  } finally {
+    await db.exec("reset role");
+    await db.query("select set_config('request.jwt.claim.sub', '', false)");
+  }
+}
 async function liveTeamRows(episode: string, teamId: string) {
   return (await db.query<{ couple_id: string; total: number; scaled: number; max: number; judges: number }>(
     `select d.couple_id, d.total_score::float as total, d.scaled_score::float as scaled, d.max_score::float as max,
@@ -146,6 +166,9 @@ describe("apply-episode-rounds.sql", () => {
       const teamId = await saveSpecial(e10, { danceType: "Dance-Off", name, memberCoupleIds: members, sortOrder: 0 }, friend);
       await db.query("update public.episode_teams set name_is_auto = true where id = $1", [teamId]);
     }
+    // Harry & Jenna's bonus entered by hand as a one-couple Points special.
+    const handMade = await saveSpecial(e10, { danceType: "Immunity", memberCoupleIds: [harry], scoringMode: "points" }, friend);
+    await savePoints(e10, handMade, [{ coupleId: harry, points: 3, result: "Immune" }]);
     await db.exec(roundsSql);
     await db.exec(roundsSql); // Dashboard reruns must be safe.
   }, 60_000);
@@ -171,8 +194,17 @@ describe("apply-episode-rounds.sql", () => {
       ["Dance-Off 1", 1, "points", [amber, ezra]],
       ["Dance-Off 2", 2, "points", [jenna, tatyana]],
       ["Dance-Off 3", 3, "points", [connor, maura]],
+      // The hand-made Immunity special is the round's immunity row, not a round of its own.
+      ["Immunity", null, "points", [harry]],
     ]);
+    expect((await db.query("select kind, bonus_points::float as bonus from public.episode_round_exceptions where round_id = $1 and couple_id = $2", [plan[1].id, harry])).rows)
+      .toEqual([{ kind: "immune", bonus: 3 }]);
     expect((await rounds(e11)).map((r) => r.round_type)).toEqual(["Individual Dance"]);
+    const verify = (await db.query<{ result: Record<string, unknown> }>(readFileSync("supabase/queries/verify-episode-rounds.sql", "utf8"))).rows[0].result;
+    expect(verify).toMatchObject({ tables: 3, columns: 2, functions: 12, episodes_without_plan: 0 });
+    expect((verify.plans as { episode: number; type: string }[]).map((p) => [p.episode, p.type])).toEqual([
+      [9, "Individual Dance"], [9, "Team Dance"], [10, "Individual Dance"], [10, "Dance-Off"],
+    ]);
   });
 
   it("keeps the plan admin only and Round 1 fixed", async () => {
@@ -226,6 +258,7 @@ describe("apply-episode-rounds.sql", () => {
     expect(await outcome(e10, harry)).toEqual({ outcome: "safe", had_immunity: true });
     const immunity = (await heats(danceOff.id)).find((h) => h.heat === null)!;
     expect(immunity).toMatchObject({ name: "Dance-Off Immunity", mode: "points", members: [harry] });
+    // Marked again without a bonus of their own, Harry follows the round's bonus, still unknown.
     // No bonus yet: the immunity row is blank and holds Finish Week.
     expect((await db.query("select public.special_dance_blocker($1, 'before finishing the week') as b", [immunity.id])).rows[0]).toEqual({
       b: "Dance-Off Immunity has points for 0 of 1 couples. Enter every couple's points or remove it before finishing the week.",
@@ -268,6 +301,18 @@ describe("apply-episode-rounds.sql", () => {
     await expect(setBonus(e10, round1.id, 3)).rejects.toThrow(/winner's bonus/);
   });
 
+  it("shows fans who unlocked drafts a released bonus heat as points", async () => {
+    const [, danceOff] = await rounds(e10);
+    const [heat1] = await heats(danceOff.id);
+    await db.query("select public.set_special_draft_release($1, $2, $3, true)", [e10, heat1.id, friend]);
+    await unlockDrafts(9);
+    expect(await visibleDrafts()).toEqual([
+      { team_id: heat1.id, couple_id: ezra, total: 0, scaled: 0, max: 0 },
+      { team_id: heat1.id, couple_id: amber, total: 3, scaled: 0, max: 0 },
+    ]);
+    await db.query("select public.set_special_draft_release($1, $2, $3, false)", [e10, heat1.id, friend]);
+  });
+
   it("finishes Grammy Night: winners' bonus, losers 0 and the immune couple's bonus add to the night", async () => {
     const [, danceOff] = await rounds(e10);
     const [heat1, heat2, heat3] = await heats(danceOff.id);
@@ -305,6 +350,12 @@ describe("apply-episode-rounds.sql", () => {
     await coupleMarks(e11, heat.id, ezra, [7, 8, 8]);
     expect((await db.query("select public.special_dance_complete($1) as c", [heat.id])).rows[0]).toEqual({ c: true });
     await ownDances(e11, cast);
+    await db.query("select public.set_special_draft_release($1, $2, $3, true)", [e11, heat.id, friend]);
+    await unlockDrafts(10);
+    expect(await visibleDrafts()).toEqual([
+      { team_id: heat.id, couple_id: ezra, total: 23, scaled: 23, max: 30 },
+      { team_id: heat.id, couple_id: amber, total: 28, scaled: 28, max: 30 },
+    ]);
 
     const data = await snapshot(e11);
     expect(data.teamCoupleMarks).toHaveLength(6);

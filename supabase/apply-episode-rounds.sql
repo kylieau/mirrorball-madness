@@ -20,7 +20,8 @@
 -- 4. Backfill: every episode gets Round 1 plus its extra dances and one round
 --    per special Dance Type. E09 becomes Round 1 + Team Dance (2 teams); E10
 --    becomes Round 1 + Dance-Off (3 heats, now scored by the winner's bonus,
---    "Dance-Off" renamed "Dance-Off 1"). No score or posted row changes.
+--    "Dance-Off" renamed "Dance-Off 1"); an Immunity special entered by hand
+--    becomes that round's immunity bonus. No score or posted row changes.
 --
 -- Additive: the app already deployed keeps working against it, so apply
 -- this before deploying the app that plans rounds. Runs after
@@ -868,7 +869,8 @@ $$;
 -- takes the couple out of its heats; a heat left empty goes back to a
 -- placeholder. The draft outcome follows the night: Withdrawn, or Did Not
 -- Dance when every round has them Not Dancing, and back to Safe when that
--- stops being true; Immune ticks the Immunity box. Callers check the actor.
+-- stops being true; marking Immune ticks the Immunity box and clearing the
+-- couple's last Immune unticks it. Callers check the actor.
 create or replace function public.apply_round_exception(
   p_episode_id uuid, p_actor_id uuid, p_couple_id uuid, p_round_ids uuid[], p_kind text, p_note text, p_bonus numeric)
 returns void language plpgsql set search_path = '' as $$
@@ -930,7 +932,7 @@ begin
 
   v_after := public.couple_night_exception(ep.id, p_couple_id);
   v_immune_after := exists (select 1 from public.episode_round_exceptions where episode_id = ep.id and couple_id = p_couple_id and kind = 'immune');
-  if v_after is distinct from v_before or v_immune_after is distinct from v_immune_before then
+  if v_after is distinct from v_before or v_immune_after is distinct from v_immune_before or p_kind = 'immune' then
     select outcome into v_outcome from public.draft_episode_results where episode_id = ep.id and couple_id = p_couple_id;
     v_new := case
       when v_after is not null then v_after
@@ -942,7 +944,7 @@ begin
     insert into public.draft_episode_results (episode_id, couple_id, outcome, had_immunity)
     values (ep.id, p_couple_id, v_new, v_immune_after)
     on conflict (episode_id, couple_id) do update set outcome = excluded.outcome,
-      had_immunity = case when v_immune_after is distinct from v_immune_before then excluded.had_immunity
+      had_immunity = case when v_immune_after is distinct from v_immune_before or p_kind = 'immune' then excluded.had_immunity
                           else public.draft_episode_results.had_immunity end;
     if v_new in ('withdrawn', 'bye') then
       delete from public.draft_episode_in_jeopardy_couples where episode_id = ep.id and couple_id = p_couple_id;
@@ -1160,13 +1162,16 @@ end $$;
 -- special round per Dance Type among its special dances, heats numbered by
 -- sort order and then the number an auto-named heat already carries
 -- ("Dance-Off" before "Dance-Off 2"). An auto-named first heat of several is
--- renamed ("Dance-Off" becomes "Dance-Off 1"). A Dance-Off round with no
+-- renamed ("Dance-Off" becomes "Dance-Off 1"). An Immunity special (a
+-- one-couple bonus entered by hand) becomes the first special round's
+-- immunity row, its couples marked Immune with their points as their own
+-- bonus, so the plan never pays them twice. A Dance-Off round with no
 -- saved marks is scored by the winner's bonus, its heats switched to points;
 -- a scored marks round keeps its shared marks. Scores, members and posted
 -- rows are not touched. Episodes that already have rounds are skipped.
 do $$
 declare
-  e record; g record; v_round uuid; v_pos int; v_scoring text; i int;
+  e record; g record; im record; v_round uuid; v_pos int; v_scoring text; i int;
 begin
   for e in select * from public.episodes ep where not exists (select 1 from public.episode_rounds r where r.episode_id = ep.id) order by ep.id loop
     insert into public.episode_rounds (episode_id, position, kind, round_type, scoring)
@@ -1182,7 +1187,7 @@ begin
         bool_and(t.scoring_mode = 'points') as all_points,
         bool_or(t.scoring_mode = 'marks' and exists (select 1 from public.episode_team_marks k where k.team_id = t.id)) as marked
       from public.episode_teams t
-      where t.episode_id = e.id and t.round_id is null
+      where t.episode_id = e.id and t.round_id is null and lower(btrim(t.dance_type)) <> 'immunity'
       group by t.dance_type
       order by min(t.sort_order), min(t.created_at)
     loop
@@ -1209,6 +1214,23 @@ begin
           and not exists (select 1 from public.episode_teams o where o.episode_id = e.id and o.id <> t.id
                           and lower(o.name) = lower(public.round_heat_name(t.dance_type, t.heat_number, g.n)));
       end if;
+    end loop;
+    for im in select t.id from public.episode_teams t
+        where t.episode_id = e.id and t.round_id is null and lower(btrim(t.dance_type)) = 'immunity'
+        order by t.sort_order, t.created_at loop
+      v_round := null;
+      select r.id into v_round from public.episode_rounds r
+      where r.episode_id = e.id and r.kind = 'special'
+        and not exists (select 1 from public.episode_teams i where i.round_id = r.id and i.heat_number is null)
+      order by r.position limit 1;
+      exit when v_round is null;
+      update public.episode_teams set round_id = v_round, heat_number = null where id = im.id;
+      insert into public.episode_round_exceptions (round_id, episode_id, couple_id, kind, bonus_points)
+      select v_round, e.id, m.couple_id, 'immune', s.points
+      from public.episode_team_members m
+      left join public.episode_team_scores s on s.team_id = m.team_id and s.couple_id = m.couple_id
+      where m.team_id = im.id
+      on conflict (round_id, couple_id) do nothing;
     end loop;
   end loop;
 end $$;
