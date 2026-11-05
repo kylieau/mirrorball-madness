@@ -42,6 +42,7 @@ import {
   type RoundException,
 } from "@/lib/episode-rounds";
 import type { SpecialDance } from "@/lib/team-dances";
+import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 
 type Episode = {
   id: string;
@@ -264,6 +265,8 @@ export function ScheduleManager({
       : null;
   const castWeek = parsedWeekNumber ?? episodeNumber;
   const selectableCouples = selectableCast(seasonCouples, castWeek, { published: editingPublished });
+  // Short names ("Jenna D. & Val"), as on Enter Results, so a pairing fits.
+  const coupleNames = buildCoupleDisplayNames(seasonCouples);
   const selectableIds = selectableCouples.map((c) => c.id);
   const allSelectableChecked = isFullSelectableCast(
     selectableIds.filter((id) => participantCoupleIds.has(id)),
@@ -553,7 +556,7 @@ export function ScheduleManager({
       </Card>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="overflow-y-auto data-[side=right]:sm:max-w-md">
+        <SheetContent className="overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-md">
           <SheetHeader>
             <SheetTitle>{editingId ? "Edit Episode" : "Add Episode"}</SheetTitle>
             <SheetDescription>
@@ -623,7 +626,7 @@ export function ScheduleManager({
               published={editingPublished}
               couples={selectableCouples
                 .filter((c) => participantCoupleIds.size === 0 || participantCoupleIds.has(c.id))
-                .map((c) => ({ id: c.id, name: `${c.celebrity_name} & ${c.pro_name}` }))}
+                .map((c) => ({ id: c.id, name: formatCoupleName(coupleNames.get(c.id) ?? { celebrity: c.celebrity_name, pro: c.pro_name }) }))}
             />
             <div className="flex items-center justify-between gap-3">
               <div>
