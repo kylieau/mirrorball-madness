@@ -1,66 +1,82 @@
-# Session Handoff — 2026-11-05 (episode rounds shipped, before E10)
+# Session Handoff — 2026-11-06 (couple history + dance names shipped, before E10)
 
 ## 1. Current State
 
-**`main` is at `5e904be`, pushed.** Nothing of ours is uncommitted. E10 (Week 9, Grammy Night) airs **Tuesday 2026-11-10, 8pm ET** (`airs_at` 01:00Z Nov 11).
+**`main` is at `1d050cf`, pushed.** Nothing of ours is uncommitted. E10 (Week 9, Grammy Night) airs **Tuesday 2026-11-10, 8pm ET** (`airs_at` 01:00Z Nov 11). Kylie hasn't yet confirmed Vercel shows `1d050cf` Ready.
 
-Shipped and pushed this session:
-- **Episode rounds** (`36d443c` … `5e904be`). Edit Episode's "Dance Rounds For This Episode" replaces Dances (Per Couple) and Round Types. Enter Results gets round tabs, planned-heat placeholders, a Not in This Round band, Mark an Exception, and an on-air Winner's Bonus. See CLAUDE.md "Episode rounds".
-  - `supabase/apply-episode-rounds.sql` is **applied live and verified**: `supabase/queries/verify-episode-rounds.sql` returned 3 tables, 2 columns, 12 functions and 0 episodes without a plan. Types are regenerated.
-  - E09 is Round 1 + Team Dance (Wildcats 1, Slaytopia 2). E10 is Round 1 + Dance-Off (Dance-Off 1–3, Winner's Bonus, points mode). No hand-made Immunity special existed.
-  - Kylie's click-through on production (Edit Episode save with Harry & Jenna Immune on E10) passed.
-  - **UI pass** (`330143e`) after a Codex + advisor review: app chips, standard type scale, plain Labels, neutral badges, stacked bonus fields with errors, one compact exception action, and Undo errors shown in place.
-  - **Rounds as underlined base-nova Tabs** (`5e904be`), so they no longer look like the status chips.
-- **Retired special-dance leftovers** (`5b5d981`): `TeamEntry` and the inferred mode (now `"none"`), the per-dance panel/Out-of/Theme/Artist columns and the custom-moment tables are gone. `apply-retire-special-leftovers.sql` is applied and verified.
-- **Publish Results bar** pinned to the bottom edge (`2254e75`); it floated 80px up for an admin tab bar that no longer exists.
-- **Standings**: undrafted couples' points are no longer italic (`0ffdcaf`); the runbook names E08's guest judge.
+Shipped this session (all app-only, no SQL), each browser-checked at 360/390px with throwaway accounts and writes blocked:
+- **Couple history page** `/couples/[id]` (see CLAUDE.md "Couple history"). Results cards, Couples Leaderboard rows and Your Fantasy Roster cards link to it. All gating happens on the server (`loadCoupleHistory`), and Codex found no spoiler leaks. Stats are:
+  - **Average:** per night, on the 30 basis.
+  - **Best:** the couple's own dance with the largest share of its marks possible, so 30/30 beats 38/40. Shown raw with its out-of; special dances never count.
+  - **In Jeopardy:** how many weeks.
+- **Special dance naming, rule A** (`src/lib/special-dance-names.ts`, CLAUDE.md Special Dances "Naming"). The short name is the dance's own name (Slaytopia, Dance-Off 1, Dance-Off Immunity). Where it's used:
+  - Fan Results, Home and the Night Summary use the short name.
+  - Member cards use the full name ("Team Dance · Slaytopia").
+  - The couple page uses **Team Dance** (Slaytopia).
+  - Both special-dance pickers wrap the name in the menu and stay on one line when closed.
+- **Adversarial review fixes** (`1d050cf`, advisor + Codex):
+  - Bonuses are always signed ("+0", "−1.5"), and Home drops a loser's 0.
+  - The couple page highlights no tab, and the tab bar stays in the originating league.
+  - Back keeps `rosterWeek` and returns to `Standings#couples` (`ScrollToHash`).
+  - The couple page live-refreshes and shows a "posting live" line.
+  - Long names shrink in the closed picker.
+- **Earlier small fixes** (`b573f84`): Home shows an immune bonus as "with Dance-Off Immunity"; Points rows stay on one line.
 
 ## 2. Changes Made
 
-All committed and pushed. This sync touches only `MEMORY_HANDOFF.md` and `BACKLOG.md`.
+All committed and pushed (`b573f84` … `1d050cf`). This sync touches only `MEMORY_HANDOFF.md`.
 
 **Not ours; leave unstaged:** `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile.codex`, `.devcontainer/devcontainer-lock.json`, `.agents/`, `AGENTS.md`, `ios/App/App.xcodeproj/project.pbxproj`, `supabase/queries/add-*.sql`, `supabase/queries/prefill-*.sql`. `npm run lint` errors come from `.codex-private/` (not ours); `npx eslint src` is clean.
 
 ## 3. Key Decisions
 
-- **Settled by Kylie 2026-11-05:**
-  - **Rounds plan:**
-    - round order is the order rounds are added (no reordering);
-    - only a site admin edits the plan on Edit Episode, while contributors pair or set up heats and mark exceptions on Enter Results;
-    - Immune also ticks Finish Week's Immunity box;
-    - swapping heat partners after marks warns but is allowed.
-  - **Scoring:**
-    - per-couple Judges' Marks heats (`couple_marks`, `PLAN_VERSION = 3`) were built now;
-    - elimination-only rounds (`none`) exist and never score.
-  - **E10:**
-    - dance-offs are a Winner's Bonus round (winner = the round's bonus, loser 0);
-    - the bonus stays blank until announced, which holds Finish Week.
-  - **Look:** rounds are tabs and the In progress / Drafted / Published chips are the filter (she liked the UI pass).
-- **SQL ships before the app that reads it.** Additive SQL first, verified with a read-only query, then push. A push to `main` needs Kylie's yes in that turn (handoff syncs excepted).
-- **Production reads through the Management API are now blocked here** (auto-mode classifier, after Kylie's "don't touch the production database directly"). Ask Kylie to run a read-only `.sql` instead. `npx supabase gen types` still works.
-- **Fallback for E10:** redeploying `b3ab890` works against the new SQL as long as no `couple_marks` heat exists.
-- **Rehearsal:** the PGlite stacks in `retire-special-leftovers-db.test.ts` / `episode-rounds-db.test.ts` (`LIVE_STACK`) reproduce live function bodies exactly; rewrite RPCs from live definitions, not `schema.sql` (which lags behind the `apply-*` files).
-- **Unchanged:**
-  - SQL goes to Kylie as `.sql` files, rehearsed in PGlite;
-  - throwaway accounts only, with POSTs aborted on real episodes (`scripts/qa-screenshots/seed.mjs up|down`, temp scripts in the project root, deleted after);
+- **Settled by Kylie 2026-11-05/06:**
+  - **Couple history:**
+    - a full page, not a sheet;
+    - no tap cue (no chevron);
+    - judge marks for signed-in viewers only (no SQL);
+    - Best as above;
+    - the dance count includes dance-off heats but not immunity;
+    - the unwatched row points to Results and has no Mark Watched button (the strip's sheet stays the one control).
+  - **Naming:**
+    - rule A;
+    - fans see heat numbers;
+    - songs stay after the name;
+    - the app part shipped before E10;
+    - the SQL `special_dance_label` ("Team Slaytopia" in errors, mirrored in `episode-publication.ts`) waits until after E10.
+  - **Carried over from 2026-11-05:**
+    - **Rounds plan:**
+      - rounds stay in the order they're added;
+      - only a site admin edits the plan;
+      - Immune ticks Immunity.
+    - **E10 dance-offs:**
+      - Winner's Bonus, entered on air;
+      - the bonus stays blank until it's announced, which holds Finish Week.
+- **SQL ships before the app that reads it.** A push to `main` needs Kylie's yes in that turn (handoff syncs excepted).
+- **Production reads through the Management API are blocked here.** Ask Kylie to run read-only `.sql`. Service-role REST in throwaway scripts (from the project root, deleted after) still works.
+- **Unchanged practice:**
+  - render-check with throwaway accounts and every non-GET aborted (`scripts/qa-screenshots/seed.mjs up|down` for a scratch league);
   - stage by name;
   - attribution `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`;
-  - never `pkill -f`;
+  - **never `pkill -f`** (this session broke it once; use TaskStop);
   - `rm -rf .next` before `npm run dev` after a build;
-  - a `next/font` build error is a network flake, so retry.
+  - a `next/font` build error is a network flake, so retry;
+  - don't run prettier (it isn't the repo's formatter).
+- **Codex runs:** `codex:codex-rescue` sometimes backgrounds itself. If so, fetch the review with `node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs result`.
 
 ## 4. Backlog & Next Steps
 
-See BACKLOG "Episode rounds — 2026-11-05":
-- **Still to see with a real write:** Winner's Bonus on E10 night, Undo, a placeholder heat set up on air, and a `couple_marks` heat.
-- **Also listed there:**
-  - the two-step Schedule save;
-  - the Immunity wording on Home;
-  - Points rows wrapping at 360px;
-  - the Tabs override note.
+See BACKLOG:
+- **"Adversarial review of 2026-11-05/06 work":** the open item there is the West feed, a decision for Kylie. After East publish, a West viewer who chose Stay Updated sees that week's outcomes on Results and on the couple page.
+- **"Long special-dance names":** the SQL label rewrite (also fixes "Team Team Dance 2").
+- **"Couple history":** the next slices are league context and more tap targets.
+- **"Episode rounds":** the E10 watch list.
 
-The "Special dances follow-ups" section still holds the E10 watch list.
+Watch on E10 night:
+- a loser's "+0" in the Night Summary, and Home leaving it out;
+- the couple page refreshing and its "Week 9 is posting live" line;
+- the Winner's Bonus, then Winner/Loser per heat, then Finish Week.
 
-Next: Kylie confirms Vercel shows `5e904be` Ready. On E10 night she enters the Winner's Bonus on the Dance-Off tab once announced, picks Winner/Loser per heat, then runs Finish Week; afterwards run the runbook step 8 checks for E10 (ask Kylie to run them, since reads are blocked here).
+Afterwards, run the runbook step 8 checks for E10 (Kylie runs them, since reads are blocked here).
 
 Next command: none pending.
