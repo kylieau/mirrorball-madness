@@ -4,6 +4,16 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Long special-dance names — inventory 2026-11-05
 
+Rule A chosen 2026-11-06 (see CLAUDE.md Special Dances "Naming"); the app
+side is done: fan Results, couple history, Home, member cards, Night
+Summary, both special-dance pickers (render-checked on E09 and E10 at 360px,
+writes blocked). Still to do, after E10:
+- SQL `special_dance_label` and its mirror in `episode-publication.ts` to the
+  same rule (an apply script, rehearsed in PGlite), which also fixes "Team
+  Team Dance 2" for an auto-named team.
+- Not yet seen: a Special Dances band entry (only on-air dances outside the
+  plan land there) and a signed bonus in the Night Summary on a real night.
+
 Kylie wants long dance names fixed everywhere. Every place a special dance
 adds to a displayed name (360px behaviour inferred from CSS, not rendered):
 

@@ -65,6 +65,7 @@ import {
   type CoupleMarks,
   type TeamMark,
 } from "@/lib/team-dances";
+import { specialDanceFullName, specialDanceShortName, specialDanceTypeBadge } from "@/lib/special-dance-names";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,6 +107,42 @@ import { resultsEntryCoupleIds, selectableCast } from "@/lib/episode-cast";
 import { judgesForScoreInputs, type ScoringJudge } from "@/lib/scoring-judges";
 import { collapseToNights, MARK_MAX, scaledJudgesScore } from "@/lib/scoring";
 import { formatPoints } from "@/lib/format-points";
+
+// A special dance in a picker menu. Menu rows don't wrap and size to their
+// text by default (SelectItem), so a long name or member list would run
+// under the check mark: the row may shrink, the name wraps, Posted keeps the
+// right, and the member line ends in "…". The Dance Type is plain text, since
+// a badge turns unreadable on the highlighted row.
+const SPECIAL_PICKER_ITEM = "*:min-w-0";
+
+function specialPickerLabel({ name, badge, members, posted }: { name: string; badge: string | null; members: string; posted: boolean }) {
+  const detail = [badge, members].filter(Boolean).join(" · ");
+  return (
+    <span className="flex min-w-0 flex-1 flex-col whitespace-normal">
+      <span className="flex items-baseline gap-2">
+        <strong className="min-w-0 flex-1">{name}</strong>
+        {posted && <span className="shrink-0 text-xs text-muted-foreground">Posted</span>}
+      </span>
+      {detail && <span className="truncate text-xs text-muted-foreground">{detail}</span>}
+    </span>
+  );
+}
+
+// The closed picker is one 32px line, so it gets the name and members on one
+// line, ending in "…".
+function specialPickerTrigger({ name, members }: { name: string; members: string }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <strong className="shrink-0">{name}</strong>
+      {members && <span className="truncate text-muted-foreground">· {members}</span>}
+    </span>
+  );
+}
+
+// A bonus part reads signed ("Dance-Off 1 +3") so it can't pass for marks.
+function nightPartScore(part: { total: number; bonus: boolean }): string {
+  return part.bonus && part.total > 0 ? `+${part.total}` : String(part.total);
+}
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type CoupleWithStatus = Couple & {
@@ -1301,9 +1338,9 @@ export function ResultsForm({
         if (!view.eligible.includes(c.id)) return [];
         if (view.dance.scoringMode === "points") {
           const points = view.scores.find((s) => s.coupleId === c.id)?.points;
-          return points != null ? [{ marks: [], points, label: view.dance.danceType || view.dance.name }] : [];
+          return points != null ? [{ marks: [], points, label: specialDanceShortName(view.dance) }] : [];
         }
-        const label = view.dance.danceType === "Team Dance" ? view.dance.name : view.dance.danceType;
+        const label = specialDanceShortName(view.dance);
         if (view.dance.scoringMode === "couple_marks") {
           const marks = view.coupleMarks[c.id] ?? [];
           return marks.length === nightJudgeIds.length ? [{ marks: marks.map((m) => m.score), label }] : [];
@@ -1341,10 +1378,7 @@ export function ResultsForm({
           return (
             <div key={dance.id} className="flex flex-col gap-1 rounded-lg border border-dashed border-accent/40 bg-muted/30 p-1.5 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-x-2">
-                <span className="font-medium">
-                  {dance.danceType}
-                  {dance.nameIsAuto || dance.danceType === dance.name ? "" : ` · ${dance.name}`}
-                </span>
+                <span className="font-medium">{specialDanceFullName(dance)}</span>
                 <button type="button" className="font-semibold text-accent" onClick={() => openTeamEntry(dance.id)}>
                   Open →
                 </button>
@@ -1380,7 +1414,7 @@ export function ResultsForm({
         {summary && (
           <p className="text-xs text-muted-foreground">
             Individual {individual}
-            {summary.parts.map((part) => ` + ${part.label} ${part.total}`).join("")}
+            {summary.parts.map((part) => ` + ${part.label} ${nightPartScore(part)}`).join("")}
             {summary.parts.length > 0 ? (
               <>
                 {" "}= Night {summary.nightTotal}
@@ -1421,22 +1455,14 @@ export function ResultsForm({
       : selectedTeam
         ? teamPickValue(selectedTeam.dance.id)
         : (current?.id ?? (allowAdd ? ADD_SPECIAL_VALUE : teamPickValue(listedTeams[0]?.dance.id ?? "")));
-    const teamLabel = (item: PickerTeam) => {
-      const members = oxfordJoin(item.dance.memberCoupleIds.map(firstName));
-      const status = item.dance.postedAt ? "Posted" : null;
-      return (
-        <span className="flex flex-col">
-          <span className="flex flex-wrap items-center gap-1.5">
-            <strong>{item.dance.name || "New Special Dance"}</strong>
-            {item.dance.danceType && <Badge variant="secondary">{item.dance.danceType}</Badge>}
-            {status && <span className="text-muted-foreground">{status}</span>}
-          </span>
-          {members ? <span className="text-xs text-muted-foreground">{members}</span> : null}
-        </span>
-      );
-    };
+    const teamNames = (item: PickerTeam) => ({
+      name: item.dance.name ? specialDanceShortName(item.dance) : "New Special Dance",
+      members: oxfordJoin(item.dance.memberCoupleIds.map(firstName)),
+    });
+    const teamLabel = (item: PickerTeam) =>
+      specialPickerLabel({ ...teamNames(item), badge: specialDanceTypeBadge(item.dance), posted: !!item.dance.postedAt });
     const items: Record<string, ReactNode> = {
-      ...Object.fromEntries(listedTeams.map((v) => [teamPickValue(v.dance.id), teamLabel(v)])),
+      ...Object.fromEntries(listedTeams.map((v) => [teamPickValue(v.dance.id), specialPickerTrigger(teamNames(v))])),
       ...Object.fromEntries(list.map((c) => [c.id, coupleNameNode(coupleParts(c))])),
     };
     if (allowAdd) items[ADD_SPECIAL_VALUE] = "+ Add Special Dance";
@@ -1472,7 +1498,7 @@ export function ResultsForm({
               <SelectGroup>
                 <SelectLabel>Special Dances · {listedTeams.length}</SelectLabel>
                 {listedTeams.map((v) => (
-                  <SelectItem key={v.dance.id} value={teamPickValue(v.dance.id)}>
+                  <SelectItem key={v.dance.id} value={teamPickValue(v.dance.id)} className={SPECIAL_PICKER_ITEM}>
                     {teamLabel(v)}
                   </SelectItem>
                 ))}
@@ -1660,17 +1686,12 @@ export function ResultsForm({
         ? selectedId
         : (entries[0]?.value ?? "");
     const current = entries.find((e) => e.value === value);
-    const label = (entry: (typeof entries)[number]) => {
-      const name = entry.dance?.name ?? entry.unit?.name ?? "";
-      const members = entry.dance ? oxfordJoin(entry.dance.memberCoupleIds.map(firstName)) : "Not set up yet";
-      return (
-        <span className="flex min-w-0 items-center gap-1.5">
-          <strong className="shrink-0">{name}</strong>
-          <span className="truncate text-muted-foreground">· {members}</span>
-          {entry.dance?.postedAt && <span className="shrink-0 text-muted-foreground">· Posted</span>}
-        </span>
-      );
-    };
+    const entryNames = (entry: (typeof entries)[number]) => ({
+      name: entry.dance ? specialDanceShortName(entry.dance) : (entry.unit?.name ?? ""),
+      members: entry.dance ? oxfordJoin(entry.dance.memberCoupleIds.map(firstName)) : "Not set up yet",
+    });
+    // The round's tab already names its kind, so no Dance Type here.
+    const label = (entry: (typeof entries)[number]) => specialPickerLabel({ ...entryNames(entry), badge: null, posted: !!entry.dance?.postedAt });
     if (entries.length === 0) {
       return (
         <p className="text-sm text-muted-foreground">
@@ -1683,7 +1704,7 @@ export function ResultsForm({
     return (
       <>
         <Select
-          items={Object.fromEntries(entries.map((e) => [e.value, label(e)]))}
+          items={Object.fromEntries(entries.map((e) => [e.value, specialPickerTrigger(entryNames(e))]))}
           value={value}
           onValueChange={(v) => {
             if (!v) return;
@@ -1700,7 +1721,7 @@ export function ResultsForm({
                 {round.unitCount} {round.unitCount === 1 ? unitNoun(round, false) : unitNoun(round)}
               </SelectLabel>
               {entries.map((e) => (
-                <SelectItem key={e.value} value={e.value}>
+                <SelectItem key={e.value} value={e.value} className={SPECIAL_PICKER_ITEM}>
                   {label(e)}
                 </SelectItem>
               ))}
@@ -2301,7 +2322,7 @@ export function ResultsForm({
                                   </span>
                                   <span className="text-[11px] text-muted-foreground">
                                     Individual {row.individualTotal}
-                                    {row.parts.map((part) => ` + ${part.label} ${part.total}`).join("")}
+                                    {row.parts.map((part) => ` + ${part.label} ${nightPartScore(part)}`).join("")}
                                   </span>
                                 </div>
                                 <div className="flex shrink-0 flex-col items-end">

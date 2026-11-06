@@ -1,3 +1,5 @@
+import { specialDanceShortName } from "./special-dance-names";
+
 export type NightDance = {
   episodeId: string;
   coupleId: string;
@@ -49,24 +51,21 @@ function isPointsRow(dance: NightDance): boolean {
   return dance.maxScore === 0;
 }
 
-// A row tagged with its special dance reads "Team Dance · Slaytopia" (or just
-// "Team Dance" when the name is not readable, e.g. a guest before the episode
-// publishes); an auto-named entry ("Dance-Off 2") is not repeated after its
-// type. An untagged Freestyle on a Team Dance night keeps the older "(Team)"
-// hint.
+// A row tagged with its special dance reads by the dance's short name
+// ("Slaytopia", "Dance-Off 1", "Dance-Off Immunity"), or its kind when the
+// name is not readable (a guest before the episode publishes). An untagged
+// Freestyle on a Team Dance night keeps the older "(Team)" hint.
 function styleLabel(dance: NightDance, team: boolean, labels: ReadonlyMap<string, SpecialDanceLabelInput>): string {
   if (dance.teamId) {
     const label = labels.get(dance.teamId);
     if (!label) return isPointsRow(dance) ? "Bonus" : TEAM_DANCE_ROUND_TYPE;
-    const type = label.danceType.trim() || TEAM_DANCE_ROUND_TYPE;
-    if (isPointsRow(dance)) return type;
-    return label.name.toLowerCase().startsWith(type.toLowerCase()) ? label.name : `${type} · ${label.name}`;
+    return specialDanceShortName({ name: label.name, danceType: label.danceType.trim() || TEAM_DANCE_ROUND_TYPE });
   }
   return `${dance.style}${team ? " (Team)" : ""}`;
 }
 
-// One dance's name as fans read it ("Jive", "Team Dance · Slaytopia",
-// "Dance-Off"), without its song or score.
+// One dance's name as fans read it ("Jive", "Slaytopia", "Dance-Off 1"),
+// without its song or score.
 export function nightDanceLabel(
   dance: NightDance,
   teamDanceEpisodes: ReadonlySet<string>,

@@ -33,11 +33,11 @@ describe("coupleDanceLines", () => {
     expect(isTeamDance("Freestyle", false)).toBe(false);
   });
 
-  it("labels a team-tagged row by its type and name, or Team Dance when the name is not readable", () => {
+  it("labels a team-tagged row by its short name, or Team Dance when the name is not readable", () => {
     const team = { ...dance("Freestyle", 36, "Zoo"), teamId: "t1" };
-    expect(coupleDanceLines([dance("Quickstep", 28), team], new Set(), slaytopia).lines).toEqual(["Quickstep", "Team Dance · Slaytopia · Zoo"]);
+    expect(coupleDanceLines([dance("Quickstep", 28), team], new Set(), slaytopia).lines).toEqual(["Quickstep", "Slaytopia · Zoo"]);
     expect(coupleDanceLines([dance("Quickstep", 28), team], new Set()).lines).toEqual(["Quickstep", "Team Dance · Zoo"]);
-    expect(coupleDanceLines([team], new Set(), slaytopia).lines).toEqual(["Team Dance · Slaytopia · Zoo"]);
+    expect(coupleDanceLines([team], new Set(), slaytopia).lines).toEqual(["Slaytopia · Zoo"]);
   });
 
   it("does not repeat the type before an automatic name", () => {
@@ -50,10 +50,10 @@ describe("coupleDanceLines", () => {
     const danceOff = { ...dance("Freestyle", 3), teamId: "d1", maxScore: 0 };
     const named = labels({ d1: { name: "Dance-Off 1", danceType: "Dance-Off", scoringMode: "points" } });
     expect(coupleDanceLines([dance("Quickstep", 28), dance("Freestyle", 36, "Zoo"), danceOff], teamNight, named)).toEqual({
-      lines: ["Quickstep", "Freestyle (Team) · Zoo", "Dance-Off"],
+      lines: ["Quickstep", "Freestyle (Team) · Zoo", "Dance-Off 1"],
       parts: { marks: ["28", "36"], bonus: ["+3"] },
     });
-    expect(coupleDanceLines([{ ...danceOff, totalScore: -1.5 }], new Set(), named)).toEqual({ lines: ["Dance-Off · −1.5"], parts: null });
+    expect(coupleDanceLines([{ ...danceOff, totalScore: -1.5 }], new Set(), named)).toEqual({ lines: ["Dance-Off 1 · −1.5"], parts: null });
     expect(coupleDanceLines([danceOff], new Set()).lines).toEqual(["Bonus · +3"]);
   });
 
@@ -62,9 +62,9 @@ describe("coupleDanceLines", () => {
     const named = labels({ d1: { name: "Dance-Off", danceType: "Dance-Off", scoringMode: "points" } });
     expect(coupleDanceLines([dance("Tango", 27), lost], new Set(), named)).toEqual({ lines: ["Tango", "Dance-Off"], parts: null });
     const immune = { ...dance("Freestyle", 3), teamId: "i1", maxScore: 0 };
-    const immunity = labels({ i1: { name: "Immunity", danceType: "Immunity", scoringMode: "points" } });
+    const immunity = labels({ i1: { name: "Dance-Off Immunity", danceType: "Immunity", scoringMode: "points" } });
     expect(coupleDanceLines([dance("Tango", 27), immune], new Set(), immunity)).toEqual({
-      lines: ["Tango", "Immunity"],
+      lines: ["Tango", "Dance-Off Immunity"],
       parts: { marks: ["27"], bonus: ["+3"] },
     });
   });

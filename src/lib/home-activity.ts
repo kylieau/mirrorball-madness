@@ -1,11 +1,12 @@
 import { formatEpisodeCasual } from "./format-week";
 import { ordinal } from "./ordinal";
+import { IMMUNITY_DANCE_TYPE } from "./episode-rounds";
+import { specialDanceShortName } from "./special-dance-names";
 
 export type ActivityScore = {
   celebrity: string;
-  // The dance style for a judged dance; the special dance's type ("Dance-Off")
-  // for a bonus round paid in points, or its name for an immunity row
-  // ("Dance-Off Immunity").
+  // The dance style for a judged dance; the special dance's short name
+  // ("Dance-Off 1", "Dance-Off Immunity") for a bonus round paid in points.
   danceStyle: string;
   total: number;
   at: string;
@@ -34,8 +35,7 @@ export type ActivityDanceRow = {
 };
 
 // A posted row as an activity entry: a bonus round paid in points names its
-// special dance's type (an immunity row its name, which carries the round);
-// every judged dance keeps its style.
+// special dance by its short name; every judged dance keeps its style.
 export function activityScore(
   row: ActivityDanceRow,
   celebrity: string,
@@ -44,10 +44,14 @@ export function activityScore(
   const total = Number(row.total_score);
   if (row.max_score != null && Number(row.max_score) === 0) {
     const label = row.team_id ? specialDanceLabels[row.team_id] : undefined;
-    if (label?.danceType === "Immunity") {
-      return { celebrity, danceStyle: label.name.trim() || "Immunity", total, at: row.created_at, bonus: true, immunity: true };
-    }
-    return { celebrity, danceStyle: label?.danceType.trim() || "Bonus", total, at: row.created_at, bonus: true };
+    return {
+      celebrity,
+      danceStyle: label ? specialDanceShortName(label) : "a bonus round",
+      total,
+      at: row.created_at,
+      bonus: true,
+      immunity: label?.danceType === IMMUNITY_DANCE_TYPE,
+    };
   }
   return { celebrity, danceStyle: row.dance_styles?.name ?? "Unknown dance", total, at: row.created_at };
 }
@@ -93,7 +97,7 @@ export function buildRecentActivity({
                 { text: s.celebrity, kind: "couple" },
                 { text: " earned " },
                 { text: signedTotal(s.total), kind: "score" },
-                { text: s.immunity ? ` with ${s.danceStyle}` : ` in the ${s.danceStyle}` },
+                { text: `${s.immunity ? " with" : " in"} ${s.danceStyle}` },
               ]
             : [
                 { text: s.celebrity, kind: "couple" },

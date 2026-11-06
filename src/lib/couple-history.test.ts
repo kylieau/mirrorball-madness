@@ -102,8 +102,8 @@ describe("buildCoupleHistory", () => {
     expect(night.combined).toEqual({ total: 67, max: expected.maxScore, scaled: expected.scaledScore });
     expect(night.dances.map((d) => [d.label, d.bonus])).toEqual([
       ["Jive", false],
-      ["Team Dance · Slaytopia", false],
-      ["Dance-Off", true],
+      ["Slaytopia", false],
+      ["Dance-Off 1", true],
     ]);
     expect(history.danceCount).toBe(2);
   });
