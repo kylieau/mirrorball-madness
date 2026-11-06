@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { CoupleNameParts } from "@/lib/couple-display";
+import { WAIVER_CLAIM_METHOD_LABELS, type WaiverClaimMethod } from "@/lib/recast-framing";
 import { CoupleNameLink, coupleNameNode } from "@/components/couple-name";
 import { RecastCatchUpCard } from "@/components/recast-catch-up-card";
 
@@ -53,7 +54,7 @@ export function WaiversPanel({
 }: {
   leagueId: string;
   closeHref: string;
-  claimMethod: string;
+  claimMethod: WaiverClaimMethod;
   isCommissioner: boolean;
   openSlots: OpenSlot[];
   hiddenOpenSlotCount?: number;
@@ -119,8 +120,8 @@ export function WaiversPanel({
       </Link>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Recast</h1>
-        <p className="mt-1 text-sm capitalize text-muted-foreground">
-          {claimMethod.replace("_", " ")} recast method
+        <p className="mt-1 text-sm text-muted-foreground">
+          Recast method: {WAIVER_CLAIM_METHOD_LABELS[claimMethod]}
         </p>
         {error && <p role="alert" className="mt-2 text-sm text-danger-text">{error}</p>}
         {message && <p className="mt-2 text-sm text-muted-foreground">{message}</p>}

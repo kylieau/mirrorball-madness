@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { WaiversPanel } from "@/components/waivers-panel";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
-import { partitionRecastSlots } from "@/lib/recast-framing";
+import { partitionRecastSlots, type WaiverClaimMethod } from "@/lib/recast-framing";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { isSpoilerSafeActive } from "@/lib/spoiler-safe-couple-status";
@@ -195,7 +195,7 @@ export default async function WaiversPage({
     <WaiversPanel
       leagueId={id}
       closeHref={closeHref}
-      claimMethod={league.waiver_claim_method!}
+      claimMethod={league.waiver_claim_method as WaiverClaimMethod}
       isCommissioner={membership?.role === "commissioner"}
       openSlots={openSlots}
       hiddenOpenSlotCount={hiddenOpenCount}

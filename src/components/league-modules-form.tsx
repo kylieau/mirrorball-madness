@@ -1,5 +1,6 @@
 "use client";
 
+import { WAIVER_CLAIM_METHOD_LABELS, type WaiverClaimMethod } from "@/lib/recast-framing";
 import { formatPoints } from "@/lib/format-points";
 import { curtainCallLockAt, describePickLockOffset, pickLockFlip, type PickLockCoast, type PickLockFlip, type PickTiming } from "@/lib/curtain-call-lock";
 import { useState } from "react";
@@ -74,7 +75,6 @@ import { judgesScoreMultiplierHelp, judgesScoreMultiplierLocked } from "@/lib/ju
 
 type ScoringMethod = GrandFinaleMethod;
 type WaiverMode = "locked" | "waivers";
-type WaiverClaimMethod = "reverse_standings" | "fcfs" | "manual";
 type DraftType = "snake" | "linear" | "custom";
 
 type ScoringSettings = {
@@ -149,12 +149,6 @@ const LOCK_DIRECTION_ITEMS: Record<LockDirection, string> = {
 const WAIVER_MODE_ITEMS: Record<WaiverMode, string> = {
   locked: "Locked (No Recast)",
   waivers: "Recast Enabled",
-};
-
-const WAIVER_CLAIM_METHOD_ITEMS: Record<WaiverClaimMethod, string> = {
-  reverse_standings: "Reverse Standings",
-  fcfs: "First Come, First Served",
-  manual: "Manual (Commissioner Decides)",
 };
 
 const DRAFT_TYPE_ITEMS: Record<DraftType, string> = {
@@ -674,7 +668,7 @@ export function LeagueModulesForm({
               <SettingRow label="5th Place Bonus" value={formatPoints(fifthPlacePoints)} />
               <SettingRow label="Recast Mode" value={WAIVER_MODE_ITEMS[waiverMode]} />
               {waiverMode === "waivers" && (
-                <SettingRow label="Recast Method" value={WAIVER_CLAIM_METHOD_ITEMS[waiverClaimMethod]} />
+                <SettingRow label="Recast Method" value={WAIVER_CLAIM_METHOD_LABELS[waiverClaimMethod]} />
               )}
               <SettingRow label="Draft Pick Timer" value={`${pickTimeLimitSeconds}s`} />
               <SettingRow label="Draft Type" value={DRAFT_TYPE_ITEMS[draftType]} />
@@ -1111,7 +1105,7 @@ export function LeagueModulesForm({
                   <div className="flex flex-col gap-2 sm:col-span-2">
                     <Label htmlFor="waiverClaimMethod">Recast Method</Label>
                     <Select
-                      items={WAIVER_CLAIM_METHOD_ITEMS}
+                      items={WAIVER_CLAIM_METHOD_LABELS}
                       value={waiverClaimMethod}
                       onValueChange={(v) => setWaiverClaimMethod((v as WaiverClaimMethod) ?? "reverse_standings")}
                     >
