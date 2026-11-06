@@ -4,7 +4,7 @@ import { formatPoints, roundPoints } from "@/lib/format-points";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { cn } from "cn";
-import { coupleNameNode } from "@/components/couple-name";
+import { CoupleNameLink, coupleNameNode } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasualAbbreviated } from "@/lib/format-week";
 import { nextPredictedElimination, pinnedEliminatedIds, type PinnableCouple } from "@/lib/grand-finale-pins";
@@ -218,6 +218,7 @@ export function GrandFinaleOrderList({
   showNextEliminationHighlight,
   windowed = false,
   compact = false,
+  historyFrom,
 }: {
   order: string[]; // elimination-ascending: index 0 = first predicted out, last = predicted winner
   couples: GrandFinaleCouple[];
@@ -233,6 +234,9 @@ export function GrandFinaleOrderList({
   // auto-centers) — same list, just less of it visible before the viewer
   // expands.
   compact?: boolean;
+  // Names open the couple page, linking back here. Left out while the
+  // viewer is still building an order, so a tap can't leave it unsaved.
+  historyFrom?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const coupleById = new Map(couples.map((c) => [c.id, c]));
@@ -241,9 +245,8 @@ export function GrandFinaleOrderList({
 
   function nameFor(coupleId: string) {
     const c = coupleById.get(coupleId);
-    return coupleNameNode(
-      coupleDisplayNames[coupleId] ?? { celebrity: c?.celebrity_name ?? "Unknown", pro: c?.pro_name ?? "Unknown" }
-    );
+    const parts = coupleDisplayNames[coupleId] ?? { celebrity: c?.celebrity_name ?? "Unknown", pro: c?.pro_name ?? "Unknown" };
+    return historyFrom ? <CoupleNameLink coupleId={coupleId} from={historyFrom} {...parts} /> : coupleNameNode(parts);
   }
 
   useEffect(() => {

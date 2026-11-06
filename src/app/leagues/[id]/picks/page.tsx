@@ -101,6 +101,10 @@ export default async function LeaguePicksPage({
   const latestVisibleDanceWeek = visibleDanceWeeks[visibleDanceWeeks.length - 1] ?? null;
   const yourRosterWeek =
     visibleDanceWeeks.find((w) => w.id === rosterWeekParam) ?? latestVisibleDanceWeek;
+  // Couple pages opened from here come back to the same Curtain Call and roster weeks.
+  const historyFrom = yourRosterWeek
+    ? rosterWeekHref(id, yourRosterWeek.id, weekParam)
+    : `/leagues/${id}/picks${weekParam ? `?week=${weekParam}` : ""}`;
   const yourRosterWeekEpisodeIds =
     groupedWeeks.find((w) => w.id === yourRosterWeek?.id)?.episodes.map((e) => e.id) ?? [];
 
@@ -650,6 +654,7 @@ export default async function LeaguePicksPage({
                   isDoubleElimination={curtainCallEpisode.is_double_elimination_week}
                   coupleDisplayNames={Object.fromEntries(allDisplayNames)}
                   entries={curtainCallPicksEntries}
+                  historyFrom={historyFrom}
                 />
               )}
               {curtainCallMode === "recap" && curtainCallEpisode && !pastPicksLocked && (
@@ -660,6 +665,7 @@ export default async function LeaguePicksPage({
                   isDoubleElimination={curtainCallEpisode.is_double_elimination_week}
                   coupleDisplayNames={Object.fromEntries(allDisplayNames)}
                   entries={curtainCallRecapEntries}
+                  historyFrom={historyFrom}
                 />
               )}
             </CurtainCallCard>
@@ -686,7 +692,7 @@ export default async function LeaguePicksPage({
                 couples={rosterCouples}
                 totalPoints={yourRosterWeekTotalPoints}
                 weekBonusPoints={yourRosterWeekBonusPoints}
-                historyFrom={yourRosterWeek ? rosterWeekHref(id, yourRosterWeek.id, weekParam) : `/leagues/${id}/picks`}
+                historyFrom={historyFrom}
                 carousel={
                   yourRosterWeek ? (
                     <EpisodeCarousel
@@ -712,6 +718,7 @@ export default async function LeaguePicksPage({
                       leagueId={id}
                       weekId={yourRosterWeek.id}
                       entries={danceCardLeagueEntries}
+                      historyFrom={historyFrom}
                     />
                   ) : undefined
                 }
@@ -749,6 +756,7 @@ export default async function LeaguePicksPage({
               categoryWeight={scoringSettings?.bonus_picks_category_weight ?? 1}
               scoring={grandFinaleScoring}
               leagueGrandFinale={leagueGrandFinale}
+              historyFrom={historyFrom}
             />
           </div>
         )}

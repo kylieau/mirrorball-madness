@@ -23,12 +23,14 @@ export function GrandFinaleLeagueList({
   couples,
   coupleDisplayNames,
   scoring,
+  historyFrom,
 }: {
   leagueId: string;
   managers: LeagueGrandFinalePrediction[];
   couples: GrandFinaleCouple[];
   coupleDisplayNames: Record<string, CoupleNameParts>;
   scoring: GrandFinaleScoring;
+  historyFrom: string;
 }) {
   const [expanded, setExpanded] = usePersistedState<string[]>(`gf-league-expanded:${leagueId}`, []);
   const coupleById = new Map(couples.map((c) => [c.id, c]));
@@ -64,7 +66,7 @@ export function GrandFinaleLeagueList({
                 </span>
               </span>
             </AccordionTrigger>
-            <AccordionContent>
+            <AccordionContent className="[&_a]:no-underline [&_a]:hover:text-accent">
               <GrandFinaleOrderList
                 order={m.order}
                 couples={couples}
@@ -74,6 +76,7 @@ export function GrandFinaleLeagueList({
                 showStatus
                 showNextEliminationHighlight
                 windowed
+                historyFrom={historyFrom}
               />
             </AccordionContent>
           </AccordionItem>

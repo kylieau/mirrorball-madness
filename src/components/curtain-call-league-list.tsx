@@ -3,7 +3,7 @@
 import { LeagueGlanceHop } from "@/components/league-glance-hop";
 import { formatPoints, formatSignedPoints } from "@/lib/format-points";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CoupleName } from "@/components/couple-name";
+import { CoupleNameLink } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { partialVerdictLabel, type PastPicksComparison, type PickMatch } from "@/lib/past-picks";
 import { usePersistedState } from "@/lib/use-persisted-state";
@@ -43,6 +43,7 @@ export function CurtainCallLeagueList({
   isDoubleElimination,
   coupleDisplayNames,
   entries,
+  historyFrom,
 }: {
   leagueId: string;
   weekId: string;
@@ -50,6 +51,7 @@ export function CurtainCallLeagueList({
   isDoubleElimination: boolean;
   coupleDisplayNames: Record<string, CoupleNameParts>;
   entries: CurtainCallLeagueEntry[];
+  historyFrom: string;
 }) {
   const [expanded, setExpanded] = usePersistedState<string[]>(`cc-league-expanded:${leagueId}:${weekId}`, []);
 
@@ -86,14 +88,18 @@ export function CurtainCallLeagueList({
                 </span>
               </span>
             </AccordionTrigger>
-            <AccordionContent>
+            <AccordionContent className="[&_a]:no-underline [&_a]:hover:text-accent">
               <div className="flex flex-col gap-1.5 text-sm">
                 {pickLines(e).map((line, i) => (
                   <div key={i} className="flex items-center justify-between gap-3">
                     <span>
                       <span className="text-muted-foreground">{line.label}: </span>
                       {line.coupleId ? (
-                        <CoupleName {...(coupleDisplayNames[line.coupleId] ?? { celebrity: "Unknown", pro: "Unknown" })} />
+                        <CoupleNameLink
+                          coupleId={line.coupleId}
+                          from={historyFrom}
+                          {...(coupleDisplayNames[line.coupleId] ?? { celebrity: "Unknown", pro: "Unknown" })}
+                        />
                       ) : (
                         <span className="text-muted-foreground">No Pick</span>
                       )}

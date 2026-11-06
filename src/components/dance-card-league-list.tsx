@@ -4,7 +4,7 @@ import { LeagueGlanceHop } from "@/components/league-glance-hop";
 import { formatSignedPoints } from "@/lib/format-points";
 import { cn } from "cn";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CoupleName } from "@/components/couple-name";
+import { CoupleNameLink } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
@@ -24,10 +24,12 @@ export function DanceCardLeagueList({
   leagueId,
   weekId,
   entries,
+  historyFrom,
 }: {
   leagueId: string;
   weekId: string;
   entries: DanceCardLeagueEntry[];
+  historyFrom: string;
 }) {
   const [expanded, setExpanded] = usePersistedState<string[]>(`dc-league-expanded:${leagueId}:${weekId}`, []);
 
@@ -49,7 +51,7 @@ export function DanceCardLeagueList({
                 </span>
               </span>
             </AccordionTrigger>
-            <AccordionContent>
+            <AccordionContent className="[&_a]:no-underline [&_a]:hover:text-accent">
               <div className="flex flex-col gap-1 text-sm">
                 {e.couples.map((c) => (
                   <div
@@ -57,7 +59,7 @@ export function DanceCardLeagueList({
                     className={cn("flex items-center justify-between gap-3", c.tag === "eliminated" && "opacity-60")}
                   >
                     <span>
-                      <CoupleName celebrity={c.celebrity} pro={c.pro} />
+                      <CoupleNameLink coupleId={c.coupleId} from={historyFrom} celebrity={c.celebrity} pro={c.pro} />
                     </span>
                     <span className="font-heading font-semibold">
                       {formatSignedPoints(c.weeklyPoints)}

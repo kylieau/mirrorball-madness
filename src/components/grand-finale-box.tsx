@@ -58,6 +58,7 @@ export function GrandFinaleBox({
   scoring,
   leagueGrandFinale,
   categoryWeight = 1,
+  historyFrom,
 }: {
   leagueId: string;
   couples: GrandFinaleCouple[];
@@ -72,6 +73,7 @@ export function GrandFinaleBox({
   scoring: GrandFinaleScoring;
   leagueGrandFinale: LeagueGrandFinalePrediction[];
   categoryWeight?: number;
+  historyFrom: string;
 }) {
   const previewNote = (categoryWeight !== 1 || (lateEntry?.factor ?? 1) !== 1) ?
     <p className="text-xs text-muted-foreground">Point labels show module points before the league’s × {categoryWeight} weight{lateEntry ? ` and your × ${lateEntry.factor} late-entry adjustment` : ""}.</p> : null;
@@ -230,6 +232,7 @@ export function GrandFinaleBox({
               showNextEliminationHighlight
               windowed={isCollapsed}
               compact={isCollapsed}
+              historyFrom={historyFrom}
             />
           )}
           {summaryLocked && (
@@ -263,6 +266,7 @@ export function GrandFinaleBox({
             couples={couples}
             coupleDisplayNames={coupleDisplayNames}
             scoring={scoring}
+            historyFrom={historyFrom}
           />}
         </CardContent>
       </Card>
@@ -287,6 +291,7 @@ export function GrandFinaleBox({
               couples={couples}
               coupleDisplayNames={coupleDisplayNames}
               scoring={scoring}
+              historyFrom={historyFrom}
             />
           </CardContent>
         </Card>
