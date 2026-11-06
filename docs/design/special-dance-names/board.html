@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Special dance names · options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="board.css" />
+</head>
+<body>
+<div class="wrap">
+<h1>Special dance names: one rule</h1>
+<p class="lede">Mocks, not production UI. Every special dance gets one short name (tight spots) and one full name (headers), built in one place. Teams, heats and songs are from S35 (E08 Slaytopia, E10 Dance-Off 1, Harry &amp; Jenna's immunity). "Villains" is a made-up Trio name, there to test each rule on a named dance that isn't a team, and so is the long team name in the picker.</p>
+
+<section id="shot-table">
+  <h2>Same dance, every name</h2>
+  <p class="note">Current shows what each screen says today. A, B and C are the three rules. C differs only for fans; admins see A's names there.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Dance</th>
+        <th>Current<b>Depends on the screen</b></th>
+        <th>A · Name first<b>Short: its name</b></th>
+        <th>B · Team-style<b>Short: "Team Slaytopia"</b></th>
+        <th>C · Kind for fans<b>Fans: its Dance Type</b></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="kind"><b>Named team</b>Team Dance "Slaytopia"</td>
+        <td class="cur"><span>Team Dance · Slaytopia <i>Results, couple cards</i></span><span>Slaytopia <i>Night Summary</i></span><span>Team Slaytopia <i>errors</i></span></td>
+        <td><div class="pair"><span class="s">Slaytopia</span><span class="f">Team Dance · Slaytopia</span></div></td>
+        <td><div class="pair"><span class="s">Team Slaytopia</span><span class="f">Team Dance · Slaytopia</span></div></td>
+        <td><div class="pair"><span class="s">Team Dance <i class="muted">(admins: Slaytopia)</i></span><span class="f">Team Dance · Slaytopia</span></div></td>
+      </tr>
+      <tr>
+        <td class="kind"><b>Unnamed team</b>auto-named "Team Dance 2"</td>
+        <td class="cur"><span>Team Dance 2 <i>Results, Night Summary</i></span><span>Team Dance <i>couple cards</i></span><span class="bug">Team Team Dance 2 <i>errors (bug)</i></span></td>
+        <td><div class="pair"><span class="s">Team Dance 2</span><span class="f">Team Dance 2</span></div></td>
+        <td><div class="pair"><span class="s">Team Dance 2</span><span class="f">Team Dance 2</span></div></td>
+        <td><div class="pair"><span class="s">Team Dance <i class="muted">(admins: Team Dance 2)</i></span><span class="f">Team Dance 2</span></div></td>
+      </tr>
+      <tr>
+        <td class="kind"><b>Named, not a team</b>Trio "Villains"</td>
+        <td class="cur"><span>Trio · Villains <i>Results, couple cards</i></span><span>Trio <i>Night Summary</i></span><span>Villains <i>errors</i></span></td>
+        <td><div class="pair"><span class="s">Villains</span><span class="f">Trio · Villains</span></div></td>
+        <td><div class="pair"><span class="s">Villains (Trio)</span><span class="f">Trio · Villains</span></div></td>
+        <td><div class="pair"><span class="s">Trio <i class="muted">(admins: Villains)</i></span><span class="f">Trio · Villains</span></div></td>
+      </tr>
+      <tr>
+        <td class="kind"><b>One heat of several</b>Dance-Off, heat 2 of 3</td>
+        <td class="cur"><span>Dance-Off <i>Results, Night Summary, couple cards</i></span><span>Dance-Off 2 <i>pickers, errors</i></span></td>
+        <td><div class="pair"><span class="s">Dance-Off 2</span><span class="f">Dance-Off 2</span></div></td>
+        <td><div class="pair"><span class="s">Dance-Off 2</span><span class="f">Dance-Off 2</span></div></td>
+        <td><div class="pair"><span class="s">Dance-Off <i class="muted">(admins: Dance-Off 2)</i></span><span class="f">Dance-Off 2</span></div></td>
+      </tr>
+      <tr>
+        <td class="kind"><b>A round's only heat</b>one Dance-Off</td>
+        <td class="cur"><span>Dance-Off <i>everywhere</i></span></td>
+        <td><div class="pair"><span class="s">Dance-Off</span><span class="f">Dance-Off</span></div></td>
+        <td><div class="pair"><span class="s">Dance-Off</span><span class="f">Dance-Off</span></div></td>
+        <td><div class="pair"><span class="s">Dance-Off</span><span class="f">Dance-Off</span></div></td>
+      </tr>
+      <tr>
+        <td class="kind"><b>Immunity bonus</b>Dance Type Immunity, named "Dance-Off Immunity"</td>
+        <td class="cur"><span>Immunity <i>Results, Night Summary</i></span><span>Dance-Off Immunity <i>Home, errors</i></span><span>Immunity · Dance-Off Immunity <i>couple cards</i></span></td>
+        <td><div class="pair"><span class="s">Dance-Off Immunity</span><span class="f">Dance-Off Immunity</span></div></td>
+        <td><div class="pair"><span class="s">Dance-Off Immunity</span><span class="f">Dance-Off Immunity</span></div></td>
+        <td><div class="pair"><span class="s">Immunity <i class="muted">(admins: Dance-Off Immunity)</i></span><span class="f">Dance-Off Immunity</span></div></td>
+      </tr>
+      <tr>
+        <td class="kind"><b>Older team weeks</b>an untagged Freestyle</td>
+        <td class="cur"><span>Freestyle (Team) <i>everywhere</i></span></td>
+        <td colspan="3" class="muted">Freestyle (Team), unchanged in every rule</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note" style="margin-top:10px">The rule behind A and B's full name: "Dance Type · Name", but just the name when it already says the type ("Dance-Off 2", "Team Dance 2", "Dance-Off Immunity"). B's short name only reads naturally for teams; for every other type it falls back to "Name (Type)".</p>
+</section>
+
+<section id="shot-results">
+  <h2>Results card (fans and guests)</h2>
+  <p class="note">Julia &amp; Ezra on Disney Night with the Slaytopia team dance, and Amber &amp; Pasha on Grammy Night winning Dance-Off 1. A and B show the heat number to fans; whether they should is a separate question.</p>
+  <div class="cols">
+    <div class="col">
+      <p class="col-title">Current</p>
+      <div class="frame">
+        <div class="rcard"><div class="l"><p class="name"><strong>Julia</strong> &amp; Ezra</p><p class="line">Paso Doble · Satisfied (Hamilton)</p><p class="line">Team Dance · Slaytopia · Zoo (Zootopia 2)</p></div><div class="r"><span class="badge safe">Safe</span><span class="tot">69</span><span class="parts">33 + 36</span></div></div>
+        <div class="rcard"><div class="l"><p class="name"><strong>Amber</strong> &amp; Pasha</p><p class="line">Rumba · Golden Hour</p><p class="line">Dance-Off</p></div><div class="r"><span class="badge safe">Safe</span><span class="tot">29</span><span class="parts">26 <span class="gold">+3 bonus</span></span></div></div>
+      </div>
+    </div>
+    <div class="col">
+      <p class="col-title">A · Name first</p>
+      <div class="frame">
+        <div class="rcard"><div class="l"><p class="name"><strong>Julia</strong> &amp; Ezra</p><p class="line">Paso Doble · Satisfied (Hamilton)</p><p class="line">Slaytopia · Zoo (Zootopia 2)</p></div><div class="r"><span class="badge safe">Safe</span><span class="tot">69</span><span class="parts">33 + 36</span></div></div>
+        <div class="rcard"><div class="l"><p class="name"><strong>Amber</strong> &amp; Pasha</p><p class="line">Rumba · Golden Hour</p><p class="line">Dance-Off 1</p></div><div class="r"><span class="badge safe">Safe</span><span class="tot">29</span><span class="parts">26 <span class="gold">+3 bonus</span></span></div></div>
+      </div>
+    </div>
+    <div class="col">
+      <p class="col-title">B · Team-style</p>
+      <div class="frame">
+        <div class="rcard"><div class="l"><p class="name"><strong>Julia</strong> &amp; Ezra</p><p class="line">Paso Doble · Satisfied (Hamilton)</p><p class="line">Team Slaytopia · Zoo (Zootopia 2)</p></div><div class="r"><span class="badge safe">Safe</span><span class="tot">69</span><span class="parts">33 + 36</span></div></div>
+        <div class="rcard"><div class="l"><p class="name"><strong>Amber</strong> &amp; Pasha</p><p class="line">Rumba · Golden Hour</p><p class="line">Dance-Off 1</p></div><div class="r"><span class="badge safe">Safe</span><span class="tot">29</span><span class="parts">26 <span class="gold">+3 bonus</span></span></div></div>
+      </div>
+    </div>
+    <div class="col">
+      <p class="col-title">C · Kind for fans</p>
+      <div class="frame">
+        <div class="rcard"><div class="l"><p class="name"><strong>Julia</strong> &amp; Ezra</p><p class="line">Paso Doble · Satisfied (Hamilton)</p><p class="line">Team Dance · Zoo (Zootopia 2)</p></div><div class="r"><span class="badge safe">Safe</span><span class="tot">69</span><span class="parts">33 + 36</span></div></div>
+        <div class="rcard"><div class="l"><p class="name"><strong>Amber</strong> &amp; Pasha</p><p class="line">Rumba · Golden Hour</p><p class="line">Dance-Off</p></div><div class="r"><span class="badge safe">Safe</span><span class="tot">29</span><span class="parts">26 <span class="gold">+3 bonus</span></span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="shot-song">
+  <h2>Separate question: the song on its own line</h2>
+  <p class="note">Works with any rule (shown with A). Lines get shorter whatever the name; the card gets one line taller per dance with a song.</p>
+  <div class="cols">
+    <div class="col">
+      <p class="col-title">Song after the name <span>(today)</span></p>
+      <div class="frame">
+        <div class="rcard"><div class="l"><p class="name"><strong>Julia</strong> &amp; Ezra</p><p class="line">Paso Doble · Satisfied (Hamilton)</p><p class="line">Slaytopia · Zoo (Zootopia 2)</p></div><div class="r"><span class="badge safe">Safe</span><span class="tot">69</span><span class="parts">33 + 36</span></div></div>
+      </div>
+    </div>
+    <div class="col">
+      <p class="col-title">Song on its own line</p>
+      <div class="frame">
+        <div class="rcard"><div class="l"><p class="name"><strong>Julia</strong> &amp; Ezra</p><p class="line">Paso Doble</p><p class="line song">Satisfied (Hamilton)</p><p class="line">Slaytopia</p><p class="line song">Zoo (Zootopia 2)</p></div><div class="r"><span class="badge safe">Safe</span><span class="tot">69</span><span class="parts">33 + 36</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="shot-picker">
+  <h2>Couple picker, open at 360px (contributors and admins)</h2>
+  <p class="note">As built, a menu row never wraps and keeps room on the right for the check mark, so a long name pushes its badge and Posted off the edge with no "…". Proposed (with A's names): the name wraps, Posted sits on the right, and the Dance Type badge (only when the name doesn't already say it) leads the member line, which ends in "…".</p>
+  <div class="cols">
+    <div class="col">
+      <p class="col-title">Current</p>
+      <div class="frame">
+        <div class="trigger"><span class="trunc"><strong>Wicked Witches of the West</strong></span><span class="muted">▾</span></div>
+        <div class="menu">
+          <div class="band">Special Dances · 4</div>
+          <div class="item real"><div class="row"><strong>Dance-Off 1</strong><span class="badge type">Dance-Off</span><span class="muted">Posted</span></div><div class="sub">Amber and Ezra</div></div>
+          <div class="item real"><div class="row"><strong>Dance-Off Immunity</strong><span class="badge type">Immunity</span></div><div class="sub">Harry</div></div>
+          <div class="item real"><div class="row"><strong>Slaytopia</strong><span class="badge type">Team Dance</span><span class="muted">Posted</span></div><div class="sub">Amber, Ezra, Harry, and Julia</div></div>
+          <div class="item real on"><span class="check">✓</span><div class="row"><strong>Wicked Witches of the West</strong><span class="badge type">Team Dance</span><span class="muted">Posted</span></div><div class="sub">Jackson, Tyler, Guillermo, and Ciara</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <p class="col-title">Proposed <span>(A's names)</span></p>
+      <div class="frame">
+        <div class="trigger"><span class="trunc"><strong>Wicked Witches of the West</strong></span><span class="muted">▾</span></div>
+        <div class="menu">
+          <div class="band">Special Dances · 4</div>
+          <div class="item"><div class="top"><strong>Dance-Off 1</strong><span class="st">Posted</span></div><div class="sub2"><span class="trunc">Amber and Ezra</span></div></div>
+          <div class="item"><div class="top"><strong>Dance-Off Immunity</strong></div><div class="sub2"><span class="trunc">Harry</span></div></div>
+          <div class="item"><div class="top"><strong>Slaytopia</strong><span class="st">Posted</span></div><div class="sub2"><span class="badge type">Team Dance</span><span class="trunc">Amber, Ezra, Harry, and Julia</span></div></div>
+          <div class="item on"><div class="top"><strong>Wicked Witches of the West</strong><span class="st">Posted ✓</span></div><div class="sub2"><span class="badge type">Team Dance</span><span class="trunc">Jackson, Tyler, Guillermo, and Ciara</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="shot-summary">
+  <h2>Night Summary on Enter Results' Leaderboard (contributors and admins)</h2>
+  <p class="note">Today a team shows its name but a heat shows only its type, and a bonus reads like marks ("Dance-Off 3"). Proposed: each dance's short name, and a bonus always signed ("+3").</p>
+  <div class="cols">
+    <div class="col">
+      <p class="col-title">Current</p>
+      <div class="frame">
+        <div><div class="ns"><div class="who"><strong>Julia</strong> &amp; Ezra<span class="calc">Individual 33 + Slaytopia 36</span></div><div class="n">69<small>/80</small></div></div>
+        <div class="ns"><div class="who"><strong>Amber</strong> &amp; Pasha<span class="calc">Individual 26 + Dance-Off 3</span></div><div class="n">29<small>/30</small></div></div>
+        <div class="ns"><div class="who"><strong>Harry</strong> &amp; Jenna<span class="calc">Individual 27 + Immunity 3</span></div><div class="n">30<small>/30</small></div></div></div>
+      </div>
+    </div>
+    <div class="col">
+      <p class="col-title">A · Name first</p>
+      <div class="frame">
+        <div><div class="ns"><div class="who"><strong>Julia</strong> &amp; Ezra<span class="calc">Individual 33 + Slaytopia 36</span></div><div class="n">69<small>/80</small></div></div>
+        <div class="ns"><div class="who"><strong>Amber</strong> &amp; Pasha<span class="calc">Individual 26 + Dance-Off 1 <span class="gold">+3</span></span></div><div class="n">29<small>/30</small></div></div>
+        <div class="ns"><div class="who"><strong>Harry</strong> &amp; Jenna<span class="calc">Individual 27 + Dance-Off Immunity <span class="gold">+3</span></span></div><div class="n">30<small>/30</small></div></div></div>
+      </div>
+    </div>
+    <div class="col">
+      <p class="col-title">B · Team-style</p>
+      <div class="frame">
+        <div><div class="ns"><div class="who"><strong>Julia</strong> &amp; Ezra<span class="calc">Individual 33 + Team Slaytopia 36</span></div><div class="n">69<small>/80</small></div></div>
+        <div class="ns"><div class="who"><strong>Amber</strong> &amp; Pasha<span class="calc">Individual 26 + Dance-Off 1 <span class="gold">+3</span></span></div><div class="n">29<small>/30</small></div></div>
+        <div class="ns"><div class="who"><strong>Harry</strong> &amp; Jenna<span class="calc">Individual 27 + Dance-Off Immunity <span class="gold">+3</span></span></div><div class="n">30<small>/30</small></div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+</body>
+</html>

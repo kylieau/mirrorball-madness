@@ -1,0 +1,92 @@
+/* Special dance names board: the app's own tokens (src/app/globals.css). */
+:root {
+  --background: #1e1420;
+  --foreground: #f2e8d8;
+  --card: #271a29;
+  --primary: #c9a24b;
+  --muted: #332338;
+  --muted-fg: #9c8296;
+  --accent: #e4c77a;
+  --border: rgba(201, 162, 75, 0.28);
+  --hair: rgba(242, 232, 216, 0.08);
+  --emerald-text: #9fcbac;
+  --danger-text: #e7aba8;
+  --desk: #150d18;
+  --heading: "Fraunces", Georgia, serif;
+  --sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--desk); color: var(--foreground); font: 14px/1.4 var(--sans); }
+strong { font-weight: 600; }
+.wrap { padding: 28px; max-width: 1640px; }
+h1 { font-family: var(--heading); font-size: 28px; margin: 0; }
+h2 { font-family: var(--heading); font-size: 20px; margin: 0 0 4px; color: var(--accent); }
+.lede { color: var(--muted-fg); max-width: 1000px; margin: 6px 0 0; }
+section { margin-top: 32px; }
+.note { color: var(--muted-fg); font-size: 12.5px; margin: 0 0 12px; max-width: 1000px; }
+.muted { color: var(--muted-fg); }
+.bug { color: var(--danger-text); }
+
+/* Naming table */
+table { border-collapse: separate; border-spacing: 0; width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-top: 1px solid var(--hair); font-size: 13px; }
+thead th { border-top: 0; background: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-fg); }
+thead th b { display: block; color: var(--foreground); font-size: 13px; text-transform: none; letter-spacing: 0; margin-top: 2px; }
+td.kind { color: var(--muted-fg); width: 15%; }
+td.kind b { color: var(--foreground); display: block; font-weight: 600; }
+.pair { display: flex; flex-direction: column; gap: 2px; }
+.pair .s::before { content: "Short "; color: var(--muted-fg); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.pair .f::before { content: "Full "; color: var(--muted-fg); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.cur span { display: block; }
+.cur i { font-style: normal; color: var(--muted-fg); font-size: 11px; }
+
+/* Columns of fragments */
+.cols { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.col { width: 360px; }
+.col-title { font-weight: 600; font-size: 13px; margin: 0 0 8px; }
+.col-title span { color: var(--muted-fg); font-weight: 400; }
+.frame { width: 360px; background: var(--background); padding: 12px 16px; border-radius: 16px; box-shadow: 0 0 0 1px var(--hair); display: flex; flex-direction: column; gap: 10px; }
+
+/* Results card (weekly-results-view) */
+.rcard { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border); background: var(--card); border-radius: 16px; padding: 12px 14px; }
+.rcard .l p { margin: 0; }
+.rcard .name { font-size: 14px; font-weight: 400; }
+.rcard .line { margin-top: 2px; font-size: 12px; color: var(--muted-fg); }
+.rcard .line.song { margin-top: 0; padding-left: 10px; }
+.rcard .r { flex-shrink: 0; text-align: right; font-size: 12px; color: var(--muted-fg); }
+.badge { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 700; }
+.safe { background: rgba(76, 122, 90, 0.2); color: var(--emerald-text); }
+.type { background: var(--muted); color: var(--muted-fg); font-weight: 600; }
+.rcard .tot { display: block; font-family: var(--heading); font-size: 16px; font-weight: 600; color: var(--foreground); margin-top: 4px; }
+.rcard .parts { display: block; font-size: 11px; white-space: nowrap; }
+.gold { color: var(--accent); }
+
+/* Couple picker menu (base-nova Select, open) */
+.trigger { height: 32px; border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; background: var(--card); }
+.menu { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.45); width: 328px; overflow: hidden; }
+.band { font-size: 11px; color: var(--muted-fg); padding: 6px 8px 4px; }
+.item { padding: 6px 8px; border-radius: 6px; font-size: 13px; }
+.item.on { background: var(--muted); }
+.clip { white-space: nowrap; }
+.item .row { display: flex; align-items: center; gap: 6px; }
+.item .sub { font-size: 12px; color: var(--muted-fg); }
+.trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Night Summary (Enter Results Leaderboard row) */
+.ns { display: flex; gap: 10px; align-items: flex-start; border-top: 1px solid var(--hair); padding: 8px 0; }
+.ns:first-child { border-top: 0; }
+.ns .who { flex: 1; min-width: 0; font-size: 13px; }
+.ns .calc { display: block; font-size: 11px; color: var(--muted-fg); margin-top: 1px; }
+.ns .n { flex-shrink: 0; text-align: right; font-family: var(--heading); font-weight: 600; font-size: 16px; }
+.ns .n small { font-family: var(--sans); font-weight: 400; font-size: 11px; color: var(--muted-fg); }
+
+/* SelectItem as built: no wrap, 32px kept on the right for the check mark,
+   and the popup hides what overflows sideways. */
+.item.real { padding-right: 32px; position: relative; overflow: hidden; }
+.item.real .row, .item.real .sub { white-space: nowrap; }
+.check { position: absolute; right: 10px; top: 8px; color: var(--foreground); font-size: 12px; }
+.item .top { display: flex; align-items: baseline; gap: 8px; }
+.item .top strong { flex: 1; min-width: 0; }
+.item .top .st { flex-shrink: 0; font-size: 12px; color: var(--muted-fg); }
+.item .sub2 { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-fg); min-width: 0; }
+.item .sub2 .badge { flex-shrink: 0; }
