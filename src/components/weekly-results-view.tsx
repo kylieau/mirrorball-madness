@@ -189,7 +189,11 @@ export function WeeklyResultsView({
           <p className="text-xs text-accent">Eliminated</p>
           <div className="mt-1 font-heading text-lg font-semibold">
             {eliminated.map((r) => (
-              <p key={r.couple_id}>{r.parts ? `${r.parts.celebrity} & ${r.parts.pro}` : "Unknown"}</p>
+              <p key={r.couple_id}>
+                <Link href={coupleHistoryHref(r.couple_id, historyFrom)} className="hover:text-accent">
+                  {r.parts ? `${r.parts.celebrity} & ${r.parts.pro}` : "Unknown"}
+                </Link>
+              </p>
             ))}
           </div>
         </div>
