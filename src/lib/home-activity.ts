@@ -4,6 +4,7 @@ import { IMMUNITY_DANCE_TYPE } from "./episode-rounds";
 import { specialDanceShortName } from "./special-dance-names";
 
 export type ActivityScore = {
+  coupleId: string;
   celebrity: string;
   // The dance style for a judged dance; the special dance's short name
   // ("Dance-Off 1", "Dance-Off Immunity") for a bonus round paid in points.
@@ -18,7 +19,7 @@ export type ActivityRankMove = { league: string; mover: string; passed: string[]
 
 export type ActivityWeek = {
   weekNumber: number;
-  eliminated: string[];
+  eliminated: { coupleId: string; name: string }[];
   scores: ActivityScore[];
   rankMoves?: ActivityRankMove[];
 };
@@ -45,6 +46,7 @@ export function activityScore(
   if (row.max_score != null && Number(row.max_score) === 0) {
     const label = row.team_id ? specialDanceLabels[row.team_id] : undefined;
     return {
+      coupleId: row.couple_id,
       celebrity,
       danceStyle: label ? specialDanceShortName(label) : "a bonus round",
       total,
@@ -53,10 +55,11 @@ export function activityScore(
       immunity: label?.danceType === IMMUNITY_DANCE_TYPE,
     };
   }
-  return { celebrity, danceStyle: row.dance_styles?.name ?? "Unknown dance", total, at: row.created_at };
+  return { coupleId: row.couple_id, celebrity, danceStyle: row.dance_styles?.name ?? "Unknown dance", total, at: row.created_at };
 }
 
-export type ActivitySegment = { text: string; kind?: "couple" | "manager" | "league" | "score" };
+// coupleId: a couple's name opens its history page.
+export type ActivitySegment = { text: string; kind?: "couple" | "manager" | "league" | "score"; coupleId?: string };
 export type ActivityLine = { key: string; segments: ActivitySegment[]; weekLabel: string | null };
 
 // Weeks arrive already limited to what the viewer may see. `westWeek` is the
@@ -80,8 +83,8 @@ export function buildRecentActivity({
     if (week.weekNumber === westWeek && week.eliminated.length > 0) {
       lines.push({ key: `w${week.weekNumber}-hidden`, segments: [{ text: `${weekLabel} results are in` }], weekLabel: null });
     } else {
-      week.eliminated.forEach((name, i) =>
-        lines.push({ key: `w${week.weekNumber}-elim-${i}`, segments: [{ text: name, kind: "couple" }, { text: " eliminated" }], weekLabel })
+      week.eliminated.forEach(({ coupleId, name }, i) =>
+        lines.push({ key: `w${week.weekNumber}-elim-${i}`, segments: [{ text: name, kind: "couple", coupleId }, { text: " eliminated" }], weekLabel })
       );
       (week.rankMoves ?? []).forEach((move, i) =>
         lines.push({ key: `w${week.weekNumber}-rank-${i}`, segments: rankMoveSegments(move), weekLabel })
@@ -96,13 +99,13 @@ export function buildRecentActivity({
           key: `w${week.weekNumber}-score-${i}`,
           segments: s.bonus
             ? [
-                { text: s.celebrity, kind: "couple" },
+                { text: s.celebrity, kind: "couple", coupleId: s.coupleId },
                 { text: " earned " },
                 { text: signedTotal(s.total), kind: "score" },
                 { text: `${s.immunity ? " with" : " in"} ${s.danceStyle}` },
               ]
             : [
-                { text: s.celebrity, kind: "couple" },
+                { text: s.celebrity, kind: "couple", coupleId: s.coupleId },
                 { text: " scored " },
                 { text: String(s.total), kind: "score" },
                 { text: ` on their ${s.danceStyle}` },

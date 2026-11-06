@@ -7,6 +7,7 @@ import { GuestSignInCard } from "@/components/guest-sign-in-card";
 import { LeagueTriageCard, type LeagueTriage } from "@/components/league-triage-card";
 import { ScrollFade } from "@/components/scroll-fade";
 import type { EpisodeBannerInput, EpisodeBannerState } from "@/lib/episode-banner";
+import { coupleHistoryHref } from "@/lib/couple-history-link";
 import type { ActivityLine } from "@/lib/home-activity";
 import { homeLeagueChrome } from "@/lib/league-triage";
 
@@ -72,19 +73,23 @@ export function HomeDashboard({
                   className="flex items-baseline justify-between gap-3 border-t border-border py-2.5 text-sm text-muted-foreground first:border-t-0"
                 >
                   <span>
-                    {line.segments.map((seg, i) => (
-                      <span
-                        key={i}
-                        className={cn(
-                          seg.kind === "couple" && "font-semibold text-accent/92",
-                          seg.kind === "manager" && "font-medium text-foreground",
-                          seg.kind === "league" && "italic text-foreground/70",
-                          seg.kind === "score" && "font-heading font-semibold text-foreground"
-                        )}
-                      >
-                        {seg.text}
-                      </span>
-                    ))}
+                    {line.segments.map((seg, i) => {
+                      const className = cn(
+                        seg.kind === "couple" && "font-semibold text-accent/92",
+                        seg.kind === "manager" && "font-medium text-foreground",
+                        seg.kind === "league" && "italic text-foreground/70",
+                        seg.kind === "score" && "font-heading font-semibold text-foreground"
+                      );
+                      return seg.coupleId ? (
+                        <Link key={i} href={coupleHistoryHref(seg.coupleId, "/")} className={cn(className, "hover:text-accent")}>
+                          {seg.text}
+                        </Link>
+                      ) : (
+                        <span key={i} className={className}>
+                          {seg.text}
+                        </span>
+                      );
+                    })}
                   </span>
                   {line.weekLabel && <span className="shrink-0 text-xs">{line.weekLabel}</span>}
                 </p>

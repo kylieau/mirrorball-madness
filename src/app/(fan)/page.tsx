@@ -112,7 +112,7 @@ export default async function Home() {
     for (const r of episodeResults ?? []) {
       const parts = displayNames.get(r.couple_id);
       const week = activityWeeks.get(weekNumberByEpisodeId.get(r.episode_id) ?? -1);
-      if (r.outcome === "eliminated" && parts && week) week.eliminated.push(formatCoupleName(parts));
+      if (r.outcome === "eliminated" && parts && week) week.eliminated.push({ coupleId: r.couple_id, name: formatCoupleName(parts) });
     }
     const liveDanceScores = excludeReleasedCoupleRows(danceScores, draftNight?.releasedCoupleIdsByEpisode ?? {});
     for (const d of liveDanceScores) {

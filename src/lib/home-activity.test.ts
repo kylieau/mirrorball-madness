@@ -14,12 +14,12 @@ describe("buildRecentActivity", () => {
   it("lists newest week first, eliminations before scores, scores newest first", () => {
     const lines = buildRecentActivity({
       weeks: [
-        week(1, { scores: [{ celebrity: "Sam", danceStyle: "Foxtrot", total: 20, at: "2026-09-16T00:09:00Z" }] }),
+        week(1, { scores: [{ coupleId: "Sam", celebrity: "Sam", danceStyle: "Foxtrot", total: 20, at: "2026-09-16T00:09:00Z" }] }),
         week(2, {
-          eliminated: ["Giada & Alan"],
+          eliminated: [{ coupleId: "Giada", name: "Giada & Alan" }],
           scores: [
-            { celebrity: "Ava", danceStyle: "Waltz", total: 24, at: "2026-09-23T00:30:00Z" },
-            { celebrity: "Ben", danceStyle: "Jive", total: 27, at: "2026-09-23T00:05:00Z" },
+            { coupleId: "Ava", celebrity: "Ava", danceStyle: "Waltz", total: 24, at: "2026-09-23T00:30:00Z" },
+            { coupleId: "Ben", celebrity: "Ben", danceStyle: "Jive", total: 27, at: "2026-09-23T00:05:00Z" },
           ],
         }),
       ],
@@ -33,11 +33,12 @@ describe("buildRecentActivity", () => {
       "Sam scored 20 on their Foxtrot",
     ]);
     expect(lines.map((l) => l.weekLabel)).toEqual(["Week 2", "Week 2", "Week 2", "Week 1"]);
+    expect(lines.map((l) => l.segments.find((seg) => seg.kind === "couple")?.coupleId)).toEqual(["Giada", "Ava", "Ben", "Sam"]);
   });
 
   it("puts non-week lines first", () => {
     const lines = buildRecentActivity({
-      weeks: [week(1, { eliminated: ["A & B"] })],
+      weeks: [week(1, { eliminated: [{ coupleId: "A", name: "A & B" }] })],
       westWeek: null,
       extraLines: [[{ text: "Pat", kind: "manager" }, { text: " joined " }, { text: "Friends", kind: "league" }]],
     });
@@ -49,11 +50,11 @@ describe("buildRecentActivity", () => {
     const lines = buildRecentActivity({
       weeks: [
         week(2, {
-          eliminated: ["A & B"],
-          scores: [{ celebrity: "Ava", danceStyle: "Waltz", total: 24, at: "2026-09-23T00:05:00Z" }],
+          eliminated: [{ coupleId: "A", name: "A & B" }],
+          scores: [{ coupleId: "Ava", celebrity: "Ava", danceStyle: "Waltz", total: 24, at: "2026-09-23T00:05:00Z" }],
           rankMoves: [{ league: "Alpha", mover: "Kim", passed: ["you"], place: 1 }],
         }),
-        week(1, { eliminated: ["C & D"] }),
+        week(1, { eliminated: [{ coupleId: "C", name: "C & D" }] }),
       ],
       westWeek: 2,
       extraLines: [],
@@ -65,7 +66,7 @@ describe("buildRecentActivity", () => {
     const lines = buildRecentActivity({
       weeks: [
         week(9, {
-          scores: [{ celebrity: "Amber", danceStyle: "Paso Doble", total: 27, at: "2026-11-11T01:20:00Z" }],
+          scores: [{ coupleId: "Amber", celebrity: "Amber", danceStyle: "Paso Doble", total: 27, at: "2026-11-11T01:20:00Z" }],
           rankMoves: [
             { league: "Alpha", mover: "You", passed: ["Kim"], place: 2 },
             { league: "Beta", mover: "Lee & Sam", passed: ["Pat", "Ro", "you"], place: 1 },
@@ -88,9 +89,9 @@ describe("buildRecentActivity", () => {
       weeks: [
         week(8, {
           scores: [
-            { celebrity: "Julia", danceStyle: "Dance-Off 1", total: 3, at: "2026-11-04T02:30:00Z", bonus: true },
-            { celebrity: "Harry", danceStyle: "Dance-Off 1", total: -1.5, at: "2026-11-04T02:30:00Z", bonus: true },
-            { celebrity: "Julia", danceStyle: "Freestyle", total: 36, at: "2026-11-04T02:00:00Z" },
+            { coupleId: "Julia", celebrity: "Julia", danceStyle: "Dance-Off 1", total: 3, at: "2026-11-04T02:30:00Z", bonus: true },
+            { coupleId: "Harry", celebrity: "Harry", danceStyle: "Dance-Off 1", total: -1.5, at: "2026-11-04T02:30:00Z", bonus: true },
+            { coupleId: "Julia", celebrity: "Julia", danceStyle: "Freestyle", total: 36, at: "2026-11-04T02:00:00Z" },
           ],
         }),
       ],
@@ -107,8 +108,8 @@ describe("buildRecentActivity bonus rounds", () => {
       weeks: [
         week(9, {
           scores: [
-            { celebrity: "Amber", danceStyle: "Dance-Off 1", total: 3, at: "2026-11-11T02:30:00Z", bonus: true },
-            { celebrity: "Ezra", danceStyle: "Dance-Off 1", total: 0, at: "2026-11-11T02:30:00Z", bonus: true },
+            { coupleId: "Amber", celebrity: "Amber", danceStyle: "Dance-Off 1", total: 3, at: "2026-11-11T02:30:00Z", bonus: true },
+            { coupleId: "Ezra", celebrity: "Ezra", danceStyle: "Dance-Off 1", total: 0, at: "2026-11-11T02:30:00Z", bonus: true },
           ],
         }),
       ],
@@ -123,9 +124,10 @@ describe("activityScore", () => {
   const row = { episode_id: "ep", couple_id: "c", total_score: 36, created_at: "2026-11-04T02:00:00Z", dance_styles: { name: "Freestyle" } };
 
   it("keeps a judged dance on its style and names a Points row by its special dance's short name", () => {
-    expect(activityScore(row, "Julia", {})).toEqual({ celebrity: "Julia", danceStyle: "Freestyle", total: 36, at: row.created_at });
+    expect(activityScore(row, "Julia", {})).toEqual({ coupleId: "c", celebrity: "Julia", danceStyle: "Freestyle", total: 36, at: row.created_at });
     expect(activityScore({ ...row, team_id: "t1", max_score: "40" }, "Julia", { t1: { name: "Slaytopia", danceType: "Team Dance" } })).toMatchObject({ danceStyle: "Freestyle" });
     expect(activityScore({ ...row, total_score: 3, team_id: "d1", max_score: 0 }, "Julia", { d1: { name: "Dance-Off 1", danceType: "Dance-Off" } })).toEqual({
+      coupleId: "c",
       celebrity: "Julia",
       danceStyle: "Dance-Off 1",
       total: 3,
