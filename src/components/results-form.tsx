@@ -43,6 +43,7 @@ import {
 } from "@/lib/episode-rounds";
 import { SpecialDanceEntry, blankSpecialDance, type SpecialDanceView, type SpecialScoreEdit } from "@/components/special-dance-entry";
 import type { TeamsMode } from "@/lib/episode-teams";
+import { westFeedStillAiring } from "@/lib/episode-banner";
 import {
   ADD_SPECIAL_VALUE,
   NEW_SPECIAL_ID,
@@ -467,6 +468,7 @@ export function ResultsForm({
 
 
   const [confirmNoElimination, setConfirmNoElimination] = useState(false);
+  const [confirmWestFeed, setConfirmWestFeed] = useState(false);
   const [teamBusy, setTeamBusy] = useState(false);
   const [draftSpecial, setDraftSpecial] = useState<SpecialDance | null>(null);
 
@@ -1031,6 +1033,14 @@ export function ResultsForm({
   }
 
   function handleFinishWeek() {
+    if (selectedEpisode && westFeedStillAiring(selectedEpisode.airs_at)) {
+      setConfirmWestFeed(true);
+      return;
+    }
+    finishWeekCheckingEliminations();
+  }
+
+  function finishWeekCheckingEliminations() {
     if (selectedWeek?.is_elimination_week && eliminatedCount < requiredEliminations) {
       setConfirmNoElimination(true);
       return;
@@ -2497,6 +2507,32 @@ export function ResultsForm({
               </AccordionItem>
             </Accordion>
           </Card>
+
+          <Dialog open={confirmWestFeed} onOpenChange={setConfirmWestFeed}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>West Coast Is Still Watching</DialogTitle>
+                <DialogDescription>
+                  The West Coast feed runs until 10pm PT. Finishing now shows who went home on Home, Results,
+                  Standings and Picks before it airs there. Posting couples&apos; scores is fine; finish the week
+                  once the feed ends.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirmWestFeed(false)}>
+                  Wait
+                </Button>
+                <Button
+                  onClick={() => {
+                    setConfirmWestFeed(false);
+                    finishWeekCheckingEliminations();
+                  }}
+                >
+                  Finish Week Now
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Dialog open={confirmNoElimination} onOpenChange={setConfirmNoElimination}>
             <DialogContent>

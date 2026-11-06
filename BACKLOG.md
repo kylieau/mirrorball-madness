@@ -34,8 +34,17 @@ Decisions for Kylie:
 - Mixed scales: raw dance totals beside "Average · of 30" and the Night
   line's converted score.
 - West feed: after East publish, a West viewer who chose Stay Updated sees
-  that week's outcomes on Results and the couple page (Home masks them).
-  Pre-existing on Results; fix both or neither.
+  that week's outcomes. Kylie (2026-11-06): guard, not mask. Finish Week now
+  asks first from the East curtain until 10pm PT (every S35 week so far was
+  finished after 10pm PT). Codex found the leak is not two pages but every
+  outcome surface: Home league cards (strikes, Next elim, rank/points),
+  Standings (totals, arrows, Score History, Couples Leaderboard fading),
+  Picks (Curtain Call recap, Grand Finale lists, rosters), Results gold
+  bracket lines, Recast/waivers, guests. A real mask would need separate
+  score/outcome eligibility and judges-only standings, plus a refresh at
+  10pm PT (`RevealAutoRefresh` stops at the window's end). Home's own mask
+  also lets a no-elimination week's overtakes through
+  (`week.eliminated.length > 0`).
 
 ## Long special-dance names — inventory 2026-11-05
 

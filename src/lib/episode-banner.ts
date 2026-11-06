@@ -124,6 +124,14 @@ export function liveAirPhase(weeks: BannerWeek[], now: Date = new Date()): LiveA
   return null;
 }
 
+// From the East curtain until the West feed ends (10pm PT). Finishing a week
+// in this span puts who went home on every fan page before the West Coast
+// has seen it, so Finish Week asks first.
+export function westFeedStillAiring(airsAtIso: string, now: Date = new Date()): boolean {
+  const airs = new Date(airsAtIso);
+  return now >= airs && now < pacificClockOnSameDay(airs, WEST_FEED_END_HOUR);
+}
+
 // Shapes a season's grouped weeks for the banner and live-air helpers.
 export function toBannerWeeks(
   weeks: {

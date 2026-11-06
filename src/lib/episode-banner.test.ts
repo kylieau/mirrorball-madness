@@ -5,6 +5,7 @@ import {
   liveRefreshWindows,
   nextBannerRefreshMs,
   seasonTrack,
+  westFeedStillAiring,
   type BannerEpisode,
   type BannerWeek,
   type EpisodeBannerInput,
@@ -273,6 +274,25 @@ describe("liveAirPhase", () => {
     const phase = liveAirPhase([live()], at(now));
     expect(phase?.kind ?? null).toBe(kind);
     if (phase) expect(phase.weekNumber).toBe(2);
+  });
+});
+
+describe("westFeedStillAiring", () => {
+  // AIRS is 5pm PT; the West feed ends 10pm PT = 05:00Z.
+  it.each([
+    ["2026-09-22T23:59:00Z", false],
+    ["2026-09-23T00:00:00Z", true],
+    ["2026-09-23T02:30:00Z", true],
+    ["2026-09-23T04:59:00Z", true],
+    ["2026-09-23T05:00:00Z", false],
+  ])("at %s is %s", (now, expected) => {
+    expect(westFeedStillAiring(AIRS, at(now))).toBe(expected);
+  });
+
+  it("follows Pacific standard time after the clocks change", () => {
+    // 8pm ET Monday Nov 2, 2026 = 01:00Z Nov 3; 10pm PST = 06:00Z.
+    expect(westFeedStillAiring("2026-11-03T01:00:00Z", at("2026-11-03T05:59:00Z"))).toBe(true);
+    expect(westFeedStillAiring("2026-11-03T01:00:00Z", at("2026-11-03T06:00:00Z"))).toBe(false);
   });
 });
 
