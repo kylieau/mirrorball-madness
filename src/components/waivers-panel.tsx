@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { CoupleNameParts } from "@/lib/couple-display";
-import { CoupleName, coupleNameNode } from "@/components/couple-name";
+import { CoupleNameLink, coupleNameNode } from "@/components/couple-name";
 import { RecastCatchUpCard } from "@/components/recast-catch-up-card";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -181,7 +181,7 @@ export function WaiversPanel({
         <CardContent className="flex flex-col gap-1">
           {availableCouples.map((c) => (
             <p key={c.id} className="text-sm">
-              <CoupleName {...coupleParts(c)} />
+              <CoupleNameLink coupleId={c.id} from={`/leagues/${leagueId}/waivers`} {...coupleParts(c)} />
             </p>
           ))}
         </CardContent>

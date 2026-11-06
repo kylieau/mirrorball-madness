@@ -735,6 +735,7 @@ export default async function LeaguePicksPage({
                 claimMethod={league.waiver_claim_method}
                 priorityRank={recastPriorityRank}
                 totalManagers={standings.length}
+                historyFrom={historyFrom}
               />
             )}
           </div>

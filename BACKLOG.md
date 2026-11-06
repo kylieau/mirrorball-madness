@@ -120,10 +120,13 @@ Next slices, in order:
 - League context: whose roster each week (`roster_slots` timeline, not just
   the current owner), the viewer's Curtain Call / Grand Finale picks of them,
   fantasy judges points on that roster (`judgePointsThroughWeek`).
-- More tap targets: Home Recent Activity couple names (carry couple ids
-  through `buildRecentActivity`), the triage card stack, League at a Glance,
-  Grand Finale lists, draft room / Recast (beside their existing controls),
-  the Results Eliminated banner.
+- More tap targets: done 2026-11-06 (Home Recent Activity, league cards,
+  League at a Glance, Grand Finale brackets, Recast, the Eliminated banner),
+  browser-checked except the Curtain Call glance list, the Grand Finale
+  lists and the Recast claim sheet on Picks (the scratch league has no
+  peers' picks, brackets or open slots). Left out: the draft room (a live,
+  timed draft is the wrong place to leave, and its couples are buttons) and
+  a Grand Finale peer's Next elim line (inside the row's button).
 - Released drafts for viewers who unlocked them (Results doesn't show them
   either today).
 - Not yet seen on a revealing night: the Posting Live week for a Stay

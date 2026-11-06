@@ -14,7 +14,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import type { CoupleNameParts } from "@/lib/couple-display";
-import { CoupleName } from "@/components/couple-name";
+import { CoupleNameLink } from "@/components/couple-name";
 import { RecastCatchUpCard } from "@/components/recast-catch-up-card";
 
 type OpenSlot = { slotNumber: number; formerCoupleName: string };
@@ -30,6 +30,7 @@ export function RecastNudgeCard({
   claimMethod,
   priorityRank,
   totalManagers,
+  historyFrom,
 }: {
   leagueId: string;
   openSlots: OpenSlot[];
@@ -40,6 +41,7 @@ export function RecastNudgeCard({
   claimMethod: string | null;
   priorityRank: number;
   totalManagers: number;
+  historyFrom: string;
 }) {
   const [claimedCoupleIds, setClaimedCoupleIds] = useState<Set<string>>(new Set());
   const [pendingCoupleId, setPendingCoupleId] = useState<string | null>(null);
@@ -107,7 +109,7 @@ export function RecastNudgeCard({
                 const claimed = claimedCoupleIds.has(c.id);
                 return (
                   <div key={c.id} className="flex items-center justify-between gap-3 text-sm">
-                    <CoupleName {...coupleParts(c)} />
+                    <CoupleNameLink coupleId={c.id} from={historyFrom} {...coupleParts(c)} />
                     <Button
                       size="sm"
                       variant={claimed ? "outline" : "default"}
