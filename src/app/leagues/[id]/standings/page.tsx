@@ -9,6 +9,7 @@ import { scoringModule } from "@/lib/scoring-modules";
 import { buildCouplesLeaderboard } from "@/lib/couples-leaderboard";
 import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
 import { roundPoints } from "@/lib/format-points";
+import { scoringSettingsFromRow } from "@/lib/scoring";
 
 export default async function LeagueStandingsPage({
   params,
@@ -171,18 +172,7 @@ export default async function LeagueStandingsPage({
   const couplesLeaderboard =
     showLeagueRosters && scoringSettings
       ? buildCouplesLeaderboard({
-          scoring: {
-            judgesScoreMultiplier: scoringSettings.judges_score_multiplier,
-            survivalPoints: scoringSettings.survival_points,
-            eliminationPredictionPoints: scoringSettings.elimination_prediction_points,
-            topScorerPredictionPoints: scoringSettings.top_scorer_prediction_points,
-            firstPlacePoints: scoringSettings.first_place_points,
-            secondPlacePoints: scoringSettings.second_place_points,
-            thirdPlacePoints: scoringSettings.third_place_points,
-            fourthPlacePoints: scoringSettings.fourth_place_points,
-            fifthPlacePoints: scoringSettings.fifth_place_points,
-            curtainCallNearMissEnabled: scoringSettings.curtain_call_near_miss_enabled !== false,
-          },
+          scoring: scoringSettingsFromRow(scoringSettings),
           anchorWeek: scoringSettings.judges_score_starts_week,
           categoryWeight: scoringSettings.judges_score_category_weight,
           weeks: replaceWeekDanceScores(await loadCoupleWeekResults(supabase, visibleDanceWeeks), draftNight && draftNight.dances.length > 0

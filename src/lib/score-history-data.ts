@@ -6,7 +6,7 @@ import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { excludeReleasedCoupleRows, unpostedDraftDances } from "@/lib/draft-scores";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { buildScoreHistory, weekResults, type HistoryWeekData, type ScoreHistoryLine } from "@/lib/score-history";
-import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
+import { scoringSettingsFromRow, type GrandFinaleMethod, type TierPayStyle } from "@/lib/scoring";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { isOwnMembership } from "@/lib/acting-manager";
 import { danceMaxScore, danceScoreColumns } from "@/lib/episode-teams";
@@ -166,18 +166,7 @@ export async function loadScoreHistory(
   const weekNumberById = new Map(completedAllowedWeeks.map((week) => [week.id, week.week_number]));
 
   const lines = buildScoreHistory({
-    scoring: {
-      judgesScoreMultiplier: settings.judges_score_multiplier,
-      survivalPoints: settings.survival_points,
-      eliminationPredictionPoints: settings.elimination_prediction_points,
-      topScorerPredictionPoints: settings.top_scorer_prediction_points,
-      firstPlacePoints: settings.first_place_points,
-      secondPlacePoints: settings.second_place_points,
-      thirdPlacePoints: settings.third_place_points,
-      fourthPlacePoints: settings.fourth_place_points,
-      fifthPlacePoints: settings.fifth_place_points,
-      curtainCallNearMissEnabled: settings.curtain_call_near_miss_enabled !== false,
-    },
+    scoring: scoringSettingsFromRow(settings),
     anchorWeek: settings.judges_score_starts_week,
     categoryWeights: {
       judges: settings.judges_score_category_weight,

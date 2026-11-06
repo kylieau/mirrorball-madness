@@ -2,6 +2,9 @@ import Link from "next/link";
 import { cn } from "cn";
 import type { CoupleHistoryPage } from "@/lib/couple-history-data";
 import type { CoupleHistoryDance, CoupleHistoryWeek } from "@/lib/couple-history";
+import type { CoupleLeagueRow } from "@/lib/couple-leagues";
+import { YouPill } from "@/components/you-pill";
+import { formatPoints } from "@/lib/format-points";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { fanOutcomeBadge, IN_JEOPARDY_BADGE, showInJeopardyBadge } from "@/lib/results-outcome";
 
@@ -96,6 +99,40 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: string
   );
 }
 
+function LeaguesCard({ rows }: { rows: CoupleLeagueRow[] }) {
+  return (
+    <section className="rounded-2xl border border-border bg-card px-3.5 py-3">
+      <h2 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">In Your Leagues</h2>
+      <div className="mt-1.5 flex flex-col gap-1.5">
+        {rows.map((row) => {
+          const yours = row.owner.kind === "you";
+          return (
+            <div key={row.leagueId} className="flex items-baseline justify-between gap-3 text-sm">
+              <span className={cn("min-w-0 break-words", !yours && "text-muted-foreground")}>
+                {row.leagueName} ·{" "}
+                {row.owner.kind === "you" ? "your roster" : row.owner.kind === "manager" ? `${row.owner.name}'s roster` : "Undrafted"}
+                {yours && (
+                  <>
+                    {" "}
+                    <YouPill />
+                  </>
+                )}
+              </span>
+              <span className={cn("shrink-0 font-heading font-semibold tabular-nums", !yours && "text-muted-foreground")}>
+                {formatPoints(row.judgesPoints)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Judges&apos; points while on that roster
+        {rows.some((row) => row.owner.kind === "undrafted") ? ", or what an undrafted couple would have earned since the Anchor Week." : "."}
+      </p>
+    </section>
+  );
+}
+
 export function CoupleHistoryView({ page }: { page: CoupleHistoryPage }) {
   const { history, unwatched } = page;
   const status = statusBadge(page.status, page.eliminationWeek);
@@ -163,6 +200,8 @@ export function CoupleHistoryView({ page }: { page: CoupleHistoryPage }) {
           />
         </div>
       )}
+
+      {page.leagues.length > 0 && <LeaguesCard rows={page.leagues} />}
 
       {history.weeks.map((week) => (
         <WeekCard key={week.weekNumber} week={week} />

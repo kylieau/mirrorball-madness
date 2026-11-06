@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { buildCoupleHistory, unwatchedRange, type CoupleHistory, type CoupleHistoryWeekInput } from "@/lib/couple-history";
+import { buildCoupleLeagueRows, type CoupleLeagueRow } from "@/lib/couple-leagues";
+import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
+import { formatManagerName } from "@/lib/manager-display";
+import { scoringSettingsFromRow } from "@/lib/scoring";
 import { danceMaxScore, danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { liveRefreshWindows, toBannerWeeks, type RefreshWindow } from "@/lib/episode-banner";
@@ -9,7 +13,7 @@ import { teamDanceEpisodeIds } from "@/lib/night-dance-lines";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
-import { loadActiveSeasonId, loadAllCouples, loadTeamsMode, loadViewerSeason } from "@/lib/viewer-season-data";
+import { loadActiveSeasonId, loadAllCouples, loadTeamsMode, loadViewerMemberships, loadViewerSeason } from "@/lib/viewer-season-data";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -26,6 +30,8 @@ export type CoupleHistoryPage = {
   // posting or an episode night is on, and name a posting week the viewer
   // hasn't opted into (Stay Updated lives on Results).
   live: { refresh: boolean; windows: RefreshWindow[]; postingWeek: number | null };
+  // Signed-in viewers' leagues with a finished draft (In Your Leagues).
+  leagues: CoupleLeagueRow[];
 };
 
 type DanceRow = {
@@ -39,6 +45,73 @@ type DanceRow = {
   team_id?: string | null;
   dance_styles: { name: string } | null;
 };
+
+// Each of the viewer's leagues whose Dance Card has drafted: who holds the
+// couple and its judges' points there, over the same weeks the page shows.
+// Standings also folds in released drafts on a draft night; this page never
+// shows drafts, so the two can differ until that week posts.
+async function loadCoupleLeagues(
+  supabase: SupabaseClient<Database>,
+  viewerId: string,
+  coupleId: string,
+  weeks: CoupleHistoryWeekInput[],
+  couples: { id: string; status: string; elimination_week: number | null }[]
+): Promise<CoupleLeagueRow[]> {
+  const memberships = await loadViewerMemberships(supabase, viewerId);
+  const leagueIds = memberships.flatMap((m) => (m.leagues ? [m.leagues.id] : []));
+  if (leagueIds.length === 0) return [];
+  const [{ data: leagues }, { data: settings }, { data: slots }, { data: members }, weekResults] = await Promise.all([
+    supabase.from("leagues").select("id, draft_status").in("id", leagueIds),
+    supabase
+      .from("scoring_settings")
+      .select(
+        "league_id, judges_score_category_enabled, judges_score_starts_week, judges_score_category_weight, judges_score_multiplier, survival_points, elimination_prediction_points, top_scorer_prediction_points, first_place_points, second_place_points, third_place_points, fourth_place_points, fifth_place_points, curtain_call_near_miss_enabled"
+      )
+      .in("league_id", leagueIds),
+    supabase.from("roster_slots").select("league_id, manager_id, couple_id, start_week, end_week").in("league_id", leagueIds),
+    supabase
+      .from("league_members")
+      .select("league_id, user_id, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)")
+      .in("league_id", leagueIds),
+    loadCoupleWeekResults(supabase, weeks.map((week) => ({ week_number: week.weekNumber, episodeIds: week.episodeIds }))),
+  ]);
+  const drafted = new Set((leagues ?? []).filter((l) => l.draft_status === "completed").map((l) => l.id));
+  const settingsByLeague = new Map((settings ?? []).map((s) => [s.league_id, s]));
+
+  return buildCoupleLeagueRows({
+    coupleId,
+    weeks: weekResults,
+    couples,
+    leagues: memberships.flatMap((m) => {
+      const setting = m.leagues ? settingsByLeague.get(m.leagues.id) : undefined;
+      if (!m.leagues || !setting || !drafted.has(m.leagues.id) || setting.judges_score_category_enabled === false) return [];
+      const leagueId = m.leagues.id;
+      return [
+        {
+          id: leagueId,
+          name: m.leagues.name,
+          myTeamId: m.user_id,
+          managerNames: new Map(
+            (members ?? [])
+              .filter((member) => member.league_id === leagueId)
+              .map((member) => [
+                member.user_id,
+                formatManagerName({ displayName: member.profiles?.display_name ?? "Unknown", coManagerDisplayName: member.co_manager?.display_name }),
+              ])
+          ),
+          scoring: scoringSettingsFromRow(setting),
+          anchorWeek: setting.judges_score_starts_week,
+          categoryWeight: setting.judges_score_category_weight,
+          slots: (slots ?? []).flatMap((slot) =>
+            slot.league_id === leagueId && slot.couple_id
+              ? [{ managerId: slot.manager_id, coupleId: slot.couple_id, startWeek: slot.start_week, endWeek: slot.end_week }]
+              : []
+          ),
+        },
+      ];
+    }),
+  });
+}
 
 // "Carrie Ann Inaba" → "Carrie Ann", so a four-judge night fits one line.
 function judgeShortName(name: string): string {
@@ -100,6 +173,21 @@ export async function loadCoupleHistory(
 
   const episodeIds = weeks.flatMap((week) => week.episodeIds);
   const resultEpisodeIds = weeks.filter((week) => week.mode === "results").flatMap((week) => week.episodeIds);
+  const leaguesPending = viewer
+    ? loadCoupleLeagues(
+        supabase,
+        viewer.id,
+        coupleId,
+        weeks,
+        couples
+          .filter((c) => c.season_id === seasonId)
+          .map((c) => ({
+            id: c.id,
+            elimination_week: c.elimination_week,
+            status: spoilerSafeCoupleStatus({ status: c.status, eliminationWeek: c.elimination_week }, cutoffWeek, finaleWeekNumber),
+          }))
+      )
+    : Promise.resolve([]);
   const teamsMode = episodeIds.length > 0 ? await loadTeamsMode(supabase) : "none";
   const [{ data: danceRows }, { data: episodeRows }, { data: outcomes }, { data: jeopardyRows }, { data: roundTypeRows }, labels] = await Promise.all([
     episodeIds.length > 0
@@ -174,5 +262,6 @@ export async function loadCoupleHistory(
     history,
     unwatched,
     live,
+    leagues: await leaguesPending,
   };
 }

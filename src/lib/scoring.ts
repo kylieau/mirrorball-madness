@@ -17,6 +17,33 @@ export type ScoringSettings = {
   curtainCallNearMissEnabled: boolean;
 };
 
+// A league's stored scoring_settings row as the engine reads it.
+export function scoringSettingsFromRow(row: {
+  judges_score_multiplier: number;
+  survival_points: number;
+  elimination_prediction_points: number;
+  top_scorer_prediction_points: number;
+  first_place_points: number;
+  second_place_points: number;
+  third_place_points: number;
+  fourth_place_points: number;
+  fifth_place_points: number;
+  curtain_call_near_miss_enabled: boolean | null;
+}): ScoringSettings {
+  return {
+    judgesScoreMultiplier: row.judges_score_multiplier,
+    survivalPoints: row.survival_points,
+    eliminationPredictionPoints: row.elimination_prediction_points,
+    topScorerPredictionPoints: row.top_scorer_prediction_points,
+    firstPlacePoints: row.first_place_points,
+    secondPlacePoints: row.second_place_points,
+    thirdPlacePoints: row.third_place_points,
+    fourthPlacePoints: row.fourth_place_points,
+    fifthPlacePoints: row.fifth_place_points,
+    curtainCallNearMissEnabled: row.curtain_call_near_miss_enabled !== false,
+  };
+}
+
 export type RosterSlot = { managerId: string; coupleId: string };
 
 // One dance. totalScore is the raw judges' sum fans see (Curtain Call's top

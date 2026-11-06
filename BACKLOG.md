@@ -117,9 +117,16 @@ watched through Week 6 (Julia & Ezra read Still Dancing, Weeks 7–8 held
 back) and as a guest (published weeks, no judge marks).
 
 Next slices, in order:
-- League context: whose roster each week (`roster_slots` timeline, not just
-  the current owner), the viewer's Curtain Call / Grand Finale picks of them,
-  fantasy judges points on that roster (`judgePointsThroughWeek`).
+- League context: In Your Leagues card done 2026-11-06 (holder + judges'
+  points per league, matching the Couples Leaderboard; browser-checked
+  caught up, Spoiler-Free at Week 6 and as a co-manager). Still to do: whose
+  roster each week (the `roster_slots` timeline), the viewer's Curtain Call
+  / Grand Finale picks of them.
+- Holder spoiler (shared with Standings' Couples Leaderboard): the holder is
+  the current (else latest) slot whatever the viewer has watched, so a
+  Recast pickup after a Spoiler-Free viewer's cutoff names the new holder,
+  hinting that someone's couple went home. Fix both together (clamp to the
+  slot active at the cutoff), never one.
 - More tap targets: done 2026-11-06 (Home Recent Activity, league cards,
   League at a Glance, Grand Finale brackets, Recast, the Eliminated banner),
   browser-checked except the Curtain Call glance list, the Grand Finale
