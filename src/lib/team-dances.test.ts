@@ -3,6 +3,7 @@ import {
   automaticSpecialDanceName,
   oxfordJoin,
   buildNightSummary,
+  nightPartScore,
   eligibleTeamMembers,
   isHalfStep,
   isValidPoints,
@@ -331,5 +332,14 @@ describe("eligibleTeamMembers", () => {
       { coupleId: "d", reason: "eliminated" },
       { coupleId: "f", reason: "not_performing" },
     ]);
+  });
+});
+
+describe("nightPartScore", () => {
+  it("signs every bonus, a loser's 0 and a negative included, and leaves marks plain", () => {
+    expect(nightPartScore({ total: 36, bonus: false })).toBe("36");
+    expect(nightPartScore({ total: 3, bonus: true })).toBe("+3");
+    expect(nightPartScore({ total: 0, bonus: true })).toBe("+0");
+    expect(nightPartScore({ total: -1.5, bonus: true })).toBe("−1.5");
   });
 });

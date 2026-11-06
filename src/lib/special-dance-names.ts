@@ -23,3 +23,11 @@ export function specialDanceTypeBadge(dance: Named): string | null {
   const type = dance.danceType.trim();
   return type && specialDanceFullName(dance) !== specialDanceShortName(dance) ? type : null;
 }
+
+// The couple page's form (Kylie, 2026-11-06): the Dance Type as the cue,
+// with the name beside it when the name doesn't already say the type —
+// Team Dance (Slaytopia), Trio (Villains), but Dance-Off 1.
+export function specialDanceTypeAndName(dance: Named): { type: string; name: string | null } {
+  const badge = specialDanceTypeBadge(dance);
+  return badge ? { type: badge, name: specialDanceShortName(dance) } : { type: specialDanceShortName(dance), name: null };
+}

@@ -100,11 +100,28 @@ describe("buildCoupleHistory", () => {
     const [night] = history.weeks[0].nights;
     const [expected] = collapseToNights(rows);
     expect(night.combined).toEqual({ total: 67, max: expected.maxScore, scaled: expected.scaledScore });
-    expect(night.dances.map((d) => [d.label, d.bonus])).toEqual([
-      ["Jive", false],
-      ["Slaytopia", false],
-      ["Dance-Off 1", true],
+    expect(night.dances.map((d) => [d.label, d.detail, d.bonus])).toEqual([
+      ["Jive", null, false],
+      ["Team Dance", "Slaytopia", false],
+      ["Dance-Off 1", null, true],
     ]);
+    expect(history.danceCount).toBe(3);
+  });
+
+  it("counts a dance-off heat as a dance but not an immunity bonus", () => {
+    const history = buildCoupleHistory({
+      ...base,
+      weeks: [{ weekNumber: 9, theme: null, episodeIds: ["e9"], mode: "results" }],
+      dances: [
+        dance({ id: "own", episodeId: "e9", style: "Rumba", totalScore: 26, scaledScore: 26 }),
+        dance({ id: "heat", episodeId: "e9", totalScore: 3, scaledScore: 3, maxScore: 0, teamId: "h1" }),
+        dance({ id: "imm", episodeId: "e9", totalScore: 3, scaledScore: 3, maxScore: 0, teamId: "i1" }),
+      ],
+      labels: new Map([
+        ["h1", { name: "Dance-Off 1", danceType: "Dance-Off", scoringMode: "points" as const }],
+        ["i1", { name: "Dance-Off Immunity", danceType: "Immunity", scoringMode: "points" as const }],
+      ]),
+    });
     expect(history.danceCount).toBe(2);
   });
 

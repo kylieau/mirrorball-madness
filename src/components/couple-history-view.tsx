@@ -27,7 +27,10 @@ function DanceRow({ dance }: { dance: CoupleHistoryDance }) {
   return (
     <div className="flex gap-3 border-t border-border/40 px-3 py-2">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">{dance.label}</p>
+        <p className="text-sm font-semibold">
+          {dance.label}
+          {dance.detail && <span className="font-normal text-muted-foreground"> ({dance.detail})</span>}
+        </p>
         {dance.song && <p className="text-xs text-muted-foreground">{dance.song}</p>}
         {dance.marks.length > 0 && (
           <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -132,6 +135,17 @@ export function CoupleHistoryView({ page }: { page: CoupleHistoryPage }) {
             to see them here.
           </p>
         </div>
+      )}
+
+      {page.live.postingWeek !== null && (
+        <p className="rounded-2xl border border-dashed border-primary/50 px-3.5 py-3 text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">{formatEpisodeCasual(page.live.postingWeek)}</span> is posting live. Choose
+          Stay Updated on{" "}
+          <Link href="/this-week" className="font-semibold text-accent underline-offset-2 hover:underline">
+            Results
+          </Link>{" "}
+          to follow it here.
+        </p>
       )}
 
       {history.average !== null && history.best && (

@@ -309,6 +309,14 @@ export type NightSummaryRow = {
   tag: "top" | "within1" | "within2" | null;
 };
 
+// A part of a Night Summary as it reads after its name: marks plain ("36"),
+// a bonus always signed ("+3", "+0", "−1.5") so a heat's number and a
+// loser's 0 can't run together ("Dance-Off 1 +0", never "Dance-Off 1 0").
+export function nightPartScore(part: { total: number; bonus: boolean }): string {
+  if (!part.bonus) return String(part.total);
+  return part.total < 0 ? `−${-part.total}` : `+${part.total}`;
+}
+
 // One dance as the engine sees it: marks on their own scale, or points as a
 // 0-max row. Shared with the per-couple night preview on Enter Results.
 export function nightSummaryDanceScore(episodeId: string, coupleId: string, dance: NightSummaryDance) {

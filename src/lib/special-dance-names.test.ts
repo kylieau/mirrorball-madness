@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { specialDanceFullName, specialDanceShortName, specialDanceTypeBadge } from "./special-dance-names";
+import { specialDanceFullName, specialDanceShortName, specialDanceTypeAndName, specialDanceTypeBadge } from "./special-dance-names";
 
 const cases = [
   { dance: { name: "Slaytopia", danceType: "Team Dance" }, short: "Slaytopia", full: "Team Dance · Slaytopia", badge: "Team Dance" },
@@ -16,5 +16,13 @@ describe("special dance names", () => {
     expect(specialDanceShortName(dance)).toBe(short);
     expect(specialDanceFullName(dance)).toBe(full);
     expect(specialDanceTypeBadge(dance)).toBe(badge);
+  });
+});
+
+describe("specialDanceTypeAndName", () => {
+  it("leads with the type and adds the name only when the name doesn't say it", () => {
+    expect(specialDanceTypeAndName({ name: "Slaytopia", danceType: "Team Dance" })).toEqual({ type: "Team Dance", name: "Slaytopia" });
+    expect(specialDanceTypeAndName({ name: "Dance-Off 1", danceType: "Dance-Off" })).toEqual({ type: "Dance-Off 1", name: null });
+    expect(specialDanceTypeAndName({ name: "Dance-Off Immunity", danceType: "Immunity" })).toEqual({ type: "Dance-Off Immunity", name: null });
   });
 });

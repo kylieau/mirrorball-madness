@@ -87,7 +87,9 @@ export function buildRecentActivity({
         lines.push({ key: `w${week.weekNumber}-rank-${i}`, segments: rankMoveSegments(move), weekLabel })
       );
     }
-    [...week.scores]
+    // A dance-off loser's 0 earned nothing, so it gets no line (Results leaves
+    // it out too).
+    [...week.scores.filter((score) => !(score.bonus && score.total === 0))]
       .sort((a, b) => b.at.localeCompare(a.at) || b.total - a.total || a.celebrity.localeCompare(b.celebrity))
       .forEach((s, i) =>
         lines.push({

@@ -60,7 +60,9 @@ export function FanBottomNav({
   active,
   leagueId,
 }: {
-  active: FanTab;
+  // Omitted on a page under a tab (a couple's history), so every tab, the one
+  // it was opened from included, stays a link back.
+  active?: FanTab;
   // Null for guests and viewers with no league: Picks and Standings then go
   // to /picks and /standings, which prompt sign-in or forward to a league.
   leagueId: string | null;

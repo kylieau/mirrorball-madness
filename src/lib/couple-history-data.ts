@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import { buildCoupleHistory, unwatchedRange, type CoupleHistory, type CoupleHistoryWeekInput } from "@/lib/couple-history";
 import { danceMaxScore, danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
+import { liveRefreshWindows, toBannerWeeks, type RefreshWindow } from "@/lib/episode-banner";
 import { loadGuestSeason } from "@/lib/guest-season-data";
 import { teamDanceEpisodeIds } from "@/lib/night-dance-lines";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
@@ -21,6 +22,10 @@ export type CoupleHistoryPage = {
   history: CoupleHistory;
   // Completed weeks a Spoiler-Free viewer hasn't marked watched.
   unwatched: { from: number; to: number } | null;
+  // A night's live state, as Results has it: refresh while the shown week is
+  // posting or an episode night is on, and name a posting week the viewer
+  // hasn't opted into (Stay Updated lives on Results).
+  live: { refresh: boolean; windows: RefreshWindow[]; postingWeek: number | null };
 };
 
 type DanceRow = {
@@ -62,6 +67,7 @@ export async function loadCoupleHistory(
   let cutoffWeek: number | null;
   let unwatched: { from: number; to: number } | null = null;
   let finaleWeekNumber: number | null;
+  let live: CoupleHistoryPage["live"] = { refresh: false, windows: [], postingWeek: null };
 
   if (viewer) {
     const season = await loadViewerSeason(supabase, viewer.id);
@@ -78,6 +84,11 @@ export async function loadCoupleHistory(
     cutoffWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;
     if (cutoff.pendingRevealEpisode) unwatched = unwatchedRange(cutoff.lastWatchedWeek ?? 0, completedWeeks[0]?.week_number ?? null);
     finaleWeekNumber = groupedWeeks.find((week) => week.is_finale)?.week_number ?? null;
+    live = {
+      refresh: !!revealing && visible,
+      windows: liveRefreshWindows(toBannerWeeks(groupedWeeks)),
+      postingWeek: revealing && !visible ? revealing.week.week_number : null,
+    };
   } else {
     const { groupedWeeks, completedWeeks } = await loadGuestSeason(supabase);
     for (const week of completedWeeks) {
@@ -162,5 +173,6 @@ export async function loadCoupleHistory(
     eliminationWeek: status === couple.status ? couple.elimination_week : null,
     history,
     unwatched,
+    live,
   };
 }

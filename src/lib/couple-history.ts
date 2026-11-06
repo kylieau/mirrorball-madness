@@ -1,6 +1,8 @@
 import { collapseToNights, judgeCountForDance, MARK_MAX, type DanceScore } from "./scoring";
 import { mergeCoupleOutcomes } from "./competition-week";
 import { isTeamDance, nightDanceLabel, type NightDance, type SpecialDanceLabelInput } from "./night-dance-lines";
+import { IMMUNITY_DANCE_TYPE } from "./episode-rounds";
+import { specialDanceTypeAndName } from "./special-dance-names";
 
 // A week the viewer may see. "scores" is a week still being revealed: its
 // posted dances show, its outcome does not.
@@ -16,6 +18,8 @@ export type CoupleHistoryDanceRow = NightDance & { id: string; scaledScore: numb
 export type CoupleHistoryDance = {
   id: string;
   label: string;
+  // A special dance's name beside its type: "Team Dance" (Slaytopia).
+  detail: string | null;
   song: string | null;
   total: number;
   // A bonus round paid in points (max_score 0), shown signed.
@@ -26,6 +30,8 @@ export type CoupleHistoryDance = {
   // The couple's own dance, not a special dance (or a pre-entity Team Dance
   // Freestyle) whose marks they share.
   own: boolean;
+  // An immunity bonus: points the couple got without dancing.
+  immunity: boolean;
   marks: { judge: string; score: number }[];
 };
 
@@ -98,16 +104,22 @@ export function buildCoupleHistory(input: {
       return [
         {
           episodeId,
-          dances: rows.map((row) => ({
-            id: row.id,
-            possible: row.maxScore === 0 ? null : (row.maxScore ?? (judgeCountForDance(row) ?? 0) * MARK_MAX) || null,
-            own: !row.teamId && !isTeamDance(row.style, input.teamDanceEpisodes.has(episodeId)),
-            label: nightDanceLabel(row, input.teamDanceEpisodes, input.labels),
-            song: row.song?.trim() || null,
-            total: row.totalScore,
-            bonus: row.maxScore === 0 && !!row.teamId,
-            marks: [...(marksByDance.get(row.id) ?? [])].sort((a, b) => a.judge.localeCompare(b.judge)),
-          })),
+          dances: rows.map((row) => {
+            const special = row.teamId ? input.labels.get(row.teamId) : undefined;
+            const named = special ? specialDanceTypeAndName(special) : null;
+            return {
+              id: row.id,
+              possible: row.maxScore === 0 ? null : (row.maxScore ?? (judgeCountForDance(row) ?? 0) * MARK_MAX) || null,
+              own: !row.teamId && !isTeamDance(row.style, input.teamDanceEpisodes.has(episodeId)),
+              immunity: special?.danceType.trim() === IMMUNITY_DANCE_TYPE,
+              label: named?.type ?? nightDanceLabel(row, input.teamDanceEpisodes, input.labels),
+              detail: named?.name ?? null,
+              song: row.song?.trim() || null,
+              total: row.totalScore,
+              bonus: row.maxScore === 0 && !!row.teamId,
+              marks: [...(marksByDance.get(row.id) ?? [])].sort((a, b) => a.judge.localeCompare(b.judge)),
+            };
+          }),
           combined: rows.length > 1 ? { total: night.totalScore, max: night.maxScore, scaled: night.scaledScore } : null,
           scaled: night.scaledScore,
         },
@@ -138,7 +150,8 @@ export function buildCoupleHistory(input: {
   }
   return {
     weeks,
-    danceCount: weeks.reduce((sum, week) => sum + week.nights.reduce((n, night) => n + night.dances.filter((d) => !d.bonus).length, 0), 0),
+    // Dance-off heats were danced, so they count; an immunity bonus wasn't.
+    danceCount: weeks.reduce((sum, week) => sum + week.nights.reduce((n, night) => n + night.dances.filter((d) => !d.immunity).length, 0), 0),
     average: nights.length > 0 ? nights.reduce((sum, night) => sum + night.scaled, 0) / nights.length : null,
     best,
     jeopardyWeeks: weeks.filter((week) => week.inJeopardy).map((week) => week.weekNumber).sort((a, b) => a - b),

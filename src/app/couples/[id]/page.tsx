@@ -4,6 +4,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { CoupleHistoryView } from "@/components/couple-history-view";
+import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 import { StickyTopBar } from "@/components/top-bar";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { loadCoupleHistory } from "@/lib/couple-history-data";
@@ -42,7 +43,10 @@ export default async function CouplePage({
         </Link>
         <CoupleHistoryView page={page} />
       </div>
-      <FanBottomNav active={back.tab} leagueId={memberships[0]?.leagues?.id ?? null} />
+      <RevealAutoRefresh active={page.live.refresh} windows={page.live.windows} />
+      <FanBottomNav
+        leagueId={memberships.find((m) => m.leagues?.id === back.leagueId)?.leagues?.id ?? memberships[0]?.leagues?.id ?? null}
+      />
     </div>
   );
 }

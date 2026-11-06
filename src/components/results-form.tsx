@@ -58,6 +58,7 @@ import {
   recentSuggestions,
   specialDanceComplete,
   teamMarksTotal,
+  nightPartScore,
   type NightSummaryDance,
   type SpecialDance,
   type SpecialDanceScore,
@@ -133,16 +134,12 @@ function specialPickerLabel({ name, badge, members, posted }: { name: string; ba
 function specialPickerTrigger({ name, members }: { name: string; members: string }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
-      <strong className="shrink-0">{name}</strong>
-      {members && <span className="truncate text-muted-foreground">· {members}</span>}
+      <strong className="min-w-0 truncate">{name}</strong>
+      {members && <span className="min-w-0 shrink-[4] truncate text-muted-foreground">· {members}</span>}
     </span>
   );
 }
 
-// A bonus part reads signed ("Dance-Off 1 +3") so it can't pass for marks.
-function nightPartScore(part: { total: number; bonus: boolean }): string {
-  return part.bonus && part.total > 0 ? `+${part.total}` : String(part.total);
-}
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type CoupleWithStatus = Couple & {

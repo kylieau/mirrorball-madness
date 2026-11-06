@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ScrollFade } from "@/components/scroll-fade";
+import { ScrollToHash } from "@/components/scroll-to-hash";
 import { cn } from "cn";
 import { YouPill } from "@/components/you-pill";
 import { formatPoints } from "@/lib/format-points";
@@ -21,7 +22,8 @@ const COLUMNS = "grid grid-cols-[1.25rem_minmax(0,1fr)_3.25rem_3.25rem_4rem] ite
 
 export function CouplesLeaderboard({ rows, historyFrom }: { rows: CoupleLeaderboardRow[]; historyFrom: string }) {
   return (
-    <section id="couples" className="mt-4 scroll-mt-4">
+    <section id="couples" className="mt-4 scroll-mt-20">
+      <ScrollToHash id="couples" />
       <h2 className="font-heading text-lg font-semibold text-accent">Couples Leaderboard</h2>
 
       <ScrollFade

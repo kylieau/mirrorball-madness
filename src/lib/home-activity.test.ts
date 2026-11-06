@@ -101,6 +101,24 @@ describe("buildRecentActivity", () => {
   });
 });
 
+describe("buildRecentActivity bonus rounds", () => {
+  it("gives a dance-off loser's 0 no line", () => {
+    const lines = buildRecentActivity({
+      weeks: [
+        week(9, {
+          scores: [
+            { celebrity: "Amber", danceStyle: "Dance-Off 1", total: 3, at: "2026-11-11T02:30:00Z", bonus: true },
+            { celebrity: "Ezra", danceStyle: "Dance-Off 1", total: 0, at: "2026-11-11T02:30:00Z", bonus: true },
+          ],
+        }),
+      ],
+      westWeek: null,
+      extraLines: [],
+    });
+    expect(lines.map(plain)).toEqual(["Amber earned +3 in Dance-Off 1"]);
+  });
+});
+
 describe("activityScore", () => {
   const row = { episode_id: "ep", couple_id: "c", total_score: 36, created_at: "2026-11-04T02:00:00Z", dance_styles: { name: "Freestyle" } };
 

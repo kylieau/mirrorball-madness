@@ -4,7 +4,10 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Adversarial review of 2026-11-05/06 work (advisor + Codex)
 
-Verified against the code. Bugs (fix before E10, 2026-11-10, with Kylie's yes):
+Verified against the code. All six bugs fixed 2026-11-06 (Kylie: no tap
+cue; couple page names a special dance as type + name; dance count includes
+heats). The live-night refresh and the posting line are not yet seen on a
+real night. Bugs as found:
 - Night Summary reads a dance-off loser's 0 as "Dance-Off 1 0" (looks like
   "Dance-Off 10"): `nightPartScore` signs only positives. Sign every bonus,
   0 and U+2212 included; move it beside `buildNightSummary` with a test.

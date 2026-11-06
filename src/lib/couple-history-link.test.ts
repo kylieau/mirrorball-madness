@@ -3,14 +3,14 @@ import { coupleHistoryHref, coupleHistoryReturn } from "./couple-history-link";
 
 describe("coupleHistoryReturn", () => {
   it("goes back to the tab it was opened from, query included", () => {
-    expect(coupleHistoryReturn("/this-week?week=w8")).toEqual({ href: "/this-week?week=w8", label: "Results", tab: "results" });
-    expect(coupleHistoryReturn("/leagues/abc/standings")).toEqual({ href: "/leagues/abc/standings", label: "Standings", tab: "standings" });
-    expect(coupleHistoryReturn("/leagues/abc/picks?week=3")).toMatchObject({ label: "Picks", tab: "picks" });
+    expect(coupleHistoryReturn("/this-week?week=w8")).toEqual({ href: "/this-week?week=w8", label: "Results", leagueId: null });
+    expect(coupleHistoryReturn("/leagues/abc/standings#couples")).toEqual({ href: "/leagues/abc/standings#couples", label: "Standings", leagueId: "abc" });
+    expect(coupleHistoryReturn("/leagues/abc/picks?week=3")).toMatchObject({ label: "Picks", leagueId: "abc" });
   });
 
   it("falls back to Results for anything that isn't a known in-app page", () => {
     for (const from of [undefined, "", "https://evil.example", "//evil.example", "/\\evil.example", "/admin/results", ["/this-week", "/"]]) {
-      expect(coupleHistoryReturn(from)).toEqual({ href: "/this-week", label: "Results", tab: "results" });
+      expect(coupleHistoryReturn(from)).toEqual({ href: "/this-week", label: "Results", leagueId: null });
     }
   });
 
