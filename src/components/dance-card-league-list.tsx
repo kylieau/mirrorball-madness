@@ -40,13 +40,13 @@ export function DanceCardLeagueList({
       <Accordion multiple value={expanded} onValueChange={setExpanded}>
         {entries.map((e) => (
           <AccordionItem key={e.managerId} value={e.managerId}>
-            <AccordionTrigger>
-              <span className="flex flex-1 items-center gap-2">
+            <AccordionTrigger className="min-w-0">
+              <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold">
                   {e.displayName.charAt(0).toUpperCase()}
                 </span>
-                <span>{e.displayName}</span>
-                <span className="ml-auto pr-2 text-xs font-normal text-muted-foreground">
+                <span className="min-w-0 break-words">{e.displayName}</span>
+                <span className="ml-auto shrink-0 pr-2 text-xs font-normal text-muted-foreground">
                   <span className="font-heading font-semibold">{formatSignedPoints(e.weekPoints)}</span> pts
                 </span>
               </span>

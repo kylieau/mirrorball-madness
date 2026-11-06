@@ -50,12 +50,12 @@ export function GrandFinaleLeagueList({
       <Accordion multiple value={expanded} onValueChange={setExpanded}>
         {managers.map((m) => (
           <AccordionItem key={m.managerId} value={m.managerId}>
-            <AccordionTrigger>
-              <span className="flex items-center gap-2">
+            <AccordionTrigger className="min-w-0">
+              <span className="flex min-w-0 items-center gap-2">
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold">
                   {m.displayName.charAt(0).toUpperCase()}
                 </span>
-                <span>
+                <span className="min-w-0 break-words">
                   {m.displayName}
                   <span className="block text-xs font-normal text-muted-foreground">
                     Next elim: {nameFor(nextPredictedElimination(m.order, couples))}
