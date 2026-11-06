@@ -2,6 +2,38 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Adversarial review of 2026-11-05/06 work (advisor + Codex)
+
+Verified against the code. Bugs (fix before E10, 2026-11-10, with Kylie's yes):
+- Night Summary reads a dance-off loser's 0 as "Dance-Off 1 0" (looks like
+  "Dance-Off 10"): `nightPartScore` signs only positives. Sign every bonus,
+  0 and U+2212 included; move it beside `buildNightSummary` with a test.
+- Home says "Ezra earned +0 in Dance-Off 1" for every dance-off loser: no
+  zero filter in `buildRecentActivity`. Drop zero bonus lines, as Results does.
+- On the couple page the bottom tab it was opened from is a dead span
+  (`FanTabItem` renders the active tab unlinked), so tapping Results does
+  nothing; the other tabs use the first league, not the one it came from.
+- A long special-dance name in a closed picker can't shrink (name
+  `shrink-0`) and pushes past the chevron.
+- Opening a couple from Your Fantasy Roster drops `rosterWeek` / `week` from
+  the back link; Standings returns to the top, not the Couples Leaderboard.
+- The couple page never refreshes on a live night (no `RevealAutoRefresh`),
+  so "Posting Live" freezes; a viewer who hasn't opted in sees no line saying
+  the week is posting.
+
+Decisions for Kylie:
+- No visible cue that Results cards, leaderboard rows and roster cards open
+  a couple (no chevron; hover only on desktop).
+- The couple page uses short names ("Slaytopia"), where the approved mock
+  had "Team Dance · Slaytopia"; it has room for the full name.
+- Dance count leaves out dance-off heats (they're points rows); immunity
+  should stay out, heats arguably count.
+- Mixed scales: raw dance totals beside "Average · of 30" and the Night
+  line's converted score.
+- West feed: after East publish, a West viewer who chose Stay Updated sees
+  that week's outcomes on Results and the couple page (Home masks them).
+  Pre-existing on Results; fix both or neither.
+
 ## Long special-dance names — inventory 2026-11-05
 
 Rule A chosen 2026-11-06 (see CLAUDE.md Special Dances "Naming"); the app
