@@ -117,16 +117,20 @@ watched through Week 6 (Julia & Ezra read Still Dancing, Weeks 7–8 held
 back) and as a guest (published weeks, no judge marks).
 
 Next slices, in order:
-- League context: In Your Leagues card done 2026-11-06 (holder + judges'
-  points per league, matching the Couples Leaderboard; browser-checked
-  caught up, Spoiler-Free at Week 6 and as a co-manager). Still to do: whose
-  roster each week (the `roster_slots` timeline), the viewer's Curtain Call
-  / Grand Finale picks of them.
-- Holder spoiler (shared with Standings' Couples Leaderboard): the holder is
-  the current (else latest) slot whatever the viewer has watched, so a
-  Recast pickup after a Spoiler-Free viewer's cutoff names the new holder,
-  hinting that someone's couple went home. Fix both together (clamp to the
-  slot active at the cutoff), never one.
+- League context: In Your Leagues card and per-week pick lines done
+  2026-11-06 (matching the Couples Leaderboard and Results' gold lines;
+  browser-checked caught up, Spoiler-Free at Week 6 and as a co-manager).
+- For Kylie after E10, one question: a roster timeline ("Pat Weeks 1–5 ·
+  you Weeks 6–8") together with the holder spoiler it would expose. Today
+  the holder (couple page and Standings' Couples Leaderboard) is the current
+  (else latest) slot whatever the viewer has watched, so a Recast pickup
+  after a Spoiler-Free viewer's cutoff names the new holder, hinting that
+  someone's couple went home. Clamping to the slot active at the cutoff
+  changes Couples Leaderboard numbers (a later pickup reads as an undrafted
+  what-if). Fix both pages together, never one.
+- Results' gold "elim pick" line reads only `predicted_eliminated_couple_id`,
+  so a double-elimination week's second pick gets no line there (the couple
+  page counts both).
 - More tap targets: done 2026-11-06 (Home Recent Activity, league cards,
   League at a Glance, Grand Finale brackets, Recast, the Eliminated banner),
   browser-checked except the Curtain Call glance list, the Grand Finale

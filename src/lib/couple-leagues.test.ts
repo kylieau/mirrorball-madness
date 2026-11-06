@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCoupleLeagueRows, type CoupleLeagueInput } from "./couple-leagues";
+import { buildCoupleLeagueRows, coupleWeekPickNotes, type CoupleLeagueInput } from "./couple-leagues";
 import { buildCouplesLeaderboard } from "./couples-leaderboard";
 import type { ScoringSettings } from "./scoring";
 
@@ -70,5 +70,41 @@ describe("buildCoupleLeagueRows", () => {
     const standing = buildCouplesLeaderboard({ ...input, weeks, couples }).find((s) => s.coupleId === "A")!;
     expect(row.judgesPoints).toBe(standing.judgesPoints);
     expect(row.judgesPoints).toBe(6);
+  });
+});
+
+describe("coupleWeekPickNotes", () => {
+  const cast = [
+    { id: "A", celebrity_name: "Ava", status: "eliminated", elimination_week: 3 },
+    { id: "B", celebrity_name: "Ben", status: "active", elimination_week: null },
+    { id: "C", celebrity_name: "Cy", status: "winner", elimination_week: null },
+  ];
+  const leagueNames = new Map([
+    ["l1", "Alpha"],
+    ["l2", "Beta"],
+  ]);
+  const notes = (coupleId: string, weekNumber: number, over: Partial<Parameters<typeof coupleWeekPickNotes>[0]> = {}) =>
+    coupleWeekPickNotes({ coupleId, weekNumber, finaleWeekNumber: 5, leagueNames, picks: [], grandFinaleOrders: new Map(), couples: cast, ...over });
+
+  it("lists that week's Curtain Call picks only, second elimination pick included", () => {
+    const picks = [
+      { leagueId: "l1", weekNumber: 2, eliminatedIds: ["A"], topScorerId: "B" },
+      { leagueId: "l2", weekNumber: 2, eliminatedIds: ["C", "A"], topScorerId: null },
+      { leagueId: "l1", weekNumber: 3, eliminatedIds: ["B"], topScorerId: "A" },
+    ];
+    expect(notes("A", 2, { picks })).toEqual(["Your all-leagues elim picks"]);
+    expect(notes("A", 3, { picks })).toEqual(["Your Alpha top-scorer pick"]);
+    expect(notes("B", 2, { picks })).toEqual(["Your Alpha top-scorer pick"]);
+  });
+
+  it("finds the bracket's next elimination as of each week, and the winner pick from the semi-final", () => {
+    const grandFinaleOrders = new Map([["l1", ["A", "B", "C"]]]);
+    // Ava goes home in Week 3, so from that week's results on, Ben is next.
+    expect(notes("A", 2, { grandFinaleOrders })).toEqual(["Your Alpha bracket next-elim pick"]);
+    expect(notes("A", 3, { grandFinaleOrders })).toEqual([]);
+    expect(notes("B", 2, { grandFinaleOrders })).toEqual([]);
+    expect(notes("B", 3, { grandFinaleOrders })).toEqual(["Your Alpha bracket next-elim pick"]);
+    expect(notes("C", 3, { grandFinaleOrders })).toEqual([]);
+    expect(notes("C", 4, { grandFinaleOrders })).toEqual(["Your Alpha winner pick"]);
   });
 });

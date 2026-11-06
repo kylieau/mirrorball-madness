@@ -53,7 +53,7 @@ function DanceRow({ dance }: { dance: CoupleHistoryDance }) {
   );
 }
 
-function WeekCard({ week }: { week: CoupleHistoryWeek }) {
+function WeekCard({ week, notes }: { week: CoupleHistoryWeek; notes: string[] }) {
   const outcome = week.outcome ? fanOutcomeBadge(week.outcome) : null;
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -85,6 +85,15 @@ function WeekCard({ week }: { week: CoupleHistoryWeek }) {
           )}
         </div>
       ))}
+      {notes.length > 0 && (
+        <div className="border-t border-border/40 px-3 py-2">
+          {notes.map((note) => (
+            <p key={note} className="text-xs text-accent">
+              {note}
+            </p>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -204,7 +213,7 @@ export function CoupleHistoryView({ page }: { page: CoupleHistoryPage }) {
       {page.leagues.length > 0 && <LeaguesCard rows={page.leagues} />}
 
       {history.weeks.map((week) => (
-        <WeekCard key={week.weekNumber} week={week} />
+        <WeekCard key={week.weekNumber} week={week} notes={page.pickNotes[week.weekNumber] ?? []} />
       ))}
       {weekCount === 0 && !unwatched && (
         <p className="rounded-2xl border border-border bg-card px-3.5 py-3 text-sm text-muted-foreground">

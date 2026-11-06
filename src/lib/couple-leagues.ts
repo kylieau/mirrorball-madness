@@ -1,7 +1,10 @@
+import { coupleLeagueNotes } from "./couple-league-notes";
 import { buildCouplesLeaderboard } from "./couples-leaderboard";
+import { nextPredictedElimination, type PinnableCouple } from "./grand-finale-pins";
 import type { RosterSlotPeriod } from "./roster-couple-points";
 import type { HistoryWeekData } from "./score-history";
 import type { ScoringSettings } from "./scoring";
+import { spoilerSafeCoupleStatus } from "./spoiler-safe-couple-status";
 
 export type CoupleLeagueInput = {
   id: string;
@@ -54,5 +57,48 @@ export function buildCoupleLeagueRows({
           ? { kind: "you" }
           : { kind: "manager", name: league.managerNames.get(standing.ownerId) ?? "Unknown" };
     return [{ leagueId: league.id, leagueName: league.name, owner, judgesPoints: standing.judgesPoints }];
+  });
+}
+
+export type WeekPick = { leagueId: string; weekNumber: number; eliminatedIds: string[]; topScorerId: string | null };
+
+// Results' gold pick lines for one couple in one shown week, across the
+// viewer's leagues: Curtain Call picks for that week, the Grand Finale
+// bracket's next elimination with statuses clamped to that week, and the
+// predicted winner from the semi-final on. No roster line: the week cards
+// stack on one page, and In Your Leagues already names the holder.
+export function coupleWeekPickNotes({
+  coupleId,
+  weekNumber,
+  finaleWeekNumber,
+  leagueNames,
+  picks,
+  grandFinaleOrders,
+  couples,
+}: {
+  coupleId: string;
+  weekNumber: number;
+  finaleWeekNumber: number | null;
+  // Every one of the viewer's leagues, so the phrasing can say "all-leagues".
+  leagueNames: ReadonlyMap<string, string>;
+  picks: WeekPick[];
+  // Elimination-ascending order per league.
+  grandFinaleOrders: ReadonlyMap<string, string[]>;
+  couples: PinnableCouple[];
+}): string[] {
+  const names = (leagueIds: string[]) => leagueIds.flatMap((id) => leagueNames.get(id) ?? []);
+  const weekPicks = picks.filter((pick) => pick.weekNumber === weekNumber);
+  const clamped = couples.map((c) => ({
+    ...c,
+    status: spoilerSafeCoupleStatus({ status: c.status, eliminationWeek: c.elimination_week }, weekNumber, finaleWeekNumber),
+  }));
+  const semiFinalOn = finaleWeekNumber !== null && weekNumber >= finaleWeekNumber - 1;
+  const orders = [...grandFinaleOrders].filter(([, order]) => order.length > 0);
+  return coupleLeagueNotes({
+    totalLeagueCount: leagueNames.size,
+    eliminationPickLeagues: names(weekPicks.filter((pick) => pick.eliminatedIds.includes(coupleId)).map((pick) => pick.leagueId)),
+    topScorerPickLeagues: names(weekPicks.filter((pick) => pick.topScorerId === coupleId).map((pick) => pick.leagueId)),
+    grandFinaleNextElimLeagues: names(orders.filter(([, order]) => nextPredictedElimination(order, clamped) === coupleId).map(([id]) => id)),
+    grandFinaleWinnerLeagues: semiFinalOn ? names(orders.filter(([, order]) => order[order.length - 1] === coupleId).map(([id]) => id)) : [],
   });
 }

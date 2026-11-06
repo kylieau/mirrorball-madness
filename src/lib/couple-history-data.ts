@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { buildCoupleHistory, unwatchedRange, type CoupleHistory, type CoupleHistoryWeekInput } from "@/lib/couple-history";
-import { buildCoupleLeagueRows, type CoupleLeagueRow } from "@/lib/couple-leagues";
+import { buildCoupleLeagueRows, coupleWeekPickNotes, type CoupleLeagueRow } from "@/lib/couple-leagues";
 import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
 import { formatManagerName } from "@/lib/manager-display";
 import { scoringSettingsFromRow } from "@/lib/scoring";
@@ -32,6 +32,8 @@ export type CoupleHistoryPage = {
   live: { refresh: boolean; windows: RefreshWindow[]; postingWeek: number | null };
   // Signed-in viewers' leagues with a finished draft (In Your Leagues).
   leagues: CoupleLeagueRow[];
+  // Results' gold pick lines for each shown results week, by week number.
+  pickNotes: Record<number, string[]>;
 };
 
 type DanceRow = {
@@ -46,21 +48,40 @@ type DanceRow = {
   dance_styles: { name: string } | null;
 };
 
-// Each of the viewer's leagues whose Dance Card has drafted: who holds the
-// couple and its judges' points there, over the same weeks the page shows.
-// Standings also folds in released drafts on a draft night; this page never
-// shows drafts, so the two can differ until that week posts.
-async function loadCoupleLeagues(
-  supabase: SupabaseClient<Database>,
-  viewerId: string,
-  coupleId: string,
-  weeks: CoupleHistoryWeekInput[],
-  couples: { id: string; status: string; elimination_week: number | null }[]
-): Promise<CoupleLeagueRow[]> {
+// The viewer's stake in the couple across their leagues. Rows: each league
+// whose Dance Card has drafted, who holds the couple and its judges' points
+// there, over the same weeks the page shows (Standings also folds in released
+// drafts on a draft night; this page never shows drafts, so the two can
+// differ until that week posts). Pick notes: each shown results week's
+// Curtain Call and Grand Finale lines, as Results words them.
+async function loadCoupleLeagues({
+  supabase,
+  viewerId,
+  coupleId,
+  weeks,
+  resultWeeks,
+  couples,
+  cutoffWeek,
+  finaleWeekNumber,
+}: {
+  supabase: SupabaseClient<Database>;
+  viewerId: string;
+  coupleId: string;
+  weeks: CoupleHistoryWeekInput[];
+  resultWeeks: { id: string; weekNumber: number }[];
+  // The season's cast with true statuses; clamped here per use.
+  couples: { id: string; celebrity_name: string; status: string; elimination_week: number | null }[];
+  cutoffWeek: number | null;
+  finaleWeekNumber: number | null;
+}): Promise<Pick<CoupleHistoryPage, "leagues" | "pickNotes">> {
   const memberships = await loadViewerMemberships(supabase, viewerId);
   const leagueIds = memberships.flatMap((m) => (m.leagues ? [m.leagues.id] : []));
-  if (leagueIds.length === 0) return [];
-  const [{ data: leagues }, { data: settings }, { data: slots }, { data: members }, weekResults] = await Promise.all([
+  if (leagueIds.length === 0) return { leagues: [], pickNotes: {} };
+  // Team-scoped rows are keyed to the primary's user id, also for a co-manager.
+  const teamIdByLeague = new Map(memberships.flatMap((m) => (m.leagues ? [[m.leagues.id, m.user_id] as const] : [])));
+  const ownTeamRow = (row: { league_id: string; manager_id: string }) => teamIdByLeague.get(row.league_id) === row.manager_id;
+  const teamIds = [...new Set(teamIdByLeague.values())];
+  const [{ data: leagues }, { data: settings }, { data: slots }, { data: members }, weekResults, { data: predictions }, { data: grandFinaleRows }] = await Promise.all([
     supabase.from("leagues").select("id, draft_status").in("id", leagueIds),
     supabase
       .from("scoring_settings")
@@ -74,14 +95,57 @@ async function loadCoupleLeagues(
       .select("league_id, user_id, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)")
       .in("league_id", leagueIds),
     loadCoupleWeekResults(supabase, weeks.map((week) => ({ week_number: week.weekNumber, episodeIds: week.episodeIds }))),
+    resultWeeks.length > 0
+      ? supabase
+          .from("predictions")
+          .select("league_id, manager_id, week_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
+          .in("league_id", leagueIds)
+          .in("manager_id", teamIds)
+          .in("week_id", resultWeeks.map((week) => week.id))
+      : Promise.resolve({ data: [] }),
+    resultWeeks.length > 0
+      ? supabase
+          .from("grand_finale_predictions")
+          .select("league_id, manager_id, couple_id, predicted_position")
+          .in("league_id", leagueIds)
+          .in("manager_id", teamIds)
+      : Promise.resolve({ data: [] }),
   ]);
   const drafted = new Set((leagues ?? []).filter((l) => l.draft_status === "completed").map((l) => l.id));
   const settingsByLeague = new Map((settings ?? []).map((s) => [s.league_id, s]));
 
-  return buildCoupleLeagueRows({
+  const weekNumberById = new Map(resultWeeks.map((week) => [week.id, week.weekNumber]));
+  const picks = (predictions ?? []).filter(ownTeamRow).flatMap((row) => {
+    const weekNumber = weekNumberById.get(row.week_id);
+    if (weekNumber === undefined) return [];
+    return [
+      {
+        leagueId: row.league_id,
+        weekNumber,
+        eliminatedIds: [row.predicted_eliminated_couple_id, row.predicted_eliminated_couple_id_2].filter((id): id is string => !!id),
+        topScorerId: row.predicted_top_scorer_couple_id,
+      },
+    ];
+  });
+  const grandFinaleOrders = new Map<string, string[]>();
+  for (const row of [...(grandFinaleRows ?? [])].filter(ownTeamRow).sort((a, b) => a.predicted_position - b.predicted_position)) {
+    grandFinaleOrders.set(row.league_id, [...(grandFinaleOrders.get(row.league_id) ?? []), row.couple_id]);
+  }
+  const leagueNames = new Map(memberships.flatMap((m) => (m.leagues ? [[m.leagues.id, m.leagues.name] as const] : [])));
+  const pickNotes = Object.fromEntries(
+    resultWeeks.map((week) => [
+      week.weekNumber,
+      coupleWeekPickNotes({ coupleId, weekNumber: week.weekNumber, finaleWeekNumber, leagueNames, picks, grandFinaleOrders, couples }),
+    ])
+  );
+
+  const rows = buildCoupleLeagueRows({
     coupleId,
     weeks: weekResults,
-    couples,
+    couples: couples.map((c) => ({
+      ...c,
+      status: spoilerSafeCoupleStatus({ status: c.status, eliminationWeek: c.elimination_week }, cutoffWeek, finaleWeekNumber),
+    })),
     leagues: memberships.flatMap((m) => {
       const setting = m.leagues ? settingsByLeague.get(m.leagues.id) : undefined;
       if (!m.leagues || !setting || !drafted.has(m.leagues.id) || setting.judges_score_category_enabled === false) return [];
@@ -111,6 +175,7 @@ async function loadCoupleLeagues(
       ];
     }),
   });
+  return { leagues: rows, pickNotes };
 }
 
 // "Carrie Ann Inaba" → "Carrie Ann", so a four-judge night fits one line.
@@ -137,6 +202,7 @@ export async function loadCoupleHistory(
   if (!couple || !seasonId || couple.season_id !== seasonId) return null;
 
   const weeks: CoupleHistoryWeekInput[] = [];
+  const resultWeeks: { id: string; weekNumber: number }[] = [];
   let cutoffWeek: number | null;
   let unwatched: { from: number; to: number } | null = null;
   let finaleWeekNumber: number | null;
@@ -150,6 +216,7 @@ export async function loadCoupleHistory(
     const [cutoff, { revealing, visible }] = await Promise.all([cutoffPending, loadRevealingWeek(supabase, groupedWeeks, cutoffPending)]);
     for (const week of cutoff.visibleEpisodes) {
       weeks.push({ weekNumber: week.week_number, theme: week.theme, episodeIds: week.episodes.map((e) => e.id), mode: "results" });
+      resultWeeks.push({ id: week.id, weekNumber: week.week_number });
     }
     if (revealing && visible) {
       weeks.push({ weekNumber: revealing.week.week_number, theme: revealing.week.theme, episodeIds: revealing.episodeIds, mode: "scores" });
@@ -174,20 +241,19 @@ export async function loadCoupleHistory(
   const episodeIds = weeks.flatMap((week) => week.episodeIds);
   const resultEpisodeIds = weeks.filter((week) => week.mode === "results").flatMap((week) => week.episodeIds);
   const leaguesPending = viewer
-    ? loadCoupleLeagues(
+    ? loadCoupleLeagues({
         supabase,
-        viewer.id,
+        viewerId: viewer.id,
         coupleId,
         weeks,
-        couples
+        resultWeeks,
+        couples: couples
           .filter((c) => c.season_id === seasonId)
-          .map((c) => ({
-            id: c.id,
-            elimination_week: c.elimination_week,
-            status: spoilerSafeCoupleStatus({ status: c.status, eliminationWeek: c.elimination_week }, cutoffWeek, finaleWeekNumber),
-          }))
-      )
-    : Promise.resolve([]);
+          .map((c) => ({ id: c.id, celebrity_name: c.celebrity?.name ?? "Unknown", status: c.status, elimination_week: c.elimination_week })),
+        cutoffWeek,
+        finaleWeekNumber,
+      })
+    : Promise.resolve({ leagues: [], pickNotes: {} });
   const teamsMode = episodeIds.length > 0 ? await loadTeamsMode(supabase) : "none";
   const [{ data: danceRows }, { data: episodeRows }, { data: outcomes }, { data: jeopardyRows }, { data: roundTypeRows }, labels] = await Promise.all([
     episodeIds.length > 0
@@ -262,6 +328,6 @@ export async function loadCoupleHistory(
     history,
     unwatched,
     live,
-    leagues: await leaguesPending,
+    ...(await leaguesPending),
   };
 }
