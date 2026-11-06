@@ -17,5 +17,6 @@ export function coupleHistoryReturn(from: string | string[] | undefined): Couple
   const league = /^\/leagues\/([^/]+)\/(standings|picks)$/.exec(pathname);
   if (league) return { href: path, label: league[2] === "picks" ? "Picks" : "Standings", leagueId: league[1] };
   if (pathname === "/") return { href: path, label: "Home", leagueId: null };
+  if (pathname === "/leagues") return { href: path, label: "Manage Leagues", leagueId: null };
   return { href: pathname === "/this-week" ? path : "/this-week", label: "Results", leagueId: null };
 }

@@ -37,7 +37,10 @@ export async function loadModuleStackInputs(
       pro_name: c.pro?.name ?? "Unknown",
     }))
   );
-  const fullNameOf = (id: string | null) => (id ? (names.get(id) ?? null) : null);
+  const fullNameOf = (id: string | null) => {
+    const parts = id ? names.get(id) : undefined;
+    return id && parts ? { ...parts, id } : null;
+  };
   const draftStatusByLeague = new Map((leagues ?? []).map((l) => [l.id, l.draft_status]));
   const seasonCouples = couples
     .filter((c) => c.season_id === context.activeSeasonId)

@@ -4,6 +4,7 @@ import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { LeagueStatusPill } from "@/components/league-status-pill";
+import { coupleHistoryHref } from "@/lib/couple-history-link";
 import { formatCountdown } from "@/lib/format-countdown";
 import { formatPoints } from "@/lib/format-points";
 import { scoringModule } from "@/lib/scoring-modules";
@@ -26,7 +27,8 @@ export type LeagueTriage = {
   totalPoints: number;
   picksDue: boolean;
   weeksBehind: number;
-  settingsFrom?: string;
+  // The page the card sits on, which League Settings and couple pages link back to.
+  from?: string;
   modules: ModuleStackInput;
 };
 
@@ -38,7 +40,7 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
   const action = picksAction(league.picksDue, league.modules);
   const picksLabel = picksButtonLabel(action);
   const standingsPrimary = action === "locked";
-  const settingsFrom = league.settingsFrom ?? "/leagues";
+  const from = league.from ?? "/leagues";
   return (
     <Card className={cn("ring-primary/40", league.picksDue && "border-l-[3px] border-l-primary")}>
       <CardContent className="flex flex-col gap-3">
@@ -101,7 +103,7 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
                   >
                     {line.lines.length === 1 ? (
                       <span className={cn(toneClass, "flex-1")}>
-                        <StackRowText row={line.lines[0]} />
+                        <StackRowText row={line.lines[0]} from={from} />
                         {need}
                       </span>
                     ) : (
@@ -109,13 +111,13 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
                         i === 0 ? (
                           <span key={i} className="flex items-baseline justify-between gap-2">
                             <span className={cn(toneClass, "flex-1")}>
-                              <StackRowText row={row} />
+                              <StackRowText row={row} from={from} />
                             </span>
                             {status}
                           </span>
                         ) : (
                           <span key={i} className={cn(toneClass, "block")}>
-                            <StackRowText row={row} />
+                            <StackRowText row={row} from={from} />
                             {i === line.lines.length - 1 && need}
                           </span>
                         )
@@ -160,7 +162,7 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
             className={GOLD_OUTLINE}
             aria-label="League settings"
             nativeButton={false}
-            render={<Link href={`/leagues/${league.id}/settings?from=${encodeURIComponent(settingsFrom)}`} />}
+            render={<Link href={`/leagues/${league.id}/settings?from=${encodeURIComponent(from)}`} />}
           >
             <SettingsIcon aria-hidden />
           </Button>
@@ -170,14 +172,14 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
   );
 }
 
-function StackRowText({ row }: { row: StackRow }) {
+function StackRowText({ row, from }: { row: StackRow; from: string }) {
   return (
     <span className={cn(row.struck && "line-through")}>
       {row.text}
       {row.couple && (
-        <>
+        <Link href={coupleHistoryHref(row.couple.id, from)} className="hover:text-accent">
           <span className="font-semibold">{row.couple.celebrity}</span> &amp; {row.couple.pro}
-        </>
+        </Link>
       )}
     </span>
   );

@@ -9,14 +9,17 @@ export function leagueTapHref(leagueId: string, picksDue: boolean): string {
 // no_week = no live week at all (pre-premiere or off-season).
 export type CurtainCallState = "open" | "locked" | "awaiting_results" | "no_week";
 
+// A couple as the card names it, with its id so the name opens its page.
+export type StackCouple = CoupleNameParts & { id: string };
+
 export type ModuleStackInput = {
   curtainCall: {
     on: boolean;
     state: CurtainCallState;
     afterWeek: number | null;
     lockAt: string | null;
-    eliminatedName: CoupleNameParts | null;
-    topScorerName: CoupleNameParts | null;
+    eliminatedName: StackCouple | null;
+    topScorerName: StackCouple | null;
   };
   danceCard: { on: boolean; draftStatus: string; roster: RosterCouple[] };
   grandFinale: {
@@ -25,21 +28,21 @@ export type ModuleStackInput = {
     locked: boolean;
     deadlineAt: string | null;
     hasPrediction: boolean;
-    nextElimName: CoupleNameParts | null;
+    nextElimName: StackCouple | null;
   };
 };
 
 // A Dance Card couple and whether it is out of the competition (eliminated
 // or withdrawn) as far as the viewer has watched.
-export type RosterCouple = { couple: CoupleNameParts; out: boolean };
+export type RosterCouple = { couple: StackCouple; out: boolean };
 
 // One visual row: plain text, then a couple the card renders as
 // "Tatyana & Jan" with the celebrity in bold ("Home: " + couple). Rows
 // without a couple have couple null. A struck row is a couple that is out.
-export type StackRow = { text: string; couple: CoupleNameParts | null; struck?: boolean };
+export type StackRow = { text: string; couple: StackCouple | null; struck?: boolean };
 
 const plain = (text: string): StackRow => ({ text, couple: null });
-const named = (text: string, couple: CoupleNameParts): StackRow => ({ text, couple });
+const named = (text: string, couple: StackCouple): StackRow => ({ text, couple });
 
 export type ModuleLine = {
   key: ScoringModuleKey;
@@ -68,7 +71,7 @@ export function danceCardRosterNames(
   const outIds = new Set(couples.filter((c) => c.out).map((c) => c.id));
   return coupleIds.flatMap((id) => {
     const parts = display.get(id);
-    return parts ? [{ couple: parts, out: outIds.has(id) }] : [];
+    return parts ? [{ couple: { ...parts, id }, out: outIds.has(id) }] : [];
   });
 }
 

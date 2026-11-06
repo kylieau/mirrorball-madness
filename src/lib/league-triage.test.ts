@@ -9,11 +9,12 @@ import {
   showHybridStatusPill,
   type ModuleLine,
   type ModuleStackInput,
+  type StackCouple,
 } from "./league-triage";
 import type { CoupleNameParts } from "./couple-display";
 
 const LOCK = "2026-09-29T00:00:00Z";
-const c = (celebrity: string, pro: string): CoupleNameParts => ({ celebrity, pro });
+const c = (celebrity: string, pro: string): StackCouple => ({ celebrity, pro, id: celebrity });
 const joined = (parts: CoupleNameParts) => `${parts.celebrity} & ${parts.pro}`;
 const base: ModuleStackInput = {
   curtainCall: { on: true, state: "open", afterWeek: 2, lockAt: LOCK, eliminatedName: null, topScorerName: null },
@@ -116,7 +117,7 @@ describe("buildModuleStack", () => {
   });
 
   describe("Dance Card", () => {
-    const line = (draftStatus: string, couples: CoupleNameParts[] = []) =>
+    const line = (draftStatus: string, couples: StackCouple[] = []) =>
       flat(buildModuleStack({ ...base, danceCard: { on: true, draftStatus, roster: couples.map((couple) => ({ couple, out: false })) } })[1]);
 
     it("reports draft status, then each couple on its own line", () => {

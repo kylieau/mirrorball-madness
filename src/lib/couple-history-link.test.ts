@@ -6,6 +6,8 @@ describe("coupleHistoryReturn", () => {
     expect(coupleHistoryReturn("/this-week?week=w8")).toEqual({ href: "/this-week?week=w8", label: "Results", leagueId: null });
     expect(coupleHistoryReturn("/leagues/abc/standings#couples")).toEqual({ href: "/leagues/abc/standings#couples", label: "Standings", leagueId: "abc" });
     expect(coupleHistoryReturn("/leagues/abc/picks?week=3")).toMatchObject({ label: "Picks", leagueId: "abc" });
+    expect(coupleHistoryReturn("/")).toEqual({ href: "/", label: "Home", leagueId: null });
+    expect(coupleHistoryReturn("/leagues")).toEqual({ href: "/leagues", label: "Manage Leagues", leagueId: null });
   });
 
   it("falls back to Results for anything that isn't a known in-app page", () => {

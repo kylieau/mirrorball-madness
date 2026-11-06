@@ -178,7 +178,7 @@ export default async function Home() {
     totalPoints: s.totalPoints,
     picksDue: s.picksDue,
     weeksBehind,
-    settingsFrom: "/",
+    from: "/",
     modules: moduleInputs.get(s.id)!,
   }));
 
