@@ -132,8 +132,9 @@ async function write(leagueId: string, version: "v1" | "v2" | null) {
     p_actor_id: actor,
     p_league_id: leagueId,
     p_revision: snapshot._revision,
-    p_version: version,
-    p_migration_id: version ? randomUUID() : null,
+    // Null means "rebuild in place"; generated types can't express a null arg.
+    p_version: version as string,
+    p_migration_id: (version ? randomUUID() : null) as string,
     p_rows: rows as unknown as Json,
   });
   if (error) throw new Error(error.message);
