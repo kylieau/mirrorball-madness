@@ -19,7 +19,7 @@ export type BannerEpisode = {
   publishedAt: string | null;
 };
 
-export type BannerWeek = { weekNumber: number; episodes: BannerEpisode[] };
+export type BannerWeek = { weekNumber: number; isFinale?: boolean; episodes: BannerEpisode[] };
 
 export type EpisodeBannerInput = {
   weeks: BannerWeek[];
@@ -136,11 +136,13 @@ export function westFeedStillAiring(airsAtIso: string, now: Date = new Date()): 
 export function toBannerWeeks(
   weeks: {
     week_number: number;
+    is_finale?: boolean;
     episodes: { airs_at: string; duration_minutes?: number | null; status: string; results_published_at?: string | null }[];
   }[]
 ): BannerWeek[] {
   return weeks.map((week) => ({
     weekNumber: week.week_number,
+    isFinale: week.is_finale,
     episodes: week.episodes.map((episode) => ({
       airsAt: episode.airs_at,
       durationMinutes: episode.duration_minutes ?? DEFAULT_EPISODE_DURATION_MINUTES,
@@ -162,26 +164,44 @@ export type SeasonTrackModel = {
   currentWeek: number | null;
   // "now" while that week is on air or awaiting results, "next" while it is still to come.
   marker: "now" | "next";
+  futureDots: number;
 };
+
+// Without a week marked Finale the season's length is unknown, so the track
+// pads to a fixed shape instead.
+const TRACK_NODES = 7;
+const MIN_FUTURE_DOTS = 3;
+
+// Empty dots after the glowing circle (or the last check): every week up to
+// the Finale when one is marked on Schedule.
+function futureDots(weeks: BannerWeek[], lastShownWeek: number, weeksDone: number): number {
+  const finale = weeks.find((week) => week.isFinale);
+  if (!finale) return Math.max(MIN_FUTURE_DOTS, TRACK_NODES - 1 - weeksDone);
+  return weeks.filter((week) => week.weekNumber > lastShownWeek && week.weekNumber <= finale.weekNumber).length;
+}
 
 // Normally the banner's own week is the glowing circle and earlier completed
 // weeks are checked. Once that week is fully published (Results in) it is
 // checked too, and the circle moves on to the next week.
 export function seasonTrack(weeks: BannerWeek[], state: EpisodeBannerState): SeasonTrackModel {
   if (state.kind !== "results_in") {
+    const weeksDone = weeks.filter((week) => week.weekNumber < state.weekNumber && isComplete(week)).length;
     return {
-      weeksDone: weeks.filter((week) => week.weekNumber < state.weekNumber && isComplete(week)).length,
+      weeksDone,
       currentWeek: state.weekNumber,
       marker: LIVE_MARKER_KINDS.has(state.kind) ? "now" : "next",
+      futureDots: futureDots(weeks, state.weekNumber, weeksDone),
     };
   }
   const nextWeek = weeks
     .filter((week) => week.weekNumber > state.weekNumber)
     .sort((a, b) => a.weekNumber - b.weekNumber)[0];
+  const weeksDone = weeks.filter((week) => week.weekNumber <= state.weekNumber && isComplete(week)).length;
   return {
-    weeksDone: weeks.filter((week) => week.weekNumber <= state.weekNumber && isComplete(week)).length,
+    weeksDone,
     currentWeek: nextWeek?.weekNumber ?? null,
     marker: "next",
+    futureDots: futureDots(weeks, nextWeek?.weekNumber ?? state.weekNumber, weeksDone),
   };
 }
 

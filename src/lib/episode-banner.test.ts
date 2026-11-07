@@ -228,6 +228,7 @@ describe("seasonTrack", () => {
       weeksDone: 1,
       currentWeek: 2,
       marker: "now",
+      futureDots: 5,
     });
   });
 
@@ -248,6 +249,7 @@ describe("seasonTrack", () => {
       weeksDone: 2,
       currentWeek: 3,
       marker: "next",
+      futureDots: 4,
     });
   });
 
@@ -256,7 +258,34 @@ describe("seasonTrack", () => {
       weeksDone: 2,
       currentWeek: null,
       marker: "next",
+      futureDots: 4,
     });
+  });
+
+  // S35: eleven weeks, Week 11 marked Finale on Schedule.
+  const season = (doneThrough: number) =>
+    Array.from({ length: 11 }, (_, i) => i + 1).map((n) => ({
+      ...(n <= doneThrough ? done(n) : upcoming(n)),
+      isFinale: n === 11,
+    }));
+
+  it("ends at the week marked Finale", () => {
+    const track = seasonTrack(season(8), { kind: "picks_open", weekNumber: 9, airsAtIso: AIRS, picksModuleOn: true });
+    expect(track).toMatchObject({ weeksDone: 8, currentWeek: 9, futureDots: 2 });
+    expect(seasonTrack(season(9), { kind: "results_in", weekNumber: 9 })).toMatchObject({ weeksDone: 9, currentWeek: 10, futureDots: 1 });
+  });
+
+  it("has no empty dots in Finale week or once the Finale is in", () => {
+    expect(seasonTrack(season(10), { kind: "on_air", weekNumber: 11, picksModuleOn: true, picksOpen: false })).toMatchObject({
+      weeksDone: 10,
+      currentWeek: 11,
+      futureDots: 0,
+    });
+    expect(seasonTrack(season(11), { kind: "results_in", weekNumber: 11 })).toMatchObject({ weeksDone: 11, currentWeek: null, futureDots: 0 });
+  });
+
+  it("pads to seven dots early in a season with no Finale marked", () => {
+    expect(seasonTrack([done(1), upcoming(2)], { kind: "results_soon", weekNumber: 2 }).futureDots).toBe(5);
   });
 });
 

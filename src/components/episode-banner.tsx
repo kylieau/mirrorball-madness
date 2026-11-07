@@ -13,12 +13,6 @@ import {
 import { formatAirsAt } from "@/lib/format-airs";
 import { formatEpisodeCasual } from "@/lib/format-week";
 
-// Total season length isn't known, so the track shows what's done, the
-// current week, and hollow dots that fade out instead of a real "N of M". It
-// holds seven nodes early in the season, then grows with the checked weeks.
-const TRACK_NODES = 7;
-const MIN_FUTURE_DOTS = 3;
-
 // Longer titles step down in size; the curtain grows when text wraps.
 const SHORT_TITLE_MAX = 12;
 
@@ -72,11 +66,11 @@ function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
   }
 }
 
-function SeasonTrack({ weeksDone, currentWeek, marker }: SeasonTrackModel) {
+function SeasonTrack({ weeksDone, currentWeek, marker, futureDots }: SeasonTrackModel) {
   const dots = [
     ...Array.from({ length: weeksDone }, () => ({ kind: "done" as const, label: "✓" })),
     ...(currentWeek === null ? [] : [{ kind: "current" as const, label: String(currentWeek) }]),
-    ...Array.from({ length: Math.max(MIN_FUTURE_DOTS, TRACK_NODES - 1 - weeksDone) }, () => ({ kind: "future" as const, label: "" })),
+    ...Array.from({ length: futureDots }, () => ({ kind: "future" as const, label: "" })),
   ];
 
   return (
