@@ -72,6 +72,7 @@ import {
   shouldShowAnchorSyncControl,
 } from "@/lib/season-clock";
 import { judgesScoreMultiplierHelp, judgesScoreMultiplierLocked } from "@/lib/judges-score-multiplier";
+import { DANCE_CARD_V2_EXPONENT, danceCardRule } from "@/lib/dance-card-v2";
 
 type ScoringMethod = GrandFinaleMethod;
 type WaiverMode = "locked" | "waivers";
@@ -102,6 +103,7 @@ type ScoringSettings = {
   top_scorer_prediction_points: number;
   curtain_call_near_miss_enabled: boolean;
   scoring_configured: boolean;
+  dance_card_version?: string;
 };
 
 type League = {
@@ -121,6 +123,12 @@ type SeasonEpisode = { week_number: number; theme: string | null; airs_at: strin
 type CurtainCallNight = { weekNumber: number; airsAt: string; durationMinutes: number };
 
 type LockDirection = "before" | "after";
+
+// A v2 league's Dance Card (src/lib/dance-card-v2.ts). It has no editable
+// point values, so the panel explains the curve instead.
+function danceCardCurveNote(coefficient: number): string {
+  return `Each couple's season is worth ${coefficient} × (judges' total)^${DANCE_CARD_V2_EXPONENT}, counted from the Anchor Week. Each week pays the change, so earlier weeks count a little more. There are no survival or placement points.`;
+}
 
 const CURTAIN_CALL_PAYOUT_NOTE =
   "Each week's payout scales with how many couples are still in the running: full value at the start of the season, shrinking as couples are eliminated.";
@@ -171,6 +179,7 @@ export function LeagueModulesForm({
   exitHref,
   lateUnlock,
   curtainCallBackfill,
+  anchorHeld,
 }: {
   leagueId: string;
   league: League;
@@ -199,6 +208,9 @@ export function LeagueModulesForm({
   lateUnlock: GrandFinaleLateUnlockInput | null;
   // Site admins only; null for everyone else.
   curtainCallBackfill: CurtainCallBackfillInput | null;
+  // A Dance Card v2 league with scores this season: its Anchor Week can't
+  // move (the database refuses), so Update Anchor isn't offered.
+  anchorHeld: boolean;
 }) {
   const router = useRouter();
   const browserTimeZone = useBrowserTimeZone();
@@ -449,7 +461,8 @@ export function LeagueModulesForm({
     lockWeek,
     seasonNumber,
   });
-  const showAnchorSync = shouldShowAnchorSyncControl(canEdit, judgesStartsWeek, lockWeek);
+  const showAnchorSync = shouldShowAnchorSyncControl(canEdit, judgesStartsWeek, lockWeek) && !anchorHeld;
+  const danceCard = danceCardRule(scoringSettings ?? {}, league.roster_size);
 
   async function handleSave(exitAfter = false, lockFlipConfirmed = false) {
     try {
@@ -642,30 +655,39 @@ export function LeagueModulesForm({
             name={scoringModule("danceCard").name}
             icon={scoringModule("danceCard").icon}
             weight={judgesWeight}
-            detailsHint="Judges · survival · placement"
+            detailsHint={danceCard.version === "v2" ? "Judges · season curve" : "Judges · survival · placement"}
           >
             <div className="flex flex-col">
-              <SettingRow
-                label="Judges' Score Multiplier"
-                value={
-                  multiplierLocked ? (
-                    <span className="max-w-[60%] text-right leading-snug">
-                      {judgesScoreMultiplier.toFixed(2)}
-                      <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                        {multiplierHelp}
-                      </span>
-                    </span>
-                  ) : (
-                    judgesScoreMultiplier.toFixed(2)
-                  )
-                }
-              />
-              <SettingRow label="Survival Points" value={formatPoints(survivalPoints)} />
-              <SettingRow label="1st Place Bonus" value={formatPoints(firstPlacePoints)} />
-              <SettingRow label="2nd Place Bonus" value={formatPoints(secondPlacePoints)} />
-              <SettingRow label="3rd Place Bonus" value={formatPoints(thirdPlacePoints)} />
-              <SettingRow label="4th Place Bonus" value={formatPoints(fourthPlacePoints)} />
-              <SettingRow label="5th Place Bonus" value={formatPoints(fifthPlacePoints)} />
+              {danceCard.version === "v2" ? (
+                <>
+                  <SettingRow label="Dance Card Scoring" value="Season Curve" />
+                  <p className="pb-2 text-sm text-muted-foreground">{danceCardCurveNote(danceCard.coefficient)}</p>
+                </>
+              ) : (
+                <>
+                  <SettingRow
+                    label="Judges' Score Multiplier"
+                    value={
+                      multiplierLocked ? (
+                        <span className="max-w-[60%] text-right leading-snug">
+                          {judgesScoreMultiplier.toFixed(2)}
+                          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                            {multiplierHelp}
+                          </span>
+                        </span>
+                      ) : (
+                        judgesScoreMultiplier.toFixed(2)
+                      )
+                    }
+                  />
+                  <SettingRow label="Survival Points" value={formatPoints(survivalPoints)} />
+                  <SettingRow label="1st Place Bonus" value={formatPoints(firstPlacePoints)} />
+                  <SettingRow label="2nd Place Bonus" value={formatPoints(secondPlacePoints)} />
+                  <SettingRow label="3rd Place Bonus" value={formatPoints(thirdPlacePoints)} />
+                  <SettingRow label="4th Place Bonus" value={formatPoints(fourthPlacePoints)} />
+                  <SettingRow label="5th Place Bonus" value={formatPoints(fifthPlacePoints)} />
+                </>
+              )}
               <SettingRow label="Recast Mode" value={WAIVER_MODE_ITEMS[waiverMode]} />
               {waiverMode === "waivers" && (
                 <SettingRow label="Recast Method" value={WAIVER_CLAIM_METHOD_LABELS[waiverClaimMethod]} />
@@ -985,93 +1007,97 @@ export function LeagueModulesForm({
           weightInputId="judgesWeight"
           onWeightChange={editWeight(setJudgesWeight)}
           weightDisabled={scoringLocked}
-          detailsHint="Judges · survival · placement"
+          detailsHint={danceCard.version === "v2" ? "Judges · season curve" : "Judges · survival · placement"}
         >
           <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
               Roster size is set automatically when the draft starts (couples ÷ members).
             </p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="judgesScoreMultiplier">Judges&apos; Score Multiplier</Label>
-                <Input
-                  id="judgesScoreMultiplier"
-                  type="number"
-                  step="0.1"
-                  min={0}
-                  value={judgesScoreMultiplier}
-                  onChange={(e) => setJudgesScoreMultiplier(Number(e.target.value))}
-                  disabled={multiplierLocked}
-                />
-                <p className="text-xs text-muted-foreground">{multiplierHelp}</p>
+            {danceCard.version === "v2" ? (
+              <p className="text-sm text-muted-foreground">{danceCardCurveNote(danceCard.coefficient)}</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="judgesScoreMultiplier">Judges&apos; Score Multiplier</Label>
+                  <Input
+                    id="judgesScoreMultiplier"
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    value={judgesScoreMultiplier}
+                    onChange={(e) => setJudgesScoreMultiplier(Number(e.target.value))}
+                    disabled={multiplierLocked}
+                  />
+                  <p className="text-xs text-muted-foreground">{multiplierHelp}</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="survivalPoints">Survival Points</Label>
+                  <Input
+                    id="survivalPoints"
+                    type="number"
+                    min={0}
+                    value={survivalPoints}
+                    onChange={(e) => setSurvivalPoints(Number(e.target.value))}
+                    disabled={scoringLocked}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="firstPlacePoints">1st Place Bonus</Label>
+                  <Input
+                    id="firstPlacePoints"
+                    type="number"
+                    min={0}
+                    value={firstPlacePoints}
+                    onChange={(e) => setFirstPlacePoints(Number(e.target.value))}
+                    disabled={scoringLocked}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="secondPlacePoints">2nd Place Bonus</Label>
+                  <Input
+                    id="secondPlacePoints"
+                    type="number"
+                    min={0}
+                    value={secondPlacePoints}
+                    onChange={(e) => setSecondPlacePoints(Number(e.target.value))}
+                    disabled={scoringLocked}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="thirdPlacePoints">3rd Place Bonus</Label>
+                  <Input
+                    id="thirdPlacePoints"
+                    type="number"
+                    min={0}
+                    value={thirdPlacePoints}
+                    onChange={(e) => setThirdPlacePoints(Number(e.target.value))}
+                    disabled={scoringLocked}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="fourthPlacePoints">4th Place Bonus</Label>
+                  <Input
+                    id="fourthPlacePoints"
+                    type="number"
+                    min={0}
+                    value={fourthPlacePoints}
+                    onChange={(e) => setFourthPlacePoints(Number(e.target.value))}
+                    disabled={scoringLocked}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="fifthPlacePoints">5th Place Bonus</Label>
+                  <Input
+                    id="fifthPlacePoints"
+                    type="number"
+                    min={0}
+                    value={fifthPlacePoints}
+                    onChange={(e) => setFifthPlacePoints(Number(e.target.value))}
+                    disabled={scoringLocked}
+                  />
+                </div>
               </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="survivalPoints">Survival Points</Label>
-                <Input
-                  id="survivalPoints"
-                  type="number"
-                  min={0}
-                  value={survivalPoints}
-                  onChange={(e) => setSurvivalPoints(Number(e.target.value))}
-                  disabled={scoringLocked}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="firstPlacePoints">1st Place Bonus</Label>
-                <Input
-                  id="firstPlacePoints"
-                  type="number"
-                  min={0}
-                  value={firstPlacePoints}
-                  onChange={(e) => setFirstPlacePoints(Number(e.target.value))}
-                  disabled={scoringLocked}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="secondPlacePoints">2nd Place Bonus</Label>
-                <Input
-                  id="secondPlacePoints"
-                  type="number"
-                  min={0}
-                  value={secondPlacePoints}
-                  onChange={(e) => setSecondPlacePoints(Number(e.target.value))}
-                  disabled={scoringLocked}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="thirdPlacePoints">3rd Place Bonus</Label>
-                <Input
-                  id="thirdPlacePoints"
-                  type="number"
-                  min={0}
-                  value={thirdPlacePoints}
-                  onChange={(e) => setThirdPlacePoints(Number(e.target.value))}
-                  disabled={scoringLocked}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="fourthPlacePoints">4th Place Bonus</Label>
-                <Input
-                  id="fourthPlacePoints"
-                  type="number"
-                  min={0}
-                  value={fourthPlacePoints}
-                  onChange={(e) => setFourthPlacePoints(Number(e.target.value))}
-                  disabled={scoringLocked}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="fifthPlacePoints">5th Place Bonus</Label>
-                <Input
-                  id="fifthPlacePoints"
-                  type="number"
-                  min={0}
-                  value={fifthPlacePoints}
-                  onChange={(e) => setFifthPlacePoints(Number(e.target.value))}
-                  disabled={scoringLocked}
-                />
-              </div>
-            </div>
+            )}
 
             <div className="border-t border-border pt-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -112,3 +112,31 @@ export function weekCredits(ledger: DanceCardLedger, weekNumber: number): Map<st
   }
   return credits;
 }
+
+// Readers hold dance rows tagged with their week and the settled bonuses of
+// the weeks they show; this groups them the way the ledger reads them.
+export function danceCardWeeksFromRows(
+  scores: (DanceScore & { weekNumber: number })[],
+  bonuses: { weekNumber: number; coupleId: string; bonusPoints: number }[] = []
+): DanceCardWeek[] {
+  const weeks = new Map<number, DanceCardWeek>();
+  const weekFor = (weekNumber: number) => {
+    const existing = weeks.get(weekNumber);
+    if (existing) return existing;
+    const created: DanceCardWeek = { weekNumber, danceScores: [], outcomes: [] };
+    weeks.set(weekNumber, created);
+    return created;
+  };
+  for (const { weekNumber, ...score } of scores) weekFor(weekNumber).danceScores.push(score);
+  for (const { weekNumber, coupleId, bonusPoints } of bonuses) weekFor(weekNumber).outcomes!.push({ coupleId, bonusPoints });
+  return [...weeks.values()];
+}
+
+// A couple's credits over the weeks one holder had it, in cents.
+export function heldCreditCents(ledger: DanceCardLedger, coupleId: string, fromWeek: number, toWeek: number): number {
+  let cents = 0;
+  for (const [weekNumber, entry] of ledger.get(coupleId) ?? []) {
+    if (weekNumber >= fromWeek && weekNumber <= toWeek) cents += entry.creditCents;
+  }
+  return cents;
+}

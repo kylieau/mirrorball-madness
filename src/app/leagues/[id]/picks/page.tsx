@@ -94,6 +94,7 @@ export default async function LeaguePicksPage({
     rosterSlotPeriods,
     visibleDanceWeeks,
     teamsMode,
+    danceCardRule,
   } = base;
 
   const curtainCallWeekId = upcomingEpisode && curtainCallOn ? upcomingEpisode.id : null;
@@ -157,6 +158,16 @@ export default async function LeaguePicksPage({
           .in("couple_id", [...new Set(leagueSlotPeriods.map((slot) => slot.coupleId))])
           .then((result) => ({ data: result.data as unknown as LeagueDanceRow[] | null }))
       : Promise.resolve({ data: [] as LeagueDanceRow[] });
+  // Dance Card v2 lines are credits on the season curve, so a settled Fantasy
+  // Bonus in any visible week moves every later line.
+  const leagueBonusesPending =
+    danceCardRule.version === "v2" && leagueSlotPeriods.length > 0 && episodeWeekNumber.size > 0
+      ? supabase
+          .from("episode_results")
+          .select("episode_id, couple_id, bonus_points")
+          .in("episode_id", [...episodeWeekNumber.keys()])
+          .neq("bonus_points", 0)
+      : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; bonus_points: number }[] });
   const yourRosterWeekJeopardyPending =
     yourRosterWeekEpisodeIds.length > 0
       ? supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", yourRosterWeekEpisodeIds)
@@ -316,7 +327,7 @@ export default async function LeaguePicksPage({
         })
       : [];
 
-  const { data: leagueDanceScores } = await leagueDanceScoresPending;
+  const [{ data: leagueDanceScores }, { data: leagueBonuses }] = await Promise.all([leagueDanceScoresPending, leagueBonusesPending]);
   const judgePointsInputs = {
     scores: [
       ...excludeReleasedCoupleRows(leagueDanceScores ?? [], draftNight?.releasedCoupleIdsByEpisode ?? {})
@@ -338,6 +349,12 @@ export default async function LeaguePicksPage({
     judgesScoreStartsWeek: scoringSettings?.judges_score_starts_week ?? 1,
     multiplier: scoringSettings?.judges_score_multiplier ?? 1,
     categoryWeight: scoringSettings?.judges_score_category_weight ?? 1,
+    rule: danceCardRule,
+    bonuses: (leagueBonuses ?? []).map((row) => ({
+      weekNumber: episodeWeekNumber.get(row.episode_id) ?? 0,
+      coupleId: row.couple_id,
+      bonusPoints: Number(row.bonus_points),
+    })),
   };
 
   // Your Picks → Your roster: the viewer's roster as it stood in the selected
@@ -364,7 +381,8 @@ export default async function LeaguePicksPage({
   // points, not the season-cumulative total — matches the carousel it sits
   // above, same weighting as danceCardLeagueEntries' weekPoints below.
   const yourRosterWeekTotalPoints = roundPoints(yourRosterWeekRosterPoints * judgePointsInputs.categoryWeight);
-  const yourRosterWeekBonusPoints = yourRosterWeek
+  // Under Dance Card v2 nothing sits outside the couples' credits.
+  const yourRosterWeekBonusPoints = yourRosterWeek && danceCardRule.version === "v1"
     ? weeklyBonusPoints(
         yourRosterWeekRosterPoints,
         judgePointsInputs.categoryWeight,
@@ -454,11 +472,10 @@ export default async function LeaguePicksPage({
         managerId: m.managerId,
         displayName: m.displayName,
         weekPoints: roundPoints(weekRosterPoints * categoryWeight),
-        bonusPoints: weeklyBonusPoints(
-          weekRosterPoints,
-          categoryWeight,
-          couples.map((c) => c.weeklyPoints)
-        ),
+        bonusPoints:
+          danceCardRule.version === "v1"
+            ? weeklyBonusPoints(weekRosterPoints, categoryWeight, couples.map((c) => c.weeklyPoints))
+            : 0,
         couples,
       };
     });

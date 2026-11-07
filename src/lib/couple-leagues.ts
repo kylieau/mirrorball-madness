@@ -4,6 +4,7 @@ import { nextPredictedElimination, type PinnableCouple } from "./grand-finale-pi
 import type { RosterSlotPeriod } from "./roster-couple-points";
 import type { HistoryWeekData } from "./score-history";
 import type { ScoringSettings } from "./scoring";
+import type { DanceCardRule } from "./dance-card-v2";
 import { spoilerSafeCoupleStatus } from "./spoiler-safe-couple-status";
 
 export type CoupleLeagueInput = {
@@ -13,6 +14,7 @@ export type CoupleLeagueInput = {
   myTeamId: string;
   managerNames: ReadonlyMap<string, string>;
   scoring: ScoringSettings;
+  rule?: DanceCardRule;
   anchorWeek: number;
   categoryWeight: number;
   slots: RosterSlotPeriod[];
@@ -42,6 +44,7 @@ export function buildCoupleLeagueRows({
 }): CoupleLeagueRow[] {
   return leagues.flatMap((league) => {
     const standing = buildCouplesLeaderboard({
+      rule: league.rule,
       scoring: league.scoring,
       anchorWeek: league.anchorWeek,
       categoryWeight: league.categoryWeight,

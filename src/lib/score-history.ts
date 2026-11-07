@@ -26,6 +26,7 @@ import {
 } from "./scoring";
 import type { ScoringModuleKey } from "./scoring-modules";
 import { slotActiveInWeek, type RosterSlotPeriod } from "./roster-couple-points";
+import { danceCardLedger, ledgerEntry, type DanceCardRule } from "./dance-card-v2";
 
 export type HistoryModule = ScoringModuleKey;
 export type ScoreHistoryLine = {
@@ -84,6 +85,8 @@ export function weekResults(
 
 export type ManagerHistoryInput = {
   scoring: ScoringSettings;
+  // v1 when absent. Under v2 each couple-week is one line, its credit.
+  danceCardRule?: DanceCardRule;
   anchorWeek: number;
   categoryWeights: CategoryWeights;
   grandFinale: {
@@ -166,6 +169,8 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
   );
   const nameOf = (coupleId: string | null) => (coupleId && coupleNames.get(coupleId)) || "Unknown";
   const lines: ScoreHistoryLine[] = [];
+  const danceCardRule = input.danceCardRule ?? { version: "v1" };
+  const ledger = danceCardRule.version === "v2" ? danceCardLedger(input.weeks, input.anchorWeek, danceCardRule) : null;
 
   const push = (
     weekNumber: number,
@@ -271,6 +276,13 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       const rawLabel = bonusTotal !== 0 ? `${trimNumber(rawTotal - bonusTotal)}+${trimNumber(bonusTotal)}` : trimNumber(rawTotal);
       const judgesLabel =
         rawTotal === judgesTotal && bonusTotal === 0 ? trimNumber(judgesTotal) : `${rawLabel}→${trimNumber(judgesTotal)}`;
+      const entry = ledger ? ledgerEntry(ledger, slot.coupleId, w) : null;
+      if (ledger) {
+        if (entry) {
+          push(w, "danceCard", `judges:${slot.coupleId}`, `${name}: Jdg ${judgesLabel} · Season ${trimNumber(entry.cumulative)}`, entry.creditCents / 100, weight);
+        }
+        continue;
+      }
       push(
         w,
         "danceCard",

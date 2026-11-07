@@ -172,6 +172,7 @@ export default async function LeagueStandingsPage({
   const couplesLeaderboard =
     showLeagueRosters && scoringSettings
       ? buildCouplesLeaderboard({
+          rule: base.danceCardRule,
           scoring: scoringSettingsFromRow(scoringSettings),
           anchorWeek: scoringSettings.judges_score_starts_week,
           categoryWeight: scoringSettings.judges_score_category_weight,

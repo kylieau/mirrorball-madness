@@ -1,5 +1,6 @@
 import { roundPoints } from "./format-points";
 import { collapseToNights, type DanceScore } from "./scoring";
+import { danceCardLedger, danceCardWeeksFromRows, heldCreditCents, ledgerEntry, type DanceCardRule } from "./dance-card-v2";
 
 export type RosterSlotPeriod = {
   managerId: string;
@@ -19,7 +20,8 @@ export function slotActiveInWeek(slot: RosterSlotPeriod, week: number): boolean 
 // placement bonuses are manager-level and stay out of per-couple lines.
 // Pass only slots active in `week`, so each couple appears once. Dance rows
 // are collapsed per night first (collapseToNights), the same way the engine
-// pays them.
+// pays them. Under Dance Card v2 the lines are the couple's credits, which
+// need every earlier visible week and its settled bonuses.
 export function judgePointsThroughWeek({
   slots,
   scores,
@@ -27,6 +29,8 @@ export function judgePointsThroughWeek({
   week,
   multiplier,
   categoryWeight,
+  rule = { version: "v1" },
+  bonuses = [],
 }: {
   slots: RosterSlotPeriod[];
   scores: (DanceScore & { weekNumber: number })[];
@@ -34,9 +38,28 @@ export function judgePointsThroughWeek({
   week: number;
   multiplier: number;
   categoryWeight: number;
+  rule?: DanceCardRule;
+  bonuses?: { weekNumber: number; coupleId: string; bonusPoints: number }[];
 }): Map<string, { week: number; total: number }> {
-  const scale = multiplier * categoryWeight;
   const points = new Map<string, { week: number; total: number }>();
+  if (rule.version === "v2") {
+    const ledger = danceCardLedger(
+      danceCardWeeksFromRows(scores.filter((row) => row.weekNumber <= week), bonuses.filter((b) => b.weekNumber <= week)),
+      judgesScoreStartsWeek,
+      rule
+    );
+    for (const slot of slots) {
+      const firstWeek = Math.max(slot.startWeek, judgesScoreStartsWeek);
+      const lastWeek = Math.min(slot.endWeek ?? week, week);
+      const weekCents = lastWeek === week && firstWeek <= week ? (ledgerEntry(ledger, slot.coupleId, week)?.creditCents ?? 0) : 0;
+      points.set(slot.coupleId, {
+        week: roundPoints((weekCents / 100) * categoryWeight),
+        total: roundPoints((heldCreditCents(ledger, slot.coupleId, firstWeek, lastWeek) / 100) * categoryWeight),
+      });
+    }
+    return points;
+  }
+  const scale = multiplier * categoryWeight;
   const weekOfEpisode = new Map(scores.map((row) => [row.episodeId, row.weekNumber]));
   const nights = collapseToNights(scores).map((night) => ({
     ...night,

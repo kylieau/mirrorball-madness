@@ -72,7 +72,7 @@ export default async function LeagueSettingsPage({
 
   const isCommissioner = viewerMembership.role === "commissioner";
 
-  const season = await loadSeasonContext(supabase, id);
+  const [season, anchorHeld] = await Promise.all([loadSeasonContext(supabase, id), danceCardAnchorHeld(supabase, id, scoringSettings)]);
   // Same trigger update_scoring_categories enforces server-side — this is
   // just a UI hint to avoid a confusing failed-save, not the source of
   // truth. Computed here (real request-time "now", not a client re-guess)
@@ -161,6 +161,7 @@ export default async function LeagueSettingsPage({
           exitHref={closeHref}
           lateUnlock={buildLateUnlock(grandFinaleLocked, memberRows, lateGrandFinale, isCommissioner || isSuperAdmin, viewerMembership.user_id)}
           curtainCallBackfill={curtainCallBackfill}
+          anchorHeld={anchorHeld}
         />
       </div>
     </div>
@@ -365,6 +366,7 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
           exitHref={closeHref}
           lateUnlock={buildLateUnlock(grandFinaleLocked, memberRows, late, true)}
           curtainCallBackfill={curtainCallBackfill}
+          anchorHeld={false}
         />
       </div>
     </div>
@@ -427,4 +429,21 @@ async function loadCurtainCallBackfill(
       backfilled: row.entered_via === "admin_backfill",
     })),
   };
+}
+
+// A v2 league's Anchor Week is held once it has scores this season (the
+// database refuses the change; guard_dance_card_anchor).
+async function danceCardAnchorHeld(
+  supabase: SupabaseClient<Database>,
+  leagueId: string,
+  scoringSettings: { dance_card_version: string } | null
+): Promise<boolean> {
+  if (scoringSettings?.dance_card_version !== "v2") return false;
+  const { data: activeSeasonId } = await supabase.rpc("active_season_id");
+  const { count } = await supabase
+    .from("weekly_manager_scores")
+    .select("week_id, competition_weeks!inner(season_id)", { count: "exact", head: true })
+    .eq("league_id", leagueId)
+    .eq("competition_weeks.season_id", activeSeasonId ?? "");
+  return (count ?? 0) > 0;
 }
