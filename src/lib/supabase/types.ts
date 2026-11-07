@@ -2039,6 +2039,7 @@ export type Database = {
           bonus_picks_tier_pay_style: string
           bonus_picks_tier_size: number | null
           curtain_call_near_miss_enabled: boolean
+          dance_card_version: string
           elimination_prediction_points: number
           eliminations_category_enabled: boolean
           eliminations_category_weight: number
@@ -2070,6 +2071,7 @@ export type Database = {
           bonus_picks_tier_pay_style?: string
           bonus_picks_tier_size?: number | null
           curtain_call_near_miss_enabled?: boolean
+          dance_card_version?: string
           elimination_prediction_points?: number
           eliminations_category_enabled?: boolean
           eliminations_category_weight?: number
@@ -2101,6 +2103,7 @@ export type Database = {
           bonus_picks_tier_pay_style?: string
           bonus_picks_tier_size?: number | null
           curtain_call_near_miss_enabled?: boolean
+          dance_card_version?: string
           elimination_prediction_points?: number
           eliminations_category_enabled?: boolean
           eliminations_category_weight?: number

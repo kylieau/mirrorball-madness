@@ -240,6 +240,23 @@ export function solveStrongPlayCeilings(): SolvedCeilings {
   };
 }
 
+// Dance Card v2 (src/lib/dance-card-v2.ts): k per roster size so a strong
+// median-seat roster's season value, sum of k × (couple's season judges)^p,
+// matches the same full share the v1 multipliers were solved to.
+export function solveDanceCardV2Coefficients(exponent: number): { rosterSize: number; coefficient: number }[] {
+  const ceiling = TARGET_SHARE * POINT_SCALE;
+  return ROSTER_SIZES.map((rosterSize) => {
+    const slots = snakeSlotRanks(rosterSize);
+    const indexes = medianSlotIndexes(slots.length);
+    const seatValue = mean(
+      indexes.map((index) =>
+        slots[index].reduce((sum, rank) => sum + (judgeTotalForRank(rank) * couplePath(rank).weeksDanced) ** exponent, 0)
+      )
+    );
+    return { rosterSize, coefficient: roundMultiplier(ceiling / seatValue) };
+  });
+}
+
 export type GrandFinaleCeilingMethod = keyof SolvedCeilings["pointsPerCorrect"];
 
 export type SolvedCeilings = {

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "./supabase/types";
-import { buildWeeklyScoreRows, type WeeklyScoreRow } from "./weekly-score-rows";
+import { buildWeeklyScoreRows, danceCardPriorWeeks, danceCardWeekRows, type WeeklyScoreRow } from "./weekly-score-rows";
+import type { DanceCardWeek } from "./dance-card-v2";
+import { roundPoints } from "./format-points";
 import {
   inJeopardyIdsToPersist,
   MARK_MAX,
@@ -27,6 +29,10 @@ type SnapshotTeam = Pick<Row<"episode_teams">, "id" | "episode_id" | "name" | "d
 export type PublicationSnapshot = {
   _revision?: string;
   weeklyScores?: WeeklyScoreRow[];
+  // Every stored row for a later week of the season, present once
+  // apply-dance-card-v2.sql is applied: a v2 league's later weeks depend on
+  // this one, so publication rewrites their Dance Card in the same commit.
+  laterWeeklyScores?: WeeklyScoreRow[];
   season: Row<"seasons"> | null;
   episodes: Row<"episodes">[];
   weeks: Row<"competition_weeks">[];
@@ -59,17 +65,94 @@ export type PublicationSnapshot = {
   judges?: { id: string }[];
   guestJudges?: Pick<Row<"episode_guest_judges">, "episode_id" | "judge_id">[];
 };
-// Plans carry planVersion 2 once readers know max_score, and 3 once they score
-// a heat couple by couple; the SQL refuses an older plan for an episode with
-// a Points-mode (2) or couple-by-couple (3) special dance, because older code
-// would pay those rows wrongly.
-export const PLAN_VERSION = 3;
+// Plans carry planVersion 2 once readers know max_score, 3 once they score
+// a heat couple by couple, and 4 once they score Dance Card v2; the SQL
+// refuses an older plan for an episode with a Points-mode (2) or
+// couple-by-couple (3) special dance, or while any league is on v2 (4),
+// because older code would pay those rows wrongly.
+export const PLAN_VERSION = 4;
+export type LaterDanceCardRow = Pick<WeeklyScoreRow, "league_id" | "manager_id" | "week_id" | "roster_points" | "total_points">;
 export type PublicationPlan = {
   planVersion: number;
   coupleUpdates: Pick<Row<"couples">, "id" | "status" | "elimination_week">[];
   futureEpisodeIds: string[];
   weeklyScores: WeeklyScoreRow[];
+  laterDanceCard: LaterDanceCardRow[];
 };
+
+// Settled bonuses of the published nights among `episodeIds`.
+export function settledBonuses(snapshot: PublicationSnapshot, episodeIds: ReadonlySet<string>) {
+  const published = new Set(snapshot.episodes.filter((e) => e.results_published_at).map((e) => e.id));
+  return snapshot.outcomes
+    .filter((r) => episodeIds.has(r.episode_id) && published.has(r.episode_id))
+    .map((r) => ({ coupleId: r.couple_id, bonusPoints: Number(r.bonus_points) }));
+}
+
+// Stored prediction and Grand Finale points with new Dance Card points,
+// combined the way computeWeeklyScores combines them.
+export function recombinedTotal(
+  snapshot: PublicationSnapshot,
+  row: Pick<WeeklyScoreRow, "league_id" | "prediction_points" | "grand_finale_points">,
+  rosterPoints: number
+): number {
+  const settings = snapshot.settings.find((value) => value.league_id === row.league_id)!;
+  return roundPoints(
+    rosterPoints * Number(settings.judges_score_category_weight) +
+      Number(row.prediction_points) * Number(settings.eliminations_category_weight) +
+      Number(row.grand_finale_points) * Number(settings.bonus_picks_category_weight)
+  );
+}
+
+// Every stored later row of every v2 league, rebuilt on top of this week's
+// new inputs: only Dance Card changes, prediction and Grand Finale points
+// stay as stored.
+function laterDanceCardRows(
+  snapshot: PublicationSnapshot,
+  week: Row<"competition_weeks">,
+  thisWeek: DanceCardWeek,
+  couples: Row<"couples">[]
+): LaterDanceCardRow[] {
+  const v2Leagues = new Set(snapshot.settings.filter((s) => s.dance_card_version === "v2").map((s) => s.league_id));
+  const stored = (snapshot.laterWeeklyScores ?? []).filter((row) => v2Leagues.has(row.league_id));
+  if (stored.length === 0) return [];
+  const later = snapshot.weeks
+    .filter((w) => w.week_number > week.week_number && stored.some((row) => row.week_id === w.id))
+    .sort((a, b) => a.week_number - b.week_number);
+  const rows: LaterDanceCardRow[] = [];
+  for (const laterWeek of later) {
+    const episodeIds = new Set(snapshot.episodes.filter((e) => e.week_id === laterWeek.id).map((e) => e.id));
+    const priorWeeks = [
+      ...danceCardPriorWeeks(snapshot, laterWeek.week_number).filter((w) => w.weekNumber !== week.week_number),
+      thisWeek,
+    ];
+    const rebuilt = danceCardWeekRows(
+      {
+        episodes: snapshot.episodes,
+        dances: snapshot.dances.filter((d) => episodeIds.has(d.episode_id)).map(scoringDance),
+        couples,
+        leagues: snapshot.leagues,
+        settings: snapshot.settings,
+        rosters: snapshot.rosters,
+        danceCardPriorWeeks: priorWeeks,
+        danceCardWeekOutcomes: settledBonuses(snapshot, episodeIds),
+      },
+      laterWeek,
+      [...episodeIds][0]
+    );
+    const rosterByKey = new Map(rebuilt.map((row) => [`${row.league_id}:${row.manager_id}`, Number(row.roster_points)]));
+    for (const row of stored.filter((r) => r.week_id === laterWeek.id)) {
+      const roster = rosterByKey.get(`${row.league_id}:${row.manager_id}`) ?? 0;
+      rows.push({
+        league_id: row.league_id,
+        manager_id: row.manager_id,
+        week_id: row.week_id,
+        roster_points: roster,
+        total_points: recombinedTotal(snapshot, row, roster),
+      });
+    }
+  }
+  return rows;
+}
 
 export type ScoringDance = {
   episode_id: string;
@@ -288,7 +371,7 @@ export function buildPublicationPlan(
   // Teams are checked even on an exhibition night, so a half-scored team
   // never slips through just because nothing is scored.
   const teamRows = teamScoreRows(snapshot, episodeId);
-  if (!week) return { planVersion: PLAN_VERSION, coupleUpdates, futureEpisodeIds, weeklyScores: [] };
+  if (!week) return { planVersion: PLAN_VERSION, coupleUpdates, futureEpisodeIds, weeklyScores: [], laterDanceCard: [] };
   const weekEpisodes = new Set(
     snapshot.episodes.filter((e) => e.week_id === week.id).map((e) => e.id)
   );
@@ -320,12 +403,13 @@ export function buildPublicationPlan(
     snapshot.draftJeopardy.filter((r) => r.episode_id === episodeId).map((r) => r.couple_id),
     entries.map((r) => ({ coupleId: r.couple_id, outcome: r.outcome }))
   );
+  const weekOutcomes = snapshot.outcomes.filter((r) => weekEpisodes.has(r.episode_id));
   const weeklyScores = buildWeeklyScoreRows(
     {
       dances,
       episodes: snapshot.episodes,
       couples,
-      outcomes: snapshot.outcomes.filter((r) => weekEpisodes.has(r.episode_id)),
+      outcomes: weekOutcomes,
       jeopardy: [
         ...snapshot.jeopardy.filter(
           (r) => weekEpisodes.has(r.episode_id) && r.episode_id !== episodeId
@@ -338,12 +422,32 @@ export function buildPublicationPlan(
       predictions: snapshot.predictions,
       lateUnlocks: snapshot.lateUnlocks,
       grandFinalePredictions: snapshot.grandFinalePredictions,
+      danceCardPriorWeeks: danceCardPriorWeeks(snapshot, week.week_number),
     },
     week,
     episodeId,
     entries
   );
-  return { planVersion: PLAN_VERSION, coupleUpdates, futureEpisodeIds, weeklyScores };
+  // This week as the later weeks' ledger will see it once committed: these
+  // dances, sibling nights' settled bonuses and this night's entries.
+  const thisWeek: DanceCardWeek = {
+    weekNumber: week.week_number,
+    danceScores: dances.map((d) => ({
+      episodeId: d.episode_id,
+      coupleId: d.couple_id,
+      totalScore: d.total_score,
+      scaledScore: d.scaled_score,
+      maxScore: d.max_score,
+    })),
+    outcomes: [
+      ...weekOutcomes
+        .filter((r) => r.episode_id !== episodeId)
+        .map((r) => ({ coupleId: r.couple_id, bonusPoints: Number(r.bonus_points) })),
+      ...entries.map((r) => ({ coupleId: r.couple_id, bonusPoints: Number(r.bonus_points) })),
+    ],
+  };
+  const laterDanceCard = laterDanceCardRows(snapshot, week, thisWeek, couples);
+  return { planVersion: PLAN_VERSION, coupleUpdates, futureEpisodeIds, weeklyScores, laterDanceCard };
 }
 
 // A live row as the engine scores it. Snapshots taken before
