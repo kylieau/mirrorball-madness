@@ -28,9 +28,11 @@ chose Season 35 (2026-11-07). In order:
    throwaway accounts.
 7. `--verify` after any correction publish.
 
-Open for Kylie: the Score History line (`Harry: Jdg 30 · Season 177.75`);
-whether Finish Week's "Fantasy Bonus (pts)" header needs a note that it joins
-the show score in v2 leagues; the manager explainer. `start_draft` moves the
+Settled (Kylie deferred to the leans, 2026-11-07): the Score History line
+stays `Harry: Jdg 30 · Season 177.75` (the season total explains why the same
+score pays less later in the season); Finish Week's "Fantasy Bonus (pts)"
+header stays as is (site admins only); the member explainer is drafted at
+step 2 from the post-E10 dry run, so it quotes real Week 9 numbers. `start_draft` moves the
 Anchor Week forward; on a v2 league that already has scores (a reset and
 re-draft mid-season) the Anchor Week trigger refuses it, since every week's
 curve value would change. Known limit: on a v1
