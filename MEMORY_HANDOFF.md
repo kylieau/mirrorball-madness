@@ -34,7 +34,6 @@ All committed and pushed on `main`. This sync touches only `MEMORY_HANDOFF.md`.
   - Season 35, switched before E10, commissioners agreed.
   - k₂ = 0.8884, from the schedule model. p = 0.80. The Fantasy Bonus is inside S, and each night keeps paying its own night.
   - Score History keeps v1's wording with the week's effective rate (`Harry: Jdg 30 × 0.257`); Kylie: v2 changes the numbers, not the copy. The Fantasy Bonus header is unchanged.
-  - League Settings keeps v1's Dance Card fields, read-only: the multiplier reads Season Curve, Survival and Place Bonuses show 0. Kylie picked this over the curve note.
   - I told her plainly that v2 is "defensible and consistent", not "most fair". My lean was Season 36 and the advisor agreed; she chose Season 35.
 - **v2 mechanics to keep:**
   - One ledger (`danceCardLedger`, integer cents).
