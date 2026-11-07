@@ -290,11 +290,17 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       const name = nameOf(slot.coupleId);
       const outcome = lastOutcome.get(slot.coupleId);
 
+      // v2 reads like v1: the week's credit over its input is that week's
+      // rate, and a Fantasy Bonus keeps its own line at the same rate.
       if (ledger) {
         const entry = ledgerEntry(ledger, slot.coupleId, w);
-        if (entry) {
-          const label = ledgerLabels.get(slot.coupleId)?.label ?? "0";
-          push(w, "danceCard", `judges:${slot.coupleId}`, `${name}: Jdg ${label} · Season ${trimNumber(entry.cumulative)}`, entry.creditCents / 100, weight);
+        if (entry && entry.input !== 0) {
+          const judges = ledgerLabels.get(slot.coupleId) ?? { label: "0", scaled: 0 };
+          const credit = entry.creditCents / 100;
+          const rate = credit / entry.input;
+          const bonusPoints = roundPoints((entry.input - judges.scaled) * rate);
+          push(w, "danceCard", `judges:${slot.coupleId}`, `${name}: Jdg ${judges.label} × ${trimNumber(rate)}`, credit - bonusPoints, weight);
+          push(w, "danceCard", `bonus:${slot.coupleId}`, `${name}: Bonus`, bonusPoints, weight);
         }
         continue;
       }

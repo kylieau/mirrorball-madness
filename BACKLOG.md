@@ -11,12 +11,11 @@ Management API works); merged to `main` (`ab0fc98`), Vercel deploy succeeded;
 v1 browser check on the new code passed (Home, Picks, Standings with Score
 History open, the couple page, League Settings); all four leagues switched with
 `scripts/dance-card-v2.ts --apply`, `--verify` matches, live totals equal the
-dry run, Curtain Call and Grand Finale unchanged on all 175 archived rows.
+dry run, Curtain Call and Grand Finale unchanged on all 175 archived rows. `apply-dance-card-v2-default.sql` applied (new leagues start on v2).
 
 Still to do:
-- Kylie applies `supabase/apply-dance-card-v2-default.sql` (new leagues start on v2).
 - Kylie looks at a switched league on her phone: Standings, Score History
-  (`Harry: Jdg 30 · Season 177.75` lines), Picks roster lines, League Settings
+  (`Harry: Jdg 30 × 0.257` lines), Picks roster lines, League Settings
   (season-curve line, no Update Anchor). The v2 screens haven't been seen in a
   browser yet.
 - E10 night is the first live v2 publish (rehearsed in
@@ -25,8 +24,10 @@ Still to do:
   scores are posting: un-post every couple first, then `--rollback`.
 - Member note sent by Kylie (draft in the 2026-11-07 session).
 
-Settled (Kylie deferred to the leans, 2026-11-07): the Score History line
-stays `Harry: Jdg 30 · Season 177.75`; Finish Week's "Fantasy Bonus (pts)"
+Settled (Kylie, 2026-11-07): Score History keeps v1's wording, with the
+week's effective rate as the multiplier (`Harry: Jdg 30 × 0.257`, the week's
+credit over its input) and a Fantasy Bonus on its own `Bonus` line at that
+rate; v2 should change the numbers, not the copy. Finish Week's "Fantasy Bonus (pts)"
 header stays as is (site admins only). `start_draft` moves the Anchor Week
 forward; on a v2 league that already has scores (a reset and re-draft
 mid-season) the Anchor Week trigger refuses it. Known limit: on a v1 draft

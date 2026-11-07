@@ -149,14 +149,18 @@ describe("Dance Card v2 readers", () => {
       weekSchedule: weeks.map((w) => ({ weekNumber: w.weekNumber, eliminations: 1 })),
     };
     const lines = buildScoreHistory(input).filter((line) => line.module === "danceCard");
+    const rate = (points: number, weekInput: number) => String(Math.round((points / weekInput) * 1000) / 1000);
+    // Week 3's 2-point Fantasy Bonus keeps its own line at the week's rate.
+    const week3Bonus = Math.round(2 * (credit(18, 44) / 26) * 100) / 100;
     expect(lines.map((line) => [line.weekNumber, line.label, line.points])).toEqual(
       expect.arrayContaining([
-        [4, "Harry: Jdg 27 · Season 71 × 2 Wt", credit(44, 71) * 2],
-        [3, "Harry: Jdg 24 · Season 44 × 2 Wt", credit(18, 44) * 2],
-        [2, "Giada: Jdg 12 · Season 12 × 2 Wt", credit(0, 12) * 2],
+        [4, `Harry: Jdg 27 × ${rate(credit(44, 71), 27)} × 2 Wt`, credit(44, 71) * 2],
+        [3, `Harry: Jdg 24 × ${rate(credit(18, 44), 26)} × 2 Wt`, Math.round((credit(18, 44) - week3Bonus) * 2 * 100) / 100],
+        [3, "Harry: Bonus × 2 Wt", week3Bonus * 2],
+        [2, `Giada: Jdg 12 × ${rate(credit(0, 12), 12)} × 2 Wt`, credit(0, 12) * 2],
       ])
     );
-    expect(lines.some((line) => /Survival|Podium|Bonus/.test(line.label))).toBe(false);
+    expect(lines.some((line) => /Survival|Podium|Season/.test(line.label))).toBe(false);
     const stored = [...storedRosterPoints().values()].reduce((sum, p) => sum + p, 0) * 2;
     expect(lines.reduce((sum, line) => sum + line.points, 0)).toBeCloseTo(stored, 6);
   });
@@ -221,9 +225,11 @@ describe("a two-night week still posting", () => {
       grandFinalePredictions: [],
       weekSchedule: [2, 3, 4].map((weekNumber) => ({ weekNumber, eliminations: 1 })),
     });
-    expect(lines.find((line) => line.weekNumber === 4)).toMatchObject({
-      label: "Harry: Jdg 54 · Season 98",
-      points: credit(42, 98),
-    });
+    const rate = credit(42, 98) / 56;
+    const bonus = Math.round(2 * rate * 100) / 100;
+    expect(lines.filter((line) => line.weekNumber === 4).map((line) => [line.label, line.points])).toEqual([
+      [`Harry: Jdg 54 × ${Math.round(rate * 1000) / 1000}`, Math.round((credit(42, 98) - bonus) * 100) / 100],
+      ["Harry: Bonus", bonus],
+    ]);
   });
 });

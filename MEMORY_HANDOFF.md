@@ -10,8 +10,7 @@
 - `--verify` matches in all four. Live totals equal the dry run, and Curtain Call and Grand Finale are unchanged on all 175 archived rows.
 - The one rank change: Carrie Ann's Biggest Fans, Kylie Au 888.30 now ahead of balla 882.02.
 
-**Not yet done:**
-- Kylie applies `supabase/apply-dance-card-v2-default.sql`, the one line that starts new leagues on v2.
+**Not yet done** (the new-league default SQL is applied):
 - Nobody has looked at the v2 screens in a browser yet. Kylie checks on her phone.
 - E10 (Week 9, Grammy Night, **Tue 2026-11-10 8pm ET**) is the first live v2 publish. It was rehearsed in `src/lib/dance-card-v2-night-db.test.ts`.
 
@@ -34,7 +33,7 @@ All committed and pushed on `main`. This sync touches only `MEMORY_HANDOFF.md`.
 - **Dance Card v2 (Kylie, 2026-11-07):**
   - Season 35, switched before E10, commissioners agreed.
   - k₂ = 0.8884, from the schedule model. p = 0.80. The Fantasy Bonus is inside S, and each night keeps paying its own night.
-  - The Score History line is `Harry: Jdg 30 · Season 177.75`. The Fantasy Bonus header is unchanged.
+  - Score History keeps v1's wording with the week's effective rate (`Harry: Jdg 30 × 0.257`); Kylie: v2 changes the numbers, not the copy. The Fantasy Bonus header is unchanged.
   - I told her plainly that v2 is "defensible and consistent", not "most fair". My lean was Season 36 and the advisor agreed; she chose Season 35.
 - **v2 mechanics to keep:**
   - One ledger (`danceCardLedger`, integer cents).
@@ -56,7 +55,7 @@ See BACKLOG "Dance Card v2 rollout — 2026-11-07" and "Still to see on a real n
 
 **E10 night:**
 - Watch the usual list: the West-feed guard, Winner's Bonus and Winner/Loser, marks surviving a switch, blockers, the strike-through, the couple page "posting live", a loser's "+0".
-- Watch the v2 credits too. Score History lines are now front-loaded, and the Season total explains them.
+- Watch the v2 credits too. Score History rates now vary week to week (front-loaded).
 - **If Finish Week fails mid-night**, a switched league can't go back to v1 while scores are posting. Un-post every couple, then `--rollback`.
 
 Afterwards: `--verify`, then runbook step 8.
