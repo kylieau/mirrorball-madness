@@ -4,40 +4,34 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Dance Card v2 rollout — 2026-11-07
 
-Built on local branch `dance-card-v2` (not pushed: a Vercel preview would run
-against production and send version-4 plans to the old SQL). Plan:
-`docs/design/dance-card-v2/PLAN.md`, passed advisor + Codex review. Kylie
-chose Season 35 (2026-11-07). In order:
+Kylie chose to switch before E10 (2026-11-07), commissioners agreed. Done
+that day: `apply-dance-card-v2.sql` applied and verified (anon refused on the
+switch RPC and the archive); types regenerated from the live project (the
+Management API works); merged to `main` (`ab0fc98`), Vercel deploy succeeded;
+v1 browser check on the new code passed (Home, Picks, Standings with Score
+History open, the couple page, League Settings); all four leagues switched with
+`scripts/dance-card-v2.ts --apply`, `--verify` matches, live totals equal the
+dry run, Curtain Call and Grand Finale unchanged on all 175 archived rows.
 
-1. E10 published as normal on `main` (nothing from the branch before it).
-2. `--dry-run` against production with Week 9 in; review the numbers with Kylie.
-3. Kylie gets each league's commissioner to agree and tells members (Home
-   "overtook" lines and Standings rank arrows rewrite themselves after a switch).
-4. Kylie applies `supabase/apply-dance-card-v2.sql`; verify RPCs with the service
-   role; regenerate types (the branch hand-adds `dance_card_version` and the
-   three RPCs); merge and deploy. Every league is still v1. Then, before any
-   `--apply`, browser-check the v1 path with throwaway accounts: Home league
-   cards, the couple page's In Your Leagues, Score History with a row open,
-   League Settings, Picks and Standings. (A pre-SQL screenshot run on
-   2026-11-07 doesn't count: Home and the couple page now select
-   `dance_card_version`, which production doesn't have until the SQL is in.)
-5. Kylie applies `supabase/apply-dance-card-v2-default.sql`.
-6. Between a publish and the next curtain: `--apply --league <id> --actor <id>`
-   per consenting league, then `--verify`; browser-check Standings, Score
-   History, Home, Picks, the Couples Leaderboard and League Settings with
-   throwaway accounts.
-7. `--verify` after any correction publish.
+Still to do:
+- Kylie applies `supabase/apply-dance-card-v2-default.sql` (new leagues start on v2).
+- Kylie looks at a switched league on her phone: Standings, Score History
+  (`Harry: Jdg 30 · Season 177.75` lines), Picks roster lines, League Settings
+  (season-curve line, no Update Anchor). The v2 screens haven't been seen in a
+  browser yet.
+- E10 night is the first live v2 publish (rehearsed in
+  `dance-card-v2-night-db.test.ts`). Run `--verify` after it publishes. If
+  Finish Week fails mid-night, a switched league can't go back to v1 while
+  scores are posting: un-post every couple first, then `--rollback`.
+- Member note sent by Kylie (draft in the 2026-11-07 session).
 
 Settled (Kylie deferred to the leans, 2026-11-07): the Score History line
-stays `Harry: Jdg 30 · Season 177.75` (the season total explains why the same
-score pays less later in the season); Finish Week's "Fantasy Bonus (pts)"
-header stays as is (site admins only); the member explainer is drafted at
-step 2 from the post-E10 dry run, so it quotes real Week 9 numbers. `start_draft` moves the
-Anchor Week forward; on a v2 league that already has scores (a reset and
-re-draft mid-season) the Anchor Week trigger refuses it, since every week's
-curve value would change. Known limit: on a v1
-draft night a two-night week still shows judges-only Dance Card (a sibling
-night's survival drops until publish); stored picks are now kept.
+stays `Harry: Jdg 30 · Season 177.75`; Finish Week's "Fantasy Bonus (pts)"
+header stays as is (site admins only). `start_draft` moves the Anchor Week
+forward; on a v2 league that already has scores (a reset and re-draft
+mid-season) the Anchor Week trigger refuses it. Known limit: on a v1 draft
+night a two-night week still shows judges-only Dance Card (a sibling night's
+survival drops until publish); stored picks are now kept.
 
 ## Adversarial review of 2026-11-05/06 work (advisor + Codex)
 
