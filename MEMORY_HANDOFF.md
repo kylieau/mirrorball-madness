@@ -1,24 +1,25 @@
-# Session Handoff — 2026-11-07 (elim-pick line, SQL label, season track shipped; E10 setup checked)
+# Session Handoff — 2026-11-07 (Dance Card v2 built on a branch; main untouched for E10)
 
 ## 1. Current State
 
-**`main` is at `de90936`, pushed.** Nothing of ours is uncommitted. Kylie hasn't confirmed Vercel shows `de90936` Ready yet. E10 (Week 9, Grammy Night) airs **Tuesday 2026-11-10, 8pm ET** (`airs_at` 01:00Z Nov 11). Nothing more needs building before it. Kylie has a new task waiting.
+**`main` is at `77d0427` (plus this sync), pushed, and unchanged in code.** It is what E10 (Week 9, Grammy Night) publishes on, **Tuesday 2026-11-10, 8pm ET**. Kylie still needs to confirm Vercel shows `de90936` Ready.
 
-Shipped this session:
-- **Results' double-elimination elim-pick line** (`435e894`, app only). Results now reads `predicted_eliminated_couple_id_2` too, so both picks get a gold "elim pick" line. Browser-checked on Week 7 (the S35 double) with a scratch league, writes blocked.
-- **SQL `special_dance_label` on rule A** (`2b40ea4` + docs `8e5f735`). `supabase/apply-special-dance-label.sql` was **applied live 2026-11-07 and verified** through service-role `special_dance_status`: "Team Dance · Wildcats", "Team Dance · Slaytopia", and the Dance-Offs unchanged. `episode-publication.ts` now calls `specialDanceFullName`. Parity is rehearsed in `special-dance-label-db.test.ts`. Older DB tests whose messages come from the TS plan were updated; ones that assert old-stack SQL messages were left alone.
-- **Home curtain season track ends at the Finale week** (`de90936`, app only). There is one dot per week through `competition_weeks.is_finale` (S35: 11 dots). With no finale marked, it falls back to the old seven-dot padding. Browser-checked on Home at 360/390px, signed in and as a guest.
-- **E10 setup checked on production (read-only):**
-  - Standing panel only, no guests (Kylie confirmed there's no guest judge).
-  - 120 minutes, not a double.
-  - Round 1 Individual Dance, then Round 2 Dance-Off (Winner's Bonus, bonus blank) with three heats: Amber/Ezra, Jenna D/Tatyana, Connor/Maura.
-  - Harry & Jenna immune via the Dance-Off Immunity row.
-  - All 7 active couples have draft lineup rows.
-  - E10 has no round-type chip because "Dance-Off" isn't a managed round type. That's harmless and optional.
+**Dance Card v2 is built on branch `dance-card-v2`, pushed to `origin/dance-card-v2`, and not merged or deployed.** There are 10 commits after `77d0427`, ending at the "copy calls settled" docs commit. Nothing live has changed: no SQL applied and no league switched.
+- The rule: a couple's season value is `round_cents(k_N × S^0.8)`, where S is its weekly inputs from the Anchor Week. Each week pays the change in that value. There are no survival or placement points. k₂ = 0.8884, and the Fantasy Bonus is inside S.
+- Verified:
+  - 894 Vitest tests pass, including PGlite rehearsals of the new SQL on the live stack.
+  - Type-check, lint and `npm run build` pass.
+  - A read-only production dry run reproduces the frozen analysis to the cent in all four leagues, and the v1-rebuild gate passes everywhere.
+- Not verified:
+  - Any v2 screen, which needs the SQL live.
+  - The v1 browser check, which also has to wait for the SQL: Home and the couple page now select `dance_card_version`.
+- Reviews: the plan passed the advisor and Codex (three rounds). Codex's implementation review found no P1 and no v1 scoring change. Its one P2 (two-night weeks still posting) is fixed for Score History, Standings and In Your Leagues, with tests.
+
+**Read on the branch:** `docs/design/dance-card-v2/` (README, PLAN.md rev 3, frozen-rule.json, analysis scripts), the BACKLOG section "Dance Card v2 rollout — 2026-11-07", and the CLAUDE.md bullet "Dance Card v2". The full review with league tables is a private artifact: https://claude.ai/artifact/KyfrJ83pB3WBuTB5b3cudn (league tables stay out of the public repo).
 
 ## 2. Changes Made
 
-All committed and pushed (`435e894`, `2b40ea4`, `8e5f735`, `de90936`). This sync touches only `MEMORY_HANDOFF.md`.
+On `main`, this sync touches only `MEMORY_HANDOFF.md`. All v2 work lives on `dance-card-v2`.
 
 **Not ours; leave unstaged:**
 - `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile.codex`, `.devcontainer/devcontainer-lock.json`
@@ -26,45 +27,57 @@ All committed and pushed (`435e894`, `2b40ea4`, `8e5f735`, `de90936`). This sync
 - `ios/App/App.xcodeproj/project.pbxproj`
 - `supabase/queries/add-*.sql`, `supabase/queries/prefill-*.sql`
 
-`npm run lint` errors come from `.codex-private/` (not ours); `npx eslint src` is clean. `git push` prints a harmless `gh: not found` credential-helper warning, but the push succeeds.
+`npm run lint` errors come from `.codex-private/` (not ours); `npx eslint src` is clean. `git push` prints a harmless `gh: not found` warning.
 
 ## 3. Key Decisions
 
-- **Settled by Kylie, 2026-11-07:**
-  - **The season track counts weeks, not episodes**, ending at the Finale-marked week. I offered per-episode dots; she didn't ask for them.
-  - **The SQL label rewrite shipped before E10** at Kylie's request. Only message text changed.
-- **Settled by Kylie, 2026-11-06:**
-  - **West feed: guard, not mask.** See the BACKLOG "Adversarial review".
-  - **Couple names link from league cards too.** The draft room and a Grand Finale peer's Next elim line are left out.
-  - **Undrafted couples on In Your Leagues show their what-if points.**
-- **Couple page:** no per-week "On your roster" lines, and no roster timeline until Kylie decides the holder-spoiler question after E10.
-- **Carried over:** naming rule A, in the app and now in SQL. The rounds plan stays in the order added and only a site admin edits it. E10 dance-offs use Winner's Bonus, entered on air; a blank bonus holds Finish Week.
-- **SQL ships before the app that reads it.** A push to `main` needs Kylie's yes in that turn (handoff syncs excepted).
-- **Production reads:** service-role REST in throwaway scripts, run from the project root and deleted afterwards. The Management API is blocked.
-- **Unchanged practice:**
-  - Render-check with throwaway accounts and every non-GET aborted (`scripts/qa-screenshots/seed.mjs up|down`). Results takes `?week=<week id>`, not a week number.
-  - Stage by name. Attribution: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-  - **Never `pkill -f`**; use TaskStop.
-  - `rm -rf .next` before `npm run dev` after a build.
-  - Don't run prettier.
-- **Codex runs:** `codex:codex-rescue` sometimes backgrounds itself. If so, fetch the review with `node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs result`.
+- **Dance Card v2, settled by Kylie, 2026-11-07:**
+  - Applies to **Season 35**.
+  - The rest follows the reviewer's leans: k from the schedule model (0.8884 for 2-couple rosters, 2/N-like by roster size); p = 0.80; Fantasy Bonus inside S; each night keeps paying its own night.
+  - Each league's commissioner agrees and members are told before that league switches.
+  - Nothing switches before E10 is published.
+  - Score History line `Harry: Jdg 30 · Season 177.75`. The Fantasy Bonus header stays as is. The member explainer gets drafted from the post-E10 dry run.
+- **v2 design choices to keep:**
+  - One ledger (`danceCardLedger`, integer cents).
+  - A correction to an earlier week updates later weeks atomically via `commit_episode_publication_with_later_weeks`, which wraps the unchanged live commit.
+  - The version-4 gate and the reveal order guard live in `assert_special_dance_plan`.
+  - Switches run only through `scripts/dance-card-v2.ts` and `set_dance_card_points`, with a revision check and exact coverage, and are refused mid-night.
+  - Rollback is a v1 recompute; the archive is for audit only.
+  - A v2 league's Anchor Week can't move once it has scores.
+- **Repo is public:** never commit league standings or member names.
+- **Carried over:**
+  - Season track counts weeks.
+  - West feed: guard, not mask.
+  - Couple names link from league cards.
+  - Naming rule A in app and SQL.
+  - SQL ships before the app that reads it.
+  - A push to `main` needs Kylie's yes in that turn (handoff syncs excepted).
+  - Production reads go through service-role REST in throwaway scripts run from the project root.
+  - Render-check with throwaway accounts (`scripts/qa-screenshots/seed.mjs up|down`).
+  - Stage by name. Never `pkill -f`. `rm -rf .next` before `npm run dev` after a build. Don't run prettier.
 
 ## 4. Backlog & Next Steps
 
-**Before E10:** Kylie confirms Vercel shows `de90936` Ready.
+**E10 night (on `main`):** watch the list in BACKLOG "Still to see on a real night (E10…)" and "Episode rounds":
+- the West-feed guard
+- the Winner's Bonus and Winner/Loser flow
+- special-dance marks surviving a page switch
+- invalid-mark blockers and their new wording
+- the Dance Card strike-through
+- the couple page "posting live"
+- a loser's "+0"
 
-**Watch on E10 night** (BACKLOG "Still to see on a real night (E10…)" and "Episode rounds"):
-- The Finish Week West-feed guard before 10pm PT.
-- The Winner's Bonus, then Winner/Loser per heat, then Finish Week.
-- Special-dance marks surviving switching away and back; an invalid mark blocking Finish Week by name.
-- A four-judge night's score row at 360px. E10 has no guest, so this one may not come up.
-- Home's Dance Card strike-through on a roster with an eliminated couple.
-- The couple page refreshing, with its "posting live" line.
-- A loser's "+0" in the Night Summary, with Home leaving it out.
-- The new error wording ("Team Dance · …") if a blocker fires.
+Afterwards, Kylie runs runbook step 8 for E10.
 
-Afterwards, Kylie runs the runbook step 8 checks for E10.
+**Then Dance Card v2 rollout** (steps in the branch's BACKLOG section):
+1. Dry-run with Week 9 included, and draft the member explainer.
+2. Kylie gets commissioner consent.
+3. Kylie applies `apply-dance-card-v2.sql`.
+4. Verify the SQL, regenerate types, and merge.
+5. Run the v1 browser check.
+6. Kylie applies `apply-dance-card-v2-default.sql`.
+7. `--apply` each consenting league between a publish and the next curtain, then `--verify`.
 
-**After E10, for Kylie** (see BACKLOG): the roster timeline and holder spoiler, as one question. Fixing the spoiler changes some Couples Leaderboard numbers.
+**After E10, for Kylie:** the roster timeline and holder-spoiler question.
 
-Next command: none pending. Kylie has a new task to describe.
+Next command (after E10 is published): `git switch dance-card-v2 && NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --dry-run`
