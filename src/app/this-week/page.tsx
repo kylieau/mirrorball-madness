@@ -168,7 +168,7 @@ export default async function ThisWeekPage({
     selectedMode === "results" && selectedWeekId
       ? supabase
           .from("predictions")
-          .select("league_id, predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
+          .select("league_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
           .in("manager_id", myTeamIds)
           .eq("week_id", selectedWeekId)
           .in("league_id", leagueIds)
@@ -223,8 +223,8 @@ export default async function ThisWeekPage({
   for (const p of pastPredictions ?? []) {
     const leagueName = leagueNameById.get(p.league_id);
     if (!leagueName) continue;
-    if (p.predicted_eliminated_couple_id) {
-      (eliminationPickLeaguesByCouple[p.predicted_eliminated_couple_id] ??= []).push(leagueName);
+    for (const coupleId of new Set([p.predicted_eliminated_couple_id, p.predicted_eliminated_couple_id_2])) {
+      if (coupleId) (eliminationPickLeaguesByCouple[coupleId] ??= []).push(leagueName);
     }
     if (p.predicted_top_scorer_couple_id) {
       (topScorerPickLeaguesByCouple[p.predicted_top_scorer_couple_id] ??= []).push(leagueName);

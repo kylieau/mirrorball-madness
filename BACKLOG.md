@@ -128,9 +128,6 @@ Next slices, in order:
   someone's couple went home. Clamping to the slot active at the cutoff
   changes Couples Leaderboard numbers (a later pickup reads as an undrafted
   what-if). Fix both pages together, never one.
-- Results' gold "elim pick" line reads only `predicted_eliminated_couple_id`,
-  so a double-elimination week's second pick gets no line there (the couple
-  page counts both).
 - More tap targets: done 2026-11-06 (Home Recent Activity, league cards,
   League at a Glance, Grand Finale brackets, Recast, the Eliminated banner),
   browser-checked except the Curtain Call glance list, the Grand Finale
