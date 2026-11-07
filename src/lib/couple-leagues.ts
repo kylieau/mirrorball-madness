@@ -15,6 +15,8 @@ export type CoupleLeagueInput = {
   managerNames: ReadonlyMap<string, string>;
   scoring: ScoringSettings;
   rule?: DanceCardRule;
+  // v2 only: the shown weeks with a posting week's published sibling nights.
+  danceCardWeeks?: Pick<HistoryWeekData, "weekNumber" | "danceScores" | "outcomes">[];
   anchorWeek: number;
   categoryWeight: number;
   slots: RosterSlotPeriod[];
@@ -48,7 +50,7 @@ export function buildCoupleLeagueRows({
       scoring: league.scoring,
       anchorWeek: league.anchorWeek,
       categoryWeight: league.categoryWeight,
-      weeks,
+      weeks: league.danceCardWeeks ?? weeks,
       couples,
       slots: league.slots,
     }).find((row) => row.coupleId === coupleId);

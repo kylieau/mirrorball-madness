@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { danceCardRule } from "@/lib/dance-card-v2";
+import { danceCardRule, danceCardWeekEpisodeIds } from "@/lib/dance-card-v2";
 import { buildCoupleHistory, unwatchedRange, type CoupleHistory, type CoupleHistoryWeekInput } from "@/lib/couple-history";
 import { buildCoupleLeagueRows, coupleWeekPickNotes, type CoupleLeagueRow } from "@/lib/couple-leagues";
 import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
@@ -141,6 +141,23 @@ async function loadCoupleLeagues({
     ])
   );
 
+  // A v2 credit covers the whole week, so v2 leagues read a week still
+  // posting with its published sibling nights; v1 leagues keep the shown weeks.
+  const danceCardWeeks = (settings ?? []).some((setting) => setting.dance_card_version === "v2")
+    ? await loadViewerSeason(supabase, viewerId).then(({ weekRows, episodeRows }) =>
+        loadCoupleWeekResults(
+          supabase,
+          weeks.map((week) => {
+            const weekId = weekRows.find((row) => row.week_number === week.weekNumber)?.id;
+            return {
+              week_number: week.weekNumber,
+              episodeIds: danceCardWeekEpisodeIds(week.episodeIds, episodeRows.filter((episode) => episode.week_id === weekId)),
+            };
+          })
+        )
+      )
+    : null;
+
   const rows = buildCoupleLeagueRows({
     coupleId,
     weeks: weekResults,
@@ -167,6 +184,7 @@ async function loadCoupleLeagues({
           ),
           scoring: scoringSettingsFromRow(setting),
           rule: danceCardRule(setting, rosterSizeByLeague.get(setting.league_id) ?? 0),
+          danceCardWeeks: setting.dance_card_version === "v2" ? (danceCardWeeks ?? undefined) : undefined,
           anchorWeek: setting.judges_score_starts_week,
           categoryWeight: setting.judges_score_category_weight,
           slots: (slots ?? []).flatMap((slot) =>
