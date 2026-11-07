@@ -81,19 +81,27 @@ installs both in one transaction.
   later rows, every later row's new `roster_points` and `total_points`
   (stored prediction and Grand Finale points recombined as
   `computeWeeklyScores` does). `PLAN_VERSION` becomes 4.
-- `commit_episode_publication` (extended from its live body in
-  `apply-episode-rounds.sql`) applies `laterDanceCard` after installing the
-  week: each row must exist, belong to a v2 league and a later week of the
+- `commit_episode_publication_with_later_weeks` calls the unchanged live
+  `commit_episode_publication` and then `apply_later_dance_card`, in the
+  caller's one transaction (built this way rather than by copying the long
+  live body; just as atomic). `apply_later_dance_card` checks the rows after
+  the week is installed: each row must exist, belong to a v2 league and a later week of the
   active season, and the set must cover every stored later row of every v2
   league exactly, with unique keys and finite cent amounts; each total must
   equal `round(roster × w_judges + prediction × w_elim + grand_finale × w_bonus, 2)`
   from the stored prediction and Grand Finale points and current weights,
   within a cent. Only `roster_points` and `total_points` change. It refuses a
   plan below version 4 whenever a v2 league is scored.
-- The reveal commits are extended from their live bodies the same way: the
-  version-4 gate and the order guard, nothing else.
+- The version-4 gate and the reveal order guard live in
+  `assert_special_dance_plan`, which publication and both reveal commits
+  already call, so none of the three live bodies is copied. A publication
+  plan always carries `laterDanceCard` (possibly empty) and a reveal plan
+  never does; that is how the guard tells a reveal apart.
 
-## 4. Database (`supabase/apply-dance-card-v2.sql`, mirrored in `schema.sql`)
+## 4. Database (`supabase/apply-dance-card-v2.sql`)
+
+Like the other recent migrations it is not mirrored into `schema.sql`; the
+DB tests stack it on the live chain.
 
 1. `scoring_settings.dance_card_version text not null default 'v1'`, check
    `('v1','v2')`. Commissioner RPCs never write it.
