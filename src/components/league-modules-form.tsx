@@ -127,7 +127,7 @@ type LockDirection = "before" | "after";
 // A v2 league's Dance Card (src/lib/dance-card-v2.ts). It has no editable
 // point values, so the panel explains the curve instead.
 function danceCardCurveNote(coefficient: number): string {
-  return `Each couple's season is worth ${coefficient} × (judges' total)^${DANCE_CARD_V2_EXPONENT}, counted from the Anchor Week. Each week pays the change, so earlier weeks count a little more. There are no survival or placement points.`;
+  return `Each couple's season is worth ${coefficient} × (judges' total)^${DANCE_CARD_V2_EXPONENT}, counted from the Anchor Week. Each week pays the change, so earlier weeks count a little more.`;
 }
 
 const CURTAIN_CALL_PAYOUT_NOTE =
