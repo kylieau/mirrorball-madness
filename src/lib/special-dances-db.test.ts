@@ -189,7 +189,7 @@ describe("apply-special-dances.sql on a live Disney Night", () => {
     await revealTeam(team1);
     expect((await liveRows(amber)).filter((r) => r.team_id === team1)).toMatchObject([{ total: 36, scaled: 27, max: 40, judges: 4 }]);
     // Wildcats still needs its fourth mark, by name, exactly as before.
-    await expect(revealTeam(cats)).rejects.toThrow(/Team Wildcats has 3 of 4 marks/);
+    await expect(revealTeam(cats)).rejects.toThrow(/Team Dance · Wildcats has 3 of 4 marks/);
     await saveMarks(cats, [8, 8, 8, 8]);
     await finishWeek();
     expect((await liveRows(connor)).map((r) => [r.total, r.max, r.team_id])).toEqual([[33, null, null], [32, 40, cats]]);

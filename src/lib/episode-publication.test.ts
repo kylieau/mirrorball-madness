@@ -58,7 +58,7 @@ describe("buildPublicationPlan", () => {
 
   it("refuses to finish while a team with members has fewer than four marks", () => {
     const half = withTeam(snapshotWithDraftDances([{ style: "contemporary", song: "Easy as Life", marks: [8, 8, 9, 8] }]), [9, 9, 9]);
-    expect(() => buildPublicationPlan(half, "ep")).toThrow(/Team Slaytopia has 3 of four marks/);
+    expect(() => buildPublicationPlan(half, "ep")).toThrow(/Team Dance · Slaytopia has 3 of four marks/);
   });
 
   it("pays every eligible member the team's marks and skips the withdrawn", () => {

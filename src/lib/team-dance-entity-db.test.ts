@@ -145,7 +145,7 @@ describe("team dances as their own entity in PostgreSQL", () => {
     await checkedSave([entry(maura, [], "bye")]);
     await db.query("select public.save_team_marks($1, $2, $3, $4)", [episode, team, friend, JSON.stringify(marks([9, 9, 9], judges))]);
     expect((await db.query("select * from public.episode_team_marks where team_id = $1", [team])).rows).toHaveLength(3);
-    await expect(revealTeam(team)).rejects.toThrow(/Team Slaytopia has 3 of four marks/);
+    await expect(revealTeam(team)).rejects.toThrow(/Team Dance · Slaytopia has 3 of four marks/);
     await expect(db.query("select public.save_team_marks($1, $2, $3, $4)", [episode, team, friend, JSON.stringify(marks([9, 9, 11, 9]))])).rejects.toThrow(/between 0 and 10/);
     await expect(db.query("select public.save_team_marks($1, $2, $3, $4)", [episode, team, outsider, JSON.stringify(marks([9, 9, 9, 9]))])).rejects.toThrow(/Not authorized/);
     await saveMarks(team, [9, 9, 9, 9]);
@@ -225,7 +225,7 @@ describe("team dances as their own entity in PostgreSQL", () => {
     for (const c of [amber, julia, connor, ezra]) await revealCouple(c);
     await db.query("select public.save_team_marks($1, $2, $3, $4)", [episode, cats, friend, JSON.stringify(marks([8, 8, 8], judges))]);
     let data = await snapshot();
-    expect(() => buildPublicationPlan(data, episode)).toThrow(/Team Wildcats has 3 of four marks/);
+    expect(() => buildPublicationPlan(data, episode)).toThrow(/Team Dance · Wildcats has 3 of four marks/);
     const blind = { ...data, teamMarks: [...(data.teamMarks ?? []), { team_id: cats, judge_id: guest, score: 8, updated_at: "", updated_by: null }] } as PublicationSnapshot;
     await expect(
       db.query("select public.commit_episode_publication($1, $2, $3, $4)", [episode, admin, JSON.stringify(data), JSON.stringify(buildPublicationPlan(blind, episode))])

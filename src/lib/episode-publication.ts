@@ -9,7 +9,14 @@ import {
   type Outcome,
 } from "./scoring";
 import { unpostedCoupleIds } from "./reveal-state";
-import { eligibleTeamMembers, isValidPanelSize, SPECIAL_DANCE_MAX_JUDGES, SPECIAL_DANCE_MIN_JUDGES } from "./team-dances";
+import { specialDanceFullName } from "./special-dance-names";
+import {
+  DEFAULT_DANCE_TYPE,
+  eligibleTeamMembers,
+  isValidPanelSize,
+  SPECIAL_DANCE_MAX_JUDGES,
+  SPECIAL_DANCE_MIN_JUDGES,
+} from "./team-dances";
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 // The team columns every snapshot has carried since the entity migration;
@@ -125,7 +132,7 @@ export function teamScoreRows(
         participantIds: (snapshot.participants ?? []).filter((p) => p.episode_id === episodeId).map((p) => p.couple_id),
       }
     );
-    const label = (team.dance_type?.trim() || "Team Dance") === "Team Dance" ? `Team ${team.name}` : team.name;
+    const label = specialDanceFullName({ name: team.name, danceType: team.dance_type?.trim() || DEFAULT_DANCE_TYPE });
     if (team.scoring_mode === "points") {
       const scores = (snapshot.teamScores ?? []).filter((s) => s.team_id === team.id && s.points != null);
       const missing = eligible.filter((coupleId) => !scores.some((s) => s.couple_id === coupleId));

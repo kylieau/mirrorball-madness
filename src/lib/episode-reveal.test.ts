@@ -43,7 +43,7 @@ describe("buildTeamRevealPlan", () => {
   });
 
   it("refuses to post a team with fewer than four marks", () => {
-    expect(() => buildTeamRevealPlan(snapshot({ live: [], teamMarks: [9, 9, 9] }), "ep", "t", false)).toThrow(/Team Slaytopia has 3 of four marks/);
+    expect(() => buildTeamRevealPlan(snapshot({ live: [], teamMarks: [9, 9, 9] }), "ep", "t", false)).toThrow(/Team Dance · Slaytopia has 3 of four marks/);
   });
 
   it("removes only the team's rows on undo and rewrites them in place on re-post", () => {
