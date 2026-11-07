@@ -1,6 +1,8 @@
 import { buildCoupleDisplayNames, formatCoupleName } from "./couple-display";
 import { slotActiveInWeek } from "./roster-couple-points";
 import { computeWeeklyScores, type DanceScore } from "./scoring";
+import { danceCardLedger, weekCredits, type DanceCardV2Rule, type DanceCardWeek } from "./dance-card-v2";
+import { roundPoints } from "./format-points";
 
 // A night with at least one drafted dance released (a couple's own, via
 // draft_couple_releases, or a special dance's, via draft_special_releases --
@@ -179,7 +181,13 @@ export type DraftManagerScore = {
 
 // Judges points only, matching a live reveal: no survival, Curtain Call, or
 // Grand Finale until official publish. Weeks before the league's Anchor Week
-// pay nothing.
+// pay nothing. A Dance Card v2 league pays the week's credits on top of the
+// earlier weeks, with the week's settled sibling-night bonuses.
+export type DraftNightDanceCard = {
+  rule: DanceCardV2Rule;
+  priorWeeks: DanceCardWeek[];
+  weekOutcomes: { coupleId: string; bonusPoints: number }[];
+};
 export function draftWeekManagerScores(input: {
   weekNumber: number;
   anchorWeek: number;
@@ -187,6 +195,7 @@ export function draftWeekManagerScores(input: {
   judgesCategoryWeight: number;
   rosterSlots: { managerId: string; coupleId: string }[];
   danceScores: DanceScore[];
+  danceCard?: DraftNightDanceCard;
 }): DraftManagerScore[] {
   if (input.weekNumber < input.anchorWeek || input.danceScores.length === 0 || input.rosterSlots.length === 0) {
     return [];
@@ -212,6 +221,19 @@ export function draftWeekManagerScores(input: {
     couplesRemaining: 1,
     totalCouples: 1,
     categoryWeights: { judges: input.judgesCategoryWeight, eliminations: 1, bonus: 1 },
+    danceCardCreditByCouple: input.danceCard
+      ? weekCredits(
+          danceCardLedger(
+            [
+              ...input.danceCard.priorWeeks.filter((w) => w.weekNumber < input.weekNumber),
+              { weekNumber: input.weekNumber, danceScores: input.danceScores, outcomes: input.danceCard.weekOutcomes },
+            ],
+            input.anchorWeek,
+            input.danceCard.rule
+          ),
+          input.weekNumber
+        )
+      : undefined,
   }).map((row) => ({
     managerId: row.managerId,
     rosterPoints: row.rosterPoints,
@@ -248,7 +270,8 @@ export function draftManagerScoresForNight(
     judges_score_starts_week: number;
   },
   slots: { manager_id: string; couple_id: string | null; start_week: number; end_week: number | null }[],
-  night: { weekNumber: number; danceScores: DanceScore[] }
+  night: { weekNumber: number; danceScores: DanceScore[] },
+  danceCard?: DraftNightDanceCard
 ): DraftManagerScore[] {
   const rosterSlots = slots.flatMap((slot) => {
     if (!slot.couple_id) return [];
@@ -267,6 +290,7 @@ export function draftManagerScoresForNight(
     judgesCategoryWeight: settings.judges_score_category_weight,
     rosterSlots,
     danceScores: night.danceScores,
+    danceCard,
   });
 }
 
@@ -279,24 +303,38 @@ export type WeekManagerScoreRow = {
   total_points: number;
 };
 
-// Swap the stored week (live-reveal judges points, possibly partial) for the
-// full draft. An empty draft does not wipe points already posted.
+// Swap the stored week's Dance Card (live-reveal judges points, possibly
+// partial) for the full draft. With the league's weights, a published sibling
+// night's stored Curtain Call and Grand Finale points stay in the total. An
+// empty draft does not wipe points already posted.
 export function scoresReplacingDraftWeek(
   rows: WeekManagerScoreRow[],
   weekId: string,
-  managers: DraftManagerScore[]
+  managers: DraftManagerScore[],
+  weights?: { judges_score_category_weight: number; eliminations_category_weight: number; bonus_picks_category_weight: number }
 ): WeekManagerScoreRow[] {
   if (managers.length === 0) return rows;
   return [
     ...rows.filter((row) => row.week_id !== weekId),
-    ...managers.map((manager) => ({
-      week_id: weekId,
-      manager_id: manager.managerId,
-      roster_points: manager.rosterPoints,
-      prediction_points: 0,
-      grand_finale_points: 0,
-      total_points: manager.totalPoints,
-    })),
+    ...managers.map((manager) => {
+      const stored = weights ? rows.find((row) => row.week_id === weekId && row.manager_id === manager.managerId) : undefined;
+      const prediction = Number(stored?.prediction_points ?? 0);
+      const grandFinale = Number(stored?.grand_finale_points ?? 0);
+      return {
+        week_id: weekId,
+        manager_id: manager.managerId,
+        roster_points: manager.rosterPoints,
+        prediction_points: prediction,
+        grand_finale_points: grandFinale,
+        total_points: stored
+          ? roundPoints(
+              manager.rosterPoints * weights!.judges_score_category_weight +
+                prediction * weights!.eliminations_category_weight +
+                grandFinale * weights!.bonus_picks_category_weight
+            )
+          : manager.totalPoints,
+      };
+    }),
   ];
 }
 

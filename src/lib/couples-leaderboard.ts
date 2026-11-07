@@ -1,6 +1,7 @@
 import { roundPoints } from "./format-points";
 import type { RosterSlotPeriod } from "./roster-couple-points";
 import type { HistoryWeekData } from "./score-history";
+import { danceCardLedger, heldCreditCents, type DanceCardRule } from "./dance-card-v2";
 import {
   DANCE_CARD_PLACEMENT_KEY,
   finalPlacementFromRange,
@@ -26,6 +27,8 @@ export type CoupleStanding = {
 // scored as if it had been on a roster since the Anchor Week — a what-if.
 // Mirrors the Dance Card half of `computeWeeklyScores`, category weight
 // included, so a manager's couples add up to their Dance Card module total.
+// Under Dance Card v2 a couple's points are its credits over the held weeks,
+// and nothing sits outside them.
 export function buildCouplesLeaderboard({
   scoring,
   anchorWeek,
@@ -33,7 +36,9 @@ export function buildCouplesLeaderboard({
   weeks,
   couples,
   slots,
+  rule = { version: "v1" },
 }: {
+  rule?: DanceCardRule;
   scoring: ScoringSettings;
   anchorWeek: number;
   categoryWeight: number;
@@ -54,6 +59,22 @@ export function buildCouplesLeaderboard({
     ) {
       holderByCouple.set(slot.coupleId, slot);
     }
+  }
+
+  if (rule.version === "v2") {
+    const ledger = danceCardLedger(weeks, anchorWeek, rule);
+    const lastWeek = Math.max(0, ...weeks.map((week) => week.weekNumber));
+    return couples.map((couple) => {
+      const slot = holderByCouple.get(couple.id);
+      const cents = heldCreditCents(
+        ledger,
+        couple.id,
+        Math.max(anchorWeek, slot?.startWeek ?? anchorWeek),
+        slot?.endWeek ?? lastWeek
+      );
+      const judgesPoints = roundPoints((cents / 100) * categoryWeight);
+      return { coupleId: couple.id, ownerId: slot?.managerId ?? null, judgesPoints, bonusPoints: 0, totalPoints: judgesPoints };
+    });
   }
 
   const judgesRaw = new Map<string, number>();

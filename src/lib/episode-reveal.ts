@@ -1,18 +1,33 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "./supabase/types";
-import { isTeamRow, PLAN_VERSION, scoringDance, teamScoreRows, type PublicationSnapshot, type ScoringDance } from "./episode-publication";
-import { buildWeeklyScoreRows, type WeeklyScoreRow } from "./weekly-score-rows";
+import { isTeamRow, PLAN_VERSION, recombinedTotal, scoringDance, settledBonuses, teamScoreRows, type PublicationSnapshot, type ScoringDance } from "./episode-publication";
+import { buildWeeklyScoreRows, danceCardPriorWeeks, type WeeklyScoreRow } from "./weekly-score-rows";
 import { roundPoints } from "./format-points";
 import { scaledJudgesScore } from "./scoring";
 
 type WeekRow = PublicationSnapshot["weeks"][number];
 
 // Judges points only. Preserve already-paid sibling-night bonuses and
-// predictions until official publication settles the whole week.
+// predictions until official publication settles the whole week. A v1
+// league moves by this night's change; a v2 league's credit isn't linear,
+// so its Dance Card is the whole week rebuilt from everything live,
+// published sibling nights' bonuses included.
 function revealWeeklyScores(snapshot: PublicationSnapshot, week: WeekRow, episodeId: string, before: ScoringDance[], after: ScoringDance[]) {
+  const v2Leagues = new Set(snapshot.settings.filter((row) => row.dance_card_version === "v2").map((row) => row.league_id));
+  const laterWeek = (snapshot.laterWeeklyScores ?? []).find((row) => v2Leagues.has(row.league_id));
+  if (laterWeek) {
+    const number = snapshot.weeks.find((w) => w.id === laterWeek.week_id)?.week_number;
+    throw new Error(`Week ${number} already has scores. Publish weeks in order.`);
+  }
+  const weekEpisodeIds = new Set(snapshot.episodes.filter((row) => row.week_id === week.id).map((row) => row.id));
+  const danceCardInputs = {
+    danceCardPriorWeeks: danceCardPriorWeeks(snapshot, week.week_number),
+    danceCardWeekOutcomes: settledBonuses(snapshot, weekEpisodeIds),
+  };
   const judgeRows = (dances: ScoringDance[]) => buildWeeklyScoreRows({
-    dances, outcomes: [], jeopardy: [], couples: snapshot.couples, leagues: snapshot.leagues,
+    dances, episodes: snapshot.episodes, outcomes: [], jeopardy: [], couples: snapshot.couples, leagues: snapshot.leagues,
     settings: snapshot.settings, rosters: snapshot.rosters, predictions: [], lateUnlocks: [], grandFinalePredictions: [],
+    ...danceCardInputs,
   }, week, episodeId, [], { reveal: true });
   const key = (row: WeeklyScoreRow) => `${row.league_id}:${row.manager_id}`;
   const beforeRows = new Map(judgeRows(before).map((row) => [key(row), row]));
@@ -21,11 +36,12 @@ function revealWeeklyScores(snapshot: PublicationSnapshot, week: WeekRow, episod
   return [...new Set([...afterRows.keys(), ...storedRows.keys()])].map((id) => {
     const stored = storedRows.get(id), afterRow = afterRows.get(id), beforeRow = beforeRows.get(id);
     const row = { ...(afterRow ?? stored!) };
-    row.roster_points = roundPoints(stored ? Number(stored.roster_points) + Number(afterRow?.roster_points ?? 0) - Number(beforeRow?.roster_points ?? 0) : Number(afterRow?.roster_points ?? 0));
+    row.roster_points = v2Leagues.has(row.league_id)
+      ? Number(afterRow?.roster_points ?? 0)
+      : roundPoints(stored ? Number(stored.roster_points) + Number(afterRow?.roster_points ?? 0) - Number(beforeRow?.roster_points ?? 0) : Number(afterRow?.roster_points ?? 0));
     row.prediction_points = Number(stored?.prediction_points ?? 0);
     row.grand_finale_points = Number(stored?.grand_finale_points ?? 0);
-    const settings = snapshot.settings.find((value) => value.league_id === row.league_id)!;
-    row.total_points = roundPoints(row.roster_points * Number(settings.judges_score_category_weight) + row.prediction_points * Number(settings.eliminations_category_weight) + row.grand_finale_points * Number(settings.bonus_picks_category_weight));
+    row.total_points = recombinedTotal(snapshot.settings, row, row.roster_points);
     return row;
   });
 }

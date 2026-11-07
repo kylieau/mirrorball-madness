@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { danceCardRule, danceCardWeekEpisodeIds } from "@/lib/dance-card-v2";
 import { buildCoupleHistory, unwatchedRange, type CoupleHistory, type CoupleHistoryWeekInput } from "@/lib/couple-history";
 import { buildCoupleLeagueRows, coupleWeekPickNotes, type CoupleLeagueRow } from "@/lib/couple-leagues";
 import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
@@ -82,11 +83,11 @@ async function loadCoupleLeagues({
   const ownTeamRow = (row: { league_id: string; manager_id: string }) => teamIdByLeague.get(row.league_id) === row.manager_id;
   const teamIds = [...new Set(teamIdByLeague.values())];
   const [{ data: leagues }, { data: settings }, { data: slots }, { data: members }, weekResults, { data: predictions }, { data: grandFinaleRows }] = await Promise.all([
-    supabase.from("leagues").select("id, draft_status").in("id", leagueIds),
+    supabase.from("leagues").select("id, draft_status, roster_size").in("id", leagueIds),
     supabase
       .from("scoring_settings")
       .select(
-        "league_id, judges_score_category_enabled, judges_score_starts_week, judges_score_category_weight, judges_score_multiplier, survival_points, elimination_prediction_points, top_scorer_prediction_points, first_place_points, second_place_points, third_place_points, fourth_place_points, fifth_place_points, curtain_call_near_miss_enabled"
+        "league_id, dance_card_version, judges_score_category_enabled, judges_score_starts_week, judges_score_category_weight, judges_score_multiplier, survival_points, elimination_prediction_points, top_scorer_prediction_points, first_place_points, second_place_points, third_place_points, fourth_place_points, fifth_place_points, curtain_call_near_miss_enabled"
       )
       .in("league_id", leagueIds),
     supabase.from("roster_slots").select("league_id, manager_id, couple_id, start_week, end_week").in("league_id", leagueIds),
@@ -113,6 +114,7 @@ async function loadCoupleLeagues({
   ]);
   const drafted = new Set((leagues ?? []).filter((l) => l.draft_status === "completed").map((l) => l.id));
   const settingsByLeague = new Map((settings ?? []).map((s) => [s.league_id, s]));
+  const rosterSizeByLeague = new Map((leagues ?? []).map((l) => [l.id, l.roster_size]));
 
   const weekNumberById = new Map(resultWeeks.map((week) => [week.id, week.weekNumber]));
   const picks = (predictions ?? []).filter(ownTeamRow).flatMap((row) => {
@@ -139,6 +141,23 @@ async function loadCoupleLeagues({
     ])
   );
 
+  // A v2 credit covers the whole week, so v2 leagues read a week still
+  // posting with its published sibling nights; v1 leagues keep the shown weeks.
+  const danceCardWeeks = (settings ?? []).some((setting) => setting.dance_card_version === "v2")
+    ? await loadViewerSeason(supabase, viewerId).then(({ weekRows, episodeRows }) =>
+        loadCoupleWeekResults(
+          supabase,
+          weeks.map((week) => {
+            const weekId = weekRows.find((row) => row.week_number === week.weekNumber)?.id;
+            return {
+              week_number: week.weekNumber,
+              episodeIds: danceCardWeekEpisodeIds(week.episodeIds, episodeRows.filter((episode) => episode.week_id === weekId)),
+            };
+          })
+        )
+      )
+    : null;
+
   const rows = buildCoupleLeagueRows({
     coupleId,
     weeks: weekResults,
@@ -164,6 +183,8 @@ async function loadCoupleLeagues({
               ])
           ),
           scoring: scoringSettingsFromRow(setting),
+          rule: danceCardRule(setting, rosterSizeByLeague.get(setting.league_id) ?? 0),
+          danceCardWeeks: setting.dance_card_version === "v2" ? (danceCardWeeks ?? undefined) : undefined,
           anchorWeek: setting.judges_score_starts_week,
           categoryWeight: setting.judges_score_category_weight,
           slots: (slots ?? []).flatMap((slot) =>

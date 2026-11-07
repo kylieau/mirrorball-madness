@@ -418,6 +418,7 @@ export function computeWeeklyScores({
   categoryWeights = { judges: 1, eliminations: 1, bonus: 1 },
   grandFinalePointsByManager = {},
   inJeopardyCoupleIds = [],
+  danceCardCreditByCouple,
 }: {
   scoringSettings: ScoringSettings;
   rosterSlots: RosterSlot[];
@@ -432,6 +433,9 @@ export function computeWeeklyScores({
   // Commissioner ticks on Enter Results, unioned across the week's episodes.
   // Not inferred from judges scores.
   inJeopardyCoupleIds?: string[];
+  // Dance Card v2 (dance-card-v2.ts): each couple's credit this week, which
+  // replaces judges × multiplier, survival, placement and the flat bonus.
+  danceCardCreditByCouple?: Map<string, number>;
 }): WeeklyManagerScore[] {
   // Top scorer compares the combined raw total; Dance Card pays per night.
   const coupleTotalScore = sumDanceScoresByCouple(danceScores);
@@ -455,6 +459,11 @@ export function computeWeeklyScores({
 
   const rosterPointsByManager = new Map<string, number>();
   for (const { managerId, coupleId } of rosterSlots) {
+    if (danceCardCreditByCouple) {
+      const credit = danceCardCreditByCouple.get(coupleId) ?? 0;
+      rosterPointsByManager.set(managerId, (rosterPointsByManager.get(managerId) ?? 0) + credit);
+      continue;
+    }
     let points = (coupleScaledScore.get(coupleId) ?? 0) * scoringSettings.judgesScoreMultiplier;
 
     const outcome = outcomeByCouple.get(coupleId);

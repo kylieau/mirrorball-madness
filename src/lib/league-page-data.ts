@@ -7,6 +7,8 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { groupEpisodesByWeek, liveCompetitionWeek } from "@/lib/competition-week";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
+import { loadDanceCardHistory } from "@/lib/dance-card-history-data";
+import { danceCardRule, danceCardWeekEpisodeIds } from "@/lib/dance-card-v2";
 import { draftManagerScoresForNight, draftNightDanceScores, homeStripChoice, scoresReplacingDraftWeek } from "@/lib/draft-scores";
 import { formatManagerName } from "@/lib/manager-display";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
@@ -139,16 +141,32 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     draftContext,
     bannerWeeks: toBannerWeeks(groupedWeeks),
   });
+  const danceCard = scoringSettings ? danceCardRule(scoringSettings, league.roster_size) : null;
+  const draftHistory =
+    draftNight && danceCard?.version === "v2" && season.seasonId
+      ? await loadDanceCardHistory(supabase, season.seasonId, draftNight.weekNumber + 1)
+      : null;
   const draftManagers =
     draftNight && scoringSettings
-      ? draftManagerScoresForNight(scoringSettings, allLeagueSlots ?? [], {
-          weekNumber: draftNight.weekNumber,
-          danceScores: draftNightDanceScores(draftNight),
-        })
+      ? draftManagerScoresForNight(
+          scoringSettings,
+          allLeagueSlots ?? [],
+          {
+            weekNumber: draftNight.weekNumber,
+            danceScores: draftNightDanceScores(draftNight),
+          },
+          danceCard?.version === "v2" && draftHistory
+            ? {
+                rule: danceCard,
+                priorWeeks: draftHistory,
+                weekOutcomes: draftHistory.find((w) => w.weekNumber === draftNight.weekNumber)?.outcomes ?? [],
+              }
+            : undefined
+        )
       : [];
   const scoreRows =
     draftNight && draftManagers.length > 0
-      ? scoresReplacingDraftWeek(allScores ?? [], draftNight.weekId, draftManagers)
+      ? scoresReplacingDraftWeek(allScores ?? [], draftNight.weekId, draftManagers, scoringSettings ?? undefined)
       : (allScores ?? []);
 
   const pointsByManager = new Map<string, number>();
@@ -289,6 +307,13 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     ...revealingDanceWeek,
     ...draftDanceWeek,
   ].sort((a, b) => a.week_number - b.week_number);
+  // A v2 credit covers the whole week, so a week still posting also counts
+  // its already-published sibling nights (dances and settled bonuses) as
+  // Dance Card input; which nights are displayed stays as above.
+  const danceCardInputWeeks = visibleDanceWeeks.map((week) => ({
+    ...week,
+    episodeIds: danceCardWeekEpisodeIds(week.episodeIds, groupedWeeks.find((w) => w.id === week.id)?.episodes ?? []),
+  }));
 
   // Other leagues' rank and Picks Due load when the switcher opens
   // (getSwitcherSummaries), not on every render and refresh.
@@ -301,6 +326,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     user,
     league,
     scoringSettings,
+    danceCardRule: danceCard ?? ({ version: "v1" } as const),
     danceCardOn,
     waiversOn,
     curtainCallOn,
@@ -343,6 +369,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     leagueSlotPeriods,
     rosterSlotPeriods,
     visibleDanceWeeks,
+    danceCardInputWeeks,
     teamsMode,
     switcherLeagues,
     switcherCurrent: { rank, totalMembers: standings.length },

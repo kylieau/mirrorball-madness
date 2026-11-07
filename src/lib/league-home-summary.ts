@@ -2,7 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
 import { hasCurtainCallPicks } from "@/lib/curtain-call-picks";
-import { draftWeekManagerScores } from "@/lib/draft-scores";
+import { draftWeekManagerScores, scoresReplacingDraftWeek } from "@/lib/draft-scores";
+import { loadDanceCardHistory } from "@/lib/dance-card-history-data";
+import { danceCardRule } from "@/lib/dance-card-v2";
+import { loadActiveSeasonId } from "@/lib/viewer-season-data";
 import type { CurtainCallState } from "@/lib/league-triage";
 import type { DanceScore } from "@/lib/scoring";
 import { slotActiveInWeek } from "@/lib/roster-couple-points";
@@ -57,7 +60,7 @@ export async function computeLeagueHomeSummary(
     supabase
       .from("scoring_settings")
       .select(
-        "judges_score_category_enabled, eliminations_category_enabled, bonus_picks_category_enabled, judges_score_multiplier, judges_score_category_weight, judges_score_starts_week"
+        "judges_score_category_enabled, eliminations_category_enabled, bonus_picks_category_enabled, judges_score_multiplier, judges_score_category_weight, eliminations_category_weight, bonus_picks_category_weight, judges_score_starts_week, dance_card_version"
       )
       .eq("league_id", league.id)
       .single(),
@@ -67,7 +70,10 @@ export async function computeLeagueHomeSummary(
         "user_id, co_manager_id, joined_at, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
       )
       .eq("league_id", league.id),
-supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points").eq("league_id", league.id),
+supabase
+      .from("weekly_manager_scores")
+      .select("week_id, manager_id, roster_points, prediction_points, grand_finale_points, total_points")
+      .eq("league_id", league.id),
   ]);
 
   // A co-manager's auth uid never matches a manager_id/user_id column
@@ -82,10 +88,14 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
 
   // Everything left needs only the settings and myTeamId above, so it goes out
   // as one round instead of a query per module.
-  const [{ data: slots }, { data: grandFinaleDeadlineData }, { data: lockData }, { data: prediction }, { data: ownGrandFinalePick }] =
+  const scoringDraftNight = draftNight && draftNight.dances.length > 0 && scoringSettings ? draftNight : null;
+  const [{ data: slots }, { data: leagueRow }, { data: grandFinaleDeadlineData }, { data: lockData }, { data: prediction }, { data: ownGrandFinalePick }] =
     await Promise.all([
-      draftNight && draftNight.dances.length > 0 && scoringSettings
+      scoringDraftNight
         ? supabase.from("roster_slots").select("manager_id, couple_id, start_week, end_week").eq("league_id", league.id)
+        : Promise.resolve({ data: null }),
+      scoringDraftNight && scoringSettings?.dance_card_version === "v2"
+        ? supabase.from("leagues").select("roster_size").eq("id", league.id).single()
         : Promise.resolve({ data: null }),
       grandFinaleOn
         ? supabase.rpc("effective_grand_finale_deadline", { p_league_id: league.id })
@@ -127,6 +137,9 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
         ? [{ managerId: period.managerId, coupleId: period.coupleId }]
         : [];
     });
+    const rule = leagueRow ? danceCardRule(scoringSettings, leagueRow.roster_size) : null;
+    const seasonId = rule?.version === "v2" ? await loadActiveSeasonId(supabase) : null;
+    const history = rule?.version === "v2" && seasonId ? await loadDanceCardHistory(supabase, seasonId, draftNight.weekNumber + 1) : null;
     const managers = draftWeekManagerScores({
       weekNumber: draftNight.weekNumber,
       anchorWeek: scoringSettings.judges_score_starts_week,
@@ -134,8 +147,21 @@ supabase.from("weekly_manager_scores").select("week_id, manager_id, total_points
       judgesCategoryWeight: scoringSettings.judges_score_category_weight,
       rosterSlots,
       danceScores: draftNight.dances,
+      danceCard:
+        rule?.version === "v2" && history
+          ? {
+              rule,
+              priorWeeks: history,
+              weekOutcomes: history.find((w) => w.weekNumber === draftNight.weekNumber)?.outcomes ?? [],
+            }
+          : undefined,
     });
-    if (managers.length > 0) draftTotals = new Map(managers.map((manager) => [manager.managerId, manager.totalPoints]));
+    if (managers.length > 0) {
+      const replaced = scoresReplacingDraftWeek(scores ?? [], draftNight.weekId, managers, scoringSettings);
+      draftTotals = new Map(
+        replaced.filter((row) => row.week_id === draftNight.weekId).map((row) => [row.manager_id, row.total_points])
+      );
+    }
   }
   const draftWeekId = draftTotals ? draftNight!.weekId : null;
 

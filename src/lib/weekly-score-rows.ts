@@ -11,6 +11,7 @@ import {
   type TierPayStyle,
 } from "./scoring";
 import { eligibleGrandFinalePredictions, scaleGrandFinaleLateFactors } from "./grand-finale-late";
+import { danceCardLedger, danceCardV2Rule, weekCredits, type DanceCardWeek } from "./dance-card-v2";
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 export type WeeklyScoreRow = Pick<
@@ -33,7 +34,8 @@ export type WeekScoringData = {
   outcomes: Pick<Row<"episode_results">, "episode_id" | "couple_id" | "outcome" | "bonus_points">[];
   couples: Pick<Row<"couples">, "id" | "status" | "elimination_week">[];
   jeopardy: Pick<Row<"episode_in_jeopardy_couples">, "couple_id">[];
-  leagues: Pick<Row<"leagues">, "id">[];
+  // roster_size picks a v2 league's coefficient; v1 leagues never read it.
+  leagues: (Pick<Row<"leagues">, "id"> & Partial<Pick<Row<"leagues">, "roster_size">>)[];
   settings: Row<"scoring_settings">[];
   rosters: Pick<
     Row<"roster_slots">,
@@ -42,7 +44,59 @@ export type WeekScoringData = {
   predictions: Row<"predictions">[];
   lateUnlocks: Row<"grand_finale_late_unlocks">[];
   grandFinalePredictions: Row<"grand_finale_predictions">[];
+  // Dance Card v2 only. Every earlier week of the season (danceCardPriorWeeks)
+  // and this week's settled Fantasy Bonuses, which default to the outcomes
+  // scored here; a reveal passes its published sibling nights' instead.
+  danceCardPriorWeeks?: DanceCardWeek[];
+  danceCardWeekOutcomes?: { coupleId: string; bonusPoints: number }[];
 };
+
+// Every live week before `beforeWeekNumber`, as the v2 ledger reads it: all
+// live dance rows (posted or published) and the bonuses of published nights.
+export function danceCardPriorWeeks(
+  data: {
+    episodes: Pick<Row<"episodes">, "id" | "week_id" | "results_published_at">[];
+    weeks: Pick<Row<"competition_weeks">, "id" | "week_number">[];
+    dances: (Pick<Row<"dance_scores">, "episode_id" | "couple_id" | "total_score" | "scaled_score" | "max_score"> & { team_id?: string | null })[];
+    outcomes: Pick<Row<"episode_results">, "episode_id" | "couple_id" | "bonus_points">[];
+  },
+  beforeWeekNumber: number
+): DanceCardWeek[] {
+  const weekNumberById = new Map(data.weeks.map((w) => [w.id, w.week_number]));
+  const episodeWeek = new Map(
+    data.episodes.flatMap((e) => {
+      const weekNumber = e.week_id ? weekNumberById.get(e.week_id) : undefined;
+      return weekNumber !== undefined && weekNumber < beforeWeekNumber ? [[e.id, weekNumber] as const] : [];
+    })
+  );
+  const published = new Set(data.episodes.filter((e) => e.results_published_at).map((e) => e.id));
+  const weeks = new Map<number, DanceCardWeek>();
+  const weekFor = (weekNumber: number) => {
+    const existing = weeks.get(weekNumber);
+    if (existing) return existing;
+    const created: DanceCardWeek = { weekNumber, danceScores: [], outcomes: [] };
+    weeks.set(weekNumber, created);
+    return created;
+  };
+  for (const row of data.dances) {
+    const weekNumber = episodeWeek.get(row.episode_id);
+    if (weekNumber === undefined) continue;
+    weekFor(weekNumber).danceScores.push({
+      episodeId: row.episode_id,
+      coupleId: row.couple_id,
+      totalScore: Number(row.total_score),
+      scaledScore: Number(row.scaled_score),
+      maxScore: row.max_score == null ? null : Number(row.max_score),
+      teamId: row.team_id ?? null,
+    });
+  }
+  for (const row of data.outcomes) {
+    const weekNumber = episodeWeek.get(row.episode_id);
+    if (weekNumber === undefined || !published.has(row.episode_id)) continue;
+    weekFor(weekNumber).outcomes!.push({ coupleId: row.couple_id, bonusPoints: Number(row.bonus_points) });
+  }
+  return [...weeks.values()];
+}
 
 // Publication computes these rows before any live write; the database then
 // installs results and all leagues' scores in one transaction.
@@ -145,6 +199,26 @@ export function buildWeeklyScoreRows(
     // week that aired before it pays nothing, even where picks exist for it.
     const scoringStarted = week.week_number >= scoringSettings.judges_score_starts_week;
 
+    let danceCardCreditByCouple: Map<string, number> | undefined;
+    if (scoringSettings.dance_card_version === "v2") {
+      if (!data.danceCardPriorWeeks || league.roster_size == null)
+        throw new Error("Dance Card v2 needs the season's earlier weeks and the league's roster size");
+      const rule = danceCardV2Rule(league.roster_size);
+      const thisWeek: DanceCardWeek = {
+        weekNumber: week.week_number,
+        danceScores: danceScoreInputs,
+        outcomes: data.danceCardWeekOutcomes ?? rawOutcomeRows,
+      };
+      danceCardCreditByCouple = weekCredits(
+        danceCardLedger(
+          [...data.danceCardPriorWeeks.filter((w) => w.weekNumber < week.week_number), thisWeek],
+          scoringSettings.judges_score_starts_week,
+          rule
+        ),
+        week.week_number
+      );
+    }
+
     let grandFinalePointsByManager: Record<string, number> = {};
     if (scoringStarted && newlyResolvedCoupleIds.length > 0) {
       const grandFinalePredictions = data.grandFinalePredictions.filter(
@@ -233,6 +307,7 @@ export function buildWeeklyScoreRows(
       },
       grandFinalePointsByManager,
       inJeopardyCoupleIds,
+      danceCardCreditByCouple,
     });
 
     rows.push(
@@ -249,3 +324,31 @@ export function buildWeeklyScoreRows(
   }
   return rows;
 }
+
+// v2 leagues' Dance Card for one week from the dances given and that week's
+// settled Fantasy Bonuses, paying nothing else. A reveal, a later week after
+// a correction, and a rebuild from live data all score a week this way.
+export function danceCardWeekRows(
+  data: Pick<WeekScoringData, "episodes" | "dances" | "couples" | "leagues" | "settings" | "rosters" | "danceCardPriorWeeks"> & {
+    danceCardWeekOutcomes: { coupleId: string; bonusPoints: number }[];
+  },
+  week: { id: string; week_number: number; is_double_elimination_week: boolean },
+  episodeId: string
+): WeeklyScoreRow[] {
+  return buildWeeklyScoreRows(
+    {
+      ...data,
+      settings: data.settings.filter((row) => row.dance_card_version === "v2"),
+      outcomes: [],
+      jeopardy: [],
+      predictions: [],
+      lateUnlocks: [],
+      grandFinalePredictions: [],
+    },
+    week,
+    episodeId,
+    [],
+    { reveal: true }
+  );
+}
+

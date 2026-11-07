@@ -2039,6 +2039,7 @@ export type Database = {
           bonus_picks_tier_pay_style: string
           bonus_picks_tier_size: number | null
           curtain_call_near_miss_enabled: boolean
+          dance_card_version: string
           elimination_prediction_points: number
           eliminations_category_enabled: boolean
           eliminations_category_weight: number
@@ -2070,6 +2071,7 @@ export type Database = {
           bonus_picks_tier_pay_style?: string
           bonus_picks_tier_size?: number | null
           curtain_call_near_miss_enabled?: boolean
+          dance_card_version?: string
           elimination_prediction_points?: number
           eliminations_category_enabled?: boolean
           eliminations_category_weight?: number
@@ -2101,6 +2103,7 @@ export type Database = {
           bonus_picks_tier_pay_style?: string
           bonus_picks_tier_size?: number | null
           curtain_call_near_miss_enabled?: boolean
+          dance_card_version?: string
           elimination_prediction_points?: number
           eliminations_category_enabled?: boolean
           eliminations_category_weight?: number
@@ -2331,6 +2334,67 @@ export type Database = {
           },
         ]
       }
+      weekly_manager_scores_archive: {
+        Row: {
+          archived_at: string
+          dance_card_version: string
+          grand_finale_points: number
+          league_id: string
+          manager_id: string
+          migration_id: string
+          prediction_points: number
+          roster_points: number
+          total_points: number
+          week_id: string
+        }
+        Insert: {
+          archived_at?: string
+          dance_card_version: string
+          grand_finale_points: number
+          league_id: string
+          manager_id: string
+          migration_id: string
+          prediction_points: number
+          roster_points: number
+          total_points: number
+          week_id: string
+        }
+        Update: {
+          archived_at?: string
+          dance_card_version?: string
+          grand_finale_points?: number
+          league_id?: string
+          manager_id?: string
+          migration_id?: string
+          prediction_points?: number
+          roster_points?: number
+          total_points?: number
+          week_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_manager_scores_archive_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_manager_scores_archive_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_manager_scores_archive_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "competition_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -2368,6 +2432,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      apply_later_dance_card: {
+        Args: { p_episode_id: string; p_plan: Json }
+        Returns: undefined
       }
       apply_round_exception: {
         Args: {
@@ -2420,6 +2488,15 @@ export type Database = {
         Returns: undefined
       }
       commit_episode_publication: {
+        Args: {
+          p_episode_id: string
+          p_plan: Json
+          p_published_by: string
+          p_snapshot: Json
+        }
+        Returns: undefined
+      }
+      commit_episode_publication_with_later_weeks: {
         Args: {
           p_episode_id: string
           p_plan: Json
@@ -2486,6 +2563,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      dance_card_snapshot: { Args: never; Returns: Json }
       delete_league: { Args: { p_league_id: string }; Returns: undefined }
       delete_special_dance: {
         Args: { p_actor_id: string; p_episode_id: string; p_team_id: string }
@@ -2842,6 +2920,17 @@ export type Database = {
         Args: { p_league_id: string; p_user_ids: string[] }
         Returns: undefined
       }
+      set_dance_card_points: {
+        Args: {
+          p_actor_id: string
+          p_league_id: string
+          p_migration_id: string
+          p_revision: string
+          p_rows: Json
+          p_version: string
+        }
+        Returns: number
+      }
       set_draft_autopilot: {
         Args: { p_enabled: boolean; p_league_id: string }
         Returns: boolean
@@ -3096,6 +3185,7 @@ export type Database = {
           bonus_picks_tier_pay_style: string
           bonus_picks_tier_size: number | null
           curtain_call_near_miss_enabled: boolean
+          dance_card_version: string
           elimination_prediction_points: number
           eliminations_category_enabled: boolean
           eliminations_category_weight: number
@@ -3140,6 +3230,7 @@ export type Database = {
           bonus_picks_tier_pay_style: string
           bonus_picks_tier_size: number | null
           curtain_call_near_miss_enabled: boolean
+          dance_card_version: string
           elimination_prediction_points: number
           eliminations_category_enabled: boolean
           eliminations_category_weight: number
