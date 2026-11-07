@@ -1,0 +1,25 @@
+{
+ "frozen_at_utc": "2026-11-07T00:51:42.633492Z",
+ "frozen_before": "any league or manager standings were computed under this review (couple-level metrics only so far)",
+ "name": "dance_card.v2.concave_judges",
+ "exponent_p": 0.8,
+ "coefficient_rule": "k_N = 100 / E[sum over a median-seat N-couple roster of (couple season judges total)^p] on the app's schedule model (src/lib/strong-play-ceilings.ts: 12 couples, 4-couple finale, judges 28->21). Same yardstick that produced legacy 0.2449. No couple or manager outcomes used.",
+ "k_by_roster_size": {
+  "1": 1.7309,
+  "2": 0.8884,
+  "3": 0.6117,
+  "4": 0.4589
+ },
+ "weekly_input": "per night: collapseToNights (all marks over all marks possible x30, points rows in numerator only; Kylie 2026-11-04), summed over a week's nights; episode_results.bonus_points added to the week's input like a points row (provisional; zero in all published data)",
+ "start_week": "league Anchor Week (judges_score_starts_week) = 2 for all four leagues = first week after each draft completed",
+ "survival_points": 0,
+ "placement_points": [
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "rounding": "per league per couple: V(t)=round_half_up_cents(k_N * S(t)^p); weekly couple increment = V(t)-V(t-1); manager roster_points(week) = sum of its couples' increments; total = round_cents(roster*w_judges + stored prediction*w_elim + stored GF*w_bonus)",
+ "unchanged": "rosters, Curtain Call and Grand Finale stored points, module weights, Anchor Week"
+}
