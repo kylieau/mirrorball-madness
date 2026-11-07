@@ -15,7 +15,12 @@ chose Season 35 (2026-11-07). In order:
    "overtook" lines and Standings rank arrows rewrite themselves after a switch).
 4. Kylie applies `supabase/apply-dance-card-v2.sql`; verify RPCs with the service
    role; regenerate types (the branch hand-adds `dance_card_version` and the
-   three RPCs); merge and deploy. Every league is still v1.
+   three RPCs); merge and deploy. Every league is still v1. Then, before any
+   `--apply`, browser-check the v1 path with throwaway accounts: Home league
+   cards, the couple page's In Your Leagues, Score History with a row open,
+   League Settings, Picks and Standings. (A pre-SQL screenshot run on
+   2026-11-07 doesn't count: Home and the couple page now select
+   `dance_card_version`, which production doesn't have until the SQL is in.)
 5. Kylie applies `supabase/apply-dance-card-v2-default.sql`.
 6. Between a publish and the next curtain: `--apply --league <id> --actor <id>`
    per consenting league, then `--verify`; browser-check Standings, Score
@@ -25,7 +30,10 @@ chose Season 35 (2026-11-07). In order:
 
 Open for Kylie: the Score History line (`Harry: Jdg 30 · Season 177.75`);
 whether Finish Week's "Fantasy Bonus (pts)" header needs a note that it joins
-the show score in v2 leagues; the manager explainer. Known limit: on a v1
+the show score in v2 leagues; the manager explainer. `start_draft` moves the
+Anchor Week forward; on a v2 league that already has scores (a reset and
+re-draft mid-season) the Anchor Week trigger refuses it, since every week's
+curve value would change. Known limit: on a v1
 draft night a two-night week still shows judges-only Dance Card (a sibling
 night's survival drops until publish); stored picks are now kept.
 

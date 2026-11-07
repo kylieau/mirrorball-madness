@@ -176,7 +176,7 @@ export default async function LeagueStandingsPage({
           scoring: scoringSettingsFromRow(scoringSettings),
           anchorWeek: scoringSettings.judges_score_starts_week,
           categoryWeight: scoringSettings.judges_score_category_weight,
-          weeks: replaceWeekDanceScores(await loadCoupleWeekResults(supabase, visibleDanceWeeks), draftNight && draftNight.dances.length > 0
+          weeks: replaceWeekDanceScores(await loadCoupleWeekResults(supabase, base.danceCardRule.version === "v2" ? base.danceCardInputWeeks : visibleDanceWeeks), draftNight && draftNight.dances.length > 0
             ? {
                 weekNumber: draftNight.weekNumber,
                 danceScores: draftDanceScores(draftNight.dances),

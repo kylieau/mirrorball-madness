@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCouplesLeaderboard } from "./couples-leaderboard";
-import { coupleValueCents, danceCardV2Rule, type DanceCardWeek } from "./dance-card-v2";
+import { coupleValueCents, danceCardV2Rule, danceCardWeekEpisodeIds, type DanceCardWeek } from "./dance-card-v2";
 import { draftWeekManagerScores, scoresReplacingDraftWeek } from "./draft-scores";
 import { judgePointsThroughWeek } from "./roster-couple-points";
 import { buildScoreHistory, type HistoryWeekData, type ManagerHistoryInput } from "./score-history";
@@ -182,5 +182,48 @@ describe("Dance Card v2 readers", () => {
     expect(replaced).toEqual([
       { week_id: "w4", manager_id: "m", roster_points: credit(44, 71), prediction_points: 3, grand_finale_points: 1, total_points: Math.round((credit(44, 71) * 2 + 4) * 100) / 100 },
     ]);
+  });
+});
+
+describe("a two-night week still posting", () => {
+  // Night 1 (published) scored 24 with a 2-point Fantasy Bonus; night 2 is
+  // posting a 30. Harry came in with 42.
+  const prior: HistoryWeekData[] = [
+    { weekNumber: 2, danceScores: [dance("e2", "harry", 18)], outcomes: [{ coupleId: "harry", outcome: "safe", bonusPoints: 0 }], inJeopardyCoupleIds: [], isDoubleElimination: false },
+    { weekNumber: 3, danceScores: [dance("e3", "harry", 24)], outcomes: [{ coupleId: "harry", outcome: "safe", bonusPoints: 0 }], inJeopardyCoupleIds: [], isDoubleElimination: false },
+  ];
+  const fullWeek: HistoryWeekData = {
+    weekNumber: 4,
+    danceScores: [dance("n1", "harry", 24), dance("n2", "harry", 30)],
+    outcomes: [{ coupleId: "harry", outcome: "safe", bonusPoints: 2 }],
+    inJeopardyCoupleIds: [],
+    isDoubleElimination: false,
+  };
+  const shownWeek: HistoryWeekData = { ...fullWeek, danceScores: [dance("n2", "harry", 30)], outcomes: [] };
+
+  it("reads the published sibling night as input, whichever nights are shown", () => {
+    expect(danceCardWeekEpisodeIds(["n2"], [{ id: "n1", results_published_at: "2026-11-11" }, { id: "n2", results_published_at: null }])).toEqual(["n2", "n1"]);
+  });
+
+  it("Score History credits the whole week while showing the posting night", () => {
+    const lines = buildScoreHistory({
+      scoring,
+      danceCardRule: rule,
+      danceCardWeeks: [...prior, fullWeek],
+      anchorWeek: 2,
+      categoryWeights: { judges: 1, eliminations: 1, bonus: 1 },
+      grandFinale: { method: "distance_based", distancePenalty: 1, tierSize: null, tierPayStyle: "equal", pointsPerCorrect: 6 },
+      couples,
+      coupleNames: new Map([["harry", "Harry"]]),
+      weeks: [...prior, shownWeek],
+      rosterSlots: slots.slice(0, 1),
+      predictions: [],
+      grandFinalePredictions: [],
+      weekSchedule: [2, 3, 4].map((weekNumber) => ({ weekNumber, eliminations: 1 })),
+    });
+    expect(lines.find((line) => line.weekNumber === 4)).toMatchObject({
+      label: "Harry: Jdg 54 · Season 98",
+      points: credit(42, 98),
+    });
   });
 });

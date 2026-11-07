@@ -87,6 +87,9 @@ export type ManagerHistoryInput = {
   scoring: ScoringSettings;
   // v1 when absent. Under v2 each couple-week is one line, its credit.
   danceCardRule?: DanceCardRule;
+  // v2 only: the weeks as the ledger reads them, when a week still posting
+  // shows fewer nights than its credit covers (a published sibling night).
+  danceCardWeeks?: Pick<HistoryWeekData, "weekNumber" | "danceScores" | "outcomes">[];
   anchorWeek: number;
   categoryWeights: CategoryWeights;
   grandFinale: {
@@ -148,6 +151,26 @@ function verdictLabel(verdict: CurtainCallVerdict): string {
   return verdict === "exact" ? HIT_MARK : "🤏";
 }
 
+// Each couple's week as Score History labels it: the TV total and, for a
+// guest-judge or multi-dance night, the 30-point basis it pays on
+// ("Jdg 64→24"); bonus-round points sit beside the marks ("Jdg 64+3→25.13").
+function weekJudgesLabels(danceScores: HistoryWeekData["danceScores"]): Map<string, { label: string; scaled: number }> {
+  const totals = sumDanceScoresByCouple(danceScores);
+  const scaledTotals = nightScaledScoresByCouple(danceScores);
+  const bonusTotals = new Map<string, number>();
+  for (const night of collapseToNights(danceScores)) {
+    bonusTotals.set(night.coupleId, (bonusTotals.get(night.coupleId) ?? 0) + night.bonusScore);
+  }
+  return new Map(
+    [...totals].map(([coupleId, rawTotal]) => {
+      const scaled = scaledTotals.get(coupleId) ?? 0;
+      const bonus = bonusTotals.get(coupleId) ?? 0;
+      const rawLabel = bonus !== 0 ? `${trimNumber(rawTotal - bonus)}+${trimNumber(bonus)}` : trimNumber(rawTotal);
+      return [coupleId, { label: rawTotal === scaled && bonus === 0 ? trimNumber(scaled) : `${rawLabel}→${trimNumber(scaled)}`, scaled }];
+    })
+  );
+}
+
 // Reconstructs one manager's nonzero point-contribution lines from the same
 // helpers and inputs the scoring engine uses — no stored ledger. Lines carry
 // the category weight, so they sum (within rounding) to the weighted module
@@ -170,7 +193,8 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
   const nameOf = (coupleId: string | null) => (coupleId && coupleNames.get(coupleId)) || "Unknown";
   const lines: ScoreHistoryLine[] = [];
   const danceCardRule = input.danceCardRule ?? { version: "v1" };
-  const ledger = danceCardRule.version === "v2" ? danceCardLedger(input.weeks, input.anchorWeek, danceCardRule) : null;
+  const ledgerWeeks = input.danceCardWeeks ?? input.weeks;
+  const ledger = danceCardRule.version === "v2" ? danceCardLedger(ledgerWeeks, input.anchorWeek, danceCardRule) : null;
 
   const push = (
     weekNumber: number,
@@ -200,11 +224,10 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
     const w = week.weekNumber;
     if (w < input.anchorWeek) continue;
     const totals = sumDanceScoresByCouple(week.danceScores);
-    const scaledTotals = nightScaledScoresByCouple(week.danceScores);
-    const bonusTotals = new Map<string, number>();
-    for (const night of collapseToNights(week.danceScores)) {
-      bonusTotals.set(night.coupleId, (bonusTotals.get(night.coupleId) ?? 0) + night.bonusScore);
-    }
+    const judgesLabels = weekJudgesLabels(week.danceScores);
+    const ledgerLabels = ledger
+      ? weekJudgesLabels(ledgerWeeks.find((lw) => lw.weekNumber === w)?.danceScores ?? week.danceScores)
+      : judgesLabels;
     const lastOutcome = new Map(week.outcomes.map((o) => [o.coupleId, o]));
     const resolvedThisWeek = [...lastOutcome.values()]
       .filter((o) => RESOLVING_OUTCOMES.has(o.outcome) && positionRanges.has(o.coupleId));
@@ -267,28 +290,21 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       const name = nameOf(slot.coupleId);
       const outcome = lastOutcome.get(slot.coupleId);
 
-      const rawTotal = totals.get(slot.coupleId) ?? 0;
-      const judgesTotal = scaledTotals.get(slot.coupleId) ?? 0;
-      const bonusTotal = bonusTotals.get(slot.coupleId) ?? 0;
-      // A guest-judge or multi-dance night shows the TV total and the
-      // 30-point basis it pays on ("Jdg 64→24"); bonus-round points sit
-      // beside the marks ("Jdg 64+3→25.13").
-      const rawLabel = bonusTotal !== 0 ? `${trimNumber(rawTotal - bonusTotal)}+${trimNumber(bonusTotal)}` : trimNumber(rawTotal);
-      const judgesLabel =
-        rawTotal === judgesTotal && bonusTotal === 0 ? trimNumber(judgesTotal) : `${rawLabel}→${trimNumber(judgesTotal)}`;
-      const entry = ledger ? ledgerEntry(ledger, slot.coupleId, w) : null;
       if (ledger) {
+        const entry = ledgerEntry(ledger, slot.coupleId, w);
         if (entry) {
-          push(w, "danceCard", `judges:${slot.coupleId}`, `${name}: Jdg ${judgesLabel} · Season ${trimNumber(entry.cumulative)}`, entry.creditCents / 100, weight);
+          const label = ledgerLabels.get(slot.coupleId)?.label ?? "0";
+          push(w, "danceCard", `judges:${slot.coupleId}`, `${name}: Jdg ${label} · Season ${trimNumber(entry.cumulative)}`, entry.creditCents / 100, weight);
         }
         continue;
       }
+      const judges = judgesLabels.get(slot.coupleId) ?? { label: "0", scaled: 0 };
       push(
         w,
         "danceCard",
         `judges:${slot.coupleId}`,
-        `${name}: Jdg ${judgesLabel} × ${trimNumber(scoring.judgesScoreMultiplier)}`,
-        judgesTotal * scoring.judgesScoreMultiplier,
+        `${name}: Jdg ${judges.label} × ${trimNumber(scoring.judgesScoreMultiplier)}`,
+        judges.scaled * scoring.judgesScoreMultiplier,
         weight
       );
 

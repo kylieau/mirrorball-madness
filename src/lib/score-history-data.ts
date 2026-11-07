@@ -5,7 +5,7 @@ import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { excludeReleasedCoupleRows, unpostedDraftDances } from "@/lib/draft-scores";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
-import { danceCardRule } from "@/lib/dance-card-v2";
+import { danceCardRule, danceCardWeekEpisodeIds } from "@/lib/dance-card-v2";
 import { buildScoreHistory, weekResults, type HistoryWeekData, type ScoreHistoryLine } from "@/lib/score-history";
 import { scoringSettingsFromRow, type GrandFinaleMethod, type TierPayStyle } from "@/lib/scoring";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
@@ -85,7 +85,16 @@ export async function loadScoreHistory(
   const allowedWeeks = [...completedAllowedWeeks, ...(revealingWeek ? [revealingWeek] : []), ...draftHistoryWeek];
   if (allowedWeeks.length === 0) return { lines: [], error: null };
 
-  const episodeIds = allowedWeeks.flatMap((week) => week.episodes.map((episode) => episode.id));
+  // A v2 credit covers the whole week, so a week still posting also reads its
+  // published sibling nights as Dance Card input; the lines shown don't change.
+  const rule = danceCardRule(settings, league.roster_size);
+  const danceCardEpisodeIds = (week: (typeof allowedWeeks)[number]) => {
+    const shown = week.episodes.map((episode) => episode.id);
+    return rule.version === "v2"
+      ? danceCardWeekEpisodeIds(shown, groupedWeeks.find((w) => w.id === week.id)?.episodes ?? [])
+      : shown;
+  };
+  const episodeIds = allowedWeeks.flatMap(danceCardEpisodeIds);
   const weekIds = completedAllowedWeeks.map((week) => week.id);
 
   const [
@@ -169,7 +178,14 @@ export async function loadScoreHistory(
 
   const lines = buildScoreHistory({
     scoring: scoringSettingsFromRow(settings),
-    danceCardRule: danceCardRule(settings, league.roster_size),
+    danceCardRule: rule,
+    danceCardWeeks:
+      rule.version === "v2"
+        ? allowedWeeks.map((week) => ({
+            weekNumber: week.week_number,
+            ...weekResults(danceCardEpisodeIds(week), historyDanceRows, outcomeRows ?? []),
+          }))
+        : undefined,
     anchorWeek: settings.judges_score_starts_week,
     categoryWeights: {
       judges: settings.judges_score_category_weight,

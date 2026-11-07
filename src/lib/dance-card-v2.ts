@@ -140,3 +140,12 @@ export function heldCreditCents(ledger: DanceCardLedger, coupleId: string, fromW
   }
   return cents;
 }
+
+// A v2 credit covers a couple's whole week, so a week still posting reads
+// its already-published sibling nights too, whichever nights a page shows.
+export function danceCardWeekEpisodeIds(
+  shownEpisodeIds: string[],
+  weekEpisodes: { id: string; results_published_at?: string | null }[]
+): string[] {
+  return [...new Set([...shownEpisodeIds, ...weekEpisodes.filter((e) => e.results_published_at).map((e) => e.id)])];
+}
