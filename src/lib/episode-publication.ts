@@ -81,7 +81,7 @@ export type PublicationPlan = {
 };
 
 // Settled bonuses of the published nights among `episodeIds`.
-export function settledBonuses(snapshot: PublicationSnapshot, episodeIds: ReadonlySet<string>) {
+export function settledBonuses(snapshot: Pick<PublicationSnapshot, "episodes" | "outcomes">, episodeIds: ReadonlySet<string>) {
   const published = new Set(snapshot.episodes.filter((e) => e.results_published_at).map((e) => e.id));
   return snapshot.outcomes
     .filter((r) => episodeIds.has(r.episode_id) && published.has(r.episode_id))
@@ -91,11 +91,11 @@ export function settledBonuses(snapshot: PublicationSnapshot, episodeIds: Readon
 // Stored prediction and Grand Finale points with new Dance Card points,
 // combined the way computeWeeklyScores combines them.
 export function recombinedTotal(
-  snapshot: PublicationSnapshot,
+  allSettings: Row<"scoring_settings">[],
   row: Pick<WeeklyScoreRow, "league_id" | "prediction_points" | "grand_finale_points">,
   rosterPoints: number
 ): number {
-  const settings = snapshot.settings.find((value) => value.league_id === row.league_id)!;
+  const settings = allSettings.find((value) => value.league_id === row.league_id)!;
   return roundPoints(
     rosterPoints * Number(settings.judges_score_category_weight) +
       Number(row.prediction_points) * Number(settings.eliminations_category_weight) +
@@ -147,7 +147,7 @@ function laterDanceCardRows(
         manager_id: row.manager_id,
         week_id: row.week_id,
         roster_points: roster,
-        total_points: recombinedTotal(snapshot, row, roster),
+        total_points: recombinedTotal(snapshot.settings, row, roster),
       });
     }
   }
@@ -483,7 +483,7 @@ export async function publishEpisodeAtomically(
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not prepare publication" };
   }
-  const committed = await admin.rpc("commit_episode_publication", {
+  const committed = await admin.rpc("commit_episode_publication_with_later_weeks", {
     p_episode_id: episodeId,
     p_published_by: publishedBy,
     p_snapshot: data,

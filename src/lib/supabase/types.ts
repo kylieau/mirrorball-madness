@@ -2431,6 +2431,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      commit_episode_publication_with_later_weeks: {
+        Args: {
+          p_episode_id: string
+          p_plan: Json
+          p_published_by: string
+          p_snapshot: Json
+        }
+        Returns: undefined
+      }
       commit_episode_reveal: {
         Args: {
           p_actor_id: string
@@ -2490,6 +2499,7 @@ export type Database = {
         }
       }
       delete_league: { Args: { p_league_id: string }; Returns: undefined }
+      dance_card_snapshot: { Args: never; Returns: Json }
       delete_special_dance: {
         Args: { p_actor_id: string; p_episode_id: string; p_team_id: string }
         Returns: undefined
@@ -2844,6 +2854,17 @@ export type Database = {
       set_custom_draft_order: {
         Args: { p_league_id: string; p_user_ids: string[] }
         Returns: undefined
+      }
+      set_dance_card_points: {
+        Args: {
+          p_actor_id: string
+          p_league_id: string
+          p_migration_id: string | null
+          p_revision: string
+          p_rows: Json
+          p_version: string | null
+        }
+        Returns: number
       }
       set_draft_autopilot: {
         Args: { p_enabled: boolean; p_league_id: string }

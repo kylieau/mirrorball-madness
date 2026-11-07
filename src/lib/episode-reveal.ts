@@ -41,7 +41,7 @@ function revealWeeklyScores(snapshot: PublicationSnapshot, week: WeekRow, episod
       : roundPoints(stored ? Number(stored.roster_points) + Number(afterRow?.roster_points ?? 0) - Number(beforeRow?.roster_points ?? 0) : Number(afterRow?.roster_points ?? 0));
     row.prediction_points = Number(stored?.prediction_points ?? 0);
     row.grand_finale_points = Number(stored?.grand_finale_points ?? 0);
-    row.total_points = recombinedTotal(snapshot, row, row.roster_points);
+    row.total_points = recombinedTotal(snapshot.settings, row, row.roster_points);
     return row;
   });
 }
