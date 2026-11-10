@@ -1,24 +1,31 @@
-# Session Handoff — 2026-11-07 (Dance Card v2 live in all four leagues)
+# Session Handoff — 2026-11-10 (Dance Card v3 live in all four leagues)
 
 ## 1. Current State
 
-**Dance Card v2 is live in all four Season 35 leagues.** `main` is at `a4127d4` (plus this sync), pushed. Vercel deployed the merge (`ab0fc98`, success).
-- `supabase/apply-dance-card-v2.sql` is applied and verified. Anon is refused on the switch RPC and the archive.
-- Types were regenerated from the live project. The Management API works; the old note saying it was blocked was wrong.
-- The v1 browser check on the new code passed before switching: Home, Picks, Standings with Score History open, the couple page and League Settings.
-- The switch, with commissioners agreed per Kylie, covered Pen & Paso, matt with the stars, #supportSWEKylie and Carrie Ann's Biggest Fans. Each ran `scripts/dance-card-v2.ts --apply` with actor `d40ab813-6763-4ebe-ba83-72c99ec6750b` (Kylie).
-- `--verify` matches in all four. Live totals equal the dry run, and Curtain Call and Grand Finale are unchanged on all 175 archived rows.
-- The one rank change: Carrie Ann's Biggest Fans, Kylie Au 888.30 now ahead of balla 882.02.
+**Dance Card v3 is live in all four Season 35 leagues, switched before E10 (Tue 2026-11-10, 8pm ET).** `main` is at `79ff033` plus this sync, all pushed. The code commit `4fd806d` deployed on Vercel (success).
 
-**Not yet done** (the new-league default SQL is applied):
-- Nobody has looked at the v2 screens in a browser yet. Kylie checks on her phone.
-- E10 (Week 9, Grammy Night, **Tue 2026-11-10 8pm ET**) is the first live v2 publish. It was rehearsed in `src/lib/dance-card-v2-night-db.test.ts`.
+What v3 is (`docs/design/dance-card-v3/`):
+- Judges' points pay one rate all season: 0.2731 for two-couple rosters.
+- Survival is 3.00 × √(safe weeks) in total.
+- The Fantasy Bonus pays at face value. No placement.
 
-Design and rule are in `docs/design/dance-card-v2/`. The private review artifact with league tables is https://claude.ai/artifact/KyfrJ83pB3WBuTB5b3cudn. The `dance-card-v2` branch is merged and can be deleted.
+Verified 2026-11-10:
+- `apply-dance-card-v3.sql` is applied: the constraint, all four functions and the grants.
+- A throwaway v3 league looked right in the browser against live data.
+- All four leagues switched v2 → v3 (commissioners agreed, per Kylie), and `--verify` matches.
+- Curtain Call and Grand Finale are unchanged on all 175 rows.
+- Ranks are identical to v1 in every league. In Carrie Ann's Biggest Fans, balla is 1st with 880.74 and Kylie 2nd with 880.62.
+
+Tests: 907 pass and the build is clean. Codex reviewed the change and found one P1 (the correction cascade dropped outcomes), fixed in `4fd806d`.
+
+Not yet done:
+- E10 tonight is the first live v3 publish.
+- `apply-dance-card-v3-default.sql` hasn't been run.
+- Kylie hasn't checked a real v3 league on her phone.
 
 ## 2. Changes Made
 
-All committed and pushed on `main`. This sync touches only `MEMORY_HANDOFF.md`.
+All committed and pushed on `main`. This sync touches `MEMORY_HANDOFF.md` and `BACKLOG.md`.
 
 **Not ours; leave unstaged:**
 - `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile.codex`, `.devcontainer/devcontainer-lock.json`
@@ -26,38 +33,43 @@ All committed and pushed on `main`. This sync touches only `MEMORY_HANDOFF.md`.
 - `ios/App/App.xcodeproj/project.pbxproj`
 - `supabase/queries/add-*.sql`, `supabase/queries/prefill-*.sql`
 
-`npm run lint` errors come from `.codex-private/` (not ours); `npx eslint src scripts` is clean. 895 tests pass.
-
 ## 3. Key Decisions
 
-- **Dance Card v2 (Kylie, 2026-11-07):**
-  - Season 35, switched before E10, commissioners agreed.
-  - k₂ = 0.8884, from the schedule model. p = 0.80. The Fantasy Bonus is inside S, and each night keeps paying its own night.
-  - Score History keeps v1's wording with the week's effective rate (`Harry: Jdg 30 × 0.257`); Kylie: v2 changes the numbers, not the copy. The Fantasy Bonus header is unchanged.
-  - I told her plainly that v2 is "defensible and consistent", not "most fair". My lean was Season 36 and the advisor agreed; she chose Season 35.
-- **v2 mechanics to keep:**
-  - One ledger (`danceCardLedger`, integer cents).
-  - Corrections update later weeks atomically through `commit_episode_publication_with_later_weeks`.
-  - The version-4 gate and reveal order guard live in `assert_special_dance_plan`.
-  - Switches go only through `set_dance_card_points`, with a revision check and exact coverage, and are refused mid-night.
-  - Rollback is a v1 recompute. The archive is for audit only.
-  - The Anchor Week is held once a v2 league has scores.
-- **Repo is public:** never commit league standings or member names.
-- **Carried over:**
-  - SQL ships before the app.
-  - A push to `main` needs Kylie's yes in that turn (handoff syncs excepted).
-  - Render-check with throwaway accounts (`scripts/qa-screenshots/seed.mjs up|down`).
-  - Stage by name. Never `pkill -f`. `rm -rf .next` before `npm run dev` after a build. Don't run prettier.
+**Dance Card v3** (Kylie, 2026-11-10). It replaces v2, whose curve made a couple's next 24 worth less the more it had already scored; Kylie hadn't realized v2 worked that way. The principles:
+- Equal module weights.
+- Dance Card is mostly out of managers' control after the draft, so one bad couple shouldn't sink a manager.
+- A 24 is a 24.
+- No paying twice: survival tapers and placement is gone.
+- Roster spread has no floor under a flat rate (front-loaded survival keeps lowering it into a handout), so the survival budget was set at about 13% of a long run, spent early.
+- The frozen rule (`frozen-rule.json`) was written before any v3 standings were computed.
+
+**How v3 is built:**
+- It reuses v2's machinery: the `danceCardLedger` survival branch, `usesDanceCardLedger` / `danceCardLedgerRule`, `PLAN_VERSION = 5`, and `scripts/dance-card-v2.ts --to v3|v2`.
+- v3 needs every outcome row with its `outcome`; the ledger throws without it.
+
+**Copy:**
+- Score History keeps v1's wording: `Jdg 30 × 0.273`, then Survival and Bonus lines.
+- League Settings: a v2 league shows the Season Curve explanation, with no survival/placement sentence. A v3 league shows the rate and "3.00, Tapering", read-only.
+
+**Earlier rounds:** I told Kylie plainly that v2 wasn't a fairness finding, and that the curve's one rank change had favored her. She chose v3 knowing it puts balla back in 1st.
+
+**Repo is public:** never commit league standings or member names. The Curve Lab artifact (https://claude.ai/artifact/F4UocJUi5jykNmNYY3jpV3) is private and names members.
+
+**Carried over:**
+- SQL ships before the app.
+- A push to `main` needs Kylie's yes in that turn (handoff syncs excepted).
+- Stage by name. Never `pkill -f`. Don't run prettier.
+- `rm -rf .next` before `npm run dev` after a build.
+- Render-check with `scripts/qa-screenshots/seed.mjs up|down`. A new QA league's Anchor Week is 9, so set it to 2 to see points.
+- The Management API (`SUPABASE_ACCESS_TOKEN`) works for verification queries.
 
 ## 4. Backlog & Next Steps
 
-See BACKLOG "Dance Card v2 rollout — 2026-11-07" and "Still to see on a real night (E10…)".
+See BACKLOG "Dance Card v3 rollout — 2026-11-10".
 
 **E10 night:**
-- Watch the usual list: the West-feed guard, Winner's Bonus and Winner/Loser, marks surviving a switch, blockers, the strike-through, the couple page "posting live", a loser's "+0".
-- Watch the v2 credits too. Score History rates now vary week to week (front-loaded).
-- **If Finish Week fails mid-night**, a switched league can't go back to v1 while scores are posting. Un-post every couple, then `--rollback`.
-
-Afterwards: `--verify`, then runbook step 8.
+- Contributors reload Enter Results before 8pm ET.
+- Judges' points post live. Survival lands at Finish Week.
+- If Finish Week fails mid-night, un-post first, then `--apply --to v2` or `--rollback`.
 
 Next command (after E10 publishes): `NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`

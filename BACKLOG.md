@@ -2,37 +2,43 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
-## Dance Card v2 rollout — 2026-11-07
+## Dance Card v3 rollout — 2026-11-10
 
-Kylie chose to switch before E10 (2026-11-07), commissioners agreed. Done
-that day: `apply-dance-card-v2.sql` applied and verified (anon refused on the
-switch RPC and the archive); types regenerated from the live project (the
-Management API works); merged to `main` (`ab0fc98`), Vercel deploy succeeded;
-v1 browser check on the new code passed (Home, Picks, Standings with Score
-History open, the couple page, League Settings); all four leagues switched with
-`scripts/dance-card-v2.ts --apply`, `--verify` matches, live totals equal the
-dry run, Curtain Call and Grand Finale unchanged on all 175 archived rows. `apply-dance-card-v2-default.sql` applied (new leagues start on v2).
+Kylie replaced v2's season curve with v3 before E10 (`docs/design/dance-card-v3/`):
+one judges' rate (0.2731 for two-couple rosters), survival 3.00 × √(safe
+weeks), Fantasy Bonus at face value, no placement. Done 2026-11-10:
+`apply-dance-card-v3.sql` applied and verified (constraint, all four functions,
+grants); `main` pushed (`4fd806d`), Vercel success; a throwaway v3 league
+checked in the browser against live data (Standings, Score History, Couples
+Leaderboard, Picks, League Settings, no console errors); all four leagues
+switched v2 → v3 with commissioners' OK, `--verify` matches, Curtain Call and
+Grand Finale unchanged on all 175 rows. Codex reviewed the commit: one P1
+(correction cascade dropped outcomes) fixed in `4fd806d` with a test.
 
 Still to do:
-- Kylie looks at a switched league on her phone: Standings, Score History
-  (`Harry: Jdg 30 × 0.257` lines), Picks roster lines, League Settings
-  (season-curve line, no Update Anchor). The v2 screens haven't been seen in a
-  browser yet.
-- E10 night is the first live v2 publish (rehearsed in
-  `dance-card-v2-night-db.test.ts`). Run `--verify` after it publishes. If
-  Finish Week fails mid-night, a switched league can't go back to v1 while
-  scores are posting: un-post every couple first, then `--rollback`.
-- Member note sent by Kylie (draft in the 2026-11-07 session).
+- E10 (tonight) is the first live v3 publish, rehearsed in
+  `dance-card-v3-night-db.test.ts`. Contributors reload Enter Results first
+  (a pre-deploy tab sends plan version 4, which is refused). Run `--verify`
+  after it publishes. If Finish Week fails mid-night, a league can't switch
+  while scores are posting: un-post first, then `--apply --to v2` or
+  `--rollback`.
+- Kylie runs `apply-dance-card-v3-default.sql` (new leagues start on v3).
+- Kylie looks at a real v3 league on her phone (Score History survival lines,
+  Picks Survival & Bonuses row with stored weekly rows).
+- Optional: tell Carrie Ann's Biggest Fans that Dance Card is weighted 8× there,
+  which is where a bad couple can still sink a manager (the weight, not the
+  formula).
+- Types weren't regenerated; no schema shape changed (only a check constraint).
 
-Settled (Kylie, 2026-11-07): Score History keeps v1's wording, with the
-week's effective rate as the multiplier (`Harry: Jdg 30 × 0.257`, the week's
-credit over its input) and a Fantasy Bonus on its own `Bonus` line at that
-rate; v2 should change the numbers, not the copy. Finish Week's "Fantasy Bonus (pts)"
-header stays as is (site admins only). `start_draft` moves the Anchor Week
-forward; on a v2 league that already has scores (a reset and re-draft
-mid-season) the Anchor Week trigger refuses it. Known limit: on a v1 draft
-night a two-night week still shows judges-only Dance Card (a sibling night's
-survival drops until publish); stored picks are now kept.
+Settled (Kylie): Score History keeps v1's wording (v3: `Harry: Jdg 30 × 0.273`,
+then Survival and Bonus lines). League Settings shows a v2 league the Season
+Curve explanation (no survival/placement sentence) and a v3 league the rate
+and "3.00, Tapering" read-only. Roster spread has no floor under a flat rate
+(bigger front-loaded survival keeps lowering it into a handout), so the
+survival budget was picked as ~13% of a long run, spent early. Known limit
+from v2: on a v1 draft night a two-night week still shows judges-only Dance
+Card. `start_draft` moving the Anchor Week on a v2/v3 league with scores is
+refused by the trigger.
 
 ## Adversarial review of 2026-11-05/06 work (advisor + Codex)
 
