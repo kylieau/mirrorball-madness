@@ -442,8 +442,8 @@ export function buildPublicationPlan(
     outcomes: [
       ...weekOutcomes
         .filter((r) => r.episode_id !== episodeId)
-        .map((r) => ({ coupleId: r.couple_id, bonusPoints: Number(r.bonus_points) })),
-      ...entries.map((r) => ({ coupleId: r.couple_id, bonusPoints: Number(r.bonus_points) })),
+        .map((r) => ({ coupleId: r.couple_id, bonusPoints: Number(r.bonus_points), outcome: r.outcome })),
+      ...entries.map((r) => ({ coupleId: r.couple_id, bonusPoints: Number(r.bonus_points), outcome: r.outcome })),
     ],
   };
   const laterDanceCard = laterDanceCardRows(snapshot, week, thisWeek, couples);

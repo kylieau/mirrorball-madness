@@ -6,7 +6,7 @@ import { buildRevealPlan } from "./episode-reveal";
 const rule = danceCardV2Rule(2);
 const credit = (before: number, after: number) => (coupleValueCents(after, rule) - coupleValueCents(before, rule)) / 100;
 
-function settings(leagueId: string, version: "v1" | "v2") {
+function settings(leagueId: string, version: "v1" | "v2" | "v3") {
   return {
     league_id: leagueId,
     dance_card_version: version,
@@ -107,6 +107,31 @@ describe("Dance Card v2 publication", () => {
     const later = credit(45, 69);
     expect(plan.laterDanceCard).toEqual([
       { league_id: "curve", manager_id: "m-curve", week_id: "w4", roster_points: later, total_points: Math.round((later * 2 + 5 + 1) * 100) / 100 },
+    ]);
+  });
+});
+
+describe("Dance Card v3 publication", () => {
+  it("rewrites a v3 league's later weeks from the corrected week's outcomes", () => {
+    const data = season();
+    data.settings = [settings("flat", "v1"), settings("curve", "v3")] as typeof data.settings;
+    data.episodes = data.episodes.map((e) => (e.id === "e4" ? { ...e, results_published_at: "2026-10-07" } : e));
+    data.dances = [...data.dances, live("d4", "e4", "harry", 24)] as typeof data.dances;
+    data.outcomes = [...data.outcomes, { episode_id: "e4", couple_id: "harry", outcome: "safe", bonus_points: 0 }] as typeof data.outcomes;
+    // Correct Week 3 to 27 and a bye, which takes away that week's survival.
+    data.draftOverrides = [{ episode_id: "e3" }] as typeof data.draftOverrides;
+    data.draftDances = [{ id: "dd3", episode_id: "e3", couple_id: "harry", dance_style_id: "waltz", song_title: null }] as typeof data.draftDances;
+    data.draftJudges = [9, 9, 9].map((score, i) => ({ draft_dance_score_id: "dd3", judge_id: `j${i}`, score })) as typeof data.draftJudges;
+    data.draftResults = [{ episode_id: "e3", couple_id: "harry", outcome: "bye", bonus_points: 0 }] as typeof data.draftResults;
+    data.laterWeeklyScores = [
+      { league_id: "curve", manager_id: "m-curve", week_id: "w4", roster_points: 7.51, prediction_points: 5, grand_finale_points: 1, total_points: 21.02 },
+    ];
+    const plan = buildPublicationPlan(data, "e3");
+    // Week 3: 27 × 0.2731 = 7.37, no survival. Week 4: 24 × 0.2731 = 6.55
+    // plus the second survival week, 3.00 × √2 − 3.00 = 1.24.
+    expect(row(plan.weeklyScores, "curve").roster_points).toBe(7.37);
+    expect(plan.laterDanceCard).toEqual([
+      { league_id: "curve", manager_id: "m-curve", week_id: "w4", roster_points: 7.79, total_points: Math.round((7.79 * 2 + 5 + 1) * 100) / 100 },
     ]);
   });
 });
