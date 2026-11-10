@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCouplesLeaderboard } from "./couples-leaderboard";
-import { coupleValueCents, danceCardV2Rule, danceCardWeekEpisodeIds, type DanceCardWeek } from "./dance-card-v2";
+import { coupleValueCents, danceCardV2Rule, danceCardV3Rule, danceCardWeekEpisodeIds, type DanceCardWeek } from "./dance-card-v2";
 import { draftWeekManagerScores, scoresReplacingDraftWeek } from "./draft-scores";
 import { judgePointsThroughWeek } from "./roster-couple-points";
 import { buildScoreHistory, type HistoryWeekData, type ManagerHistoryInput } from "./score-history";
@@ -66,8 +66,8 @@ const slots = [
   { managerId: "m", coupleId: "giada", startWeek: 1, endWeek: null },
 ];
 
-// What publishing stores for the manager each week under v2.
-function storedRosterPoints(): Map<number, number> {
+// What publishing stores for the manager each week.
+function storedRosterPoints(version = "v2"): Map<number, number> {
   const snapshotLike = {
     episodes: ["e1", "e2", "e3", "e4"].map((id, i) => ({ id, week_id: `w${i + 1}`, results_published_at: "2026-10-01", episode_number: i + 1 })),
     weeks: [1, 2, 3, 4].map((n) => ({ id: `w${n}`, week_number: n })),
@@ -89,7 +89,7 @@ function storedRosterPoints(): Map<number, number> {
         jeopardy: [],
         couples,
         leagues: [{ id: "l", roster_size: 2 }],
-        settings: [{ league_id: "l", dance_card_version: "v2", judges_score_starts_week: 2, judges_score_category_weight: 2, eliminations_category_weight: 1, bonus_picks_category_weight: 1 } as never],
+        settings: [{ league_id: "l", dance_card_version: version, judges_score_starts_week: 2, judges_score_category_weight: 2, eliminations_category_weight: 1, bonus_picks_category_weight: 1 } as never],
         rosters: slots.map((s) => ({ league_id: "l", manager_id: s.managerId, couple_id: s.coupleId, start_week: s.startWeek, end_week: s.endWeek })),
         predictions: [],
         lateUnlocks: [],
@@ -186,6 +186,65 @@ describe("Dance Card v2 readers", () => {
     expect(replaced).toEqual([
       { week_id: "w4", manager_id: "m", roster_points: credit(44, 71), prediction_points: 3, grand_finale_points: 1, total_points: Math.round((credit(44, 71) * 2 + 4) * 100) / 100 },
     ]);
+  });
+});
+
+// Worked by hand at 0.2731 a judges' point and survival 3.00 × √n:
+// Week 2 Harry 18 → 4.92 + 3.00, Giada 12 → 3.28 (eliminated, no survival);
+// Week 3 Harry 24 → 6.55 + 1.24 + the 2.00 Fantasy Bonus; Week 4 Harry 27 →
+// 7.37 + 0.96.
+describe("Dance Card v3 readers", () => {
+  const v3 = danceCardV3Rule(2);
+
+  it("stores judges, tapering survival and the bonus at face value", () => {
+    expect([...storedRosterPoints("v3")]).toEqual([[1, 0], [2, 11.2], [3, 9.79], [4, 8.33]]);
+  });
+
+  it("Couples Leaderboard splits judges from survival and bonus, adding up to the stored module", () => {
+    const standings = buildCouplesLeaderboard({ rule: v3, scoring, anchorWeek: 2, categoryWeight: 2, weeks, couples, slots });
+    expect(standings.find((s) => s.coupleId === "harry")).toEqual({
+      coupleId: "harry", ownerId: "m", judgesPoints: 37.68, bonusPoints: 14.4, totalPoints: 52.08,
+    });
+    expect(standings.reduce((sum, s) => sum + s.totalPoints, 0)).toBeCloseTo((11.2 + 9.79 + 8.33) * 2, 6);
+  });
+
+  it("roster lines are judges' points only", () => {
+    const scores = weeks.flatMap((w) => w.danceScores.map((d) => ({ ...d, weekNumber: w.weekNumber })));
+    const outcomes = weeks.flatMap((w) => w.outcomes.map((o) => ({ weekNumber: w.weekNumber, coupleId: o.coupleId, bonusPoints: o.bonusPoints, outcome: o.outcome })));
+    const points = judgePointsThroughWeek({
+      slots: slots.slice(0, 1), scores, bonuses: outcomes, rule: v3, judgesScoreStartsWeek: 2, week: 4, multiplier: 0.2449, categoryWeight: 1,
+    });
+    expect(points.get("harry")).toEqual({ week: 7.37, total: 18.84 });
+  });
+
+  it("Score History reads like v1 and sums to the stored rows", () => {
+    const lines = buildScoreHistory({
+      scoring,
+      danceCardRule: v3,
+      anchorWeek: 2,
+      categoryWeights: { judges: 2, eliminations: 1, bonus: 1 },
+      grandFinale: { method: "distance_based", distancePenalty: 1, tierSize: null, tierPayStyle: "equal", pointsPerCorrect: 6 },
+      couples,
+      coupleNames: new Map([["harry", "Harry"], ["giada", "Giada"]]),
+      weeks,
+      rosterSlots: slots,
+      predictions: [],
+      grandFinalePredictions: [],
+      weekSchedule: weeks.map((w) => ({ weekNumber: w.weekNumber, eliminations: 1 })),
+    }).filter((line) => line.module === "danceCard");
+    expect(lines.map((line) => [line.weekNumber, line.label, line.points])).toEqual(
+      expect.arrayContaining([
+        [4, "Harry: Jdg 27 × 0.273 × 2 Wt", 14.74],
+        [4, "Harry: Survival × 2 Wt", 1.92],
+        [3, "Harry: Jdg 24 × 0.273 × 2 Wt", 13.1],
+        [3, "Harry: Survival × 2 Wt", 2.48],
+        [3, "Harry: Bonus × 2 Wt", 4],
+        [2, "Harry: Survival × 2 Wt", 6],
+        [2, "Giada: Jdg 12 × 0.273 × 2 Wt", 6.56],
+      ])
+    );
+    expect(lines.some((line) => /Giada: Survival|Podium/.test(line.label))).toBe(false);
+    expect(lines.reduce((sum, line) => sum + line.points, 0)).toBeCloseTo((11.2 + 9.79 + 8.33) * 2, 6);
   });
 });
 

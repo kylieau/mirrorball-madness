@@ -76,7 +76,7 @@ const row = (rows: { league_id: string; roster_points: number }[], league: strin
 describe("Dance Card v2 publication", () => {
   it("pays a v2 league the week's credit and leaves a v1 league on the old rule", () => {
     const plan = buildPublicationPlan(season(), "e4");
-    expect(plan.planVersion).toBe(4);
+    expect(plan.planVersion).toBe(5);
     expect(row(plan.weeklyScores, "curve").roster_points).toBe(credit(42, 66));
     expect(row(plan.weeklyScores, "flat").roster_points).toBe(7.44); // 24 × 0.2449 + 1.56
     expect(row(plan.weeklyScores, "curve")).toMatchObject({ total_points: credit(42, 66) * 2 });

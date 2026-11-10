@@ -18,6 +18,7 @@ import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
 import { XIcon } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { usesDanceCardLedger } from "@/lib/dance-card-v2";
 
 export default async function LeagueSettingsPage({
   params,
@@ -438,7 +439,7 @@ async function danceCardAnchorHeld(
   leagueId: string,
   scoringSettings: { dance_card_version: string } | null
 ): Promise<boolean> {
-  if (scoringSettings?.dance_card_version !== "v2") return false;
+  if (!usesDanceCardLedger(scoringSettings?.dance_card_version)) return false;
   const { data: activeSeasonId } = await supabase.rpc("active_season_id");
   const { count } = await supabase
     .from("weekly_manager_scores")

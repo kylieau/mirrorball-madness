@@ -61,19 +61,16 @@ export function buildCouplesLeaderboard({
     }
   }
 
-  if (rule.version === "v2") {
+  if (rule.version !== "v1") {
     const ledger = danceCardLedger(weeks, anchorWeek, rule);
     const lastWeek = Math.max(0, ...weeks.map((week) => week.weekNumber));
     return couples.map((couple) => {
       const slot = holderByCouple.get(couple.id);
-      const cents = heldCreditCents(
-        ledger,
-        couple.id,
-        Math.max(anchorWeek, slot?.startWeek ?? anchorWeek),
-        slot?.endWeek ?? lastWeek
-      );
-      const judgesPoints = roundPoints((cents / 100) * categoryWeight);
-      return { coupleId: couple.id, ownerId: slot?.managerId ?? null, judgesPoints, bonusPoints: 0, totalPoints: judgesPoints };
+      const from = Math.max(anchorWeek, slot?.startWeek ?? anchorWeek);
+      const to = slot?.endWeek ?? lastWeek;
+      const totalPoints = roundPoints((heldCreditCents(ledger, couple.id, from, to) / 100) * categoryWeight);
+      const judgesPoints = roundPoints((heldCreditCents(ledger, couple.id, from, to, "judges") / 100) * categoryWeight);
+      return { coupleId: couple.id, ownerId: slot?.managerId ?? null, judgesPoints, bonusPoints: roundPoints(totalPoints - judgesPoints), totalPoints };
     });
   }
 

@@ -4,7 +4,7 @@ import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
 import { hasCurtainCallPicks } from "@/lib/curtain-call-picks";
 import { draftWeekManagerScores, scoresReplacingDraftWeek } from "@/lib/draft-scores";
 import { loadDanceCardHistory } from "@/lib/dance-card-history-data";
-import { danceCardRule } from "@/lib/dance-card-v2";
+import { danceCardRule, usesDanceCardLedger } from "@/lib/dance-card-v2";
 import { loadActiveSeasonId } from "@/lib/viewer-season-data";
 import type { CurtainCallState } from "@/lib/league-triage";
 import type { DanceScore } from "@/lib/scoring";
@@ -94,7 +94,7 @@ supabase
       scoringDraftNight
         ? supabase.from("roster_slots").select("manager_id, couple_id, start_week, end_week").eq("league_id", league.id)
         : Promise.resolve({ data: null }),
-      scoringDraftNight && scoringSettings?.dance_card_version === "v2"
+      scoringDraftNight && usesDanceCardLedger(scoringSettings?.dance_card_version)
         ? supabase.from("leagues").select("roster_size").eq("id", league.id).single()
         : Promise.resolve({ data: null }),
       grandFinaleOn
@@ -138,8 +138,8 @@ supabase
         : [];
     });
     const rule = leagueRow ? danceCardRule(scoringSettings, leagueRow.roster_size) : null;
-    const seasonId = rule?.version === "v2" ? await loadActiveSeasonId(supabase) : null;
-    const history = rule?.version === "v2" && seasonId ? await loadDanceCardHistory(supabase, seasonId, draftNight.weekNumber + 1) : null;
+    const seasonId = rule && rule.version !== "v1" ? await loadActiveSeasonId(supabase) : null;
+    const history = rule && rule.version !== "v1" && seasonId ? await loadDanceCardHistory(supabase, seasonId, draftNight.weekNumber + 1) : null;
     const managers = draftWeekManagerScores({
       weekNumber: draftNight.weekNumber,
       anchorWeek: scoringSettings.judges_score_starts_week,
@@ -148,7 +148,7 @@ supabase
       rosterSlots,
       danceScores: draftNight.dances,
       danceCard:
-        rule?.version === "v2" && history
+        rule && rule.version !== "v1" && history
           ? {
               rule,
               priorWeeks: history,

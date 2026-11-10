@@ -257,6 +257,23 @@ export function solveDanceCardV2Coefficients(exponent: number): { rosterSize: nu
   });
 }
 
+// Dance Card v3 (docs/design/dance-card-v3/): one judges' rate per roster
+// size, with survival tapering as first × √(survival weeks) on top. The rate
+// is what's left of the ceiling after that survival, over a median seat's
+// judges.
+export function solveDanceCardV3Rates(survivalFirst: number, survivalExponent: number): { rosterSize: number; rate: number }[] {
+  const ceiling = TARGET_SHARE * POINT_SCALE;
+  return ROSTER_SIZES.map((rosterSize) => {
+    const slots = snakeSlotRanks(rosterSize);
+    const indexes = medianSlotIndexes(slots.length);
+    const seat = (value: (rank: number) => number) =>
+      mean(indexes.map((index) => slots[index].reduce((sum, rank) => sum + value(rank), 0)));
+    const judges = seat((rank) => judgeTotalForRank(rank) * couplePath(rank).weeksDanced);
+    const survival = seat((rank) => survivalFirst * couplePath(rank).survivalWeeks ** survivalExponent);
+    return { rosterSize, rate: roundMultiplier((ceiling - survival) / judges) };
+  });
+}
+
 export type GrandFinaleCeilingMethod = keyof SolvedCeilings["pointsPerCorrect"];
 
 export type SolvedCeilings = {

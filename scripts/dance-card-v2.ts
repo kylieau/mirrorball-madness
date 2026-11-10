@@ -1,21 +1,22 @@
-// Switches a league's Dance Card between v1 and v2 (docs/design/dance-card-v2/),
-// rebuilds a v2 league in place, or checks one, against live data. Run from
-// the project root:
+// Switches a league's Dance Card between versions (v1, v2 in
+// docs/design/dance-card-v2/, v3 in docs/design/dance-card-v3/), rebuilds a
+// v2/v3 league in place, or checks one, against live data. Run from the
+// project root:
 //
-//   NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --dry-run
-//   ... --apply --league <id> --actor <site admin profile id>
-//   ... --rollback --league <id> --actor <id>
+//   NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --dry-run [--to v3]
+//   ... --apply --league <id> --actor <site admin profile id> [--to v3]
+//   ... --rollback --league <id> --actor <id>        (to v1)
 //   ... --refresh --league <id> --actor <id>
 //   ... --verify
 //
-// --dry-run and --verify only read. Before apply-dance-card-v2.sql is live the
-// dry run assembles the same snapshot from the tables; every write needs the
-// SQL, because set_dance_card_points checks its revision.
+// --to defaults to v3; --apply --to v2 is the way back from v3. --dry-run and
+// --verify only read. Every write needs the SQL, because
+// set_dance_card_points checks its revision.
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../src/lib/supabase/types";
-import { danceCardDifferences, danceCardRowsFromLive, type DanceCardSnapshot } from "../src/lib/dance-card-refresh";
-import { danceCardLedger, danceCardRule } from "../src/lib/dance-card-v2";
+import { danceCardDifferences, danceCardRowsFromLive, type DanceCardSnapshot, type DanceCardVersion } from "../src/lib/dance-card-refresh";
+import { danceCardLedger, danceCardLedgerRule } from "../src/lib/dance-card-v2";
 import { danceCardPriorWeeks } from "../src/lib/weekly-score-rows";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -29,6 +30,10 @@ const option = (name: string) => {
   const index = args.indexOf(`--${name}`);
   return index >= 0 ? args[index + 1] : undefined;
 };
+const target = (option("to") ?? "v3") as DanceCardVersion;
+if (!["v2", "v3"].includes(target)) throw new Error("--to must be v2 or v3");
+const versionOf = (settings: { dance_card_version: string | null }): DanceCardVersion =>
+  settings.dance_card_version === "v2" || settings.dance_card_version === "v3" ? settings.dance_card_version : "v1";
 
 async function all<T>(table: keyof Database["public"]["Tables"]): Promise<T[]> {
   const rows: T[] = [];
@@ -76,9 +81,9 @@ async function report(snapshot: DanceCardSnapshot, leagueId: string) {
   const league = snapshot.leagues.find((l) => l.id === leagueId)!;
   const settings = snapshot.settings.find((s) => s.league_id === leagueId)!;
   const stored = snapshot.weeklyScores.filter((r) => r.league_id === leagueId);
-  const current = settings.dance_card_version === "v2" ? "v2" : "v1";
+  const current = versionOf(settings);
   const rebuilt = danceCardDifferences(stored, danceCardRowsFromLive(snapshot, leagueId, current));
-  const v2Rows = danceCardRowsFromLive(snapshot, leagueId, "v2");
+  const targetRows = danceCardRowsFromLive(snapshot, leagueId, target);
   const { data: profiles } = await admin.from("profiles").select("id, display_name");
   const name = new Map((profiles ?? []).map((p) => [p.id, (p.display_name ?? "").trim()]));
   const managers = [...new Set(stored.map((r) => r.manager_id))];
@@ -87,24 +92,24 @@ async function report(snapshot: DanceCardSnapshot, leagueId: string) {
   const table = managers.map((id) => ({
     manager: name.get(id) ?? id,
     danceCardNow: sum(stored, id, "roster_points"),
-    danceCardV2: sum(v2Rows, id, "roster_points"),
+    danceCardTarget: sum(targetRows, id, "roster_points"),
     totalNow: sum(stored, id, "total_points"),
-    totalV2: sum(v2Rows, id, "total_points"),
+    totalTarget: sum(targetRows, id, "total_points"),
   }));
-  const rank = (key: "totalNow" | "totalV2", value: number) => 1 + table.filter((t) => t[key] > value).length;
-  console.log(`\n== ${league.name} (${current}, weights DC×${settings.judges_score_category_weight} CC×${settings.eliminations_category_weight} GF×${settings.bonus_picks_category_weight})`);
+  const rank = (key: "totalNow" | "totalTarget", value: number) => 1 + table.filter((t) => t[key] > value).length;
+  console.log(`\n== ${league.name} (${current} → ${target}, weights DC×${settings.judges_score_category_weight} CC×${settings.eliminations_category_weight} GF×${settings.bonus_picks_category_weight})`);
   console.table(
     table
-      .map((t) => ({ ...t, rankNow: rank("totalNow", t.totalNow), rankV2: rank("totalV2", t.totalV2), delta: round(t.totalV2 - t.totalNow) }))
+      .map((t) => ({ ...t, rankNow: rank("totalNow", t.totalNow), rankTarget: rank("totalTarget", t.totalTarget), delta: round(t.totalTarget - t.totalNow) }))
       .sort((a, b) => a.rankNow - b.rankNow)
   );
-  const rule = danceCardRule({ dance_card_version: "v2" }, league.roster_size);
-  if (rule.version === "v2") {
+  const rule = danceCardLedgerRule(target, league.roster_size);
+  if (rule) {
     const lastWeek = Math.max(...snapshot.weeks.map((w) => w.week_number));
     const ledger = danceCardLedger(danceCardPriorWeeks(snapshot, lastWeek + 1), settings.judges_score_starts_week, rule);
     const people = new Map((await admin.from("people").select("id, name")).data?.map((p) => [p.id, p.name]) ?? []);
     const coupleName = new Map(snapshot.couples.map((c) => [c.id, (people.get(c.celebrity_id) ?? c.id).split(" ")[0]]));
-    console.log(`k = ${rule.coefficient}, p = ${rule.exponent}; per couple: week input → cumulative → credit`);
+    console.log(`${JSON.stringify(rule)}; per couple: week input → cumulative → credit`);
     for (const [coupleId, entries] of ledger) {
       console.log(
         `  ${coupleName.get(coupleId)}: ` +
@@ -116,18 +121,19 @@ async function report(snapshot: DanceCardSnapshot, leagueId: string) {
   return { rebuildMatches: rebuilt.length === 0 };
 }
 
-async function write(leagueId: string, version: "v1" | "v2" | null) {
+async function write(leagueId: string, version: DanceCardVersion | null) {
   const actor = option("actor");
   if (!actor) throw new Error("--actor <site admin profile id> is required");
   const snapshot = await loadSnapshot(false);
   const settings = snapshot.settings.find((s) => s.league_id === leagueId);
   if (!settings) throw new Error("League not found");
-  const current = settings.dance_card_version === "v2" ? "v2" : "v1";
+  const current = versionOf(settings);
   if (version !== null) {
     const { rebuildMatches } = await report(snapshot, leagueId);
     if (!rebuildMatches) throw new Error(`Stored rows don't match a ${current} rebuild; nothing written`);
   }
-  const rows = danceCardRowsFromLive(snapshot, leagueId, version ?? "v2");
+  if (version === null && current === "v1") throw new Error("Only a v2 or v3 league can be rebuilt in place");
+  const rows = danceCardRowsFromLive(snapshot, leagueId, version ?? current);
   const { data, error } = await admin.rpc("set_dance_card_points", {
     p_actor_id: actor,
     p_league_id: leagueId,
@@ -145,7 +151,7 @@ async function main() {
   const leagueId = option("league");
   if (flag("apply") || flag("rollback") || flag("refresh")) {
     if (!leagueId) throw new Error("--league <id> is required");
-    await write(leagueId, flag("apply") ? "v2" : flag("rollback") ? "v1" : null);
+    await write(leagueId, flag("apply") ? target : flag("rollback") ? "v1" : null);
     return;
   }
   const snapshot = await loadSnapshot(true);
@@ -154,8 +160,9 @@ async function main() {
     let failures = 0;
     for (const league of drafted) {
       const settings = snapshot.settings.find((s) => s.league_id === league.id)!;
-      if (settings.dance_card_version !== "v2") continue;
-      const differences = danceCardDifferences(snapshot.weeklyScores, danceCardRowsFromLive(snapshot, league.id, "v2"));
+      const version = versionOf(settings);
+      if (version === "v1") continue;
+      const differences = danceCardDifferences(snapshot.weeklyScores, danceCardRowsFromLive(snapshot, league.id, version));
       failures += differences.length;
       console.log(`${league.name}: ${differences.length === 0 ? "matches" : `${differences.length} rows differ`}`);
     }

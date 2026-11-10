@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "./supabase/types";
 import { buildWeeklyScoreRows, danceCardPriorWeeks, danceCardWeekRows, type WeeklyScoreRow } from "./weekly-score-rows";
-import type { DanceCardWeek } from "./dance-card-v2";
+import { usesDanceCardLedger, type DanceCardWeek } from "./dance-card-v2";
 import { roundPoints } from "./format-points";
 import {
   inJeopardyIdsToPersist,
@@ -68,9 +68,9 @@ export type PublicationSnapshot = {
 // Plans carry planVersion 2 once readers know max_score, 3 once they score
 // a heat couple by couple, and 4 once they score Dance Card v2; the SQL
 // refuses an older plan for an episode with a Points-mode (2) or
-// couple-by-couple (3) special dance, or while any league is on v2 (4),
-// because older code would pay those rows wrongly.
-export const PLAN_VERSION = 4;
+// couple-by-couple (3) special dance, or while any league is on v2 (4) or
+// v3 (5), because older code would pay those rows wrongly.
+export const PLAN_VERSION = 5;
 export type LaterDanceCardRow = Pick<WeeklyScoreRow, "league_id" | "manager_id" | "week_id" | "roster_points" | "total_points">;
 export type PublicationPlan = {
   planVersion: number;
@@ -85,7 +85,7 @@ export function settledBonuses(snapshot: Pick<PublicationSnapshot, "episodes" | 
   const published = new Set(snapshot.episodes.filter((e) => e.results_published_at).map((e) => e.id));
   return snapshot.outcomes
     .filter((r) => episodeIds.has(r.episode_id) && published.has(r.episode_id))
-    .map((r) => ({ coupleId: r.couple_id, bonusPoints: Number(r.bonus_points) }));
+    .map((r) => ({ coupleId: r.couple_id, bonusPoints: Number(r.bonus_points), outcome: r.outcome }));
 }
 
 // Stored prediction and Grand Finale points with new Dance Card points,
@@ -112,7 +112,7 @@ function laterDanceCardRows(
   thisWeek: DanceCardWeek,
   couples: Row<"couples">[]
 ): LaterDanceCardRow[] {
-  const v2Leagues = new Set(snapshot.settings.filter((s) => s.dance_card_version === "v2").map((s) => s.league_id));
+  const v2Leagues = new Set(snapshot.settings.filter((s) => usesDanceCardLedger(s.dance_card_version)).map((s) => s.league_id));
   const stored = (snapshot.laterWeeklyScores ?? []).filter((row) => v2Leagues.has(row.league_id));
   if (stored.length === 0) return [];
   const later = snapshot.weeks

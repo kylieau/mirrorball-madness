@@ -26,7 +26,7 @@ import {
 } from "./scoring";
 import type { ScoringModuleKey } from "./scoring-modules";
 import { slotActiveInWeek, type RosterSlotPeriod } from "./roster-couple-points";
-import { danceCardLedger, ledgerEntry, type DanceCardRule } from "./dance-card-v2";
+import { danceCardLedger, judgesCents, ledgerEntry, type DanceCardRule } from "./dance-card-v2";
 
 export type HistoryModule = ScoringModuleKey;
 export type ScoreHistoryLine = {
@@ -194,7 +194,7 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
   const lines: ScoreHistoryLine[] = [];
   const danceCardRule = input.danceCardRule ?? { version: "v1" };
   const ledgerWeeks = input.danceCardWeeks ?? input.weeks;
-  const ledger = danceCardRule.version === "v2" ? danceCardLedger(ledgerWeeks, input.anchorWeek, danceCardRule) : null;
+  const ledger = danceCardRule.version !== "v1" ? danceCardLedger(ledgerWeeks, input.anchorWeek, danceCardRule) : null;
 
   const push = (
     weekNumber: number,
@@ -290,6 +290,18 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
       const name = nameOf(slot.coupleId);
       const outcome = lastOutcome.get(slot.coupleId);
 
+      // v3 reads like v1: judges at the league's rate, then survival and the
+      // Fantasy Bonus on their own lines, each the ledger's own cents.
+      if (ledger && danceCardRule.version === "v3") {
+        const entry = ledgerEntry(ledger, slot.coupleId, w);
+        if (entry) {
+          const judges = ledgerLabels.get(slot.coupleId) ?? { label: "0", scaled: 0 };
+          push(w, "danceCard", `judges:${slot.coupleId}`, `${name}: Jdg ${judges.label} × ${trimNumber(danceCardRule.rate)}`, judgesCents(entry) / 100, weight);
+          push(w, "danceCard", `survival:${slot.coupleId}`, `${name}: Survival`, entry.survivalCents / 100, weight);
+          push(w, "danceCard", `bonus:${slot.coupleId}`, `${name}: Bonus`, entry.bonusCents / 100, weight);
+        }
+        continue;
+      }
       // v2 reads like v1: the week's credit over its input is that week's
       // rate, and a Fantasy Bonus keeps its own line at the same rate.
       if (ledger) {

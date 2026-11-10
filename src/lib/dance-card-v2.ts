@@ -1,4 +1,4 @@
-import { nightScaledScoresByCouple, type DanceScore } from "./scoring";
+import { NO_SURVIVAL_OUTCOMES, nightScaledScoresByCouple, type DanceScore, type Outcome } from "./scoring";
 
 // Dance Card v2 (docs/design/dance-card-v2/): a couple's season value is
 // k × S^p, where S is its weekly inputs summed from the league's Anchor
@@ -18,31 +18,67 @@ export const DANCE_CARD_V2_COEFFICIENTS: Record<number, number> = {
   6: 0.3061,
 };
 
+// Dance Card v3 (docs/design/dance-card-v3/, Kylie 2026-11-10): one judges'
+// rate all season, survival tapering as 3.00 × √(survival weeks), the Fantasy
+// Bonus at face value, no placement. Rates by roster size are pinned to
+// solveDanceCardV3Rates(3, 0.5).
+export const DANCE_CARD_V3_SURVIVAL_FIRST = 3;
+export const DANCE_CARD_V3_SURVIVAL_EXPONENT = 0.5;
+export const DANCE_CARD_V3_RATES: Record<number, number> = {
+  1: 0.5832,
+  2: 0.2731,
+  3: 0.1755,
+  4: 0.1212,
+  5: 0.0717,
+  6: 0.0676,
+};
+
 export type DanceCardRule =
   | { version: "v1" }
-  | { version: "v2"; exponent: number; coefficient: number };
+  | { version: "v2"; exponent: number; coefficient: number }
+  | { version: "v3"; rate: number; survivalFirst: number; survivalExponent: number };
 
 export type DanceCardV2Rule = Extract<DanceCardRule, { version: "v2" }>;
+export type DanceCardV3Rule = Extract<DanceCardRule, { version: "v3" }>;
+// v2 and v3 both pay week by week from a couple's history since the Anchor
+// Week, through danceCardLedger.
+export type DanceCardLedgerRule = DanceCardV2Rule | DanceCardV3Rule;
+
+export function usesDanceCardLedger(version: string | null | undefined): boolean {
+  return version === "v2" || version === "v3";
+}
 
 // The model can't seat rosters past six (12 couples, two managers), so a
 // larger roster scales the two-couple k by 2/N, which matches the model
 // within 3% where both exist.
-function coefficientForRoster(rosterSize: number): number {
-  return (
-    DANCE_CARD_V2_COEFFICIENTS[rosterSize] ??
-    Math.round(((DANCE_CARD_V2_COEFFICIENTS[2] * 2) / Math.max(1, rosterSize)) * 10000) / 10000
-  );
+function forRoster(table: Record<number, number>, rosterSize: number): number {
+  return table[rosterSize] ?? Math.round(((table[2] * 2) / Math.max(1, rosterSize)) * 10000) / 10000;
 }
 
 export function danceCardV2Rule(rosterSize: number): DanceCardV2Rule {
-  return { version: "v2", exponent: DANCE_CARD_V2_EXPONENT, coefficient: coefficientForRoster(rosterSize) };
+  return { version: "v2", exponent: DANCE_CARD_V2_EXPONENT, coefficient: forRoster(DANCE_CARD_V2_COEFFICIENTS, rosterSize) };
+}
+
+export function danceCardV3Rule(rosterSize: number): DanceCardV3Rule {
+  return {
+    version: "v3",
+    rate: forRoster(DANCE_CARD_V3_RATES, rosterSize),
+    survivalFirst: DANCE_CARD_V3_SURVIVAL_FIRST,
+    survivalExponent: DANCE_CARD_V3_SURVIVAL_EXPONENT,
+  };
+}
+
+export function danceCardLedgerRule(version: string | null | undefined, rosterSize: number): DanceCardLedgerRule | null {
+  if (version === "v2") return danceCardV2Rule(rosterSize);
+  if (version === "v3") return danceCardV3Rule(rosterSize);
+  return null;
 }
 
 export function danceCardRule(
   settings: { dance_card_version?: string | null },
   rosterSize: number
 ): DanceCardRule {
-  return settings.dance_card_version === "v2" ? danceCardV2Rule(rosterSize) : { version: "v1" };
+  return danceCardLedgerRule(settings.dance_card_version, rosterSize) ?? { version: "v1" };
 }
 
 export function coupleValueCents(cumulative: number, rule: DanceCardV2Rule): number {
@@ -53,16 +89,22 @@ export function coupleValueCents(cumulative: number, rule: DanceCardV2Rule): num
 export type DanceCardWeek = {
   weekNumber: number;
   danceScores: DanceScore[];
-  // Settled outcomes only: a Fantasy Bonus joins the week's input like a
-  // bonus-round dance.
-  outcomes?: { coupleId: string; bonusPoints: number }[];
+  // Settled outcomes only. Under v2 a Fantasy Bonus joins the week's input
+  // like a bonus-round dance; under v3 it pays at face value, and the outcome
+  // decides survival, so v3 needs it on every row.
+  outcomes?: { coupleId: string; bonusPoints: number; outcome?: string }[];
 };
 
+// input is the week's judges input (v2: with the Fantasy Bonus inside).
+// creditCents is the whole week; under v3 survivalCents and bonusCents are
+// the parts of it that aren't judges.
 export type DanceCardLedgerEntry = {
   input: number;
   cumulative: number;
   valueCents: number;
   creditCents: number;
+  survivalCents: number;
+  bonusCents: number;
 };
 
 export type DanceCardLedger = Map<string, Map<number, DanceCardLedgerEntry>>;
@@ -71,7 +113,11 @@ export type DanceCardLedger = Map<string, Map<number, DanceCardLedgerEntry>>;
 // order and values kept in integer cents, so a couple's credits always add up
 // to its value exactly. Weeks before the Anchor Week add nothing. A couple
 // gets an entry for every week from its first input on.
-export function danceCardLedger(weeks: DanceCardWeek[], anchorWeek: number, rule: DanceCardV2Rule): DanceCardLedger {
+export function danceCardLedger(weeks: DanceCardWeek[], anchorWeek: number, rule: DanceCardLedgerRule): DanceCardLedger {
+  return rule.version === "v2" ? curveLedger(weeks, anchorWeek, rule) : survivalLedger(weeks, anchorWeek, rule);
+}
+
+function curveLedger(weeks: DanceCardWeek[], anchorWeek: number, rule: DanceCardV2Rule): DanceCardLedger {
   const ledger: DanceCardLedger = new Map();
   const cumulative = new Map<string, number>();
   for (const week of [...weeks].sort((a, b) => a.weekNumber - b.weekNumber)) {
@@ -92,6 +138,51 @@ export function danceCardLedger(weeks: DanceCardWeek[], anchorWeek: number, rule
         cumulative: after,
         valueCents,
         creditCents: valueCents - coupleValueCents(before, rule),
+        survivalCents: 0,
+        bonusCents: 0,
+      });
+      ledger.set(coupleId, entries);
+    }
+  }
+  return ledger;
+}
+
+export function survivalValueCents(survivalWeeks: number, rule: DanceCardV3Rule): number {
+  return survivalWeeks > 0 ? Math.round(rule.survivalFirst * survivalWeeks ** rule.survivalExponent * 100) : 0;
+}
+
+// v3: cumulative counts survival weeks and valueCents is the couple's
+// survival so far. A week survives when the couple has a settled outcome and
+// none of that week's rows is eliminated, withdrawn or bye.
+function survivalLedger(weeks: DanceCardWeek[], anchorWeek: number, rule: DanceCardV3Rule): DanceCardLedger {
+  const ledger: DanceCardLedger = new Map();
+  const survivalWeeks = new Map<string, number>();
+  for (const week of [...weeks].sort((a, b) => a.weekNumber - b.weekNumber)) {
+    if (week.weekNumber < anchorWeek) continue;
+    const inputs = nightScaledScoresByCouple(week.danceScores);
+    const bonuses = new Map<string, number>();
+    const survived = new Map<string, boolean>();
+    for (const { coupleId, bonusPoints, outcome } of week.outcomes ?? []) {
+      if (outcome === undefined) throw new Error(`Dance Card v3 needs Week ${week.weekNumber}'s outcomes`);
+      bonuses.set(coupleId, (bonuses.get(coupleId) ?? 0) + bonusPoints);
+      survived.set(coupleId, (survived.get(coupleId) ?? true) && !NO_SURVIVAL_OUTCOMES.has(outcome as Outcome));
+    }
+    for (const coupleId of new Set([...survivalWeeks.keys(), ...inputs.keys(), ...survived.keys()])) {
+      const input = inputs.get(coupleId) ?? 0;
+      const before = survivalWeeks.get(coupleId) ?? 0;
+      const after = before + (survived.get(coupleId) ? 1 : 0);
+      survivalWeeks.set(coupleId, after);
+      const valueCents = survivalValueCents(after, rule);
+      const survivalCents = valueCents - survivalValueCents(before, rule);
+      const bonusCents = Math.round((bonuses.get(coupleId) ?? 0) * 100);
+      const entries = ledger.get(coupleId) ?? new Map<number, DanceCardLedgerEntry>();
+      entries.set(week.weekNumber, {
+        input,
+        cumulative: after,
+        valueCents,
+        creditCents: Math.round(rule.rate * input * 100) + survivalCents + bonusCents,
+        survivalCents,
+        bonusCents,
       });
       ledger.set(coupleId, entries);
     }
@@ -117,7 +208,7 @@ export function weekCredits(ledger: DanceCardLedger, weekNumber: number): Map<st
 // the weeks they show; this groups them the way the ledger reads them.
 export function danceCardWeeksFromRows(
   scores: (DanceScore & { weekNumber: number })[],
-  bonuses: { weekNumber: number; coupleId: string; bonusPoints: number }[] = []
+  bonuses: { weekNumber: number; coupleId: string; bonusPoints: number; outcome?: string }[] = []
 ): DanceCardWeek[] {
   const weeks = new Map<number, DanceCardWeek>();
   const weekFor = (weekNumber: number) => {
@@ -128,15 +219,28 @@ export function danceCardWeeksFromRows(
     return created;
   };
   for (const { weekNumber, ...score } of scores) weekFor(weekNumber).danceScores.push(score);
-  for (const { weekNumber, coupleId, bonusPoints } of bonuses) weekFor(weekNumber).outcomes!.push({ coupleId, bonusPoints });
+  for (const { weekNumber, coupleId, bonusPoints, outcome } of bonuses) {
+    weekFor(weekNumber).outcomes!.push({ coupleId, bonusPoints, outcome });
+  }
   return [...weeks.values()];
 }
 
-// A couple's credits over the weeks one holder had it, in cents.
-export function heldCreditCents(ledger: DanceCardLedger, coupleId: string, fromWeek: number, toWeek: number): number {
+export function judgesCents(entry: DanceCardLedgerEntry): number {
+  return entry.creditCents - entry.survivalCents - entry.bonusCents;
+}
+
+// A couple's credits over the weeks one holder had it, in cents: the whole
+// credit, or only its judges' part.
+export function heldCreditCents(
+  ledger: DanceCardLedger,
+  coupleId: string,
+  fromWeek: number,
+  toWeek: number,
+  part: "all" | "judges" = "all"
+): number {
   let cents = 0;
   for (const [weekNumber, entry] of ledger.get(coupleId) ?? []) {
-    if (weekNumber >= fromWeek && weekNumber <= toWeek) cents += entry.creditCents;
+    if (weekNumber >= fromWeek && weekNumber <= toWeek) cents += part === "judges" ? judgesCents(entry) : entry.creditCents;
   }
   return cents;
 }

@@ -72,7 +72,7 @@ import {
   shouldShowAnchorSyncControl,
 } from "@/lib/season-clock";
 import { judgesScoreMultiplierHelp, judgesScoreMultiplierLocked } from "@/lib/judges-score-multiplier";
-import { DANCE_CARD_V2_EXPONENT, danceCardRule } from "@/lib/dance-card-v2";
+import { DANCE_CARD_V2_EXPONENT, DANCE_CARD_V3_SURVIVAL_FIRST, danceCardRule } from "@/lib/dance-card-v2";
 
 type ScoringMethod = GrandFinaleMethod;
 type WaiverMode = "locked" | "waivers";
@@ -128,6 +128,20 @@ type LockDirection = "before" | "after";
 // point values, so the panel explains the curve instead.
 function danceCardCurveNote(coefficient: number): string {
   return `Each couple's season is worth ${coefficient} × (judges' total)^${DANCE_CARD_V2_EXPONENT}, counted from the Anchor Week. Each week pays the change, so earlier weeks count a little more.`;
+}
+
+// A v3 league's Dance Card (src/lib/dance-card-v2.ts): v1's fields, read-only,
+// with survival tapering.
+function DanceCardTaperRows({ rate }: { rate: number }) {
+  return (
+    <>
+      <SettingRow label="Judges' Score Multiplier" value={rate.toFixed(4)} />
+      <SettingRow label="Survival Points" value={`${formatPoints(DANCE_CARD_V3_SURVIVAL_FIRST)}, Tapering`} />
+      <p className="pb-2 text-sm text-muted-foreground">
+        Survival pays {formatPoints(DANCE_CARD_V3_SURVIVAL_FIRST)} for a couple&apos;s first safe week, then a little less each safe week after.
+      </p>
+    </>
+  );
 }
 
 const CURTAIN_CALL_PAYOUT_NOTE =
@@ -655,7 +669,7 @@ export function LeagueModulesForm({
             name={scoringModule("danceCard").name}
             icon={scoringModule("danceCard").icon}
             weight={judgesWeight}
-            detailsHint={danceCard.version === "v2" ? "Judges · season curve" : "Judges · survival · placement"}
+            detailsHint={danceCard.version === "v2" ? "Judges · season curve" : danceCard.version === "v3" ? "Judges · survival" : "Judges · survival · placement"}
           >
             <div className="flex flex-col">
               {danceCard.version === "v2" ? (
@@ -663,6 +677,8 @@ export function LeagueModulesForm({
                   <SettingRow label="Dance Card Scoring" value="Season Curve" />
                   <p className="pb-2 text-sm text-muted-foreground">{danceCardCurveNote(danceCard.coefficient)}</p>
                 </>
+              ) : danceCard.version === "v3" ? (
+                <DanceCardTaperRows rate={danceCard.rate} />
               ) : (
                 <>
                   <SettingRow
@@ -1007,7 +1023,7 @@ export function LeagueModulesForm({
           weightInputId="judgesWeight"
           onWeightChange={editWeight(setJudgesWeight)}
           weightDisabled={scoringLocked}
-          detailsHint={danceCard.version === "v2" ? "Judges · season curve" : "Judges · survival · placement"}
+          detailsHint={danceCard.version === "v2" ? "Judges · season curve" : danceCard.version === "v3" ? "Judges · survival" : "Judges · survival · placement"}
         >
           <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
@@ -1015,6 +1031,10 @@ export function LeagueModulesForm({
             </p>
             {danceCard.version === "v2" ? (
               <p className="text-sm text-muted-foreground">{danceCardCurveNote(danceCard.coefficient)}</p>
+            ) : danceCard.version === "v3" ? (
+              <div className="flex flex-col">
+                <DanceCardTaperRows rate={danceCard.rate} />
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">

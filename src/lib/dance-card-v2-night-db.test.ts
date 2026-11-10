@@ -26,7 +26,7 @@ const LIVE_STACK = [
   "apply-drop-curtain-call-lock-guard", "apply-team-dance-entity", "apply-special-dances", "apply-special-dances-polish",
   "apply-draft-release-own-rows", "apply-whole-judge-marks", "apply-special-draft-release",
   "apply-contributor-special-setup", "apply-draft-lineup", "apply-retire-special-leftovers", "apply-episode-rounds",
-  "apply-special-dance-label", "apply-dance-card-v2",
+  "apply-special-dance-label", "apply-dance-card-v2", "apply-dance-card-v3",
 ];
 let db: PGlite;
 

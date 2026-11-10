@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "./supabase/types";
 import { isTeamRow, PLAN_VERSION, recombinedTotal, scoringDance, settledBonuses, teamScoreRows, type PublicationSnapshot, type ScoringDance } from "./episode-publication";
 import { buildWeeklyScoreRows, danceCardPriorWeeks, type WeeklyScoreRow } from "./weekly-score-rows";
+import { usesDanceCardLedger } from "./dance-card-v2";
 import { roundPoints } from "./format-points";
 import { scaledJudgesScore } from "./scoring";
 
@@ -13,7 +14,7 @@ type WeekRow = PublicationSnapshot["weeks"][number];
 // so its Dance Card is the whole week rebuilt from everything live,
 // published sibling nights' bonuses included.
 function revealWeeklyScores(snapshot: PublicationSnapshot, week: WeekRow, episodeId: string, before: ScoringDance[], after: ScoringDance[]) {
-  const v2Leagues = new Set(snapshot.settings.filter((row) => row.dance_card_version === "v2").map((row) => row.league_id));
+  const v2Leagues = new Set(snapshot.settings.filter((row) => usesDanceCardLedger(row.dance_card_version)).map((row) => row.league_id));
   const laterWeek = (snapshot.laterWeeklyScores ?? []).find((row) => v2Leagues.has(row.league_id));
   if (laterWeek) {
     const number = snapshot.weeks.find((w) => w.id === laterWeek.week_id)?.week_number;

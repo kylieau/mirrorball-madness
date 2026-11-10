@@ -158,16 +158,16 @@ export default async function LeaguePicksPage({
           .in("couple_id", [...new Set(leagueSlotPeriods.map((slot) => slot.coupleId))])
           .then((result) => ({ data: result.data as unknown as LeagueDanceRow[] | null }))
       : Promise.resolve({ data: [] as LeagueDanceRow[] });
-  // Dance Card v2 lines are credits on the season curve, so a settled Fantasy
-  // Bonus in any visible week moves every later line.
+  // Dance Card v2/v3 lines come from each couple's history: under v2 a
+  // settled Fantasy Bonus in any visible week moves every later line, and
+  // under v3 every settled outcome counts toward survival.
   const leagueBonusesPending =
-    danceCardRule.version === "v2" && leagueSlotPeriods.length > 0 && episodeWeekNumber.size > 0
+    danceCardRule.version !== "v1" && leagueSlotPeriods.length > 0 && episodeWeekNumber.size > 0
       ? supabase
           .from("episode_results")
-          .select("episode_id, couple_id, bonus_points")
+          .select("episode_id, couple_id, bonus_points, outcome")
           .in("episode_id", [...episodeWeekNumber.keys()])
-          .neq("bonus_points", 0)
-      : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; bonus_points: number }[] });
+      : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; bonus_points: number; outcome: string }[] });
   const yourRosterWeekJeopardyPending =
     yourRosterWeekEpisodeIds.length > 0
       ? supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", yourRosterWeekEpisodeIds)
@@ -354,6 +354,7 @@ export default async function LeaguePicksPage({
       weekNumber: episodeWeekNumber.get(row.episode_id) ?? 0,
       coupleId: row.couple_id,
       bonusPoints: Number(row.bonus_points),
+      outcome: row.outcome,
     })),
   };
 
@@ -381,8 +382,9 @@ export default async function LeaguePicksPage({
   // points, not the season-cumulative total — matches the carousel it sits
   // above, same weighting as danceCardLeagueEntries' weekPoints below.
   const yourRosterWeekTotalPoints = roundPoints(yourRosterWeekRosterPoints * judgePointsInputs.categoryWeight);
-  // Under Dance Card v2 nothing sits outside the couples' credits.
-  const yourRosterWeekBonusPoints = yourRosterWeek && danceCardRule.version === "v1"
+  // Under Dance Card v2 nothing sits outside the couples' credits; under v3
+  // survival and the Fantasy Bonus do, as under v1.
+  const yourRosterWeekBonusPoints = yourRosterWeek && danceCardRule.version !== "v2"
     ? weeklyBonusPoints(
         yourRosterWeekRosterPoints,
         judgePointsInputs.categoryWeight,
@@ -473,7 +475,7 @@ export default async function LeaguePicksPage({
         displayName: m.displayName,
         weekPoints: roundPoints(weekRosterPoints * categoryWeight),
         bonusPoints:
-          danceCardRule.version === "v1"
+          danceCardRule.version !== "v2"
             ? weeklyBonusPoints(weekRosterPoints, categoryWeight, couples.map((c) => c.weeklyPoints))
             : 0,
         couples,

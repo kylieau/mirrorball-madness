@@ -25,7 +25,7 @@ export const loadDanceCardHistory = cache(
         .from("dance_scores")
         .select(danceScoreColumns(mode, "episode_id, couple_id, total_score, scaled_score", { teamId: true }))
         .in("episode_id", episodeIds),
-      supabase.from("episode_results").select("episode_id, couple_id, bonus_points").in("episode_id", episodeIds),
+      supabase.from("episode_results").select("episode_id, couple_id, bonus_points, outcome").in("episode_id", episodeIds),
     ]);
     return danceCardPriorWeeks(
       {

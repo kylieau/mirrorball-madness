@@ -85,12 +85,12 @@ export async function loadScoreHistory(
   const allowedWeeks = [...completedAllowedWeeks, ...(revealingWeek ? [revealingWeek] : []), ...draftHistoryWeek];
   if (allowedWeeks.length === 0) return { lines: [], error: null };
 
-  // A v2 credit covers the whole week, so a week still posting also reads its
+  // A v2/v3 credit covers the whole week, so a week still posting also reads its
   // published sibling nights as Dance Card input; the lines shown don't change.
   const rule = danceCardRule(settings, league.roster_size);
   const danceCardEpisodeIds = (week: (typeof allowedWeeks)[number]) => {
     const shown = week.episodes.map((episode) => episode.id);
-    return rule.version === "v2"
+    return rule.version !== "v1"
       ? danceCardWeekEpisodeIds(shown, groupedWeeks.find((w) => w.id === week.id)?.episodes ?? [])
       : shown;
   };
@@ -180,7 +180,7 @@ export async function loadScoreHistory(
     scoring: scoringSettingsFromRow(settings),
     danceCardRule: rule,
     danceCardWeeks:
-      rule.version === "v2"
+      rule.version !== "v1"
         ? allowedWeeks.map((week) => ({
             weekNumber: week.week_number,
             ...weekResults(danceCardEpisodeIds(week), historyDanceRows, outcomeRows ?? []),

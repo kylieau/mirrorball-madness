@@ -25,7 +25,7 @@ const LIVE_STACK = [
   "apply-drop-curtain-call-lock-guard", "apply-team-dance-entity", "apply-special-dances", "apply-special-dances-polish",
   "apply-draft-release-own-rows", "apply-whole-judge-marks", "apply-special-draft-release",
   "apply-contributor-special-setup", "apply-draft-lineup", "apply-retire-special-leftovers", "apply-episode-rounds",
-  "apply-special-dance-label", "apply-dance-card-v2",
+  "apply-special-dance-label", "apply-dance-card-v2", "apply-dance-card-v3",
 ];
 
 let db: PGlite;
@@ -208,7 +208,7 @@ describe("apply-dance-card-v2.sql", () => {
     await switchCurve();
     await draft(e4, { [harry]: [9, 9, 9] });
     const plan = buildPublicationPlan(await snapshot(e4), e4);
-    await expect(commit(e4, { ...plan, planVersion: 3 }, "commit_episode_publication")).rejects.toThrow(/season curve/);
+    await expect(commit(e4, { ...plan, planVersion: 3 }, "commit_episode_publication")).rejects.toThrow(/week by week/);
     await expect(db.query("select public.assert_special_dance_plan($1, $2)", [e2, JSON.stringify({ planVersion: 4 })])).rejects.toThrow(
       "Week 3 already has scores. Publish weeks in order."
     );

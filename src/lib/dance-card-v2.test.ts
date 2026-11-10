@@ -3,15 +3,19 @@ import {
   coupleValueCents,
   DANCE_CARD_V2_COEFFICIENTS,
   DANCE_CARD_V2_EXPONENT,
+  DANCE_CARD_V3_RATES,
+  DANCE_CARD_V3_SURVIVAL_EXPONENT,
+  DANCE_CARD_V3_SURVIVAL_FIRST,
   danceCardLedger,
   danceCardRule,
+  danceCardV3Rule,
   ledgerEntry,
   weekCredits,
   type DanceCardV2Rule,
   type DanceCardWeek,
 } from "./dance-card-v2";
 import type { DanceScore } from "./scoring";
-import { solveDanceCardV2Coefficients } from "./strong-play-ceilings";
+import { solveDanceCardV2Coefficients, solveDanceCardV3Rates } from "./strong-play-ceilings";
 
 const rule: DanceCardV2Rule = { version: "v2", exponent: 0.8, coefficient: 0.8884 };
 
@@ -58,7 +62,7 @@ describe("danceCardLedger", () => {
   it("reproduces the frozen-rule Week 2–8 credits for Harry", () => {
     const ledger = danceCardLedger(harryWeeks, 2, rule);
     expect([...ledger.get("harry")!.values()].map((e) => e.creditCents)).toEqual([897, 870, 770, 736, 758, 802, 770]);
-    expect(ledgerEntry(ledger, "harry", 8)).toEqual({ input: 30, cumulative: 177.75, valueCents: 5603, creditCents: 770 });
+    expect(ledgerEntry(ledger, "harry", 8)).toEqual({ input: 30, cumulative: 177.75, valueCents: 5603, creditCents: 770, survivalCents: 0, bonusCents: 0 });
   });
 
   it("telescopes: a couple's credits add up to its value exactly", () => {
@@ -70,7 +74,7 @@ describe("danceCardLedger", () => {
   it("pays a one-week couple on its single score and nothing after", () => {
     const ledger = danceCardLedger([week(2, [dance("giada", "e3", 12), dance("harry", "e3", 18)]), week(3, [dance("harry", "e4", 24)])], 2, rule);
     expect(ledgerEntry(ledger, "giada", 2)?.creditCents).toBe(649);
-    expect(ledgerEntry(ledger, "giada", 3)).toEqual({ input: 0, cumulative: 12, valueCents: 649, creditCents: 0 });
+    expect(ledgerEntry(ledger, "giada", 3)).toEqual({ input: 0, cumulative: 12, valueCents: 649, creditCents: 0, survivalCents: 0, bonusCents: 0 });
   });
 
   it("ignores weeks before the Anchor Week", () => {
@@ -124,5 +128,52 @@ describe("danceCardLedger", () => {
 
   it("reads one week's credits in points", () => {
     expect(weekCredits(danceCardLedger(harryWeeks, 2, rule), 8)).toEqual(new Map([["harry", 7.7]]));
+  });
+});
+
+describe("Dance Card v3", () => {
+  const v3 = danceCardV3Rule(2);
+  const safe = (coupleId: string, bonusPoints = 0) => ({ coupleId, bonusPoints, outcome: "safe" });
+
+  it("is chosen by the league's version and pinned to the schedule-model solve", () => {
+    expect(danceCardRule({ dance_card_version: "v3" }, 2)).toEqual({ version: "v3", rate: 0.2731, survivalFirst: 3, survivalExponent: 0.5 });
+    expect(
+      Object.fromEntries(
+        solveDanceCardV3Rates(DANCE_CARD_V3_SURVIVAL_FIRST, DANCE_CARD_V3_SURVIVAL_EXPONENT).map((row) => [row.rosterSize, row.rate])
+      )
+    ).toEqual(DANCE_CARD_V3_RATES);
+  });
+
+  it("pays judges at one rate and survival tapering by 3.00 × √n", () => {
+    const weeks = [2, 3, 4, 5].map((n) => week(n, [dance("a", `e${n}`, 24)], [safe("a")]));
+    const entries = [...danceCardLedger(weeks, 2, v3).get("a")!.values()];
+    // 24 × 0.2731 = 6.55; survival 3.00, 4.24, 5.20, 6.00 so far.
+    expect(entries.map((e) => e.creditCents)).toEqual([655 + 300, 655 + 124, 655 + 96, 655 + 80]);
+    expect(entries.map((e) => e.survivalCents)).toEqual([300, 124, 96, 80]);
+  });
+
+  it("pays no survival for an elimination, a withdrawal or a bye, and counts only survived weeks", () => {
+    const weeks = [
+      week(2, [dance("a", "e2", 24)], [safe("a")]),
+      week(3, [], [{ coupleId: "a", bonusPoints: 0, outcome: "bye" }]),
+      week(4, [dance("a", "e4", 24)], [safe("a")]),
+      week(5, [dance("a", "e5", 24)], [{ coupleId: "a", bonusPoints: 0, outcome: "eliminated" }]),
+    ];
+    expect([...danceCardLedger(weeks, 2, v3).get("a")!.values()].map((e) => e.survivalCents)).toEqual([300, 0, 124, 0]);
+  });
+
+  it("pays the Fantasy Bonus at face value, outside the judges' input", () => {
+    const entry = ledgerEntry(danceCardLedger([week(9, [dance("a", "e10", 27)], [safe("a", 3)])], 9, v3), "a", 9)!;
+    expect(entry.input).toBe(27);
+    expect(entry.bonusCents).toBe(300);
+    expect(entry.creditCents).toBe(Math.round(27 * 0.2731 * 100) + 300 + 300);
+  });
+
+  it("pays no survival before the week is settled", () => {
+    expect(ledgerEntry(danceCardLedger([week(9, [dance("a", "e10", 27)])], 9, v3), "a", 9)?.survivalCents).toBe(0);
+  });
+
+  it("refuses outcome rows without the outcome", () => {
+    expect(() => danceCardLedger([week(9, [], [{ coupleId: "a", bonusPoints: 0 }])], 9, v3)).toThrow(/needs Week 9's outcomes/);
   });
 });

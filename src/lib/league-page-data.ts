@@ -143,7 +143,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
   });
   const danceCard = scoringSettings ? danceCardRule(scoringSettings, league.roster_size) : null;
   const draftHistory =
-    draftNight && danceCard?.version === "v2" && season.seasonId
+    draftNight && danceCard && danceCard.version !== "v1" && season.seasonId
       ? await loadDanceCardHistory(supabase, season.seasonId, draftNight.weekNumber + 1)
       : null;
   const draftManagers =
@@ -155,7 +155,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
             weekNumber: draftNight.weekNumber,
             danceScores: draftNightDanceScores(draftNight),
           },
-          danceCard?.version === "v2" && draftHistory
+          danceCard && danceCard.version !== "v1" && draftHistory
             ? {
                 rule: danceCard,
                 priorWeeks: draftHistory,

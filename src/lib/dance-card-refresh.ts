@@ -14,12 +14,14 @@ export type DanceCardSnapshot = Pick<
 // Every stored row of one league with its Dance Card rebuilt from live data
 // under `version`; prediction and Grand Finale points stay as stored. A
 // published week is scored the way publishing scores it. A week still
-// posting is scored the way a v2 reveal scores it, which v1 can't be rebuilt
-// from (its stored row is the night's running change).
+// posting is scored the way a v2/v3 reveal scores it, which v1 can't be
+// rebuilt from (its stored row is the night's running change).
+export type DanceCardVersion = "v1" | "v2" | "v3";
+
 export function danceCardRowsFromLive(
   snapshot: DanceCardSnapshot,
   leagueId: string,
-  version: "v1" | "v2"
+  version: DanceCardVersion
 ): LaterDanceCardRow[] {
   const league = snapshot.leagues.find((l) => l.id === leagueId);
   const leagueSettings = snapshot.settings.find((s) => s.league_id === leagueId);
@@ -62,7 +64,7 @@ export function danceCardRowsFromLive(
           .map((o) => ({ couple_id: o.couple_id, outcome: o.outcome, bonus_points: Number(o.bonus_points) }))
       );
     } else {
-      if (version !== "v2") throw new Error(`Week ${week.week_number} is still posting, so v1 can't be rebuilt now`);
+      if (version === "v1") throw new Error(`Week ${week.week_number} is still posting, so v1 can't be rebuilt now`);
       rebuilt = danceCardWeekRows(
         {
           episodes: snapshot.episodes,

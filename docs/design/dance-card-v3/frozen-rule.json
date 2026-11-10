@@ -1,0 +1,20 @@
+{
+ "frozen_at_utc": "2026-11-10T20:46:04.185387Z",
+ "frozen_before": "any v3 league standings were computed with this exact rounding (the Curve Lab used a different bonus and survival treatment)",
+ "name": "dance_card.v3.flat_rate_tapered_survival",
+ "decided_by": "Kylie, 2026-11-10",
+ "judges": "rate_N x the week's judges input, rounded half-up to cents each week. Input = nightScaledScoresByCouple over the week's nights (collapseToNights: all marks over all marks possible x30, points rows in the numerator only). No curve.",
+ "rate_rule": "rate_N = (100 - E_seat[sum of 3.00 x sqrt(survival weeks)]) / E_seat[sum of couple season judges total] on the app's schedule model (src/lib/strong-play-ceilings.ts: 12 couples, 4-couple finale, judges 28->21, median snake seat), rounded to 4 decimals. Rosters above 6 scale rate_2 by 2/N. No couple or manager outcomes used.",
+ "survival": "Survival(n) = round_half_up_cents(3.00 x sqrt(n)), n = the couple's survival weeks from the Anchor Week through this week; a week's survival credit = Survival(n) - Survival(n-1). A survival week is a week where the couple has a settled outcome row and none of its rows that week is eliminated, withdrawn or bye (v1's NO_SURVIVAL_OUTCOMES). Paid to whoever holds the couple that week.",
+ "fantasy_bonus": "episode_results.bonus_points at face value, outside the judges input (as v1).",
+ "placement_points": [
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "rounding": "per couple per week: credit cents = judges cents + survival credit cents + bonus cents; manager roster_points(week) = sum of its couples' credits; total = round_cents(roster x w_judges + stored prediction x w_elim + stored GF x w_bonus)",
+ "start_week": "league Anchor Week (judges_score_starts_week)",
+ "unchanged": "rosters, Curtain Call and Grand Finale stored points, module weights, Anchor Week"
+}

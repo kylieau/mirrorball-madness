@@ -1,7 +1,7 @@
 import { buildCoupleDisplayNames, formatCoupleName } from "./couple-display";
 import { slotActiveInWeek } from "./roster-couple-points";
 import { computeWeeklyScores, type DanceScore } from "./scoring";
-import { danceCardLedger, weekCredits, type DanceCardV2Rule, type DanceCardWeek } from "./dance-card-v2";
+import { danceCardLedger, weekCredits, type DanceCardLedgerRule, type DanceCardWeek } from "./dance-card-v2";
 import { roundPoints } from "./format-points";
 
 // A night with at least one drafted dance released (a couple's own, via
@@ -184,7 +184,7 @@ export type DraftManagerScore = {
 // pay nothing. A Dance Card v2 league pays the week's credits on top of the
 // earlier weeks, with the week's settled sibling-night bonuses.
 export type DraftNightDanceCard = {
-  rule: DanceCardV2Rule;
+  rule: DanceCardLedgerRule;
   priorWeeks: DanceCardWeek[];
   weekOutcomes: { coupleId: string; bonusPoints: number }[];
 };

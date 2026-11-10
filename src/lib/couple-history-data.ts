@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { danceCardRule, danceCardWeekEpisodeIds } from "@/lib/dance-card-v2";
+import { danceCardRule, danceCardWeekEpisodeIds, usesDanceCardLedger } from "@/lib/dance-card-v2";
 import { buildCoupleHistory, unwatchedRange, type CoupleHistory, type CoupleHistoryWeekInput } from "@/lib/couple-history";
 import { buildCoupleLeagueRows, coupleWeekPickNotes, type CoupleLeagueRow } from "@/lib/couple-leagues";
 import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
@@ -141,9 +141,9 @@ async function loadCoupleLeagues({
     ])
   );
 
-  // A v2 credit covers the whole week, so v2 leagues read a week still
+  // A v2/v3 credit covers the whole week, so those leagues read a week still
   // posting with its published sibling nights; v1 leagues keep the shown weeks.
-  const danceCardWeeks = (settings ?? []).some((setting) => setting.dance_card_version === "v2")
+  const danceCardWeeks = (settings ?? []).some((setting) => usesDanceCardLedger(setting.dance_card_version))
     ? await loadViewerSeason(supabase, viewerId).then(({ weekRows, episodeRows }) =>
         loadCoupleWeekResults(
           supabase,
@@ -184,7 +184,7 @@ async function loadCoupleLeagues({
           ),
           scoring: scoringSettingsFromRow(setting),
           rule: danceCardRule(setting, rosterSizeByLeague.get(setting.league_id) ?? 0),
-          danceCardWeeks: setting.dance_card_version === "v2" ? (danceCardWeeks ?? undefined) : undefined,
+          danceCardWeeks: usesDanceCardLedger(setting.dance_card_version) ? (danceCardWeeks ?? undefined) : undefined,
           anchorWeek: setting.judges_score_starts_week,
           categoryWeight: setting.judges_score_category_weight,
           slots: (slots ?? []).flatMap((slot) =>
