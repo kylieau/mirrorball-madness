@@ -25,6 +25,7 @@ const LIVE_STACK = [
   "apply-contributor-special-setup", "apply-draft-lineup", "apply-retire-special-leftovers",
 ];
 const roundsSql = readFileSync("supabase/apply-episode-rounds.sql", "utf8");
+const heatGuardSql = readFileSync("supabase/apply-immune-heat-guard.sql", "utf8");
 
 async function freshDb() {
   const instance = new PGlite();
@@ -171,6 +172,8 @@ describe("apply-episode-rounds.sql", () => {
     await savePoints(e10, handMade, [{ coupleId: harry, points: 3, result: "Immune" }]);
     await db.exec(roundsSql);
     await db.exec(roundsSql); // Dashboard reruns must be safe.
+    await db.exec(heatGuardSql);
+    await db.exec(heatGuardSql);
   }, 60_000);
   afterAll(async () => db?.close());
 
@@ -304,6 +307,38 @@ describe("apply-episode-rounds.sql", () => {
     await expect(exception(e10, jenna, [round1.id], "immune")).rejects.toThrow(/special round/);
     await expect(exception(e10, jenna, [danceOff.id], "immune", { actor: outsider })).rejects.toThrow(/Not authorized/);
     await expect(setBonus(e10, round1.id, 3)).rejects.toThrow(/winner's bonus/);
+  });
+
+  it("keeps a couple marked out of a round out of its heats, but not out of its immunity row", async () => {
+    const [round1, danceOff] = await rounds(e10);
+    const [heat1] = await heats(danceOff.id);
+    // Harry is Immune from the test above.
+    await expect(saveSpecial(e10, { id: heat1.id, memberCoupleIds: [...heat1.members, harry] }, friend)).rejects.toThrow(
+      /Celebrity 0 is marked Immune in Dance-Off/
+    );
+    await exception(e10, harry, [danceOff.id], "immune", { bonus: 2.5 });
+    expect((await heats(danceOff.id)).find((h) => h.heat === null)?.members).toEqual([harry]);
+    // Out of Round 1 only: still free for the dance-off's heats.
+    await exception(e10, maura, [round1.id], "not_dancing");
+    await expect(saveSpecial(e10, { id: heat1.id, memberCoupleIds: [...heat1.members, maura] }, friend)).resolves.toBeTruthy();
+    await saveSpecial(e10, { id: heat1.id, memberCoupleIds: heat1.members }, friend);
+    await exception(e10, maura, [round1.id], null);
+    // One plan save that clears Harry's mark and puts him in a heat is fine:
+    // the heat is written before the mark is cleared, and the check waits.
+    const plan = (heat1Members: string[], exceptions: unknown[]) => [
+      { id: round1.id, kind: "own", roundType: "Individual Dance" },
+      { id: danceOff.id, kind: "special", roundType: "Dance-Off", scoring: "fixed_bonus", unitCount: 3, bonusPoints: danceOff.bonus,
+        heats: [{ heatNumber: 1, coupleIds: heat1Members }], exceptions },
+    ];
+    await saveRounds(e10, plan([...heat1.members, harry], []));
+    expect((await heats(danceOff.id)).find((h) => h.id === heat1.id)?.members).toContain(harry);
+    // Marked Immune again, he leaves the heat; a plan that keeps both is refused.
+    await exception(e10, harry, [danceOff.id], "immune");
+    expect((await heats(danceOff.id)).find((h) => h.id === heat1.id)?.members).toEqual(heat1.members);
+    await expect(saveRounds(e10, plan([...heat1.members, harry], [{ coupleId: harry, kind: "immune" }]))).rejects.toThrow(
+      /Celebrity 0 is marked Immune in Dance-Off/
+    );
+    expect((await heats(danceOff.id)).find((h) => h.id === heat1.id)?.members).toEqual(heat1.members);
   });
 
   it("shows fans who unlocked drafts a released bonus heat as points", async () => {

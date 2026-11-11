@@ -197,6 +197,7 @@ export function SpecialDanceEntry({
   nightJudgeIds,
   danceStyles,
   participants,
+  outOfRoundCoupleIds = [],
   otherDances,
   recentDanceTypes,
   recentDetailLabels,
@@ -228,6 +229,9 @@ export function SpecialDanceEntry({
   nightJudgeIds: string[];
   danceStyles: { id: string; name: string }[];
   participants: SpecialDanceParticipant[];
+  // Couples marked Immune, Not Dancing or Withdrawn in this heat's round,
+  // who can't be added to it.
+  outOfRoundCoupleIds?: string[];
   otherDances: Pick<SpecialDance, "id" | "name" | "danceType" | "memberCoupleIds">[];
   recentDanceTypes: string[];
   recentDetailLabels: string[];
@@ -417,6 +421,9 @@ export function SpecialDanceEntry({
   const undoLeft = nowMs !== null && dance.postedAt ? undoSecondsLeft(dance.postedAt, nowMs) : 0;
   const styleNames = new Map(danceStyles.map((s) => [s.id, s.name]));
   const summary = specialDanceSummary(dance, styleNames);
+  const addable = addableSpecialDanceParticipants(participants, setup.memberCoupleIds, weekNumber).filter(
+    (p) => !outOfRoundCoupleIds.includes(p.id)
+  );
   const typeOptions = Array.from(new Set([...DANCE_TYPE_SUGGESTIONS, ...recentDanceTypes]));
   const detailLabelOptions = Array.from(new Set([...DETAIL_LABEL_SUGGESTIONS, ...recentDetailLabels]));
   const overlapWarning = setup.danceType.trim()
@@ -510,7 +517,7 @@ export function SpecialDanceEntry({
         </p>
         <div className="flex items-center gap-2">
           {posted && <Badge>Posted</Badge>}
-          {canSetup && specialMode && !editing && (
+          {canSetup && specialMode && !editing && !round?.immunity && (
             <Button size="xs" variant="ghost" onClick={() => setEditing(true)} disabled={busy} aria-label="Edit Details">
               <PencilIcon className="size-3.5" />
               Edit Details
@@ -523,7 +530,11 @@ export function SpecialDanceEntry({
           <p className="mt-0.5 text-xs text-muted-foreground">
             {oxfordJoin(dance.memberCoupleIds.map((id) => participants.find((p) => p.id === id)?.celebrity ?? "a couple"))}
           </p>
-          {summary && <p className="mt-0.5 text-xs text-muted-foreground">{summary}</p>}
+          {round?.immunity ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">Immune this round, so no dance: a bonus only.</p>
+          ) : (
+            summary && <p className="mt-0.5 text-xs text-muted-foreground">{summary}</p>
+          )}
         </>
       )}
 
@@ -569,9 +580,7 @@ export function SpecialDanceEntry({
               })}
             </div>
             <Select
-              items={Object.fromEntries(
-                addableSpecialDanceParticipants(participants, setup.memberCoupleIds, weekNumber).map((p) => [p.id, p.celebrity])
-              )}
+              items={Object.fromEntries(addable.map((p) => [p.id, p.celebrity]))}
               value={null}
               onValueChange={(v) => {
                 if (v) patchSetup({ memberCoupleIds: [...setup.memberCoupleIds, v] });
@@ -582,7 +591,7 @@ export function SpecialDanceEntry({
                 <SelectValue placeholder={posted ? "Un-post to change participants" : "Add a participant"} />
               </SelectTrigger>
               <SelectContent>
-                {addableSpecialDanceParticipants(participants, setup.memberCoupleIds, weekNumber).map((p) => {
+                {addable.map((p) => {
                   const reason = participantReason(p);
                   return (
                     <SelectItem key={p.id} value={p.id}>

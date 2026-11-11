@@ -1793,6 +1793,9 @@ export function ResultsForm({
         nightJudgeIds={nightJudgeIds}
         danceStyles={danceStyles}
         participants={specialParticipants()}
+        outOfRoundCoupleIds={
+          view.dance.roundId && view.dance.heatNumber != null ? exceptionsFor(view.dance.roundId, exceptions).map((x) => x.coupleId) : []
+        }
         otherDances={others}
         recentDanceTypes={recentSuggestions(DANCE_TYPE_SUGGESTIONS, usedTypes)}
         recentDetailLabels={recentSuggestions(DETAIL_LABEL_SUGGESTIONS, usedLabels)}
