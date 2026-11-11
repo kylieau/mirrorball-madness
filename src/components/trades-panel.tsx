@@ -315,7 +315,7 @@ export function TradesPanel({
         return (
           <Card key={offer.id} className={cn(needsMe && "ring-accent/60")}>
             <CardHeader>
-              <CardTitle>
+              <CardTitle className="wrap-anywhere">
                 {offer.proposedBy === teamId ? `Your Offer to ${listNames(otherNames)}` : `Offer From ${managerName(offer.proposedBy)}`}
               </CardTitle>
               <OfferStatus offer={offer} nameOf={(managerId) => (managerId === teamId ? "you" : managerName(managerId))} />
