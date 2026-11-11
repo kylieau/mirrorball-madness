@@ -1,12 +1,12 @@
-# Session Handoff — 2026-11-11 PT (Roster Moves switch built, awaiting review and Kylie's push; one more run of the podium SQL)
+# Session Handoff — 2026-11-11 PT (Roster Moves switch built, pushed as 1554ff6)
 
 ## 1. Current State
 
-**In focus now: the Roster Moves card and pages, built and uncommitted.** Kylie picked card C1 (the same Lifeline | Recast | Trades switch on the Picks card and on the three pages, a gold dot where something needs her, the selected move's lines and an Open link) over the mock in `docs/design/roster-moves-pages/`. tsc, eslint, 1021 tests and `next build` pass; a scratch league (torn down) verified the card, the three pages, the Claim sheet, a Lifeline save, the trade picker and an accept at 390/360. Not verified: saving a waiver claim from the sheet (the scratch run was already due, see `BACKLOG.md`). `CLAUDE.md` describes it. Codex review was running at handoff; the push needs her yes.
+**Roster Moves card and pages: pushed as `1554ff6` on Nov 11 with Kylie's yes.** Kylie picked card C1 (the same Lifeline | Recast | Trades switch on the Picks card and on the three pages, a gold dot where something needs her, the selected move's lines and an Open link) over the mock in `docs/design/roster-moves-pages/`. tsc, eslint, 1021 tests and `next build` pass; a scratch league (torn down) verified the card, the three pages, the Claim sheet, a Lifeline save, the trade picker and an accept at 390/360. Not verified: saving a waiver claim from the sheet (the scratch run was already due, see `BACKLOG.md`). `CLAUDE.md` describes it. Codex findings (fallback claims, Title Case) were fixed before the push.
 
 **In focus: Kylie's Nov 11 build, committed and pushed to `main` on Nov 11 with her yes.** She applied `supabase/apply-curtain-call-podium.sql` first; a read-only check found the columns and both RPCs, and regenerated types match the committed file. No live league data was touched.
 
-- **Curtain Call's Finale podium** (she chose a podium with distance credit): Week 11's elimination pick is Winner, Runner-Up and Third Place, each paying that week's elimination payout (3.23 at defaults), half for one place off, nothing for two (`PODIUM_PLACE_OFF_FRACTION = 0.5`; the first mock had thirds, and she approved the proposal after I said I'd go with half), always on; top scorer unchanged. `supabase/apply-curtain-call-podium.sql` is applied live and rehearsed (`curtain-call-podium-db.test.ts`). **It needs one more run:** after her apply, the Codex review found `submit_podium_prediction` didn't check that picked couples are in the week's season; the check is now in the file and `schema.sql` (safe to run again; the app doesn't depend on it).
+- **Curtain Call's Finale podium** (she chose a podium with distance credit): Week 11's elimination pick is Winner, Runner-Up and Third Place, each paying that week's elimination payout (3.23 at defaults), half for one place off, nothing for two (`PODIUM_PLACE_OFF_FRACTION = 0.5`; the first mock had thirds, and she approved the proposal after I said I'd go with half), always on; top scorer unchanged. `supabase/apply-curtain-call-podium.sql` is applied live and rehearsed (`curtain-call-podium-db.test.ts`). Kylie ran it a second time on Nov 11 for the season check Codex asked for (`submit_podium_prediction` refuses a couple outside the week's season).
 - **Own dances first** wherever a night's dances are listed (`orderNightDances`).
 - **Dance Card weight line** on Picks' roster card when the weight isn't 1.
 - **Home league card roster moves** under Dance Card (`rosterMoveRows`, `loadHomeRosterMoves`); a missing Lifeline counts as Picks Due. Looked at in a browser with made-up data only (a temporary page, deleted); the scratch league has none of the three mechanisms on.
@@ -39,7 +39,11 @@ Checks on `1974e2f`: `npx tsc --noEmit` and `npx eslint src scripts` clean, `npm
 
 ## 2. Changes Made
 
-**The Nov 11 build, committed and pushed:** `supabase/apply-curtain-call-podium.sql`, `supabase/schema.sql`, `src/lib/supabase/types.ts` (matches a regenerate from the live project), `src/lib/curtain-call-podium-db.test.ts`, `src/lib/home-roster-moves-data.ts`, `src/components/league-triage-card.tsx`, `docs/design/curtain-call-finale-podium/`, `docs/design/home-card-roster-moves/`, `scripts/qa-screenshots/seed.mjs`, `CLAUDE.md`, `BACKLOG.md`, this file, and every other modified file under `src/` in `git status`.
+**`1554ff6` Roster Moves (Nov 11, pushed with Kylie's yes, no SQL):** `src/components/roster-moves-switch.tsx`, `roster-moves.tsx`, `roster-moves-frame.tsx`, `roster-moves-unavailable.tsx`, `fold-card.tsx`, `lifeline-card.tsx`, `recast-panel.tsx`, `trades-panel.tsx`; `src/lib/roster-moves-data.ts`, `roster-moves-pages.ts`, `league-triage.ts` (+ test: `rosterMoveTabs`, `defaultRosterMoveTab`, `mapRosterMoveCouples`, the reshaped `RosterMoves<Couple>`), `home-roster-moves-data.ts`, `league-module-stack-data.ts`, `lifeline-picks.ts` (`LIFELINE_RULES`); the four pages under `src/app/leagues/[id]/`; `docs/design/roster-moves-pages/`; `CLAUDE.md`, `BACKLOG.md`. Verified in a scratch league (torn down, 0 QA accounts left) at 390/360; the one path not exercised is a waiver claim saving from the Claim sheet (`BACKLOG.md`). Codex findings (fallback claims, Title Case) fixed before the push.
+
+**Uncommitted, ours (docs only):** `CLAUDE.md` and this file record Kylie's second run of `supabase/apply-curtain-call-podium.sql` (the season check). Commit with the next build or on their own when asked.
+
+**The earlier Nov 11 build (`3ad5f8f`), committed and pushed:** `supabase/apply-curtain-call-podium.sql`, `supabase/schema.sql`, `src/lib/supabase/types.ts` (matches a regenerate from the live project), `src/lib/curtain-call-podium-db.test.ts`, `src/lib/home-roster-moves-data.ts`, `src/components/league-triage-card.tsx`, `docs/design/curtain-call-finale-podium/`, `docs/design/home-card-roster-moves/`, `scripts/qa-screenshots/seed.mjs`, `CLAUDE.md`, `BACKLOG.md`, this file, and every other modified file under `src/` in `git status`.
 
 Committed and pushed earlier:
 
@@ -70,14 +74,15 @@ Rules that still hold:
 - No live SQL apply by the agent; Kylie applies SQL. Live DB writes need her yes. League data backups go in the scratchpad only.
 - The repo is public: never commit league standings or member names. No secrets in code.
 - For a UI placement change: a mock or screenshot first, then Codex and UX/UI review before the push.
+- Roster Moves (2026-11-11): one Lifeline | Recast | Trades switch on the Picks card and its pages (card C1, pages as a whole, `docs/design/roster-moves-pages/`); the tab is named Recast, the lines under it say "waiver"; no status word on the tabs, a gold dot only; a viewer who is behind gets the catch-up cards, not the Roster Moves card; folds open closed on every visit.
 - Don't run prettier. Never `pkill -f`. `rm -rf .next` before `npm run dev` after a build; never build while the dev server runs.
 - In-app Recast copy says "waiver". No turning Recast, Trades or Lifeline on in a live league for her.
 - The advisor tool can't run on `claude-fable-5-2`.
 
 ## 4. Backlog & Next Steps
 
-1. Finish the Roster Moves review (Codex findings, UX pass), commit by name (the `src` files in `git status`, `CLAUDE.md`, `BACKLOG.md`, `MEMORY_HANDOFF.md`, `docs/design/roster-moves-pages/`) and push with Kylie's yes. Kylie still runs `supabase/apply-curtain-call-podium.sql` once more (the season check). When Week 11 picks open, look at the live podium form.
-2. Confirm the Vercel deploy of `1974e2f`, and Kylie decides whether to tell the v3 commissioners about the Finale survival amendment.
+1. Once Vercel has `1554ff6`: look at the Roster Moves card and pages on a phone (the fact strip's times were only seen in UTC). When Week 11 picks open, look at the live podium form.
+2. Confirm the Vercel deploy of `1554ff6`, and Kylie decides whether to tell the v3 commissioners about the Finale survival amendment.
 3. After the Thu Nov 12 waiver run: read-only check that it ran for the three leagues (`recast_cycles`, nothing in `recast_runs_overdue`).
 4. After E11 is published: `--verify` (command below).
 5. Done: `supabase/apply-dance-card-v3-default.sql` is applied live (column default read back as v3 on Nov 11), so new leagues start on v3. One undrafted, unscored test league is still on v1; Kylie said to leave it.
