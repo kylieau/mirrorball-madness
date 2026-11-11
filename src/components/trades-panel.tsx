@@ -620,7 +620,7 @@ function OfferStatus({ offer, nameOf }: { offer: TradeView; nameOf: (managerId: 
   const expiresAt = useFormattedDeadline(offer.expiresAt);
   const waitingOn = offer.parties.filter((party) => !party.accepted).map((party) => nameOf(party.managerId));
   return (
-    <CardDescription>
+    <CardDescription className="wrap-anywhere">
       Waiting on {listNames(waitingOn)}
       {expiresAt && ` · Ends ${expiresAt}`}. Private until everyone accepts; then it can&apos;t be called off.
     </CardDescription>

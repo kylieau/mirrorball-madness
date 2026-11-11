@@ -40,7 +40,7 @@ export function LifelineCatchUpCard({ pendingRevealWeek }: { pendingRevealWeek: 
   );
 }
 
-// The viewer's own Lifeline first (one block per empty spot), then the
+// The viewer's own Lifeline first (one block per open spot), then the
 // league's picks and the rules folded away under it.
 export function LifelineCard({
   leagueId,
