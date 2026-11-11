@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<title>Picks · Roster Moves recap</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../picks-roster-moves/mock.css" />
+<link rel="stylesheet" href="recap.css" />
+</head><body>
+<h1 class="board-title">Roster Moves: a recap with some sparkle</h1>
+<p class="board-sub">Mocks, not production UI. Only the lines under the buttons change; the card, title and buttons are as built. Each direction shows a manager with everything saved, then one with an empty spot and no claim. Couples are real; nothing here is a league's data.</p>
+<div class="board">
+<div class="col">
+  <p class="cap">A · Cut In</p>
+  <p class="capsub">Each move drawn as the swap: the couple going out faded and struck, the couple cutting in below in the serif. Claims rank down the left in gold. Empty spots become a dashed gold nudge that opens the page.</p>
+  <p class="state">Everything saved</p>
+  <div class="phone slim" id="shot-a-saved"><div class="page">
+      <div class="card new">
+        <div class="card-title">Roster Moves</div>
+        <div class="btn-row"><span class="btn">Lifeline</span><span class="btn">Recast</span><span class="btn">Trades</span></div>
+        <div class="cut">
+          <div class="cut-h"><span>Week 9 Lifeline</span><span class="saved-pill">Saved</span></div>
+          <div class="swap"><span class="out">Jackson &amp; Emma</span><span class="arrow">↳</span><span class="in">Jenna &amp; Val <small>cut in</small></span></div>
+          <div class="foot">Locks today 8 PM PT</div>
+        </div>
+        <div class="cut">
+          <div class="cut-h"><span>Waiver Claims</span><span class="meta">Thursday 5 PM PT</span></div>
+          <ol class="claims">
+            <li><span class="rank">1</span><span><span class="add">Tatyana &amp; Jan</span><span class="drop">Into your open spot</span></span></li>
+            <li><span class="rank">2</span><span><span class="add">Jo &amp; Ezra</span><span class="drop">Dropping Harry &amp; Jenna</span></span></li>
+          </ol>
+          <div class="foot">Winning claims start scoring in Week 10.</div>
+        </div>
+      </div></div></div>
+  <p class="state">Nothing saved yet</p>
+  <div class="phone slim" id="shot-a-need"><div class="page">
+      <div class="card new">
+        <div class="card-title">Roster Moves</div>
+        <div class="btn-row"><span class="btn">Lifeline</span><span class="btn">Recast</span><span class="btn">Trades</span></div>
+        <div class="cut">
+          <div class="cut-h"><span>Week 9 Lifeline</span><span class="meta">Locks today 8 PM PT</span></div>
+          <div class="nudge"><span class="t">Pick a couple to cut in<small>For Jackson &amp; Emma, at half their points</small></span><span class="go">›</span></div>
+        </div>
+        <div class="cut">
+          <div class="cut-h"><span>Waiver Claims</span><span class="meta">Thursday 5 PM PT</span></div>
+          <div class="nudge"><span class="t">You have an open spot<small>Put in a claim before the run</small></span><span class="go">›</span></div>
+        </div>
+      </div></div></div>
+</div>
+<div class="col">
+  <p class="cap">B · Ticket Stubs</p>
+  <p class="capsub">Each move is a theatre ticket. The gold stub holds when it happens (Week 9, Thu 5 PM) behind a perforated edge. An empty move is an outlined ticket waiting to be filled.</p>
+  <p class="state">Everything saved</p>
+  <div class="phone slim" id="shot-b-saved"><div class="page">
+      <div class="card new">
+        <div class="card-title">Roster Moves</div>
+        <div class="btn-row"><span class="btn">Lifeline</span><span class="btn">Recast</span><span class="btn">Trades</span></div>
+        <div class="tickets">
+          <div class="ticket"><div class="stub"><small>Week</small><big>9</big></div><div class="body">
+            <div class="kind"><span>Lifeline</span><span class="saved-pill">Saved</span></div>
+            <div class="main">Jenna &amp; Val</div>
+            <div class="sub">In for Jackson &amp; Emma · Locks today 8 PM PT</div></div></div>
+          <div class="ticket"><div class="stub"><small>Runs</small><big class="day">Thu</big><small>5 PM</small></div><div class="body">
+            <div class="kind"><span>Waiver Claims</span><span class="saved-pill">2 Saved</span></div>
+            <div class="main">1 Tatyana &amp; Jan</div>
+            <div class="sub">Into your open spot</div>
+            <div class="main">2 Jo &amp; Ezra</div>
+            <div class="sub">Dropping Harry &amp; Jenna</div>
+            <div class="sub">Winning claims start scoring in Week 10.</div></div></div>
+        </div>
+      </div></div></div>
+  <p class="state">Nothing saved yet</p>
+  <div class="phone slim" id="shot-b-need"><div class="page">
+      <div class="card new">
+        <div class="card-title">Roster Moves</div>
+        <div class="btn-row"><span class="btn">Lifeline</span><span class="btn">Recast</span><span class="btn">Trades</span></div>
+        <div class="tickets">
+          <div class="ticket blank"><div class="stub"><small>Week</small><big>9</big></div><div class="body">
+            <div class="kind"><span>Lifeline</span><span class="gold">Locks today 8 PM</span></div>
+            <div class="main gold">Pick a couple ›</div>
+            <div class="sub">For Jackson &amp; Emma, at half their points</div></div></div>
+          <div class="ticket blank"><div class="stub"><small>Runs</small><big class="day">Thu</big><small>5 PM</small></div><div class="body">
+            <div class="kind"><span>Waiver Claims</span></div>
+            <div class="main gold">Claim a couple ›</div>
+            <div class="sub">You have an open spot</div></div></div>
+        </div>
+      </div></div></div>
+</div>
+<div class="col">
+  <p class="cap">C · Dance Card</p>
+  <p class="capsub">A ballroom dance card, the thing the module is named after: a double gold rule, names written in on dotted lines in serif italic. The most character, and the least like the rest of the app.</p>
+  <p class="state">Everything saved</p>
+  <div class="phone slim" id="shot-c-saved"><div class="page">
+      <div class="card new">
+        <div class="card-title">Roster Moves</div>
+        <div class="btn-row"><span class="btn">Lifeline</span><span class="btn">Recast</span><span class="btn">Trades</span></div>
+        <div class="dcard">
+          <h4>Your Dance Card<span>Saved moves</span></h4>
+          <div class="dsec">
+            <div class="dsec-h"><span>Week 9 Lifeline</span><span class="meta">Locks today 8 PM PT</span></div>
+            <div class="dline"><span class="no">♦</span><span class="nm">Jenna &amp; Val</span><span class="lead"></span><span class="for">for Jackson</span></div>
+          </div>
+          <div class="ddiv">◆ ◆ ◆</div>
+          <div class="dsec">
+            <div class="dsec-h"><span>Waiver Claims</span><span class="meta">Run Thursday 5 PM PT</span></div>
+            <div class="dline"><span class="no">1</span><span class="nm">Tatyana &amp; Jan</span><span class="lead"></span><span class="for">open spot</span></div>
+            <div class="dline"><span class="no">2</span><span class="nm">Jo &amp; Ezra</span><span class="lead"></span><span class="for">drop Harry</span></div>
+            <div class="foot">Winning claims start scoring in Week 10.</div>
+          </div>
+        </div>
+      </div></div></div>
+  <p class="state">Nothing saved yet</p>
+  <div class="phone slim" id="shot-c-need"><div class="page">
+      <div class="card new">
+        <div class="card-title">Roster Moves</div>
+        <div class="btn-row"><span class="btn">Lifeline</span><span class="btn">Recast</span><span class="btn">Trades</span></div>
+        <div class="dcard">
+          <h4>Your Dance Card<span>Two lines to fill</span></h4>
+          <div class="dsec">
+            <div class="dsec-h"><span>Week 9 Lifeline</span><span class="meta">Locks today 8 PM PT</span></div>
+            <div class="dline"><span class="no">♦</span><span class="nm empty">Pick a couple ›</span><span class="lead"></span><span class="for">for Jackson</span></div>
+          </div>
+          <div class="ddiv">◆ ◆ ◆</div>
+          <div class="dsec">
+            <div class="dsec-h"><span>Waiver Claims</span><span class="meta">Run Thursday 5 PM PT</span></div>
+            <div class="dline"><span class="no">1</span><span class="nm empty">Claim a couple ›</span><span class="lead"></span><span class="for">open spot</span></div>
+          </div>
+        </div>
+      </div></div></div>
+</div>
+<div class="col">
+  <p class="cap">Today, for comparison</p>
+  <p class="capsub">As pushed in de21ca3.</p>
+  <p class="state">Everything saved</p>
+  <div class="phone slim" id="shot-now"><div class="page"><div class="card">
+    <div class="card-title">Roster Moves</div><div class="btn-row"><span class="btn">Lifeline</span><span class="btn">Recast</span><span class="btn">Trades</span></div>
+    <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted-fg)"><span style="font-size:14px;font-weight:500;color:var(--foreground)">Week 9 Lifeline</span><span><b>Jenna</b> &amp; Val, in place of <b>Jackson</b> &amp; Emma</span><span>Saved · Locks today 8 PM PT.</span></div>
+    <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted-fg)"><span style="font-size:14px;font-weight:500;color:var(--foreground)">Waiver Claims</span><span>1&nbsp;&nbsp;Add <b>Tatyana</b> &amp; Jan, open spot</span><span>2&nbsp;&nbsp;Add <b>Jo</b> &amp; Ezra, drop <b>Harry</b> &amp; Jenna</span><span>2 saved · Next run Thursday 5 PM PT. Winning claims start scoring in Week 10.</span></div>
+  </div></div></div>
+</div>
+</div></body></html>

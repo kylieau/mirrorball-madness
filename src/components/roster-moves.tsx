@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { cn } from "cn";
+import { CircleCheckIcon, CircleDashedIcon, HourglassIcon } from "lucide-react";
 import { CoupleName } from "@/components/couple-name";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,6 +102,8 @@ export function RosterMoves({
   );
 }
 
+const ICON = "mt-px size-3.5 shrink-0";
+
 // The card's lines are sentences, so a relative day reads in lower case there
 // ("locks today 8 PM PT") while it stays a label elsewhere.
 function inSentence(formatted: string): string {
@@ -120,26 +124,43 @@ function LifelineStatusLines({ spots, weekNumber, lockAt, locked }: LifelineStat
         {formatEpisodeCasual(weekNumber)} {spots.length === 1 ? "Lifeline" : "Lifelines"}
       </span>
       {saved > 0 ? (
-        <ul className="flex flex-col gap-0.5">
+        <ul className="flex flex-col gap-1">
           {spots.map((spot, index) => (
-            <li key={index}>
+            <li key={index} className="flex gap-1.5">
               {spot.pick ? (
-                <CoupleName {...spot.pick} />
+                <CircleCheckIcon aria-hidden className={cn(ICON, "text-emerald-text")} />
               ) : (
-                <span className={locked ? undefined : "font-semibold text-accent"}>No pick</span>
+                <CircleDashedIcon aria-hidden className={cn(ICON, !locked && "text-accent")} />
               )}
-              , in place of <CoupleName {...spot.former} />
+              <span className="min-w-0">
+                {spot.pick ? (
+                  <span className="text-foreground">
+                    <CoupleName {...spot.pick} />
+                  </span>
+                ) : (
+                  <span className={locked ? undefined : "font-semibold text-accent"}>No pick</span>
+                )}
+                , in place of <CoupleName {...spot.former} />
+              </span>
             </li>
           ))}
         </ul>
       ) : (
         !locked && (
-          <span className="font-semibold text-accent">
-            {spots.length === 1 ? "1 empty roster spot" : `${spots.length} empty roster spots`} · No Lifeline saved
+          <span className="flex gap-1.5 font-semibold text-accent">
+            <CircleDashedIcon aria-hidden className={ICON} />
+            <span className="min-w-0">
+              {spots.length === 1 ? "1 empty roster spot" : `${spots.length} empty roster spots`} · No Lifeline saved
+            </span>
           </span>
         )
       )}
-      {statusLine && <span>{statusLine}.</span>}
+      {statusLine && (
+        <span className="flex gap-1.5">
+          {saved === 0 && locked && <CircleDashedIcon aria-hidden className={ICON} />}
+          <span className="min-w-0">{statusLine}.</span>
+        </span>
+      )}
     </div>
   );
 }
@@ -152,19 +173,27 @@ function WaiverClaimsStatus({ claims, openSpotCount, dueAt, startWeek, waitingOn
       : due
         ? `Next run ${inSentence(due)}`
         : null;
-  const savedPart = claims.length > 0 ? `${claims.length} saved` : openSpotCount > 0 ? null : "None saved";
-  const statusLine = [savedPart, runPart].filter(Boolean).join(" · ");
+  // A Lifeline is settled once saved; a claim still waits on the run.
+  const statusLine =
+    claims.length > 0
+      ? waitingOnWeek == null && due
+        ? `${claims.length} saved, waiting on the run · ${inSentence(due)}`
+        : [`${claims.length} saved`, runPart].filter(Boolean).join(" · ")
+      : [openSpotCount > 0 ? null : "None saved", runPart].filter(Boolean).join(" · ");
 
   return (
     <div className="flex flex-col gap-1 text-xs text-muted-foreground">
       <span className="text-sm font-medium text-foreground">Waiver Claims</span>
       {claims.length > 0 ? (
-        <ol className="flex flex-col gap-0.5">
+        <ol className="flex flex-col gap-1">
           {claims.map((claim, index) => (
-            <li key={index} className="flex gap-2">
-              <span className="w-3 shrink-0 tabular-nums">{index + 1}</span>
+            <li key={index} className="flex gap-1.5">
+              <HourglassIcon aria-hidden className={cn(ICON, "text-accent")} />
               <span className="min-w-0">
-                Add <CoupleName {...claim.add} />
+                {index + 1} · Add{" "}
+                <span className="text-foreground">
+                  <CoupleName {...claim.add} />
+                </span>
                 {claim.drop ? (
                   <>
                     , drop <CoupleName {...claim.drop} />
@@ -178,20 +207,26 @@ function WaiverClaimsStatus({ claims, openSpotCount, dueAt, startWeek, waitingOn
         </ol>
       ) : (
         openSpotCount > 0 && (
-          <span className="font-semibold text-accent">
-            {openSpotCount === 1 ? "1 open spot" : `${openSpotCount} open spots`} · No waiver claim saved
+          <span className="flex gap-1.5 font-semibold text-accent">
+            <CircleDashedIcon aria-hidden className={ICON} />
+            <span className="min-w-0">
+              {openSpotCount === 1 ? "1 open spot" : `${openSpotCount} open spots`} · No waiver claim saved
+            </span>
           </span>
         )
       )}
       {statusLine && (
-        <span>
-          {statusLine}.
-          {(claims.length > 0 || openSpotCount > 0) && (
-            <>
-              {" "}
-              <span className="whitespace-nowrap">Winning claims start scoring in {formatEpisodeCasual(startWeek)}.</span>
-            </>
-          )}
+        <span className="flex gap-1.5">
+          {claims.length === 0 && openSpotCount > 0 && <HourglassIcon aria-hidden className={ICON} />}
+          <span className="min-w-0">
+            {statusLine}.
+            {(claims.length > 0 || openSpotCount > 0) && (
+              <>
+                {" "}
+                <span className="whitespace-nowrap">Winning claims start scoring in {formatEpisodeCasual(startWeek)}.</span>
+              </>
+            )}
+          </span>
         </span>
       )}
     </div>
