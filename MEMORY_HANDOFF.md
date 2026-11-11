@@ -1,4 +1,4 @@
-# Session Handoff — 2026-11-10 PT (Lifeline / Recast / Trades released; entry points moved to Picks)
+# Session Handoff — 2026-11-10 PT (Lifeline / Recast / Trades released; entry points and waiver confirmation on Picks)
 
 ## 1. Current State
 
@@ -7,6 +7,8 @@ Lifeline, the Equalizer, Recast v2 and Trades are on `main` and deployed (Vercel
 Checks before the commit (2026-11-11): `npx tsc --noEmit` clean, `npx eslint src scripts` clean, `npm test` 99 files / 985 tests, `rm -rf .next && npm run build` succeeds. (`npm run lint` fails only on `.codex-private/`, another session's directory.)
 
 **Recast and Trades open from Picks now, not the top bar** (Kylie picked mock A, `docs/design/picks-roster-moves/`): `RosterMoves` on Your Fantasy Roster, only the mechanisms that league has on. Checked in headless chromium at 360px and 390px on a temporary fixture route (since removed): both, Recast only, Trades only, neither, and the row on its own; no overflow, no console errors.
+
+**Picks confirms a saved waiver list (Kylie approved the screenshot and said to push, Nov 10 PT):** under the Recast button, `WaiverClaimsStatus` in `roster-moves.tsx` lists the manager's saved claims in rank order, or says none are saved (gold when they have an open spot), plus the next run's time. The Fill Your Open Spot card (`recast-nudge-card.tsx`) is deleted; `RecastCatchUpCard` stays for a viewer who is behind, only while a run is left. Files: `src/components/roster-moves.tsx`, `src/app/leagues/[id]/picks/page.tsx`, the deleted card, `CLAUDE.md`, the plan, this file. Checks: `tsc`, `eslint src scripts`, `npm test` (99 files / 985), `npm run build`, and headless chromium at 360px and 390px on a temporary fixture route (since removed) for six states. Not checked against a real league: all five have Recast off.
 
 The Recast and Trades screens and the settings rows were checked in headless chromium at 360px and 390px with made-up data on a temporary route (since removed), because the SQL isn't live. No horizontal overflow, no console errors. The Lifeline turn-on sheet and Picks card have not been browser-checked.
 

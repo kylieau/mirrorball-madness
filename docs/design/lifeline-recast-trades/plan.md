@@ -127,7 +127,7 @@ The screens were checked in a headless browser at 360px and 390px with made-up d
 - Turning Recast on never triggers a run for a week that was already due, and claims can't be saved for one that Trades is keeping alive.
 - A viewer who is behind has to catch up before editing a list.
 - The alert for a late run is a notice to site admins on Enter Results, not an email.
-- A spot emptied by a trade is offered as Open Spot, and the Picks nudge reads "You have an open roster spot".
+- A spot emptied by a trade is offered as Open Spot, and counts as an open spot on Picks.
 
 **Trades**
 - A veto takes more than half of the teams not in the trade. When every team is in it, there is no veto. A vote from a team that has since left the league doesn't count.
@@ -146,6 +146,7 @@ The screens were checked in a headless browser at 360px and 390px with made-up d
 - **Released a week ahead of the dates above**, so the Hard Dates table and "the single S35 run" no longer hold: a league that turns Recast or Trades on before Thu Nov 12, 5 PM PT gets a run then (Week 9; adds and trades start scoring in the Semi-Finals), and every league with either on gets the Thu Nov 19, 5 PM run (start in the Finale). For the Nov 12 run a trade has to be accepted by Wed Nov 11, 5 PM PT, so its veto window closes first.
 - **Lifeline locks with Curtain Call**, so a league whose Week 9 lock hadn't passed could play it for Week 9. Turning it on is refused while an earlier week is unpublished.
 - **Recast and Trades open from Picks, not the top bar** (Kylie, Nov 10; mocks in `docs/design/picks-roster-moves/`, option A): a row of buttons on Your Fantasy Roster, only the ones that league has on.
+- **Picks confirms a saved waiver list** (Kylie, Nov 10): under those buttons, the manager's claims in rank order, or that none are saved (in gold when they have an open spot), and when the next run is. The Fill Your Open Spot card is gone.
 
 ### Known Limits
 

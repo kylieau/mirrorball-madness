@@ -6,7 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { RosterCard } from "@/components/roster-card";
-import { RosterMoves } from "@/components/roster-moves";
+import { RosterMoves, type WaiverStatus } from "@/components/roster-moves";
 import { DanceCardLeagueList, type DanceCardLeagueEntry } from "@/components/dance-card-league-list";
 import { CurtainCallCard } from "@/components/curtain-call-card";
 import { PickEmBox } from "@/components/pick-em-box";
@@ -16,7 +16,7 @@ import { CurtainCallLeagueList, type CurtainCallLeagueEntry } from "@/components
 import { GrandFinaleBox } from "@/components/grand-finale-box";
 import { loadOtherLeaguePicks } from "@/lib/other-league-picks";
 import { DraftStatusCard } from "@/components/draft-status-card";
-import { RecastNudgeCard } from "@/components/recast-nudge-card";
+import { RecastCatchUpCard } from "@/components/recast-catch-up-card";
 import { LifelineCard, LifelineCatchUpCard } from "@/components/lifeline-card";
 import { lifelinePicksState } from "@/lib/lifeline-picks";
 import { LeaguePageShell } from "@/components/league-page-shell";
@@ -287,9 +287,7 @@ export default async function LeaguePicksPage({
     revealedRecastSlots.length +
     (league.draft_status === "completed" ? Math.max(0, league.roster_size - ownCurrentSlots.length) : 0);
   const recastOn = danceCardOn && waiversOn;
-  const rosterMoves = league.draft_status === "completed" && (recastOn || tradesOn) && (
-    <RosterMoves leagueId={id} recastOn={recastOn} tradesOn={tradesOn} from={historyFrom} />
-  );
+  const recastOpen = recastOn && league.draft_status === "completed";
 
   // Peer picks stay behind the lock/deadline checks; RLS gates them too, but
   // the page decides what to show from these flags.
@@ -300,6 +298,7 @@ export default async function LeaguePicksPage({
     otherLeaguePicks,
     draftLineupRows,
     { data: recastCycleRows },
+    { data: waiverClaimRows },
   ] = await Promise.all([
     curtainCallWeekId && isLocked
       ? supabase
@@ -327,12 +326,40 @@ export default async function LeaguePicksPage({
       now: new Date(),
     }),
     curtainCallMode === "picks" && curtainCallWeekId && !isLocked ? loadDraftLineup(supabase) : Promise.resolve([] as DraftLineupRow[]),
-    recastOn && openRecastSpots > 0
-      ? supabase.rpc("recast_next_cycle", { p_league_id: id })
+    recastOpen ? supabase.rpc("recast_next_cycle", { p_league_id: id }) : Promise.resolve({ data: null }),
+    recastOpen
+      ? supabase
+          .from("waiver_claims")
+          .select("couple_id, drop_couple_id")
+          .eq("league_id", id)
+          .eq("manager_id", myTeamId)
+          .eq("status", "pending")
+          .order("priority_order")
       : Promise.resolve({ data: null }),
   ]);
-  // An open spot is only worth a nudge while a waiver run is still to come.
-  const recastOpenSpotCount = recastCycleRows?.[0]?.start_week != null ? openRecastSpots : 0;
+  const recastCycle = recastCycleRows?.[0];
+  const waiverCoupleName = (coupleId: string) =>
+    allDisplayNames.get(coupleId) ?? { celebrity: "Unknown", pro: "Unknown" };
+  // Picks confirms a saved list without a trip to Recast, so a list that
+  // couldn't be read shows nothing instead of "none saved".
+  const waiverStatus: WaiverStatus | null =
+    recastCycle?.start_week != null && waiverClaimRows
+      ? {
+          claims: waiverClaimRows.map((claim) => ({
+            add: waiverCoupleName(claim.couple_id),
+            drop: claim.drop_couple_id ? waiverCoupleName(claim.drop_couple_id) : null,
+          })),
+          openSpotCount: openRecastSpots,
+          dueAt: recastCycle.due_at,
+          waitingOnWeek:
+            !recastCycle.results_in && new Date(recastCycle.due_at).getTime() <= Date.now()
+              ? recastCycle.week_number
+              : null,
+        }
+      : null;
+  const rosterMoves = league.draft_status === "completed" && (recastOn || tradesOn) && (
+    <RosterMoves leagueId={id} recastOn={recastOn} tradesOn={tradesOn} waivers={waiverStatus} from={historyFrom} />
+  );
   const pickLineup = upcomingEpisode
     ? Object.fromEntries(weekLineup(draftLineupRows, upcomingEpisode, completedEpisodes, cutoff.allowedEpisodeIds))
     : {};
@@ -851,13 +878,8 @@ export default async function LeaguePicksPage({
                 historyFrom={historyFrom}
               />
             )}
-            {recastOn && (
-              <RecastNudgeCard
-                leagueId={id}
-                openSpotCount={recastOpenSpotCount}
-                hiddenOpenSlotCount={hiddenRecastOpenCount}
-                pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
-              />
+            {recastCycle?.start_week != null && openRecastSpots === 0 && hiddenRecastOpenCount > 0 && (
+              <RecastCatchUpCard pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null} />
             )}
           </div>
         )}
