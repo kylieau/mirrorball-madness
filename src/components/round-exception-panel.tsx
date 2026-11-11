@@ -13,6 +13,11 @@ import {
 
 export type ExceptionChoice = { kind: ExceptionKind; roundIds: string[]; note: string | null; bonusPoints: number | null };
 
+function parseBonus(raw: string): { value: number | null; invalid: boolean } {
+  const value = raw.trim() === "" ? null : Number(raw);
+  return { value, invalid: value != null && (Number.isNaN(value) || value * 2 !== Math.trunc(value * 2) || Math.abs(value) > 100) };
+}
+
 // Mark an Exception, inline in a couple's card or a round's Not in This Round
 // band: a reason, which rounds it covers, an optional note, and what it does
 // said before it is saved. Immune is for special rounds (it skips their
@@ -52,9 +57,7 @@ export function RoundExceptionPanel({
         : wholeNight
           ? rounds.map((r) => r.id)
           : [round.id];
-  const bonusValue = bonus.trim() === "" ? null : Number(bonus);
-  const bonusInvalid =
-    bonusValue != null && (Number.isNaN(bonusValue) || bonusValue * 2 !== Math.trunc(bonusValue * 2) || Math.abs(bonusValue) > 100);
+  const { value: bonusValue, invalid: bonusInvalid } = parseBonus(bonus);
   const roundBonus = immuneRounds.find((r) => r.bonusPoints != null)?.bonusPoints ?? null;
   const status = exceptionStatus({
     kind,
@@ -142,6 +145,62 @@ export function RoundExceptionPanel({
           Cancel
         </Button>
       </div>
+    </div>
+  );
+}
+
+// An immune couple's bonus is often only announced on air, after they were
+// marked, so it stays editable on their Not in This Round row.
+export function ImmuneBonusField({
+  bonus,
+  winnerBonusRound,
+  roundBonus,
+  saving,
+  onSave,
+}: {
+  bonus: number | null;
+  // Only a round scored by a winner's bonus has one for a blank to follow.
+  winnerBonusRound: boolean;
+  roundBonus: number | null;
+  saving: boolean;
+  onSave: (bonus: number | null) => void;
+}) {
+  const id = useId();
+  const saved = bonus != null ? String(bonus) : "";
+  const [raw, setRaw] = useState(saved);
+  const { value, invalid } = parseBonus(raw);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <Label htmlFor={id} className="text-xs">
+          Their Bonus
+        </Label>
+        <Input
+          id={id}
+          inputMode="decimal"
+          className="h-8 w-20 text-center text-xs"
+          placeholder={roundBonus != null ? String(roundBonus) : "—"}
+          aria-invalid={invalid}
+          value={raw}
+          onChange={(e) => setRaw(e.target.value)}
+        />
+        <span className="text-sm text-muted-foreground">pts</span>
+        <Button size="sm" variant="outline" disabled={saving || invalid || raw.trim() === saved} onClick={() => onSave(value)}>
+          Save
+        </Button>
+      </div>
+      {invalid ? (
+        <p role="alert" className="text-xs text-danger-text">
+          Use −100 to 100, in steps of 0.5.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {winnerBonusRound
+            ? `Leave blank to use the Winner's Bonus${roundBonus != null ? ` (+${roundBonus})` : ""}.`
+            : "Leave blank for no immunity bonus."}
+        </p>
+      )}
     </div>
   );
 }

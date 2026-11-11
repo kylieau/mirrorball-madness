@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   saveEpisodeDraft,
@@ -24,7 +24,7 @@ import {
 import { CirclePauseIcon, PlusIcon } from "lucide-react";
 import { JudgeScoreRow } from "@/components/judge-score-row";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RoundExceptionPanel, type ExceptionChoice } from "@/components/round-exception-panel";
+import { ImmuneBonusField, RoundExceptionPanel, type ExceptionChoice } from "@/components/round-exception-panel";
 import {
   EXCEPTION_LABEL,
   exceptionsAfter,
@@ -501,6 +501,10 @@ export function ResultsForm({
     if (strip && tab) strip.scrollLeft = tab.offsetLeft - (strip.clientWidth - tab.clientWidth) / 2;
   }, [activeRound?.id]);
   const [bonusError, setBonusError] = useState<string | null>(null);
+  // A winner picked before the new bonus reaches the page would save the old
+  // one over the server's refill, so picks wait for the save and its refresh.
+  const [bonusSaving, setBonusSaving] = useState(false);
+  const [bonusRefreshing, startBonusRefresh] = useTransition();
   useEffect(() => {
     setBonusInput(activeRound?.bonusPoints != null ? String(activeRound.bonusPoints) : "");
     setBonusError(null);
@@ -949,17 +953,20 @@ export function ResultsForm({
       return;
     }
     setBonusError(null);
-    const saved = await flushSpecialSaves();
-    if (saved.error) {
-      setBonusError(saved.error);
-      return;
-    }
+    setBonusSaving(true);
     try {
+      const saved = await flushSpecialSaves();
+      if (saved.error) {
+        setBonusError(saved.error);
+        return;
+      }
       const result = await setRoundBonusAction({ episodeId: selectedEpisode.id, roundId: round.id, bonusPoints: value });
       if (result.error) setBonusError(result.error);
-      else router.refresh();
+      else startBonusRefresh(() => router.refresh());
     } catch {
       setBonusError("Could not confirm the update. Please refresh and try again.");
+    } finally {
+      setBonusSaving(false);
     }
   }
 
@@ -1560,6 +1567,7 @@ export function ResultsForm({
       label: immunity ? "Immune Bonus" : `${unitNoun(round, false)} ${dance.heatNumber} of ${round.unitCount}`,
       winnerBonus: round.scoring === "fixed_bonus" ? round.bonusPoints : null,
       immunity,
+      pickWinner: round.scoring === "fixed_bonus",
     };
   }
 
@@ -1581,28 +1589,42 @@ export function ResultsForm({
         {list.map((x) => {
           const couple = namedCouple(x.coupleId);
           return (
-            <div key={x.coupleId} className="flex min-h-11 items-center justify-between gap-2 border-t border-border/50 first-of-type:border-0">
-              <div className="min-w-0">
-                <p className="text-sm">{couple ? <CoupleName {...coupleParts(couple)} /> : "A couple"}</p>
-                {x.note && <p className="truncate text-xs text-muted-foreground">{x.note}</p>}
+            <div key={x.coupleId} className="flex flex-col gap-1.5 border-t border-border/50 first-of-type:border-0">
+              <div className="flex min-h-11 items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm">{couple ? <CoupleName {...coupleParts(couple)} /> : "A couple"}</p>
+                  {x.note && <p className="truncate text-xs text-muted-foreground">{x.note}</p>}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Badge variant="outline">
+                    {EXCEPTION_LABEL[x.kind]}
+                    {x.kind === "immune" && x.bonusPoints != null ? ` · +${x.bonusPoints}` : ""}
+                  </Badge>
+                  {canMark && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-accent"
+                      disabled={exceptionSaving}
+                      onClick={() => void handleRoundException(x.coupleId, { roundIds: [round.id], kind: null, note: null, bonusPoints: null }, source)}
+                    >
+                      Undo
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Badge variant="outline">
-                  {EXCEPTION_LABEL[x.kind]}
-                  {x.kind === "immune" && x.bonusPoints != null ? ` · +${x.bonusPoints}` : ""}
-                </Badge>
-                {canMark && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-accent"
-                    disabled={exceptionSaving}
-                    onClick={() => void handleRoundException(x.coupleId, { roundIds: [round.id], kind: null, note: null, bonusPoints: null }, source)}
-                  >
-                    Undo
-                  </Button>
-                )}
-              </div>
+              {x.kind === "immune" && canMark && (
+                <ImmuneBonusField
+                  key={`${round.id}-${x.coupleId}-${x.bonusPoints}`}
+                  bonus={x.bonusPoints}
+                  winnerBonusRound={round.scoring === "fixed_bonus"}
+                  roundBonus={round.scoring === "fixed_bonus" ? round.bonusPoints : null}
+                  saving={exceptionSaving}
+                  onSave={(bonusPoints) =>
+                    void handleRoundException(x.coupleId, { roundIds: [round.id], kind: "immune", note: x.note, bonusPoints }, source)
+                  }
+                />
+              )}
             </div>
           );
         })}
@@ -1782,7 +1804,7 @@ export function ResultsForm({
         canPost={canPublish && !published}
         canSetup={canSetupSpecials && (canPublish || !view.dance.postedAt)}
         inputsDisabled={published && !canPublish}
-        busy={teamBusy || savingDraft || revealBusy || publishing || releasing}
+        busy={teamBusy || savingDraft || revealBusy || publishing || releasing || bonusSaving || bonusRefreshing}
         nowMs={nowMs}
         startInEdit={view.dance.id === NEW_SPECIAL_ID}
         onSaveSetup={handleSaveSpecial}

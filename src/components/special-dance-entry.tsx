@@ -255,8 +255,9 @@ export function SpecialDanceEntry({
   onRelease: (teamId: string, release: boolean) => Promise<{ error: string | null }>;
   // A heat, team or immunity bonus of a planned round: its type and scoring
   // come from the plan, a Winner takes the round's bonus, and an immunity
-  // row's points follow the Immune mark.
-  round?: { label: string; winnerBonus: number | null; immunity: boolean } | null;
+  // row's points follow the Immune mark. In a winner's-bonus round the heat
+  // only needs its winner: the points follow from that.
+  round?: { label: string; winnerBonus: number | null; immunity: boolean; pickWinner: boolean } | null;
 }) {
   const { dance, eligible, skipped, live } = view;
   const isNew = dance.id === NEW_SPECIAL_ID;
@@ -314,6 +315,20 @@ export function SpecialDanceEntry({
 
   const parsedMarks = parseTeamMarks(markInputs, panelIds);
   const parsedPoints = parseSpecialPoints(pointInputs, eligible);
+  const winnerIds = eligible.filter((coupleId) => results[coupleId]?.trim().toLowerCase() === "winner");
+  const winnerId = winnerIds[0] ?? null;
+  // A heat saved some other way (a Tie, two Winners) keeps the points and
+  // Result boxes, so nothing saved is hidden behind the picker.
+  const picksWinner =
+    !!round?.pickWinner &&
+    !round.immunity &&
+    winnerIds.length <= 1 &&
+    eligible.every((coupleId) => {
+      const result = results[coupleId]?.trim().toLowerCase() ?? "";
+      const points = pointInputs[coupleId]?.trim() ?? "";
+      if (coupleId === winnerId) return points === "" || Number(points) === round.winnerBonus;
+      return (result === "" && points === "") || (result === "loser" && (points === "" || Number(points) === 0));
+    });
 
   // Every edit goes to the page, which saves it in order (autosave, Finish
   // Week, leaving); an invalid value is held there unsent so it keeps
@@ -348,6 +363,19 @@ export function SpecialDanceEntry({
     }
     setError(null);
     onEditScores(dance.id, { episodeId: dance.episodeId, inputs: next, save });
+  }
+
+  function pickWinner(coupleId: string | null) {
+    const bonus = round?.winnerBonus != null ? String(round.winnerBonus) : "";
+    const nextResults = { ...results };
+    const nextPoints = { ...pointInputs };
+    for (const id of eligible) {
+      nextResults[id] = coupleId == null ? "" : id === coupleId ? "Winner" : "Loser";
+      nextPoints[id] = coupleId == null ? "" : id === coupleId ? bonus : "0";
+    }
+    setResults(nextResults);
+    setPointInputs(nextPoints);
+    editScores({ marks: markInputs, coupleMarks: coupleMarkInputs, points: nextPoints, results: nextResults });
   }
 
   // Publish reads the saved marks, so a value typed inside the autosave
@@ -862,7 +890,49 @@ export function SpecialDanceEntry({
         </fieldset>
       )}
 
-      {!isNew && scoringMode === "points" && (
+      {!isNew && scoringMode === "points" && picksWinner && round && (
+        <fieldset disabled={inputsDisabled || busy} className="mt-1.5 flex flex-col gap-2 rounded-lg bg-muted/50 p-1.5">
+          <legend className="sr-only">Winner</legend>
+          <div className="flex min-h-8 items-center justify-between gap-2 px-0.5">
+            <span className="text-xs font-medium">Tap the Winner</span>
+            {winnerId && (
+              <Button type="button" size="sm" variant="ghost" className="text-accent" onClick={() => pickWinner(null)}>
+                Clear
+              </Button>
+            )}
+          </div>
+          {eligible.map((coupleId) => {
+            const won = winnerId === coupleId;
+            return (
+              <Button
+                key={coupleId}
+                type="button"
+                variant={won ? "default" : "outline"}
+                aria-pressed={won}
+                className="h-auto min-h-11 justify-between gap-2 py-1.5 text-left whitespace-normal"
+                onClick={() => {
+                  if (!won) pickWinner(coupleId);
+                }}
+              >
+                <span className="min-w-0 break-words">{coupleName(coupleId)}</span>
+                {won ? (
+                  <span className="shrink-0 font-heading">{round.winnerBonus != null ? `+${round.winnerBonus}` : "Winner"}</span>
+                ) : (
+                  winnerId && <span className="shrink-0 font-heading text-muted-foreground">0</span>
+                )}
+              </Button>
+            );
+          })}
+          {eligible.length === 0 && <p className="text-xs text-muted-foreground">No eligible participants tonight.</p>}
+          <p className="px-0.5 text-xs text-muted-foreground">
+            {round.winnerBonus != null
+              ? `The winner takes +${round.winnerBonus}, everyone else 0.`
+              : "Set the round's Winner's Bonus to fill in the winner's points."}
+          </p>
+        </fieldset>
+      )}
+
+      {!isNew && scoringMode === "points" && !picksWinner && (
         <fieldset disabled={inputsDisabled || busy || (round?.immunity ?? false)} className="mt-1.5 flex flex-col gap-1 rounded-lg bg-muted/50 p-1.5">
           {eligible.map((coupleId) => {
             const person = participants.find((p) => p.id === coupleId);
@@ -911,9 +981,6 @@ export function SpecialDanceEntry({
           {eligible.length === 0 && <p className="text-xs text-muted-foreground">No eligible participants tonight.</p>}
           {round?.immunity && (
             <p className="text-xs text-muted-foreground">Set by the Immune mark: the round&apos;s winner&apos;s bonus, or their own. Change it under Not in This Round.</p>
-          )}
-          {round?.winnerBonus != null && !round.immunity && (
-            <p className="text-xs text-muted-foreground">Winner +{round.winnerBonus}, Loser 0 (never blank).</p>
           )}
         </fieldset>
       )}
