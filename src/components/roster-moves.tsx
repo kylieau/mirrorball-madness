@@ -7,6 +7,13 @@ import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 
+export type LifelineStatus = {
+  // The viewer's dead roster spots this week and the Lifeline saved for each.
+  spots: { former: CoupleNameParts; pick: CoupleNameParts | null }[];
+  lockAt: string | null;
+  locked: boolean;
+};
+
 export type WaiverStatus = {
   // The viewer's saved list, highest claim first.
   claims: { add: CoupleNameParts; drop: CoupleNameParts | null }[];
@@ -17,26 +24,45 @@ export type WaiverStatus = {
   waitingOnWeek: number | null;
 };
 
-// Recast and Trades are separate commissioner switches, so a league shows
-// only the ones it has on.
+// Lifeline, Recast and Trades are separate commissioner switches, so a league
+// shows only the ones it has on.
 export function RosterMoves({
   leagueId,
+  lifelineOn,
   recastOn,
   tradesOn,
+  lifeline,
   waivers,
   from,
 }: {
   leagueId: string;
+  lifelineOn: boolean;
   recastOn: boolean;
   tradesOn: boolean;
+  // Null when the viewer has no dead roster spot to confirm a Lifeline for,
+  // or when the saved picks couldn't be read.
+  lifeline: LifelineStatus | null;
   // Null once no waiver run is left, or when the saved list couldn't be read.
   waivers: WaiverStatus | null;
   from: string;
 }) {
   const query = `?from=${encodeURIComponent(from)}`;
+  const showLifeline = lifelineOn && lifeline != null;
+  const showWaivers = recastOn && waivers != null;
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-2">
+        {lifelineOn && (
+          <Button
+            render={<Link href={`/leagues/${leagueId}/lifeline${query}`} />}
+            nativeButton={false}
+            variant="outline"
+            size="sm"
+            className="flex-1"
+          >
+            Lifeline
+          </Button>
+        )}
         {recastOn && (
           <Button
             render={<Link href={`/leagues/${leagueId}/waivers${query}`} />}
@@ -60,7 +86,53 @@ export function RosterMoves({
           </Button>
         )}
       </div>
-      {recastOn && waivers && <WaiverClaimsStatus {...waivers} />}
+      {(showLifeline || showWaivers) && (
+        <div className="flex flex-col gap-3">
+          {showLifeline && <LifelineStatusLines {...lifeline} />}
+          {showWaivers && <WaiverClaimsStatus {...waivers} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LifelineStatusLines({ spots, lockAt, locked }: LifelineStatus) {
+  const formattedLockAt = useFormattedDeadline(lockAt);
+  const saved = spots.filter((spot) => spot.pick).length;
+  const lockLine = locked ? "Lifeline is locked for this week." : formattedLockAt ? `Locks ${formattedLockAt}.` : null;
+
+  return (
+    <div className="flex flex-col gap-1 px-3.5 text-xs text-muted-foreground">
+      {saved > 0 ? (
+        <>
+          <span className="font-medium text-foreground">
+            {saved < spots.length
+              ? `${saved} of ${spots.length} Lifelines Saved`
+              : saved === 1
+                ? "Lifeline Saved"
+                : `${saved} Lifelines Saved`}
+          </span>
+          <ul className="flex flex-col gap-0.5">
+            {spots.map((spot, index) => (
+              <li key={index}>
+                {spot.pick ? (
+                  <CoupleName {...spot.pick} />
+                ) : (
+                  <span className={locked ? undefined : "font-semibold text-accent"}>No pick</span>
+                )}
+                , in place of <CoupleName {...spot.former} />
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : locked ? (
+        <span>No Lifeline saved.</span>
+      ) : (
+        <span className="font-semibold text-accent">
+          {spots.length === 1 ? "1 empty roster spot" : `${spots.length} empty roster spots`} · No Lifeline saved
+        </span>
+      )}
+      {lockLine && <span>{lockLine}</span>}
     </div>
   );
 }

@@ -24,10 +24,10 @@ export function LifelineCatchUpCard({ pendingRevealWeek }: { pendingRevealWeek: 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Lifeline</CardTitle>
+        <CardTitle>Catch Up to Play a Lifeline</CardTitle>
         <CardDescription>
-          Catch up and mark the latest week as watched to see whether you have a Lifeline to play. We won&apos;t name
-          anyone until then.
+          Mark the latest week as watched to see whether you have a Lifeline to play. We won&apos;t name anyone until
+          then.
         </CardDescription>
       </CardHeader>
       {pendingRevealWeek != null && (
@@ -109,132 +109,141 @@ export function LifelineCard({
   }
 
   const pickLine = (slot: LifelineCardSlot, value: ReactNode) => (
-    <div key={slot.slotNumber} className="flex items-center justify-between gap-3">
-      <span className="text-muted-foreground">In place of {coupleNameNode(parts(slot.formerCoupleId))}</span>
-      <span className="text-right font-medium">{value}</span>
+    <div key={slot.slotNumber} className="flex items-start justify-between gap-3">
+      <span className="min-w-0 text-muted-foreground">In place of {coupleNameNode(parts(slot.formerCoupleId))}</span>
+      <span className="min-w-0 text-right font-medium">{value}</span>
     </div>
   );
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Lifeline · {formatEpisodeCasual(week.weekNumber)}</CardTitle>
+        <CardTitle>{formatEpisodeCasual(week.weekNumber)}</CardTitle>
         <CardDescription>
           {slots.length === 0
-            ? "You have no empty roster spot this week."
+            ? `You have no empty roster spot this week.${
+                isLocked ? "" : " The league's Lifelines show here once the week locks."
+              }`
             : `Pick a couple still dancing for ${several ? "each empty roster spot" : "your empty roster spot"}. You earn half their Dance Card points ${
                 week.isFinale ? "in the Finale" : "this week, even if they go home"
               }.`}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {slots.length > 0 && (
-          <p className="text-sm text-muted-foreground">
-            {isLocked ? "Lifeline is locked for this week." : formattedLockAt ? `Locks ${formattedLockAt}` : null}
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="text-sm text-danger-text">
-            {error}
-          </p>
-        )}
+      {(slots.length > 0 || (isLocked && leagueEntries.length > 0)) && (
+        <CardContent className="flex flex-col gap-3">
+          {slots.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {isLocked ? "Lifeline is locked for this week." : formattedLockAt ? `Locks ${formattedLockAt}` : null}
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-danger-text">
+              {error}
+            </p>
+          )}
 
-        {slots.length > 0 && !isLocked && editing && (
-          <>
-            {slots.map((slot) => {
-              const id = `lifeline-${slot.slotNumber}`;
-              const items: Record<string, ReactNode> = {
-                "": CHOOSE_COUPLE,
-                ...Object.fromEntries(couples.map((couple) => [couple.id, coupleNameNode(parts(couple.id))])),
-              };
-              return (
-                <div key={slot.slotNumber} className="flex flex-col gap-2">
-                  <Label htmlFor={id}>In Place of {coupleNameNode(parts(slot.formerCoupleId))}</Label>
-                  <Select items={items} value={picks[slot.slotNumber] ?? ""} onValueChange={(v) => choose(slot.slotNumber, v ?? "")}>
-                    <SelectTrigger id={id} className="w-full">
-                      <SelectValue placeholder={CHOOSE_COUPLE} />
-                    </SelectTrigger>
-                    <SelectContent align="start" alignItemWithTrigger={false}>
-                      <SelectItem value="">{CHOOSE_COUPLE}</SelectItem>
-                      {couples.map((couple) => (
-                        <SelectItem key={couple.id} value={couple.id}>
-                          {coupleNameNode(parts(couple.id))}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              );
-            })}
-            <div className="flex gap-2">
-              <Button onClick={() => void save()} disabled={saving}>
-                {saving ? "Saving…" : several ? "Save Lifelines" : "Save Lifeline"}
-              </Button>
-              {slots.some((slot) => slot.pickCoupleId) && (
-                <Button variant="outline" onClick={cancel} disabled={saving}>
-                  Cancel
+          {slots.length > 0 && !isLocked && editing && (
+            <>
+              {slots.map((slot) => {
+                const id = `lifeline-${slot.slotNumber}`;
+                const items: Record<string, ReactNode> = {
+                  "": CHOOSE_COUPLE,
+                  ...Object.fromEntries(couples.map((couple) => [couple.id, coupleNameNode(parts(couple.id))])),
+                };
+                return (
+                  <div key={slot.slotNumber} className="flex flex-col gap-2">
+                    <Label htmlFor={id} className="leading-snug">
+                      <span>In Place of {coupleNameNode(parts(slot.formerCoupleId))}</span>
+                    </Label>
+                    <Select items={items} value={picks[slot.slotNumber] ?? ""} onValueChange={(v) => choose(slot.slotNumber, v ?? "")}>
+                      <SelectTrigger id={id} className="w-full">
+                        <SelectValue placeholder={CHOOSE_COUPLE} />
+                      </SelectTrigger>
+                      <SelectContent align="start" alignItemWithTrigger={false}>
+                        <SelectItem value="">{CHOOSE_COUPLE}</SelectItem>
+                        {couples.map((couple) => (
+                          <SelectItem key={couple.id} value={couple.id}>
+                            {coupleNameNode(parts(couple.id))}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
+              <div className="flex gap-2">
+                <Button onClick={() => void save()} disabled={saving}>
+                  {saving ? "Saving…" : several ? "Save Lifelines" : "Save Lifeline"}
                 </Button>
-              )}
-            </div>
-          </>
-        )}
-
-        {slots.length > 0 && !isLocked && !editing && (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm text-emerald-text">
-                <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald/30 text-[10px]">
-                  ✓
-                </span>
-                {several ? "Lifelines saved" : "Lifeline saved"}
+                {slots.some((slot) => slot.pickCoupleId) && (
+                  <Button variant="outline" onClick={cancel} disabled={saving}>
+                    Cancel
+                  </Button>
+                )}
               </div>
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                {several ? "Edit Lifelines" : "Edit Lifeline"}
-              </Button>
+            </>
+          )}
+
+          {slots.length > 0 && !isLocked && !editing && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm text-emerald-text">
+                  <span
+                    aria-hidden
+                    className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald/30 text-[10px]"
+                  >
+                    ✓
+                  </span>
+                  {several ? "Lifelines saved" : "Lifeline saved"}
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                  {several ? "Edit Lifelines" : "Edit Lifeline"}
+                </Button>
+              </div>
+              <div className="flex flex-col gap-1.5 text-sm">
+                {slots.map((slot) =>
+                  pickLine(slot, slot.pickCoupleId ? coupleNameNode(parts(slot.pickCoupleId)) : "No Pick")
+                )}
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5 text-sm">
+          )}
+
+          {slots.length > 0 && isLocked && (
+            <div className="flex flex-col gap-1.5 text-sm [&_a]:no-underline [&_a]:hover:text-accent">
               {slots.map((slot) =>
-                pickLine(slot, slot.pickCoupleId ? coupleNameNode(parts(slot.pickCoupleId)) : "No Pick")
+                pickLine(
+                  slot,
+                  slot.pickCoupleId ? (
+                    <CoupleNameLink coupleId={slot.pickCoupleId} from={historyFrom} {...parts(slot.pickCoupleId)} />
+                  ) : (
+                    "No Pick"
+                  )
+                )
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {slots.length > 0 && isLocked && (
-          <div className="flex flex-col gap-1.5 text-sm [&_a]:no-underline [&_a]:hover:text-accent">
-            {slots.map((slot) =>
-              pickLine(
-                slot,
-                slot.pickCoupleId ? (
-                  <CoupleNameLink coupleId={slot.pickCoupleId} from={historyFrom} {...parts(slot.pickCoupleId)} />
-                ) : (
-                  "No Pick"
-                )
-              )
-            )}
-          </div>
-        )}
-
-        {isLocked && leagueEntries.length > 0 && (
-          <LeagueGlanceHop>
-            <ul className="flex flex-col [&_a]:no-underline [&_a]:hover:text-accent">
-              {leagueEntries.map((entry) => (
-                <li
-                  key={entry.managerId}
-                  className="flex items-start justify-between gap-3 border-b border-border py-2.5 text-sm last:border-b-0"
-                >
-                  <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{entry.displayName}</span>
-                  <span className="flex shrink-0 flex-col items-end">
-                    {entry.coupleIds.map((coupleId) => (
-                      <CoupleNameLink key={coupleId} coupleId={coupleId} from={historyFrom} {...parts(coupleId)} />
-                    ))}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </LeagueGlanceHop>
-        )}
-      </CardContent>
+          {isLocked && leagueEntries.length > 0 && (
+            <LeagueGlanceHop>
+              <ul className="flex flex-col [&_a]:no-underline [&_a]:hover:text-accent">
+                {leagueEntries.map((entry) => (
+                  <li
+                    key={entry.managerId}
+                    className="flex items-start justify-between gap-3 border-b border-border py-2.5 text-sm last:border-b-0"
+                  >
+                    <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{entry.displayName}</span>
+                    <span className="flex min-w-0 flex-col items-end text-right">
+                      {entry.coupleIds.map((coupleId) => (
+                        <CoupleNameLink key={coupleId} coupleId={coupleId} from={historyFrom} {...parts(coupleId)} />
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </LeagueGlanceHop>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }

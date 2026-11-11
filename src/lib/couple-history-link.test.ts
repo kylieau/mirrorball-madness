@@ -7,6 +7,11 @@ describe("coupleHistoryReturn", () => {
     expect(coupleHistoryReturn("/leagues/abc/standings#couples")).toEqual({ href: "/leagues/abc/standings#couples", label: "Standings", leagueId: "abc" });
     expect(coupleHistoryReturn("/leagues/abc/picks?week=3")).toMatchObject({ label: "Picks", leagueId: "abc" });
     expect(coupleHistoryReturn("/")).toEqual({ href: "/", label: "Home", leagueId: null });
+    expect(coupleHistoryReturn("/leagues/abc/lifeline")).toEqual({ href: "/leagues/abc/lifeline", label: "Lifeline", leagueId: "abc" });
+    expect(coupleHistoryReturn("/leagues/abc/lifeline?from=%2Fleagues%2Fabc%2Fpicks%3Fweek%3D3")).toMatchObject({
+      href: "/leagues/abc/lifeline?from=%2Fleagues%2Fabc%2Fpicks%3Fweek%3D3",
+      label: "Lifeline",
+    });
     expect(coupleHistoryReturn("/leagues/abc/waivers")).toEqual({ href: "/leagues/abc/waivers", label: "Recast", leagueId: "abc" });
     expect(coupleHistoryReturn("/leagues/abc/trades")).toEqual({ href: "/leagues/abc/trades", label: "Trades", leagueId: "abc" });
     expect(coupleHistoryReturn("/leagues")).toEqual({ href: "/leagues", label: "Manage Leagues", leagueId: null });
