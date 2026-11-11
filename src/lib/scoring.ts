@@ -573,19 +573,21 @@ export function slotWeeks(
   couples: { status: string; elimination_week: number | null }[],
   { finaleWeek, completedThroughWeek }: { finaleWeek: number; completedThroughWeek: number }
 ): SlotWeeks {
+  // Only weeks through completedThroughWeek count as they happened, so a
+  // week's payout never moves when later weeks air, and a viewer who is
+  // behind learns nothing from them.
   const outByWeek = new Map<number, number>();
   for (const c of couples) {
-    if ((c.status === "eliminated" || c.status === "withdrawn") && c.elimination_week !== null) {
+    if ((c.status === "eliminated" || c.status === "withdrawn") && c.elimination_week !== null && c.elimination_week <= completedThroughWeek) {
       outByWeek.set(c.elimination_week, (outByWeek.get(c.elimination_week) ?? 0) + 1);
     }
   }
-  const lastHappened = Math.max(completedThroughWeek, ...outByWeek.keys());
   return {
     finaleWeek,
     weekOf(position) {
       let spots = 0;
       for (let week = 1; week < finaleWeek; week++) {
-        spots += week <= lastHappened ? (outByWeek.get(week) ?? 0) : 1;
+        spots += week <= completedThroughWeek ? (outByWeek.get(week) ?? 0) : 1;
         if (position <= spots) return week;
       }
       return finaleWeek;
