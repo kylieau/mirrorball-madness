@@ -1,8 +1,8 @@
 "use client";
 
 // One Spoiler-Free status line for Home, shown only while there is a week to
-// unlock (caught-up viewers see nothing). Pattern B: it sits in HomeSpoilerChrome
-// directly under the sticky wordmark + avatar, and that stack stays stuck on
+// unlock (caught-up viewers see nothing). Pattern B: it sits in FanPageChrome
+// directly under the pinned page title + avatar, and that stack stays stuck on
 // scroll. Soft inset (docs/design/spoiler-free-strip-styles): tinted mauve fill,
 // a single hairline under the stack, gold status dot, gold Mark Watched pill.
 // Marking a week watched is always confirmed in a bottom sheet. "Mark Week N
@@ -15,11 +15,9 @@ import { useRouter } from "next/navigation";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { TopBar } from "@/components/top-bar";
 import { markWatchedAndUnlockDrafts } from "@/app/this-week/actions";
 import { LiveScoresPill } from "@/components/live-scores-prompt";
 import { formatEpisodeCasual } from "@/lib/format-week";
-import type { AccountSettingsData } from "@/lib/account-settings-data";
 
 // weekNumber is the latest week that can be unlocked; earlierWeeks are the
 // unmarked weeks before it, which marking a later week unlocks too.
@@ -50,7 +48,7 @@ export type SpoilerFreeStripState =
 
 type MarkableState = Extract<SpoilerFreeStripState, { earlierWeeks: number[] }>;
 
-// Full-bleed row. Stickiness belongs to HomeSpoilerChrome so the wordmark and
+// Full-bleed row. Stickiness belongs to FanPageChrome so the page title and
 // this line move as one stack; a hairline under the mauve is the stack's only edge.
 const STRIP_CLASSES =
   "flex min-h-[34px] items-center gap-1.5 border-b border-foreground/15 bg-[#1e1420] bg-[image:linear-gradient(180deg,rgba(52,34,50,0.92),rgba(36,24,40,0.88))] px-4 py-1.5";
@@ -60,25 +58,6 @@ const DOT_CLASSES = "size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_0_2px
 // The pill draws at 24px; the ::before pseudo-element widens its tap target to about 40px.
 const PILL_CLASSES =
   "relative h-6 shrink-0 rounded-full px-2.5 text-[11px] font-bold before:absolute before:-inset-2 before:content-['']";
-
-// Sticky wordmark + avatar, then the strip. The page's own title stays in
-// page flow and scrolls away underneath. Rendered only while there is a
-// week to unlock. Shared by every page that mounts the strip (Home,
-// Results, the league hub), not Home-specific despite the name.
-export function HomeSpoilerChrome({
-  state,
-  email,
-  ...accountSettingsData
-}: AccountSettingsData & { email: string; state: SpoilerFreeStripState }) {
-  return (
-    <div className="sticky top-0 z-30 -mx-4 bg-background pt-[env(safe-area-inset-top)]">
-      <div className="px-4 py-2">
-        <TopBar {...accountSettingsData} email={email} />
-      </div>
-      <SpoilerFreeStrip state={state} />
-    </div>
-  );
-}
 
 export function SpoilerFreeStrip({ state }: { state: SpoilerFreeStripState }) {
   if (state.kind === "watching") {

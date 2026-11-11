@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageHeader } from "@/components/page-header";
 import { LeagueSwitcher, type SwitcherLeague } from "@/components/league-switcher";
-import { StickyTopBar } from "@/components/top-bar";
-import { HomeSpoilerChrome, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
-import { HomeDraftChrome } from "@/components/draft-scores-strip";
+import { FanPageChrome } from "@/components/top-bar";
+import { SpoilerFreeStrip, type SpoilerFreeStripState } from "@/components/spoiler-free-strip";
+import { DraftScoresStrip } from "@/components/draft-scores-strip";
 import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
 import type { AccountSettingsData } from "@/lib/account-settings-data";
 
@@ -37,8 +36,7 @@ export function LeagueHeader({
   switcherCurrent: { rank: number; totalMembers: number };
   accountSettingsData: AccountSettingsData;
   viewerEmail: string;
-  // Same strip as Home/Results; when present it takes over as the sticky
-  // chrome (wordmark + avatar + strip), matching Home exactly.
+  // Same strip as Home/Results, pinned under the title row, matching Home exactly.
   spoilerFreeStrip: SpoilerFreeStripState | null;
   // Unlocked drafts: the amber strip replaces the Spoiler-Free one, as on Home.
   draftScoresStrip: boolean;
@@ -47,49 +45,40 @@ export function LeagueHeader({
   const currentPath = `/leagues/${leagueId}/${tab}`;
   const leagueSettingsHref = `/leagues/${leagueId}/settings?from=${encodeURIComponent(currentPath)}`;
 
-  const pageHeader = (
-    <PageHeader title={title}>
-      {switcherLeagues.length > 1 ? (
-        <LeagueSwitcher
-          currentLeagueId={leagueId}
-          leagues={switcherLeagues}
-          currentStanding={switcherCurrent}
-          tab={tab}
-        />
-      ) : (
-        <p className="truncate text-sm font-medium text-muted-foreground">
-          {switcherLeagues.find((l) => l.id === leagueId)?.name}
-        </p>
-      )}
-    </PageHeader>
-  );
-
   return (
     <>
-      {draftScoresStrip ? (
-        <>
-          <HomeDraftChrome {...accountSettingsData} email={viewerEmail} />
-          {pageHeader}
-        </>
-      ) : spoilerFreeStrip ? (
-        <>
-          <HomeSpoilerChrome
-            key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
-            {...accountSettingsData}
-            email={viewerEmail}
-            state={spoilerFreeStrip}
-          />
-          {pageHeader}
-        </>
-      ) : (
-        <>
-          <StickyTopBar {...accountSettingsData} email={viewerEmail} />
-          {pageHeader}
-        </>
-      )}
+      <FanPageChrome
+        {...accountSettingsData}
+        email={viewerEmail}
+        title={title}
+        trailing={
+          switcherLeagues.length > 1 ? (
+            <LeagueSwitcher
+              currentLeagueId={leagueId}
+              leagues={switcherLeagues}
+              currentStanding={switcherCurrent}
+              tab={tab}
+            />
+          ) : (
+            <p className="truncate text-sm font-medium text-muted-foreground">
+              {switcherLeagues.find((l) => l.id === leagueId)?.name}
+            </p>
+          )
+        }
+        strip={
+          draftScoresStrip ? (
+            <DraftScoresStrip />
+          ) : spoilerFreeStrip ? (
+            <SpoilerFreeStrip
+              key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
+              state={spoilerFreeStrip}
+            />
+          ) : null
+        }
+      />
 
       {justCreated && canEdit && (
-        <Card className="border-primary">
+        <Card className="mt-3 border-primary">
           <CardHeader>
             <CardTitle>🎉 League created!</CardTitle>
             <CardDescription>Share this invite code with your league.</CardDescription>
@@ -107,7 +96,7 @@ export function LeagueHeader({
       )}
 
       {!justCreated && !scoringConfigured && canEdit && (
-        <Card className="border-primary">
+        <Card className="mt-3 border-primary">
           <CardContent className="flex items-center justify-between gap-4 py-4">
             <p className="text-sm">Finish setting up your league&apos;s scoring rules.</p>
             <Button render={<Link href={leagueSettingsHref} />} nativeButton={false} size="sm">

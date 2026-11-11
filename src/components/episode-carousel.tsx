@@ -62,7 +62,7 @@ export function EpisodeCarousel({
   const label = formatEpisodeCasualWithTheme(weekNumber, theme);
 
   return (
-    <nav aria-label="Weeks" className={cn("flex items-center", compact ? "justify-start" : "justify-center")}>
+    <nav aria-label="Weeks" className={cn("flex max-w-full items-center", compact ? "justify-start" : "justify-center")}>
       <ArrowSlot href={prevHref} label="Previous week" compact={compact}>
         <ChevronLeftIcon className="size-4" />
       </ArrowSlot>

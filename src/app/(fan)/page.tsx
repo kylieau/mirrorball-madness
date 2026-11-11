@@ -3,8 +3,7 @@ import { cn } from "cn";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { HomeDashboard } from "@/components/home-dashboard";
-import { PageHeader } from "@/components/page-header";
-import { StickyTopBar } from "@/components/top-bar";
+import { FanPageChrome } from "@/components/top-bar";
 import { loadHomeLeagueData } from "@/lib/home-league-data";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { computeEpisodeBannerState, toBannerWeeks, type EpisodeBannerInput } from "@/lib/episode-banner";
@@ -12,10 +11,10 @@ import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display"
 import { activityScore, buildRecentActivity, type ActivityDanceRow, type ActivityWeek } from "@/lib/home-activity";
 import { homeTransactions } from "@/lib/home-transactions";
 import { danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
-import { HomeSpoilerChrome } from "@/components/spoiler-free-strip";
+import { SpoilerFreeStrip } from "@/components/spoiler-free-strip";
 import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
 import { LiveScoresPrompt } from "@/components/live-scores-prompt";
-import { HomeDraftChrome } from "@/components/draft-scores-strip";
+import { DraftScoresStrip } from "@/components/draft-scores-strip";
 import type { LeagueTriage } from "@/components/league-triage-card";
 import { excludeReleasedCoupleRows, homeStripChoice, unpostedDraftDances } from "@/lib/draft-scores";
 import type { ModuleStackInput } from "@/lib/league-triage";
@@ -278,36 +277,22 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col px-4">
-      {draftVisible ? (
-        <>
-          <HomeDraftChrome {...accountSettingsData} email={user.email ?? ""} />
-          <div className={cn("flex flex-col gap-3 pt-3", BOTTOM_NAV_CLEARANCE)}>
-            <PageHeader title="Home" />
-            {dashboard}
-          </div>
-        </>
-      ) : spoilerFreeStrip ? (
-        <>
-          <HomeSpoilerChrome
-            key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
-            {...accountSettingsData}
-            email={user.email ?? ""}
-            state={spoilerFreeStrip}
-          />
-          <div className={cn("flex flex-col gap-3 pt-3", BOTTOM_NAV_CLEARANCE)}>
-            <PageHeader title="Home" />
-            {dashboard}
-          </div>
-        </>
-      ) : (
-        <>
-          <StickyTopBar {...accountSettingsData} email={user.email ?? ""} />
-          <div className={cn("flex flex-col gap-3 pt-3", BOTTOM_NAV_CLEARANCE)}>
-            <PageHeader title="Home" />
-            {dashboard}
-          </div>
-        </>
-      )}
+      <FanPageChrome
+        {...accountSettingsData}
+        email={user.email ?? ""}
+        title="Home"
+        strip={
+          draftVisible ? (
+            <DraftScoresStrip />
+          ) : spoilerFreeStrip ? (
+            <SpoilerFreeStrip
+              key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
+              state={spoilerFreeStrip}
+            />
+          ) : null
+        }
+      />
+      <div className={cn("flex flex-col gap-3 pt-1", BOTTOM_NAV_CLEARANCE)}>{dashboard}</div>
 
       {livePrompt && (
         <LiveScoresPrompt {...livePrompt} spoilerFreeMode={accountSettingsData.spoilerFreeMode} />

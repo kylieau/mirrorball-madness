@@ -3,8 +3,8 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { RevealAutoRefresh } from "@/components/reveal-auto-refresh";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
-import { HomeSpoilerChrome } from "@/components/spoiler-free-strip";
-import { HomeDraftChrome } from "@/components/draft-scores-strip";
+import { SpoilerFreeStrip } from "@/components/spoiler-free-strip";
+import { DraftScoresStrip } from "@/components/draft-scores-strip";
 import { homeStripChoice } from "@/lib/draft-scores";
 import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
 import { toBannerWeeks } from "@/lib/episode-banner";
@@ -12,8 +12,7 @@ import { LiveScoresPrompt } from "@/components/live-scores-prompt";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
 import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
-import { PageHeader } from "@/components/page-header";
-import { StickyTopBar } from "@/components/top-bar";
+import { FanPageChrome } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { coupleLeagueNotes } from "@/lib/couple-league-notes";
@@ -300,19 +299,17 @@ export default async function ThisWeekPage({
     });
   }
 
-  const pageHeader = (
-    <PageHeader title="Results">
-      {selectedWeek && (
-        <EpisodeCarousel
-          weekNumber={selectedWeek.week_number}
-          theme={selectedWeek.theme}
-          nightsLabel={selectedWeek.nightsLabel}
-          prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
-          nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
-        />
-      )}
-    </PageHeader>
-  );
+  const carousel = (compact: boolean) =>
+    selectedWeek && (
+      <EpisodeCarousel
+        weekNumber={selectedWeek.week_number}
+        theme={selectedWeek.theme}
+        nightsLabel={selectedWeek.nightsLabel}
+        prevHref={neighbors.prev ? thisWeekHref(neighbors.prev.id) : null}
+        nextHref={neighbors.next ? thisWeekHref(neighbors.next.id) : null}
+        compact={compact}
+      />
+    );
 
   const resultsContent = (
     <div className={BOTTOM_NAV_CLEARANCE}>
@@ -368,36 +365,26 @@ export default async function ThisWeekPage({
 
   return (
     <div className="flex flex-col px-4">
-      {draftVisible ? (
-        <>
-          <HomeDraftChrome {...accountSettingsData} email={user.email ?? ""} />
-          <div className="flex flex-col gap-3 pt-3">
-            {pageHeader}
-            {resultsContent}
-          </div>
-        </>
-      ) : spoilerFreeStrip ? (
-        <>
-          <HomeSpoilerChrome
-            key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
-            {...accountSettingsData}
-            email={user.email ?? ""}
-            state={spoilerFreeStrip}
-          />
-          <div className="flex flex-col gap-3 pt-3">
-            {pageHeader}
-            {resultsContent}
-          </div>
-        </>
-      ) : (
-        <>
-          <StickyTopBar {...accountSettingsData} email={user.email ?? ""} />
-          <div className="flex flex-col gap-3 pt-3">
-            {pageHeader}
-            {resultsContent}
-          </div>
-        </>
-      )}
+      <FanPageChrome
+        {...accountSettingsData}
+        email={user.email ?? ""}
+        title="Results"
+        pinnedTrailing={carousel(true)}
+        strip={
+          draftVisible ? (
+            <DraftScoresStrip />
+          ) : spoilerFreeStrip ? (
+            <SpoilerFreeStrip
+              key={`${spoilerFreeStrip.kind}-${spoilerFreeStrip.weekNumber}-${"earlierWeeks" in spoilerFreeStrip ? spoilerFreeStrip.earlierWeeks.join() : ""}`}
+              state={spoilerFreeStrip}
+            />
+          ) : null
+        }
+      >
+        {carousel(false)}
+      </FanPageChrome>
+      {/* Tall enough that pinning (which shortens the block) can never shorten the document past the scroll position, which would unpin it again. */}
+      <div className="flex min-h-dvh flex-col gap-3 pt-1">{resultsContent}</div>
 
       {livePrompt && (
         <LiveScoresPrompt {...livePrompt} spoilerFreeMode={accountSettingsData.spoilerFreeMode} />

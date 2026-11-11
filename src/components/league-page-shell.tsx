@@ -23,22 +23,21 @@ export function LeaguePageShell({
   const { league, scoringSettings, spoilerFreeStrip } = base;
   return (
     <div className="flex flex-col px-4">
-      <div className="flex flex-col gap-3">
-        <LeagueHeader
-          tab={tab}
-          leagueId={league.id}
-          inviteCode={league.invite_code}
-          canEdit={base.isCommissioner}
-          justCreated={justCreated === "1"}
-          scoringConfigured={scoringSettings?.scoring_configured ?? true}
-          switcherLeagues={base.switcherLeagues}
-          switcherCurrent={base.switcherCurrent}
-          accountSettingsData={base.accountSettingsData}
-          viewerEmail={base.user.email ?? ""}
-          spoilerFreeStrip={spoilerFreeStrip}
-          draftScoresStrip={base.draftScoresStrip}
-        />
-
+      <LeagueHeader
+        tab={tab}
+        leagueId={league.id}
+        inviteCode={league.invite_code}
+        canEdit={base.isCommissioner}
+        justCreated={justCreated === "1"}
+        scoringConfigured={scoringSettings?.scoring_configured ?? true}
+        switcherLeagues={base.switcherLeagues}
+        switcherCurrent={base.switcherCurrent}
+        accountSettingsData={base.accountSettingsData}
+        viewerEmail={base.user.email ?? ""}
+        spoilerFreeStrip={spoilerFreeStrip}
+        draftScoresStrip={base.draftScoresStrip}
+      />
+      <div className="flex flex-col gap-3 pt-1">
         {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         {message && <p className="text-sm text-muted-foreground">{message}</p>}
 

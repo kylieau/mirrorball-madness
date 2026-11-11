@@ -2,7 +2,7 @@
 
 // Amber soft-inset rhyme of the Spoiler-Free soft inset: warm warning fill,
 // one hairline under the sticky stack, gold (i) and no second Mark Watched
-// button. Stickiness belongs to HomeDraftChrome so the wordmark, avatar, and
+// button. Stickiness belongs to FanPageChrome so the page title, avatar, and
 // this line move together (Pattern B). Shown only while this viewer can see
 // a released draft, and it replaces the Spoiler-Free strip on every page
 // that mounts it (Home, Results, Picks, Standings).
@@ -10,26 +10,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { TopBar } from "@/components/top-bar";
-import type { AccountSettingsData } from "@/lib/account-settings-data";
 import { DRAFT_SCORES_SHEET, DRAFT_SCORES_STRIP_LABEL } from "@/lib/draft-scores";
 
 const STRIP_CLASSES =
   "flex min-h-[34px] items-center gap-1.5 border-b border-primary/35 bg-[#23180c] bg-[image:linear-gradient(180deg,rgba(84,56,16,0.92),rgba(36,24,10,0.9))] px-4 py-1.5";
-
-export function HomeDraftChrome({
-  email,
-  ...accountSettingsData
-}: AccountSettingsData & { email: string }) {
-  return (
-    <div className="sticky top-0 z-30 -mx-4 bg-background pt-[env(safe-area-inset-top)]">
-      <div className="px-4 py-2">
-        <TopBar {...accountSettingsData} email={email} />
-      </div>
-      <DraftScoresStrip />
-    </div>
-  );
-}
 
 export function DraftScoresStrip() {
   const [open, setOpen] = useState(false);
