@@ -45,13 +45,21 @@ Offered to Kylie, not answered and not built:
 Released 2026-11-11 (`docs/design/lifeline-recast-trades/plan.md`, As Built):
 the SQL is applied live, the app deployed, types regenerated.
 
-Still to do:
-- Kylie hasn't answered: test each transaction in a scratch league
-  (`scripts/qa-screenshots/seed.mjs`; live writes need her yes).
-- Browser-check with throwaway accounts against the live project: the
-  Lifeline turn-on sheet and Equalizer numbers, a Lifeline pick, a waiver
-  list, a trade offer through accept and veto. Recast, Trades, Roster Moves
-  and the Lifeline page were checked with made-up data only.
+Live-tested 2026-11-11 in a scratch league with throwaway accounts (Recast
+and Trades; Kylie ran `process_league_recast` in the SQL Editor, since the
+service role can't call it): offer privacy, outsider can't accept, no veto
+or cancel by a party, one outside vote vetoes, invalid offers refused;
+claims on held or eliminated couples refused, a paired drop shows as a
+pending drop; the run awarded two claims (a contested couple went to the
+earlier manager, the loser's fallback took the dropped couple), executed the
+accepted trade, left the vetoed one, stamped one `recast_cycles` row, and
+the pages, Home card and Recent Activity read right. The league was deleted
+after. Still unchecked:
+- A points leg in a trade, and the open-offer / waiver-claim guard: both
+  test offers were refused by an earlier check first. PGlite tests cover them.
+- Lifeline end to end against the live project (the turn-on sheet and
+  Equalizer numbers, a pick, the lock): still made-up data only.
+- The Home card says "Ends in 1d" for a 48-hour offer (largest unit, floored).
 
 Known limits, none fixed:
 - `saveLifelinePicks` clears then sets in two calls, so it isn't atomic.
@@ -749,5 +757,5 @@ Built (per-couple publish and undo, Finish Week, Home and every page reading a r
 
 ## Roster Moves card and pages — 2026-11-11
 
-- Built from `docs/design/roster-moves-pages/` (card C1 and the page frame; Kylie's picks are in its README). Not verified end to end: saving a waiver claim from the Wire's Claim sheet, because the scratch league's next run was already due (`recast_next_cycle` kept the week 8 run) and `save_recast_list` refused; the refusal rendered in the list card. Check on a real list once a run is pending.
+- Built from `docs/design/roster-moves-pages/` (card C1 and the page frame; Kylie's picks are in its README). Saving a waiver claim from the Wire's Claim sheet was verified in the 2026-11-11 scratch-league test (see Lifeline, Recast and Trades above).
 - The fact strip's times wrap to two lines in the container's UTC; on a phone (PT/ET) they should fit. Look once on Kylie's phone.
