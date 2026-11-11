@@ -1,75 +1,85 @@
-# Session Handoff — 2026-11-10 (Dance Card v3 live in all four leagues)
+# Session Handoff — 2026-11-11 (Lifeline / Recast / Trades released to main)
 
 ## 1. Current State
 
-**Dance Card v3 is live in all four Season 35 leagues, switched before E10 (Tue 2026-11-10, 8pm ET).** `main` is at `79ff033` plus this sync, all pushed. The code commit `4fd806d` deployed on Vercel (success).
+Lifeline, the Equalizer, Recast v2 and Trades are on `main` (built on `lifeline-recast-trades`, fast-forwarded). Kylie applied the three SQL files and scheduled the cron job on 2026-11-11, then said to commit and push to `main` the same day. **Every switch is off in all five leagues; nothing has been tried against the live project in a browser yet.**
 
-What v3 is (`docs/design/dance-card-v3/`):
-- Judges' points pay one rate all season: 0.2731 for two-couple rosters.
-- Survival is 3.00 × √(safe weeks) in total.
-- The Fantasy Bonus pays at face value. No placement.
+Checks before the commit (2026-11-11): `npx tsc --noEmit` clean, `npx eslint src scripts` clean, `npm test` 99 files / 985 tests, `rm -rf .next && npm run build` succeeds. (`npm run lint` fails only on `.codex-private/`, another session's directory.)
 
-Verified 2026-11-10:
-- `apply-dance-card-v3.sql` is applied: the constraint, all four functions and the grants.
-- A throwaway v3 league looked right in the browser against live data.
-- All four leagues switched v2 → v3 (commissioners agreed, per Kylie), and `--verify` matches.
-- Curtain Call and Grand Finale are unchanged on all 175 rows.
-- Ranks are identical to v1 in every league. In Carrie Ann's Biggest Fans, balla is 1st with 880.74 and Kylie 2nd with 880.62.
+The Recast and Trades screens, the header and the settings rows were checked in headless chromium at 360px and 390px with made-up data on a temporary route (since removed), because the SQL isn't live. No horizontal overflow, no console errors. The Lifeline turn-on sheet and Picks card have not been browser-checked.
 
-Tests: 907 pass and the build is clean. Codex reviewed the change and found one P1 (the correction cascade dropped outcomes), fixed in `4fd806d`.
+**Codex reviewed the built code (2026-11-11):** four P1s, no P0 or P2, each reproduced, fixed and covered by a PGlite test (see `BACKLOG.md`). The advisor could not run: the main model, `claude-fable-5-2`, doesn't support it.
 
-Not yet done:
-- E10 tonight is the first live v3 publish.
-- `apply-dance-card-v3-default.sql` hasn't been run.
-- Kylie hasn't checked a real v3 league on her phone.
+**Added after Kylie's 2026-11-11 notes:** trade offers expire after 48 hours or at the Semi-Finals lock (`trade_offers.expires_at`); awarded waiver claims and trades that went through show on Home's Recent Activity (`src/lib/home-transactions.ts`). Not built, by her choice until she has used it: a trade-offer row on Picks, one combined Transactions page.
+
+- **The plan and what was decided while building:** `docs/design/lifeline-recast-trades/plan.md` (As Built, at the end).
+- **CLAUDE.md** has a section each for Lifeline and the Equalizer, Recast v2 and Trades.
+
+**E10 `--verify` is still owed.** E10 (Week 9) aired Tue Nov 10 and is the first live v3 publish. After it is published:
+`NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`
+Kylie released this build before E10 was published, so E10 will be the first publish through the new plan (`lifelinePayouts` / `lifelineEqualizers`, empty while no league plays). `--verify` matched on all four leagues right after the Lifeline SQL went in.
+
+Hard dates (PT):
+- Release target: Sun Nov 15 or Mon Nov 16.
+- Tue Nov 17, 5 PM: Semi-Finals lock (earliest Lifeline lock; the trade deadline).
+- Thu Nov 19, 5 PM: the only S35 waiver run (claims and trades).
+- Tue Nov 24: the Finale.
 
 ## 2. Changes Made
 
-All committed and pushed on `main`. This sync touches `MEMORY_HANDOFF.md` and `BACKLOG.md`.
+All committed on `main`.
 
-**Not ours; leave unstaged:**
+**SQL (applied live by Kylie 2026-11-11, in this order):**
+- `supabase/apply-lifeline.sql`
+- `supabase/apply-recast-v2.sql` (drops the old Recast RPCs: the old Recast page can't submit a claim until the deploy; no league has Recast on)
+- `supabase/apply-trades.sql`
+- `supabase/queries/schedule-recast-cron.sql` (`pg_cron` enabled; Kylie's `cron.job` check showed `process-due-recasts`, every 15 minutes, active)
+
+Checked afterward with reads only: every function, table and column from the three files is present, the five old Recast RPCs are gone, `anon` is refused on every new table, the standings view matches `weekly_manager_scores` (175 rows, same total, no Lifeline or transfer points), every new table is empty, and all five leagues have Lifeline, Recast and Trades off. `--verify` matched on the four S35 leagues with the Lifeline SQL in (E10 not published yet).
+
+**Tests:** `src/lib/lifeline-db.test.ts`, `recast-v2-db.test.ts`, `trades-db.test.ts` (PGlite); `lifeline.test.ts`, `lifeline-picks.test.ts`, `recast.test.ts`, `trades.test.ts`, `home-transactions.test.ts`; additions to `home-activity.test.ts`, `score-history.test.ts`, `episode-publication.test.ts`, `draft-scores.test.ts`, `dance-card-v2-readers.test.ts`, `couple-history-link.test.ts`.
+
+**Logic:** `src/lib/lifeline.ts`, `lifeline-picks.ts`, `lifeline-enable.ts`, `recast.ts`, `trades.ts`, `weekly-standings.ts`, `home-transactions.ts`; changes in `home-activity.ts`, `episode-publication.ts`, `score-history.ts`, `score-history-data.ts`, `league-page-data.ts`, `league-home-summary.ts`, `draft-scores.ts`, `recast-framing.ts`, `couple-history-link.ts`, `supabase/types.ts` (regenerated from the live project 2026-11-11).
+
+**Routes and actions:** `src/app/leagues/[id]/lifeline/`, `src/app/leagues/[id]/trades/`, `src/app/leagues/[id]/waivers/` (page and actions rewritten), `settings/actions.ts` and `settings/page.tsx`, `picks/page.tsx`, `standings/page.tsx`, `admin/results/enter/page.tsx`, `src/app/(fan)/page.tsx`.
+
+**Components:** new `lifeline-card.tsx`, `lifeline-settings.tsx`, `recast-panel.tsx`, `recast-overdue-notice.tsx`, `trades-panel.tsx`, `trades-settings.tsx`; changed `league-header.tsx`, `league-page-shell.tsx`, `league-modules-form.tsx`, `recast-nudge-card.tsx`, `roster-card.tsx`, `dance-card-league-list.tsx`, `top-bar.tsx`; deleted `waivers-panel.tsx`.
+
+**Docs:** `docs/design/lifeline-recast-trades/plan.md`, `CLAUDE.md`, `BACKLOG.md`, this file.
+
+**Not ours; still uncommitted, leave unstaged:**
 - `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile.codex`, `.devcontainer/devcontainer-lock.json`
-- `.agents/`, `AGENTS.md`
+- `.agents/`, `AGENTS.md`, `.codex-private/`
 - `ios/App/App.xcodeproj/project.pbxproj`
 - `supabase/queries/add-*.sql`, `supabase/queries/prefill-*.sql`
 
 ## 3. Key Decisions
 
-**Dance Card v3** (Kylie, 2026-11-10). It replaces v2, whose curve made a couple's next 24 worth less the more it had already scored; Kylie hadn't realized v2 worked that way. The principles:
-- Equal module weights.
-- Dance Card is mostly out of managers' control after the draft, so one bad couple shouldn't sink a manager.
-- A 24 is a 24.
-- No paying twice: survival tapers and placement is gone.
-- Roster spread has no floor under a flat rate (front-loaded survival keeps lowering it into a handout), so the survival budget was set at about 13% of a long run, spent early.
-- The frozen rule (`frozen-rule.json`) was written before any v3 standings were computed.
+**Kylie's answers (2026-11-10):** restate everything in v3 terms; Lifeline and the Equalizer take the Dance Card weight once; Lifeline options go through the viewer's spoiler cutoff; build all four now and release together (fallback: Lifeline and the Equalizer alone); the Equalizer is one-time and never automatic, the commissioner confirms it (default yes) after seeing every number and rank change; trades use points as cash, capped at 10% per season; no trades after the Semi-Finals lock; no mocks first, build then send screenshots.
 
-**How v3 is built:**
-- It reuses v2's machinery: the `danceCardLedger` survival branch, `usesDanceCardLedger` / `danceCardLedgerRule`, `PLAN_VERSION = 5`, and `scripts/dance-card-v2.ts --to v3|v2`.
-- v3 needs every outcome row with its `outcome`; the ledger throws without it.
+**Storage:** `weekly_manager_scores` is unchanged. Totals are read from the `weekly_manager_standings` view through `loadWeeklyStandings`. Lifeline settles inside the publish transaction (`lifelinePayouts` / `lifelineEqualizers` on the plan, checked by `apply_lifeline_settlement`); no `PLAN_VERSION` bump.
 
-**Copy:**
-- Score History keeps v1's wording: `Jdg 30 × 0.273`, then Survival and Bonus lines.
-- League Settings: a v2 league shows the Season Curve explanation, with no survival/placement sentence. A v3 league shows the rate and "3.00, Tapering", read-only.
+**Decided while building, for Kylie to confirm** (full list in the plan's As Built):
+- Each mechanism is its own commissioner switch, default off. Trades is independent of Recast.
+- 4th and 5th in the Finale earn judges' points and bonus only; Lifeline's Finale pays half the credit whatever the outcome.
+- Recast: claims private until the run; lists don't carry over; turning it on never runs a week already due; the late-run alert is an admin notice on Enter Results.
+- Trades: veto = more than half of the teams not in the trade; at least one couple; up to 12 parts; everything moves at the waiver run; an offer expires after 48 hours or at the Semi-Finals lock; accepted trades can't be backed out of; trade points sit under Dance Card.
+- Header: Recast and Trades are two buttons in the top bar. Under about 390px the wordmark text gives way and only the glyph shows.
 
-**Earlier rounds:** I told Kylie plainly that v2 wasn't a fairness finding, and that the curve's one rank change had favored her. She chose v3 knowing it puts balla back in 1st.
+**Rules that still hold:**
+- No merge, deploy, live SQL apply or live DB write by the build agent. Kylie applies SQL after an explicit OK.
+- No turning Recast on in the four live leagues as part of the PR. Kylie enables `pg_cron`.
+- The Equalizer preview is announced to the league. If it raises Kylie's rank, the commissioner or the league decides.
+- In-app Recast copy says "waiver".
+- The repo is public: never commit league standings or member names.
+- A push to `main` needs Kylie's yes in that turn. Commit only when asked. Stage by name. Never `pkill -f`. Don't run prettier. `rm -rf .next` before `npm run dev` after a build.
 
-**Repo is public:** never commit league standings or member names. The Curve Lab artifact (https://claude.ai/artifact/F4UocJUi5jykNmNYY3jpV3) is private and names members.
+## 4. Next Steps
 
-**Carried over:**
-- SQL ships before the app.
-- A push to `main` needs Kylie's yes in that turn (handoff syncs excepted).
-- Stage by name. Never `pkill -f`. Don't run prettier.
-- `rm -rf .next` before `npm run dev` after a build.
-- Render-check with `scripts/qa-screenshots/seed.mjs up|down`. A new QA league's Anchor Week is 9, so set it to 2 to see points.
-- The Management API (`SUPABASE_ACCESS_TOKEN`) works for verification queries.
+1. Confirm the deploy from `main` is live.
+2. After E10 is published (the first publish on this build): run `--verify`.
+3. Kylie uses the build and decides where Recast and Trades should surface (Picks row, one Transactions page).
+4. Browser-check with throwaway accounts against the live project: Lifeline turn-on sheet and Equalizer numbers, a Lifeline pick, a waiver list, a trade offer through accept and veto.
+5. Commissioners opt in before Tue Nov 17, 5 PM PT.
 
-## 4. Backlog & Next Steps
-
-See BACKLOG "Dance Card v3 rollout — 2026-11-10".
-
-**E10 night:**
-- Contributors reload Enter Results before 8pm ET.
-- Judges' points post live. Survival lands at Finish Week.
-- If Finish Week fails mid-night, un-post first, then `--apply --to v2` or `--rollback`.
-
-Next command (after E10 publishes): `NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`
+Open limits are listed in `BACKLOG.md` (Lifeline, Recast and Trades — 2026-11-11).

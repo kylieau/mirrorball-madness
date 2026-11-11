@@ -2,6 +2,51 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Lifeline, Recast and Trades — 2026-11-11
+
+Built on `lifeline-recast-trades` (`docs/design/lifeline-recast-trades/plan.md`,
+As Built). Nothing committed, applied or deployed yet.
+
+Release steps still to do:
+- E10 `--verify` first; no pipeline change goes live until it passes.
+- Kylie confirms the readings made while building (plan, As Built).
+- One PR. Kylie applies `apply-lifeline.sql`, `apply-recast-v2.sql`,
+  `apply-trades.sql`, enables `pg_cron`, runs `schedule-recast-cron.sql`; then
+  deploy; then regenerate `src/lib/supabase/types.ts` (hand-patched for now).
+- Browser-check with throwaway accounts once the SQL is live: the Lifeline
+  turn-on sheet and Picks card were never rendered in a browser; Recast and
+  Trades were checked with made-up data only.
+
+Known limits, none fixed:
+- `saveLifelinePicks` clears then sets in two calls, so it isn't atomic.
+- The Equalizer is refused when a manager has no `weekly_manager_scores` row on
+  the latest scored week.
+- `reset_draft` doesn't clear `recast_cycles`.
+- `save_recast_list` accepts claims when a cycle exists but its `start_week` is
+  null.
+- In a two-night week a couple eliminated on night 1 can still show as a drop
+  or wire option.
+- A member with no roster rows could claim into slots 1..roster_size.
+- A proposed trade offer holds its couples out of their owner's waiver drops
+  until it is declined, cancelled or lapses (48 hours).
+- A trade accepted less than 24 hours before a run waits for the next run. In
+  S35 the Semi-Finals deadline comes two days before the only run, so every
+  accepted trade clears in time; a season with a later deadline would need
+  this looked at.
+- The waiver order is set before trade points move in the same run (no test).
+- With Recast off and Trades on, Trades copy still says "waiver run".
+- Not built: a Lifeline need line / Picks Due on the Home league card, and
+  Lifeline lines on Standings' roster card.
+- Not built: a "trade offer waiting" row on Picks, and one combined
+  Transactions page (waiver awards are on Recast, trades on Trades, both on
+  Home's Recent Activity). Kylie wants to use the build first.
+
+Codex reviewed the built code (2026-11-11): four P1s, each reproduced, fixed
+and covered by a PGlite test (waiting claims keep their place in the order,
+re-applying the Recast SQL keeps saved lists in order, claims can't join a run
+that came due before Recast was turned on, a departed team's veto vote stops
+counting). No authorization, privacy or points findings.
+
 ## Dance Card v3 rollout — 2026-11-10
 
 Kylie replaced v2's season curve with v3 before E10 (`docs/design/dance-card-v3/`):
