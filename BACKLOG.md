@@ -2,20 +2,45 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Finale follow-ups — 2026-11-11
+
+Offered to Kylie, not answered and not built:
+- Real 4th Place / 5th Place outcomes (needs SQL). Today both are entered as
+  Eliminated in the Finale week and share spots, so Grand Finale, Curtain Call
+  and Dance Card can't tell them apart.
+- A Finish Week guard for a season with no week ticked Finale (the engine
+  falls back to the last scheduled week).
+- An automatic rescore when the Finale tick is set or moved after weeks are
+  published (today each week needs a republish or
+  `scripts/recompute-published-weeks.ts`).
+- `couplePath` in `src/lib/strong-play-ceilings.ts` still gives 4th place no
+  Finale survival; re-solve the v3 rates with it for a future season, not S35.
+
 ## Lifeline, Recast and Trades — 2026-11-11
 
-Built on `lifeline-recast-trades` (`docs/design/lifeline-recast-trades/plan.md`,
-As Built). Nothing committed, applied or deployed yet.
+Released 2026-11-11 (`docs/design/lifeline-recast-trades/plan.md`, As Built):
+the SQL is applied live, the app deployed, types regenerated.
 
-Release steps still to do:
-- E10 `--verify` first; no pipeline change goes live until it passes.
-- Kylie confirms the readings made while building (plan, As Built).
-- One PR. Kylie applies `apply-lifeline.sql`, `apply-recast-v2.sql`,
-  `apply-trades.sql`, enables `pg_cron`, runs `schedule-recast-cron.sql`; then
-  deploy; then regenerate `src/lib/supabase/types.ts` (hand-patched for now).
-- Browser-check with throwaway accounts once the SQL is live: the Lifeline
-  turn-on sheet and Picks card were never rendered in a browser; Recast and
-  Trades were checked with made-up data only.
+Still to do:
+- Kylie hasn't answered: test each transaction in a scratch league
+  (`scripts/qa-screenshots/seed.mjs`; live writes need her yes).
+- Browser-check with throwaway accounts against the live project: the
+  Lifeline turn-on sheet and Equalizer numbers, a Lifeline pick, a waiver
+  list, a trade offer through accept and veto. Recast, Trades, Roster Moves
+  and the Lifeline page were checked with made-up data only.
+
+Review leftovers Kylie saw and passed on ("i think we are good"); don't start
+one without her say-so:
+- The X close on Lifeline, Recast and Trades is a 20px icon with no 44px
+  touch area.
+- A viewer who is behind sees the Roster Moves card and both catch-up cards,
+  each with Mark Watched.
+- The Lifeline page has no "How Lifeline Works" card like its siblings.
+- The same dead spot reads "empty roster spot" for Lifeline and "open spot"
+  for waivers.
+- Recast and Trades couple links drop the Picks weeks on the way back.
+- Later, once she has used trades: what is waiting on you in the Roster Moves
+  card (mock C).
 
 Known limits, none fixed:
 - `saveLifelinePicks` clears then sets in two calls, so it isn't atomic.

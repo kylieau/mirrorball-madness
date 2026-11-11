@@ -1,87 +1,39 @@
-# Session Handoff — 2026-11-10 PT (Lifeline / Recast / Trades released; Lifeline, Recast and Trades open from Picks)
+# Session Handoff — 2026-11-11 PT (Finale fairness fixes pushed; Curtain Call's Finale pick awaits Kylie)
 
 ## 1. Current State
 
-Lifeline, the Equalizer, Recast v2 and Trades are on `main` and deployed (Vercel Production; the latest, `86c5aed`, confirmed deployed). The working tree holds only other sessions' files. Kylie applied the three SQL files and scheduled the cron job, then said to commit and push, all on Tue Nov 10 PT during E10's East feed (dates written 2026-11-11 below are UTC). **Live state, read 6:40 PM PT Nov 10:** the three West-lock leagues have Lifeline (from Week 9, Equalizers confirmed, 15 adjustment rows), Recast and Trades on; the two East-lock leagues have all three off. Two Lifeline picks and one waiver claim are saved, no trade offers. E10 is unpublished.
+**In focus: Finale fairness (Kylie, Nov 11: "the week rule quirk should not exist", then "agree with your fixes").** On `main` at `1974e2f`, on top of `e2b34a6` (a test pinning Grand Finale distance to the week ticked Finale). Both were pushed with this handoff sync; this session did not confirm the Vercel deploy. No SQL, no live data touched, and no week before the Finale changes, so nothing needs a recompute.
 
-**Roster Moves card (Kylie picked A from `docs/design/roster-moves-card/`, then said to address the reviews and push, Nov 10 PT):** Lifeline, Recast and Trades moved off Your Fantasy Roster into their own Roster Moves card under it, since their lines are about the weeks to come while the roster card can be paged back. The title has no week; each block is labeled (`Week 9 Lifeline`, `Waiver Claims`) and ends in one status line (`Saved · Locks today 8 PM PT.`, `1 saved · Next run Thursday 5 PM PT. Winning claims start scoring in Week 10.`). The UX review's items were all done: plainer start-week copy, the locked duplicate merged (`None saved · Locked.`), labels in every state, default-size buttons, Title Case "You May Have an Open Spot", lower-case today/tomorrow on this card only (`inSentence`; `formatAirsAt` elsewhere unchanged). Codex found nothing functional. Checked in headless chromium at 360px and 390px on a temporary fixture route (removed). Still open, parked by Kylie earlier: a viewer who is behind sees the Roster Moves card and both catch-up cards.
+- **Grand Finale distance:** the Finale is one week split evenly between its places (`SlotWeeks.finaleSpots`; `grandFinaleDistance` returns `weeks` for the penalty and keeps `off` / `unit` for Score History's `Off 1 place`). With five finalists a place costs a fifth of a week. A winner pick at 8.33 / 2.08 pays 7.91 for 2nd, 7.50 for 3rd, 7.08 for 4th or 5th, and 6.25 for a Semi-Finals exit (before: 6.25, 4.17, 2.09, 6.25, so 5th in the Finale paid less than going home the week before). League Settings' explainer says so.
+- **Dance Card v3 survival:** every finalist gets the Finale's survival step (0.49 before the Dance Card weight), the couples entered as Eliminated on Finale night included; a withdrawal or bye gets none (`survivingCoupleIds` in `src/lib/dance-card-v2.ts`: a week that names a winner is the Finale; Lifeline's `survived` uses it too). v1 is untouched (it pays 4th and 5th placement points). The v3 rates stay as solved; the amendment is in `docs/design/dance-card-v3/README.md`. This changes the rule the commissioners agreed to, so Kylie may want to tell them before the Finale.
+- **Still true:** 4th and 5th are both entered as Eliminated in the Finale week and share spots, so no module can tell them apart.
 
-**Roster Moves icons (Kylie picked the hourglass, `docs/design/roster-moves-icons/`, Nov 10 PT; she passed on the bolder `docs/design/roster-moves-recap/` directions as too dramatic):** a green check on a saved Lifeline, a dashed gold circle on an empty spot or missing pick, an hourglass on each waiver claim with `2 saved, waiting on the run · Thursday 5 PM PT.` Copy and layout otherwise unchanged.
+Checks on `1974e2f`: `npx tsc --noEmit` and `npx eslint src scripts` clean, `npm test` 100 files / 998 tests, `rm -rf .next && npm run build` succeeds. Not looked at in a browser (the only visible change is the explainer sentence).
 
-**Dance-off entry (Kylie, Nov 10 PT, during E10's West feed):** an immune couple's bonus is editable on their Not in This Round row (before, only Undo was there although the immunity row said to change it there); a Winner's Bonus heat is entered by picking its winner instead of points and Result per couple. Same saved rows, so posting and Finish Week are unchanged. Workaround given before it shipped: set the Winner's Bonus, or Undo and re-mark Immune with Their Bonus.
+**Open question, awaiting Kylie's pick (her idea, Nov 11: "for curtain call's finale, instead of predicting elimination, we predict placement...?"):** today Week 11's card asks for one Eliminated pick plus top scorer, and 4th and 5th both count as correct. Proposed: **(A, recommended)** the Finale week's first pick becomes Winner, paid like the elimination pick at that week's scaling (3.23), top scorer unchanged; **(B)** rank all the finalists, which needs new storage, SQL and a new card, and overlaps Grand Finale. Either needs a mock first, then Codex and UX/UI review before the push, and should be live before Week 11 picks open (after E11's results, about Nov 17). Not started.
 
-**Immunity isn't a dance (Kylie, Nov 10 PT):** the immunity row's card no longer shows a style (it read Freestyle for Harry) or Edit Details, and a couple out of a round can't be put in its heats: Enter Results leaves them out, and `supabase/apply-immune-heat-guard.sql` refuses it in the database. Kylie applied that SQL live on Nov 10 PT (reported successful; read-only check beforehand found no existing violations).
+**Live state (S35, as last read on Nov 11):**
+- E10 (Week 9) is published; `scripts/dance-card-v2.ts --verify` matched on all four leagues afterward. 6 of 16 couples are still in. Week 10 (E11, Semi-Finals) airs Tue Nov 17; Week 11 (E12) is the Finale, Tue Nov 24.
+- All four S35 leagues: Dance Card v3, Grand Finale `distance_based`, 8.33 per correct, 2.08 lost per week off.
+- Grand Finale distance counts weeks (`8fda8c1`, `86dcd0e`): Weeks 1–9 were recomputed live on Nov 11 (33 of 200 rows, Weeks 7–9, only Grand Finale points; replaced rows are in `weekly_manager_scores_archive`; `--verify` matched).
+- Lifeline was reset at Kylie's request after E10 ("too last minute to be fair"): every pick, payout and Equalizer row deleted and Lifeline off in every league. A commissioner can turn it back on in League Settings (it starts at the next open week with a fresh Equalizer offer).
+- Recast and Trades are on in the three West-lock leagues and off in the two East-lock ones. `apply-recast-after-results.sql` and `apply-immune-heat-guard.sql` are applied live and verified.
 
-**After E10 published (Nov 10 PT, late):** `--verify` matched on all four S35 leagues. **Lifeline was reset in every league at Kylie's request** ("too last minute to be fair"): all 6 picks, 6 payouts and 15 Equalizer rows deleted and Lifeline turned off in the three leagues that had it; standings checked equal to `weekly_manager_scores` on all 200 rows. A backup of the deleted rows is in the session scratchpad only (league data never goes in the repo). A commissioner can turn Lifeline back on from League Settings (it starts at the next open week, with a fresh Equalizer offer). The Week 9 note above about Ariana's backend pick no longer applies; that pick was deleted with the rest. Kellie & Christian's 0 for Week 9 in #supportSWEKylie was checked and is correct (both couples out, no Lifeline, Curtain Call picks missed, bracket 5 slots off). Also shipped: Scores names special-dance rows (`Dance-Off Immunity: +2`), and Home's activity lists a week's overtakes above its eliminations.
-
-**Waiver run 48 hours after results are posted (Kylie, Nov 10 PT; pushed, and Kylie applied the SQL live on Nov 11, verified read-only: the three leagues with Recast and Trades on have a Week 9 run due Thu Nov 12 about 10 PM PT, 48 hours after E10 was published, starting Week 10; the two with both off have none; nothing overdue):** `supabase/apply-recast-after-results.sql` redefines `recast_next_cycle` (due = the week's last `results_published_at` + 48h, null until every night is posted), `process_due_recasts` (no run without results; the run-anyway-after-a-day fallback is gone) and `recast_runs_overdue` (stuck runs only). Picks, Recast, Trades and `RECAST_RULES` say "48 hours after Week N results are posted" until there is a time. Rehearsed in `recast-v2-db.test.ts` and `trades-db.test.ts`. **Deploy the app first, then apply the SQL**: the old app shows a 1970 date for a null due time. Also: Home collapses any posted week during the West feed, not only weeks with an elimination (`ActivityWeek.resultsIn`).
-
-**Grand Finale distance counts weeks, not slots (Kylie, Nov 10 PT: "weeks", "retroactive is fine", commissioners fine, commit and push). Done: pushed (`8fda8c1`, `86dcd0e`) and recomputed live on Nov 11.** `slotWeeks` / `grandFinaleDistance` in `src/lib/scoring.ts`; `slotWeeks` counts real eliminations only through the scored week and one per later week, and every spot after the last regular week is the Finale (`seasonFinaleWeek`: the week ticked Finale on Schedule, Week 11 in S35; Kylie, Nov 11: the fixed number of weeks and the Finale tick must drive it, which they do, pinned in `src/lib/weekly-score-rows.test.ts`). The recompute: all 200 `weekly_manager_scores` rows of Weeks 1–9 were first copied into `weekly_manager_scores_archive` (migration id `fa3487f5-a93a-40be-bc90-42fc976500f3`), then `scripts/recompute-published-weeks.ts` changed 33 rows (Weeks 7–9, only `grand_finale_points` and `total_points`, every league up); the re-diff against the engine is 0 and `--verify` matched on all four leagues. The waiver run time did not move (`results_published_at` untouched).
-Told to Kylie, not built: with no week ticked Finale the engine uses the last scheduled week (a guard on Finish Week would stop that for a future season), and ticking or moving the Finale after weeks are published doesn't rescore them until a republish or the script. 
-
-**Finale fairness fixes (Kylie, Nov 11: "the week rule quirk should not exist", then "agree with your fixes"). Built and committed locally, NOT pushed (needs Kylie's yes); no SQL, no live data touched, nothing before the Finale changes.**
-- Grand Finale distance: the Finale is one week split evenly between its places (`SlotWeeks.finaleSpots`; `grandFinaleDistance` returns `weeks` for the penalty and keeps `off` / `unit` for Score History's `Off 1 place`). With five finalists a place costs a fifth of a week. A winner pick at 8.33 / 2.08: 2nd 7.91, 3rd 7.50, 4th or 5th 7.08, out in the Semi-Finals 6.25 (before: 6.25, 4.17, 2.09, 6.25, so 5th in the Finale paid less than a Semi-Finals exit). Explainer copy in League Settings updated.
-- Dance Card v3: every finalist gets the Finale's survival step (0.49 before the Dance Card weight), the couples entered as Eliminated on Finale night included; a withdrawal or bye still gets none (`survivingCoupleIds` in `src/lib/dance-card-v2.ts`: a week that names a winner is the Finale; Lifeline's `survived` uses it too). v1 is untouched (it pays 4th and 5th placement points). The v3 rates stay as solved; the amendment is written up in `docs/design/dance-card-v3/README.md`. Kylie was told this changes the frozen v3 rule, so commissioners may want a heads-up.
-- 4th and 5th still share spots (both entered as Eliminated in the Finale week), so no module can tell them apart. Offered, not answered: real 4th Place / 5th Place outcomes (needs SQL).
-
-**Open question from Kylie (Nov 11): "for curtain call's finale, instead of predicting elimination, we predict placement...?"** Today Week 11's card asks for one Eliminated pick plus top scorer, and 4th and 5th both count as correct. Proposed to her, awaiting her pick: (A, recommended) the Finale week's first pick becomes Winner, paid like the elimination pick at 5/16 scaling (3.23), top scorer unchanged; (B) rank all the finalists, which needs new storage, SQL and a new card. Either needs a mock first, then Codex and UX/UI review before the push, and should be live before Week 11 picks open (after E11 results, about Nov 17). Not started.
-
-**A manager's Week 9 Lifeline was added on the backend after the 8 PM PT lock (Kylie asked, Nov 10 PT, 8:13 PM):** one `lifeline_picks` row inserted with the service role after the RPC's own checks by hand (dead spot eliminated in Week 4, the couple active and not on that roster, no other pick that week); `picked_by` is Kylie. E10's publish pays it like any other pick.
-
-**Lifeline pays whatever the couple's outcome, and the Equalizer follows (Kylie said yes to both and to the push, Nov 10 PT):** a pick pays half the couple's Dance Card credit even when the couple goes home (that week's credit has no survival step). `lifelineValue` in `src/lib/lifeline.ts` no longer zeroes a pick whose couple didn't survive, and `buildLifelineEqualizer` uses the same value, so a couple that went home counts at half its credit in the week's mean. **The Equalizers the three leagues confirmed rise when E10 is published** (every publish recomputes them). If E10 was published on the old build, republishing Week 9 corrects payouts and Equalizers. Copy: Lifeline card and settings say "even if they go home"; Score History reads `Lifeline: {couple}`; the Recast rules say a run is "48 hours after a week's episode". No SQL change. Checks: `tsc`, `eslint src scripts`, `npm test` (99 files / 985), `npm run build`. The reworded copy strings were not looked at in a browser.
-
-**Lifeline on the Recast / Trades row — pushed Nov 10 PT as `86c5aed` (deploy confirmed), on Kylie's "if these decisions are good and pass codex/UX/UI review, good with me to push":** she picked "its own page" from a mock and "rule now, button after". `RosterMoves` has a Lifeline button (first in the row) to `/leagues/[id]/lifeline` (`page.tsx`, `loading.tsx`); the Lifeline card left Picks, and `LifelineStatusLines` under the buttons confirms the saved Lifeline per empty spot. `loadLifelineWeek` (`src/lib/lifeline-week-data.ts`) feeds both pages. Review fixes made before the push: any viewer who is behind gets the catch-up card on the Lifeline page (Codex: one with no couple this week reached the card and peers' locked picks); couple links from the page carry the page's own `from`, so Close still returns to the Picks weeks; the picker label no longer splits into spaced pieces; long names wrap in the pick and league lines; the no-empty-spot card says the league's Lifelines show after the lock and has no empty body; "No pick" is muted once locked; the catch-up card is titled Catch Up to Play a Lifeline; the page subhead states the half-points rule. Checked in headless chromium at 360px and 390px on a temporary fixture route (removed) with long names: no overflow, no console errors. Not checked against a real league. **Left for Kylie (review notes, not done):** the X close on Lifeline, Recast and Trades is a 20px icon with no 44px touch area (all three alike); a viewer who is behind in a league with Lifeline and Recast on sees two catch-up cards on Picks, each with Mark Watched; the Lifeline page has no "How Lifeline Works" card like its siblings; the same dead spot reads "empty roster spot" for Lifeline and "open spot" for waivers; Recast and Trades couple links still drop the Picks weeks on the way back. She was shown the list and the post-review screenshot and said "i think we are good", so none of these is asked for; don't start one without her say-so.
-
-Checks before the commit (2026-11-11): `npx tsc --noEmit` clean, `npx eslint src scripts` clean, `npm test` 99 files / 985 tests, `rm -rf .next && npm run build` succeeds. (`npm run lint` fails only on `.codex-private/`, another session's directory.)
-
-**Recast and Trades open from Picks now, not the top bar** (Kylie picked mock A, `docs/design/picks-roster-moves/`): `RosterMoves` on Your Fantasy Roster, only the mechanisms that league has on. Checked in headless chromium at 360px and 390px on a temporary fixture route (since removed): both, Recast only, Trades only, neither, and the row on its own; no overflow, no console errors.
-
-**Picks confirms a saved waiver list (Kylie approved the screenshot and said to push, Nov 10 PT):** under the Recast button, `WaiverClaimsStatus` in `roster-moves.tsx` lists the manager's saved claims in rank order, or says none are saved (gold when they have an open spot), plus the next run's time. The Fill Your Open Spot card (`recast-nudge-card.tsx`) is deleted; `RecastCatchUpCard` stays for a viewer who is behind, only while a run is left. Files: `src/components/roster-moves.tsx`, `src/app/leagues/[id]/picks/page.tsx`, the deleted card, `CLAUDE.md`, the plan, this file. Checks: `tsc`, `eslint src scripts`, `npm test` (99 files / 985), `npm run build`, and headless chromium at 360px and 390px on a temporary fixture route (since removed) for six states. Not checked against a real league (three now have Recast on).
-
-The Recast and Trades screens and the settings rows were checked in headless chromium at 360px and 390px with made-up data on a temporary route (since removed), because the SQL isn't live. No horizontal overflow, no console errors. The Lifeline turn-on sheet and Picks card have not been browser-checked.
-
-**Codex reviewed the built code (2026-11-11):** four P1s, no P0 or P2, each reproduced, fixed and covered by a PGlite test (see `BACKLOG.md`). The advisor could not run: the main model, `claude-fable-5-2`, doesn't support it.
-
-**Added after Kylie's 2026-11-11 notes:** trade offers expire after 48 hours or at the Semi-Finals lock (`trade_offers.expires_at`); awarded waiver claims and trades that went through show on Home's Recent Activity (`src/lib/home-transactions.ts`). Not built, by her choice until she has used it: a trade-offer row on Picks, one combined Transactions page.
-
-- **The plan and what was decided while building:** `docs/design/lifeline-recast-trades/plan.md` (As Built, at the end).
-- **CLAUDE.md** has a section each for Lifeline and the Equalizer, Recast v2 and Trades.
-
-**E10 `--verify` is still owed.** E10 (Week 9) airs Tue Nov 10 PT and is the first live v3 publish. After it is published:
-`NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`
-Kylie released this build before E10 was published, so E10 will be the first publish through the new plan (`lifelinePayouts` / `lifelineEqualizers`, empty while no league plays). `--verify` matched on all four leagues right after the Lifeline SQL went in.
-
-Hard dates (PT):
-- Tue Nov 10: E10 (Week 9). Three leagues lock Curtain Call and Lifeline at 8 PM (West), two at 5 PM (East). Lifeline can't be turned on once a league's Week 9 lock has passed until E10 is published.
-- Wed Nov 11, about 10 PM: a trade has to be accepted by now to clear its veto window before the first run.
-- Thu Nov 12, about 10 PM (48 hours after E10's results were posted): first waiver run (Week 9), only for a league with Recast or Trades on before then. Adds and trades start scoring in the Semi-Finals.
-- Tue Nov 17, 5 PM / 8 PM by league: Semi-Finals lock (the trade deadline).
-- 48 hours after E11's results are posted (about Thu Nov 19): last waiver run; adds and trades start in the Finale.
+**Hard dates (PT):**
+- Thu Nov 12, about 10 PM: first waiver run (Week 9), 48 hours after E10's results were posted. Adds and trades start scoring in the Semi-Finals.
+- Tue Nov 17, 5 PM / 8 PM by league: Semi-Finals lock, which is also the trade deadline. Curtain Call's Finale change should be decided and live by then.
+- About Thu Nov 19 (48 hours after E11's results): last waiver run; adds and trades start in the Finale.
 - Tue Nov 24: the Finale.
 
 ## 2. Changes Made
 
-All committed on `main`.
+All of this session's work is committed on `main`; nothing of ours is uncommitted.
 
-**SQL (applied live by Kylie 2026-11-11, in this order):**
-- `supabase/apply-lifeline.sql`
-- `supabase/apply-recast-v2.sql` (drops the old Recast RPCs: the old Recast page can't submit a claim until the deploy; no league has Recast on)
-- `supabase/apply-trades.sql`
-- `supabase/queries/schedule-recast-cron.sql` (`pg_cron` enabled; Kylie's `cron.job` check showed `process-due-recasts`, every 15 minutes, active)
+- `1974e2f` Finale fairness: `src/lib/scoring.ts`, `dance-card-v2.ts`, `lifeline.ts`, `grand-finale-explainer.ts` and their tests, a comment in `strong-play-ceilings.ts`, `docs/design/dance-card-v3/README.md`, `CLAUDE.md`.
+- `e2b34a6` `src/lib/weekly-score-rows.test.ts` pins the Finale tick; docs record the recompute.
+- Earlier this session, already pushed and deployed: Grand Finale weeks (`8fda8c1`, `86dcd0e`), waiver run 48 hours after results and special rows named on Scores (`d524444`), immunity isn't a dance (`d6a1efc`), dance-off entry by picking the winner (`a7af587`), Roster Moves icons (`f9eae3d`) and card (`de21ca3`). `CLAUDE.md` describes each.
 
-Checked afterward with reads only: every function, table and column from the three files is present, the five old Recast RPCs are gone, `anon` is refused on every new table, the standings view matches `weekly_manager_scores` (175 rows, same total, no Lifeline or transfer points), every new table is empty, and all five leagues have Lifeline, Recast and Trades off. `--verify` matched on the four S35 leagues with the Lifeline SQL in (E10 not published yet).
-
-**Tests:** `src/lib/lifeline-db.test.ts`, `recast-v2-db.test.ts`, `trades-db.test.ts` (PGlite); `lifeline.test.ts`, `lifeline-picks.test.ts`, `recast.test.ts`, `trades.test.ts`, `home-transactions.test.ts`; additions to `home-activity.test.ts`, `score-history.test.ts`, `episode-publication.test.ts`, `draft-scores.test.ts`, `dance-card-v2-readers.test.ts`, `couple-history-link.test.ts`.
-
-**Logic:** `src/lib/lifeline.ts`, `lifeline-picks.ts`, `lifeline-enable.ts`, `lifeline-week-data.ts`, `recast.ts`, `trades.ts`, `weekly-standings.ts`, `home-transactions.ts`; changes in `home-activity.ts`, `episode-publication.ts`, `score-history.ts`, `score-history-data.ts`, `league-page-data.ts`, `league-home-summary.ts`, `draft-scores.ts`, `recast-framing.ts`, `couple-history-link.ts`, `supabase/types.ts` (regenerated from the live project 2026-11-11).
-
-**Routes and actions:** `src/app/leagues/[id]/lifeline/`, `src/app/leagues/[id]/trades/`, `src/app/leagues/[id]/waivers/` (page and actions rewritten), `settings/actions.ts` and `settings/page.tsx`, `picks/page.tsx`, `standings/page.tsx`, `admin/results/enter/page.tsx`, `src/app/(fan)/page.tsx`.
-
-**Components:** new `lifeline-card.tsx`, `lifeline-settings.tsx`, `recast-panel.tsx`, `recast-overdue-notice.tsx`, `trades-panel.tsx`, `trades-settings.tsx`, `roster-moves.tsx`; changed `league-header.tsx`, `league-page-shell.tsx`, `league-modules-form.tsx`, `roster-card.tsx`, `dance-card-league-list.tsx`, `top-bar.tsx`; deleted `waivers-panel.tsx`, `recast-nudge-card.tsx`.
-
-**Docs:** `docs/design/lifeline-recast-trades/plan.md`, `CLAUDE.md`, `BACKLOG.md`, this file.
-
-**Not ours; still uncommitted, leave unstaged:**
+**Not ours; uncommitted, leave unstaged:**
 - `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile.codex`, `.devcontainer/devcontainer-lock.json`
 - `.agents/`, `AGENTS.md`, `.codex-private/`
 - `ios/App/App.xcodeproj/project.pbxproj`
@@ -89,33 +41,34 @@ Checked afterward with reads only: every function, table and column from the thr
 
 ## 3. Key Decisions
 
-**Kylie's answers (2026-11-10):** restate everything in v3 terms; Lifeline and the Equalizer take the Dance Card weight once; Lifeline options go through the viewer's spoiler cutoff; build all four now and release together (fallback: Lifeline and the Equalizer alone); the Equalizer is one-time and never automatic, the commissioner confirms it (default yes) after seeing every number and rank change; trades use points as cash, capped at 10% per season; no trades after the Semi-Finals lock; no mocks first, build then send screenshots.
+Settled by Kylie this session (details in `CLAUDE.md`):
+- Grand Finale distance counts weeks, not spots, applied retroactively; the Finale is one week split between its places. The Finale tick on Schedule fixes the week count.
+- Under v3 every finalist survives the Finale; v1 keeps its own rule; the v3 rates stay frozen for Season 35.
+- The waiver run is 48 hours after a week's results are posted and never runs without results.
+- Lifeline pays half the couple's credit whatever its outcome, and the Equalizer follows.
+- Lifeline, Recast and Trades open from their own Roster Moves card on Picks (not the top bar, not the roster card). She picked the hourglass icons and passed on the bolder recap directions as too dramatic.
+- Immunity is a bonus, not a dance; a Winner's Bonus heat is entered by picking its winner.
+- She saw the Roster Moves / Lifeline review leftovers and said "i think we are good": don't start any of them without her say-so (list in `BACKLOG.md`).
+- Trades: not building a trade-offer row on Picks or a combined Transactions page until she has used the build.
 
-**Storage:** `weekly_manager_scores` is unchanged. Totals are read from the `weekly_manager_standings` view through `loadWeeklyStandings`. Lifeline settles inside the publish transaction (`lifelinePayouts` / `lifelineEqualizers` on the plan, checked by `apply_lifeline_settlement`); no `PLAN_VERSION` bump.
+Rules that still hold:
+- A push to `main` needs Kylie's yes in that turn. Commit only when asked. Stage by name, never `git add -A`.
+- No live SQL apply by the agent; Kylie applies SQL. Live DB writes need her yes. League data backups go in the scratchpad only.
+- The repo is public: never commit league standings or member names. No secrets in code.
+- For a UI placement change: a mock or screenshot first, then Codex and UX/UI review before the push.
+- Don't run prettier. Never `pkill -f`. `rm -rf .next` before `npm run dev` after a build; never build while the dev server runs.
+- In-app Recast copy says "waiver". No turning Recast, Trades or Lifeline on in a live league for her.
+- The advisor tool can't run on `claude-fable-5-2`.
 
-**Decided while building, for Kylie to confirm** (full list in the plan's As Built):
-- Each mechanism is its own commissioner switch, default off. Trades is independent of Recast.
-- Superseded Nov 11: every finalist, 4th and 5th included, earns the Finale's survival step under v3 (see Finale fairness fixes above); Lifeline's Finale pays half the credit whatever the outcome.
-- Recast: claims private until the run; lists don't carry over; turning it on never runs a week already due; the late-run alert is an admin notice on Enter Results.
-- Trades: veto = more than half of the teams not in the trade; at least one couple; up to 12 parts; everything moves at the waiver run; an offer expires after 48 hours or at the Semi-Finals lock; accepted trades can't be backed out of; trade points sit under Dance Card.
-- Lifeline, Recast and Trades are buttons on Your Fantasy Roster on Picks (Kylie, Nov 10), not in the top bar. Lifeline has its own page; its card is no longer on Picks.
-- For a UI placement change Kylie wants a mock or screenshot first, and a Codex and UX/UI review before the push.
+## 4. Backlog & Next Steps
 
-**Rules that still hold:**
-- No merge, deploy, live SQL apply or live DB write by the build agent. Kylie applies SQL after an explicit OK.
-- No turning Recast on in the four live leagues as part of the PR. Kylie enables `pg_cron`.
-- The Equalizer preview is announced to the league. If it raises Kylie's rank, the commissioner or the league decides.
-- In-app Recast copy says "waiver".
-- The repo is public: never commit league standings or member names.
-- A push to `main` needs Kylie's yes in that turn. Commit only when asked. Stage by name. Never `pkill -f`. Don't run prettier. `rm -rf .next` before `npm run dev` after a build.
+1. Kylie picks A or B for Curtain Call's Finale week (above); then mock, build, reviews, push before about Nov 17.
+2. Confirm the Vercel deploy of `1974e2f`, and Kylie decides whether to tell the v3 commissioners about the Finale survival amendment.
+3. After the Thu Nov 12 waiver run: read-only check that it ran for the three leagues (`recast_cycles`, nothing in `recast_runs_overdue`).
+4. After E11 is published: `--verify` (command below).
+5. Kylie's own: apply `supabase/apply-dance-card-v3-default.sql` (new leagues start on v3).
 
-## 4. Next Steps
+Deferred items are in `BACKLOG.md` (Finale follow-ups — 2026-11-11; Lifeline, Recast and Trades — 2026-11-11).
 
-1. After E10 is published (the first publish on this build): run `--verify`. The rule change is deployed (`14556d4`). The three leagues' Equalizers rise at that publish.
-2. Kylie hasn't answered yet: test each transaction in a scratch league (`scripts/qa-screenshots/seed.mjs`; live writes need her yes).
-3. Browser-check with throwaway accounts against the live project: Lifeline turn-on sheet and Equalizer numbers, a Lifeline pick, a waiver list, a trade offer through accept and veto.
-4. Commissioners opt in: Recast or Trades before Thu Nov 12, about 10 PM PT for the first run; everything before the Semi-Finals lock.
-5. Kylie's own: run `supabase/apply-dance-card-v3-default.sql` (new leagues start on v3).
-6. Later, once Kylie has used trades: a Roster Moves card with what is waiting on you (mock C), or one Transactions page.
-
-Open limits are listed in `BACKLOG.md` (Lifeline, Recast and Trades — 2026-11-11).
+Next command (after E11 is published):
+`NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`
