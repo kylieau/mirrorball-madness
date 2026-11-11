@@ -100,7 +100,7 @@ export function LifelineSettings({
       </div>
       <p className="text-xs text-muted-foreground">
         A manager whose couple has gone home picks a couple still dancing each week, and earns half that couple&apos;s
-        Dance Card points if it survives the week.
+        Dance Card points that week, even if it goes home.
         {enabled && equalizerAdded ? " The Equalizer was added when it was turned on." : ""}
       </p>
       {canEdit && !enabled && (

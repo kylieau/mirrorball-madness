@@ -403,7 +403,7 @@ export function withLifelineLines(
       id: `lifeline:${payout.weekNumber}:${payout.slotNumber}`,
       weekNumber: payout.weekNumber,
       module: "danceCard" as const,
-      label: `Lifeline: ${coupleNames.get(payout.coupleId) ?? "Unknown"} survives${weightSuffix(lifeline.weight)}`,
+      label: `Lifeline: ${coupleNames.get(payout.coupleId) ?? "Unknown"}${weightSuffix(lifeline.weight)}`,
       points: payout.weightedPoints,
     })),
     ...lifeline.equalizers.map((equalizer) => {

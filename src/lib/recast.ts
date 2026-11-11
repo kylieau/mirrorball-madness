@@ -98,7 +98,7 @@ export function moveRecastClaim(list: RecastClaim[], index: number, by: -1 | 1):
 // League Settings and the Recast page explain the waiver run in the same words.
 export const RECAST_RULES = [
   "Recast is Mirrorball's waiver wire. Rank the claims you want: each one fills an open roster spot or swaps out a couple you hold.",
-  "Waiver lists are private. A waiver run decides every list 48 hours after a week's last night, with no commissioner step. If that week's results aren't posted yet, the run waits up to a day for them.",
+  "Waiver lists are private. A waiver run decides every list 48 hours after a week's episode, with no commissioner step. If that week's results aren't posted yet, the run waits up to a day for them.",
   "Managers take turns in reverse standings order: lowest season total first, then the lower latest week, then the later draft pick. A turn awards that manager's highest claim that can still win, and the turns repeat until no claim can.",
   "A drop only happens if its claim wins. A couple a manager may drop shows on the wire, and anyone else can claim them in the same run.",
   "A new couple starts scoring in the next week that hasn't aired. The couple they replace keeps scoring for their manager until then.",

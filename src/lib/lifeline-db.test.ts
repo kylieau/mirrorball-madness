@@ -140,13 +140,13 @@ describe("Lifeline on a Dance Card v3 league", () => {
     await saveNight(e10, [{ couple: a }, { couple: b }, { couple: c }, { couple: d }, { couple: e, outcome: "eliminated" }]);
     await finishWeek(e10);
 
-    // Week 9: A–D each earned 6.55 + 1.24 = 7.79 and survive, E went home.
-    // The average Lifeline is 0.5 × 7.79 × 4 / 5 = 3.12; Admin's spot 2 (F)
+    // Week 9: A–D each earned 6.55 + 1.24 = 7.79 and survive, E went home
+    // on 6.55. The average Lifeline is 0.5 × 37.71 / 5 = 3.77; Admin's spot 2 (F)
     // and Friend's spot 1 (G) were dead that week, Week 8 itself never is.
     const rows = await equalizer(10);
     expect(rows.sort((x, y) => x.manager_id.localeCompare(y.manager_id))).toEqual([
-      { manager_id: admin, points: 3.12, weighted_points: 1.87, detail: { weeks: [9], slotWeeks: 1 } },
-      { manager_id: friend, points: 3.12, weighted_points: 1.87, detail: { weeks: [9], slotWeeks: 1 } },
+      { manager_id: admin, points: 3.77, weighted_points: 2.26, detail: { weeks: [9], slotWeeks: 1 } },
+      { manager_id: friend, points: 3.77, weighted_points: 2.26, detail: { weeks: [9], slotWeeks: 1 } },
     ]);
 
     await expect(db.query("select public.enable_lifeline($1, $2, $3, $4)", [league, friend, 10, JSON.stringify(rows)])).rejects.toThrow(/Only a commissioner/);
@@ -157,8 +157,8 @@ describe("Lifeline on a Dance Card v3 league", () => {
 
     // It lands on the latest published week, on top of the stored total.
     const adminWeek9 = await standings(admin, week9);
-    expect(adminWeek9.lifeline).toBe(1.87);
-    expect(adminWeek9.total).toBeCloseTo(adminWeek9.stored + 1.87, 2);
+    expect(adminWeek9.lifeline).toBe(2.26);
+    expect(adminWeek9.total).toBeCloseTo(adminWeek9.stored + 2.26, 2);
     expect((await standings(third, week9)).lifeline).toBe(0);
   });
 
@@ -215,7 +215,7 @@ describe("Lifeline on a Dance Card v3 league", () => {
     expect(await payouts(week10)).toEqual([
       { manager_id: admin, slot: 2, couple_id: b, credit: 8.06, survived: true, points: 4.03, weighted: 2.42 },
       { manager_id: friend, slot: 1, couple_id: a, credit: 8.06, survived: true, points: 4.03, weighted: 2.42 },
-      { manager_id: friend, slot: 2, couple_id: c, credit: 7.1, survived: false, points: 0, weighted: 0 },
+      { manager_id: friend, slot: 2, couple_id: c, credit: 7.1, survived: false, points: 3.55, weighted: 2.13 },
     ]);
     const adminWeek10 = await standings(admin, week10);
     expect(adminWeek10.lifeline).toBe(2.42);
@@ -233,13 +233,13 @@ describe("Lifeline on a Dance Card v3 league", () => {
 
   it("recomputes the Equalizer and later payouts when an earlier week is corrected", async () => {
     // A's Week 9 becomes a 30: 8.19 + 1.24 = 9.43, so the average Lifeline
-    // that week is 0.5 × (9.43 + 3 × 7.79) / 5 = 3.28.
+    // that week is 0.5 × (9.43 + 3 × 7.79 + 6.55) / 5 = 3.94.
     const token = (await db.query<{ token: string }>("select public.seed_episode_correction($1, $2) as token", [e10, admin])).rows[0].token;
     await saveNight(e10, [{ couple: a, marks: [10, 10, 10] }, { couple: b }, { couple: c }, { couple: d }, { couple: e, outcome: "eliminated" }], token);
     await finishWeek(e10);
     const adminWeek9 = await standings(admin, week9);
-    expect(adminWeek9.lifeline).toBe(1.97);
-    expect(adminWeek9.total).toBeCloseTo(adminWeek9.stored + 1.97, 2);
+    expect(adminWeek9.lifeline).toBe(2.36);
+    expect(adminWeek9.total).toBeCloseTo(adminWeek9.stored + 2.36, 2);
     expect(await payouts(week10)).toHaveLength(3);
     expect((await standings(admin, week10)).lifeline).toBe(2.42);
 

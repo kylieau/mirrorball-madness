@@ -5,8 +5,7 @@ import { danceCardPriorWeeks } from "./weekly-score-rows";
 
 // Lifeline (Kylie, 2026-11-10; docs/design/lifeline-recast-trades/): a
 // manager whose roster spot is dead picks a living couple they don't own each
-// week, and gets this share of that couple's Dance Card credit for the week
-// if the couple survives it.
+// week, and gets this share of that couple's Dance Card credit for the week.
 export const LIFELINE_SHARE = 0.5;
 
 export type LifelinePick = {
@@ -88,23 +87,20 @@ function leagueLifeline(season: LifelineSeason, leagueId: string): LeagueLifelin
 }
 
 // A couple survives a week the way Dance Card v3 counts it: a settled outcome
-// and none of them eliminated, withdrawn or bye. The Finale has no survivors
-// to bet on, so every couple with a result there counts.
+// and none of them eliminated, withdrawn or bye.
 function survivedWeek(season: LifelineSeason, coupleId: string, weekNumber: number): boolean {
   const outcomes = (season.danceCardWeeks.find((w) => w.weekNumber === weekNumber)?.outcomes ?? []).filter(
     (o) => o.coupleId === coupleId
   );
-  if (outcomes.length === 0) return false;
-  if (season.weeks.find((w) => w.week_number === weekNumber)?.is_finale) return true;
-  return outcomes.every((o) => !NO_SURVIVAL_OUTCOMES.has(o.outcome as Outcome));
+  return outcomes.length > 0 && outcomes.every((o) => !NO_SURVIVAL_OUTCOMES.has(o.outcome as Outcome));
 }
 
 // What one Lifeline on this couple is worth that week, unrounded and before
-// the Dance Card weight.
+// the Dance Card weight. A couple that goes home still pays (Kylie,
+// 2026-11-10): its credit that week just has no survival step in it.
 function lifelineValue(season: LifelineSeason, league: LeagueLifeline, coupleId: string, weekNumber: number) {
   const credit = (league.ledger.get(coupleId)?.get(weekNumber)?.creditCents ?? 0) / 100;
-  const survived = survivedWeek(season, coupleId, weekNumber);
-  return { credit, survived, value: survived ? Math.max(0, LIFELINE_SHARE * credit) : 0 };
+  return { credit, survived: survivedWeek(season, coupleId, weekNumber), value: Math.max(0, LIFELINE_SHARE * credit) };
 }
 
 // A roster spot is dead for a week when the couple holding it that week went
@@ -130,7 +126,7 @@ export function isDeadSlot(
 }
 
 // One payout per pick. A pick whose spot isn't dead any more (a correction
-// brought its couple back) or whose couple didn't survive pays nothing.
+// brought its couple back) pays nothing.
 export function buildLifelinePayouts(season: LifelineSeason, picks: LifelinePick[]): LifelinePayout[] {
   const leagues = new Map<string, LeagueLifeline | null>();
   return picks.map((pick) => {

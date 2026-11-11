@@ -483,7 +483,7 @@ describe("withLifelineLines", () => {
     expect(result.map((row) => row.id)).toEqual(["cc4", "dc4", "lifeline-equalizer:4", "gf4", "dc5", "lifeline:5:2"]);
     expect(result.find((row) => row.id === "lifeline:5:2")).toMatchObject({
       module: "danceCard",
-      label: "Lifeline: Harry survives × 0.5 Wt",
+      label: "Lifeline: Harry × 0.5 Wt",
       points: 2.25,
     });
     expect(result.find((row) => row.id === "lifeline-equalizer:4")?.label).toBe("Lifeline Backfill, Weeks 3 to 4 × 0.5 Wt");

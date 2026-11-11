@@ -40,9 +40,9 @@ Lifeline, the Equalizer and trade cash all add points to standings, so they shar
   - Each week the manager picks a living couple they don't own. Two slots means two different couples.
   - Several managers may pick the same couple, and repeating last week's couple is allowed.
   - From Week 10 on.
-- **Payout:** `max(0, 0.50 × that couple's raw v3 weekly credit)` if the couple survives, then the Dance Card weight is applied.
-  - A bye pays 0. The engine counts a bye as no survival, and the couple has no dances.
-  - **The Finale always pays**, whatever the outcome. For a 4th or 5th place couple, stored as `eliminated`, the payout is half their judges' points plus any bonus.
+- **Payout:** `max(0, 0.50 × that couple's raw v3 weekly credit)`, then the Dance Card weight is applied.
+  - **A couple that goes home that week still pays** (Kylie, Nov 10, changed from "only if the couple survives"): its credit has no survival step, so the payout is half its judges' points plus any bonus. The Finale works the same way for a 4th or 5th place couple.
+  - A bye pays 0: the couple has no dances and no survival step.
 - **Lock** at `prediction_lock_at`, or at `airs_at` when Curtain Call is off. Picks can change until then.
 - **Settles** inside the publication writers and recomputes on any re-publish.
 - **Spoiler-Free covers the viewer's own card too.** The card, the number of slots and the list of pickable couples all go through the viewer's spoiler cutoff, as Recast does today (`recast-framing.ts`).
@@ -50,12 +50,12 @@ Lifeline, the Equalizer and trade cash all add points to standings, so they shar
   - If they haven't caught up by the lock, they miss that week's pick.
   - Server-side eligibility stays authoritative.
   - Peers' picks are hidden until the lock, as with Curtain Call, and their payouts until the viewer's cutoff.
-- **Score History** shows `Lifeline: <couple> survives, +X.XX`. The Couples Leaderboard excludes Lifeline.
+- **Score History** shows `Lifeline: <couple>, +X.XX`. The Couples Leaderboard excludes Lifeline.
 
 ## Equalizer (One-Time Lifeline Catch-Up)
 
 - **Formula, per dead slot-week:** 0.50 × the mean, over every couple that danced that week, of `max(0, that league's v3 credit)`.
-  - A couple eliminated or withdrawn that week counts as 0.
+  - A couple eliminated or withdrawn that week counts at its credit like any other, the same as a pick on it pays (Kylie, 2026-11-10). Every publish recomputes a confirmed Equalizer, so the amounts three leagues confirmed under the earlier rule (such a couple counting as 0) rise at the next publish.
   - Then the Dance Card weight is applied.
 - **Which weeks count:** from the week after the elimination, through the last published week before Lifeline launches. Only from the Anchor Week (2) on. Stops at a Recast `start_week`. A withdrawal counts the same as an elimination.
 - **Never automatic.** Turning Lifeline on opens a confirm sheet, with the Equalizer included by default. The sheet shows:
@@ -118,7 +118,7 @@ The screens were checked in a headless browser at 360px and 390px with made-up d
 ### Readings Made While Building (Kylie to Confirm)
 
 **Lifeline**
-- 1st to 3rd place earn the Dance Card survival step in the Finale. 4th and 5th are stored as `eliminated`, so they earn judges' points and any bonus only. Lifeline's Finale pays half the couple's credit whatever the outcome.
+- 1st to 3rd place earn the Dance Card survival step in the Finale. 4th and 5th are stored as `eliminated`, so they earn judges' points and any bonus only. Lifeline pays half the couple's credit whatever the outcome, in the Finale and every other week.
 - Each mechanism is its own commissioner switch, default off.
 
 **Recast**

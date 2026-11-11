@@ -68,16 +68,17 @@ describe("isDeadSlot", () => {
 });
 
 describe("buildLifelinePayouts", () => {
-  it("pays half the couple's week when it survives, then the Dance Card weight", () => {
+  it("pays half the couple's week, then the Dance Card weight", () => {
     // Star's Week 3: 30 × 0.2731 = 8.19, a 1.24 survival step and a 2.00 bonus.
     expect(paid(buildLifelinePayouts(season, [pick("ann", 3, 1, "star")]))).toEqual([
       { credit: 11.43, survived: true, points: 5.72, weighted_points: 2.86 },
     ]);
   });
 
-  it("pays nothing for a couple that goes home, withdraws or sits out", () => {
+  it("pays half the judges' points of a couple that leaves that week, and nothing for one that sits out", () => {
+    // Late withdraws in Week 3 with no survival step; Steady has a bye in Week 4.
     expect(paid(buildLifelinePayouts(season, [pick("ann", 3, 1, "late"), pick("ann", 4, 1, "steady")]))).toEqual([
-      { credit: 5.74, survived: false, points: 0, weighted_points: 0 },
+      { credit: 5.74, survived: false, points: 2.87, weighted_points: 1.44 },
       { credit: 0, survived: false, points: 0, weighted_points: 0 },
     ]);
   });
@@ -86,7 +87,7 @@ describe("buildLifelinePayouts", () => {
     // Fourth's Finale is judges only: 24 × 0.2731 = 6.55. Star's is 8.19
     // and a fourth survival step, 0.80.
     expect(paid(buildLifelinePayouts(season, [pick("ann", 5, 1, "fourth"), pick("ann", 5, 2, "star")]))).toEqual([
-      { credit: 6.55, survived: true, points: 3.28, weighted_points: 1.64 },
+      { credit: 6.55, survived: false, points: 3.28, weighted_points: 1.64 },
       { credit: 8.99, survived: true, points: 4.5, weighted_points: 2.25 },
     ]);
   });
@@ -99,16 +100,17 @@ describe("buildLifelinePayouts", () => {
 });
 
 describe("buildLifelineEqualizer", () => {
-  // The average Lifeline: Week 3 is half of (11.43 + 7.79 + 7.79 + 0) / 4,
-  // Week 4 half of (8.33 + 7.51) / 2 since Steady sat out.
-  const week3 = (0.5 * (11.43 + 7.79 + 7.79)) / 4;
+  // The average Lifeline: Week 3 is half of (11.43 + 7.79 + 7.79 + 5.74) / 4,
+  // Late's withdrawal included, Week 4 half of (8.33 + 7.51) / 2 since
+  // Steady sat out.
+  const week3 = (0.5 * (11.43 + 7.79 + 7.79 + 5.74)) / 4;
   const week4 = (0.5 * (8.33 + 7.51)) / 2;
 
   it("adds the average Lifeline for each week a spot was dead before the start", () => {
     const rows = buildLifelineEqualizer(season, "league", 5);
     expect(rows).toEqual([
-      { managerId: "ann", points: 11.3, weightedPoints: 5.65, detail: { weeks: [3, 4], slotWeeks: 3 } },
-      { managerId: "bo", points: 3.38, weightedPoints: 1.69, detail: { weeks: [3], slotWeeks: 1 } },
+      { managerId: "ann", points: 12.01, weightedPoints: 6.01, detail: { weeks: [3, 4], slotWeeks: 3 } },
+      { managerId: "bo", points: 4.09, weightedPoints: 2.05, detail: { weeks: [3], slotWeeks: 1 } },
     ]);
     // Ann: one dead spot in Week 3, two in Week 4, rounded once.
     expect(rows[0].points).toBeCloseTo(week3 + 2 * week4, 2);
@@ -131,7 +133,7 @@ describe("recomputeLifelineEqualizers", () => {
       { id: "c", league_id: "league", manager_id: "cy" },
     ];
     expect(recomputeLifelineEqualizers(season, stored)).toEqual([
-      { id: "a", points: 11.3, weighted_points: 5.65, detail: { weeks: [3, 4], slotWeeks: 3 } },
+      { id: "a", points: 12.01, weighted_points: 6.01, detail: { weeks: [3, 4], slotWeeks: 3 } },
       { id: "c", points: 0, weighted_points: 0, detail: { weeks: [], slotWeeks: 0 } },
     ]);
   });
@@ -139,8 +141,8 @@ describe("recomputeLifelineEqualizers", () => {
 
 describe("lifelineStandingsPreview", () => {
   const equalizer = [
-    { managerId: "ann", points: 11.3, weightedPoints: 5.65, detail: { weeks: [3, 4], slotWeeks: 3 } },
-    { managerId: "bo", points: 3.38, weightedPoints: 1.69, detail: { weeks: [3], slotWeeks: 1 } },
+    { managerId: "ann", points: 12.01, weightedPoints: 6.01, detail: { weeks: [3, 4], slotWeeks: 3 } },
+    { managerId: "bo", points: 4.09, weightedPoints: 2.05, detail: { weeks: [3], slotWeeks: 1 } },
   ];
 
   it("ranks the standings without and with the Equalizer", () => {
@@ -153,9 +155,9 @@ describe("lifelineStandingsPreview", () => {
       equalizer
     );
     expect(rows).toEqual([
-      { managerId: "ann", equalizer: 5.65, slotWeeks: 3, weeks: [3, 4], before: 55, after: 60.65, rankBefore: 3, rankAfter: 1 },
-      { managerId: "cy", equalizer: 0, slotWeeks: 0, weeks: [], before: 60, after: 60, rankBefore: 1, rankAfter: 2 },
-      { managerId: "bo", equalizer: 1.69, slotWeeks: 1, weeks: [3], before: 58, after: 59.69, rankBefore: 2, rankAfter: 3 },
+      { managerId: "ann", equalizer: 6.01, slotWeeks: 3, weeks: [3, 4], before: 55, after: 61.01, rankBefore: 3, rankAfter: 1 },
+      { managerId: "bo", equalizer: 2.05, slotWeeks: 1, weeks: [3], before: 58, after: 60.05, rankBefore: 2, rankAfter: 2 },
+      { managerId: "cy", equalizer: 0, slotWeeks: 0, weeks: [], before: 60, after: 60, rankBefore: 1, rankAfter: 3 },
     ]);
   });
 

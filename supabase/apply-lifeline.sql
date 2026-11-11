@@ -1,7 +1,7 @@
 -- Lifeline (Kylie, 2026-11-10): a manager with a dead roster slot (its couple
 -- eliminated or withdrawn, not refilled by Recast) picks a living couple they
--- don't own each week; if that couple survives, the manager gets half its
--- Dance Card credit for the week, weighted like Dance Card. The couple stays
+-- don't own each week and gets half its Dance Card credit for the week
+-- (the app computes the amount), weighted like Dance Card. The couple stays
 -- on its owner's roster. A commissioner turns it on (default off) and may add
 -- the Equalizer: one adjustment per manager for the dead slot-weeks before
 -- Lifeline existed, shown in full before it is confirmed.
