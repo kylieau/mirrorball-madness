@@ -25,8 +25,6 @@ Still open:
 - At 360px the Home card's "Need Lifeline pick" wraps to two lines.
 - One undrafted, unscored test league is still on Dance Card v1; Kylie said to
   leave it (2026-11-11).
-- Kylie asked for a mock reworking the Roster Moves card and its pages on
-  Picks, after this build.
 
 ## Finale follow-ups — 2026-11-11
 
@@ -57,16 +55,11 @@ Still to do:
 
 Review leftovers Kylie saw and passed on ("i think we are good"); don't start
 one without her say-so:
-- The X close on Lifeline, Recast and Trades is a 20px icon with no 44px
+- The `‹ Picks` back link on the Roster Moves pages is text with no 44px
   touch area.
-- A viewer who is behind sees the Roster Moves card and both catch-up cards,
-  each with Mark Watched.
-- The Lifeline page has no "How Lifeline Works" card like its siblings.
 - The same dead spot reads "empty roster spot" for Lifeline and "open spot"
   for waivers.
 - Recast and Trades couple links drop the Picks weeks on the way back.
-- Later, once she has used trades: what is waiting on you in the Roster Moves
-  card (mock C).
 
 Known limits, none fixed:
 - `saveLifelinePicks` clears then sets in two calls, so it isn't atomic.
@@ -761,3 +754,8 @@ Built (per-couple publish and undo, Finish Week, Home and every page reading a r
 
 - **Grand Finale late-deadline gap** (Phase B): if a commissioner sets the Grand Finale deadline later than the default (i.e. after some eliminations have already happened), a prediction submitted at that point won't retroactively score the already-resolved couples — only couples resolved *after* submission score. Never comes up with the default deadline (premiere date), since nothing's eliminated yet at that point.
 - **Home/Weekly category-breakdown weighting** (Phase C): the "points by category" breakdown sums each manager's raw per-category points across the season, then multiplies by *current* module weights — not the weight that was actually in effect each week. If a commissioner changes a module's weight mid-season, past weeks' breakdown reflects the new weight, not what was live at the time. Matches an existing, already-accepted limitation elsewhere (weight changes were never retroactive to begin with).
+
+## Roster Moves card and pages — 2026-11-11
+
+- Built from `docs/design/roster-moves-pages/` (card C1 and the page frame; Kylie's picks are in its README). Not verified end to end: saving a waiver claim from the Wire's Claim sheet, because the scratch league's next run was already due (`recast_next_cycle` kept the week 8 run) and `save_recast_list` refused; the refusal rendered in the list card. Check on a real list once a run is pending.
+- The fact strip's times wrap to two lines in the container's UTC; on a phone (PT/ET) they should fit. Look once on Kylie's phone.

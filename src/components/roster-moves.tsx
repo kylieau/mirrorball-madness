@@ -1,109 +1,73 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { cn } from "cn";
-import { CircleCheckIcon, CircleDashedIcon, HourglassIcon } from "lucide-react";
+import { ChevronRightIcon, CircleCheckIcon, CircleDashedIcon, HourglassIcon } from "lucide-react";
 import { CoupleName } from "@/components/couple-name";
-import { Button } from "@/components/ui/button";
+import { RosterMovesSwitch } from "@/components/roster-moves-switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasual } from "@/lib/format-week";
+import { defaultRosterMoveTab, type RosterMoves as RosterMovesState, type RosterMoveTab } from "@/lib/league-triage";
+import { rosterMoveTabHref } from "@/lib/roster-moves-pages";
 import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 
-export type LifelineStatus = {
-  // The viewer's dead roster spots this week and the Lifeline saved for each.
-  spots: { former: CoupleNameParts; pick: CoupleNameParts | null }[];
-  weekNumber: number;
-  lockAt: string | null;
-  locked: boolean;
-};
-
-export type WaiverStatus = {
-  // The viewer's saved list, highest claim first.
-  claims: { add: CoupleNameParts; drop: CoupleNameParts | null }[];
-  // Open spots the viewer has watched far enough to see.
-  openSpotCount: number;
-  // Null until the run's week has its results posted; the run is 48 hours after.
-  dueAt: string | null;
-  // The week the run is for.
-  weekNumber: number;
-  // The week a winning claim starts scoring.
-  startWeek: number;
-};
+type Moves = RosterMovesState<CoupleNameParts>;
 
 // Lifeline, Recast and Trades are separate commissioner switches, so a league
-// shows only the ones it has on. The card sits outside Your Fantasy Roster
-// because its lines are about the weeks still to come, not the roster's paged
-// week, so each line names its own week.
+// shows only the ones it has on, as one switch (the same one their pages
+// carry) over the selected move's lines and a link to its page. The card
+// sits outside Your Fantasy Roster because its lines are about the weeks
+// still to come, not the roster's paged week, so each line names its own.
+// A viewer who is behind gets the catch-up cards instead, since an open spot
+// says a couple went home.
 export function RosterMoves({
   leagueId,
-  lifelineOn,
-  recastOn,
-  tradesOn,
-  lifeline,
-  waivers,
+  tabs,
+  moves,
+  managerNames,
   from,
 }: {
   leagueId: string;
-  lifelineOn: boolean;
-  recastOn: boolean;
-  tradesOn: boolean;
-  // Null when the viewer has no dead roster spot to confirm a Lifeline for,
-  // or when the saved picks couldn't be read.
-  lifeline: LifelineStatus | null;
-  // Null once no waiver run is left, or when the saved list couldn't be read.
-  waivers: WaiverStatus | null;
+  tabs: RosterMoveTab[];
+  moves: Moves;
+  managerNames: Record<string, string>;
   from: string;
 }) {
-  const query = `?from=${encodeURIComponent(from)}`;
-  const showLifeline = lifelineOn && lifeline != null;
-  const showWaivers = recastOn && waivers != null;
+  const [picked, setPicked] = useState(defaultRosterMoveTab(tabs));
+  const selected = tabs.some((tab) => tab.key === picked) ? picked : defaultRosterMoveTab(tabs);
+  if (!selected) return null;
+  const tab = tabs.find((item) => item.key === selected)!;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Roster Moves</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <div className="flex gap-2">
-          {lifelineOn && (
-            <Button
-              render={<Link href={`/leagues/${leagueId}/lifeline${query}`} />}
-              nativeButton={false}
-              variant="outline"
-              className="flex-1"
-            >
-              Lifeline
-            </Button>
-          )}
-          {recastOn && (
-            <Button
-              render={<Link href={`/leagues/${leagueId}/waivers${query}`} />}
-              nativeButton={false}
-              variant="outline"
-              className="flex-1"
-            >
-              Recast
-            </Button>
-          )}
-          {tradesOn && (
-            <Button
-              render={<Link href={`/leagues/${leagueId}/trades${query}`} />}
-              nativeButton={false}
-              variant="outline"
-              className="flex-1"
-            >
-              Trades
-            </Button>
-          )}
-        </div>
-        {showLifeline && <LifelineStatusLines {...lifeline} />}
-        {showWaivers && <WaiverClaimsStatus {...waivers} />}
+        {tabs.length > 1 && <RosterMovesSwitch tabs={tabs} selected={selected} onSelect={setPicked} />}
+        {selected === "lifeline" ? (
+          <LifelineStatusLines lifeline={moves.lifeline} />
+        ) : selected === "recast" ? (
+          <WaiverClaimsStatus waivers={moves.waivers} />
+        ) : (
+          <TradesStatusLines trades={moves.trades} managerNames={managerNames} />
+        )}
+        <Link
+          href={rosterMoveTabHref(leagueId, selected, from)}
+          className="flex items-center gap-0.5 self-end text-sm font-semibold text-accent no-underline hover:underline"
+        >
+          Open {tab.label}
+          <ChevronRightIcon aria-hidden className="size-4" />
+        </Link>
       </CardContent>
     </Card>
   );
 }
 
 const ICON = "mt-px size-3.5 shrink-0";
+const LINES = "flex flex-col gap-1 text-xs text-muted-foreground";
 
 // The card's lines are sentences, so a relative day reads in lower case there
 // ("locks today 8 PM PT") while it stays a label elsewhere.
@@ -111,19 +75,19 @@ function inSentence(formatted: string): string {
   return formatted.replace(/^(Today|Tomorrow) /, (day) => day.toLowerCase());
 }
 
-function LifelineStatusLines({ spots, weekNumber, lockAt, locked }: LifelineStatus) {
-  const formattedLockAt = useFormattedDeadline(lockAt);
+function LifelineStatusLines({ lifeline }: { lifeline: Moves["lifeline"] }) {
+  const formattedLockAt = useFormattedDeadline(lifeline?.lockAt);
+  if (!lifeline) return <p className={LINES}>Nothing to pick this week.</p>;
+  const { spots, weekNumber, locked } = lifeline;
+  const week = formatEpisodeCasual(weekNumber);
   const saved = spots.filter((spot) => spot.pick).length;
   const savedPart =
     saved === 0 ? (locked ? "None saved" : null) : saved < spots.length ? `${saved} of ${spots.length} saved` : "Saved";
-  const lockPart = locked ? "Locked" : formattedLockAt ? `Locks ${inSentence(formattedLockAt)}` : null;
+  const lockPart = locked ? `${week} locked` : formattedLockAt ? `${week} locks ${inSentence(formattedLockAt)}` : null;
   const statusLine = [savedPart, lockPart].filter(Boolean).join(" · ");
 
   return (
-    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-      <span className="text-sm font-medium text-foreground">
-        {formatEpisodeCasual(weekNumber)} {spots.length === 1 ? "Lifeline" : "Lifelines"}
-      </span>
+    <div className={LINES}>
       {saved > 0 ? (
         <ul className="flex flex-col gap-1">
           {spots.map((spot, index) => (
@@ -166,8 +130,10 @@ function LifelineStatusLines({ spots, weekNumber, lockAt, locked }: LifelineStat
   );
 }
 
-function WaiverClaimsStatus({ claims, openSpotCount, dueAt, weekNumber, startWeek }: WaiverStatus) {
-  const due = useFormattedDeadline(dueAt);
+function WaiverClaimsStatus({ waivers }: { waivers: Moves["waivers"] }) {
+  const due = useFormattedDeadline(waivers?.dueAt);
+  if (!waivers) return <p className={LINES}>No waiver run to come.</p>;
+  const { claims, openSpotCount, dueAt, weekNumber, startWeek } = waivers;
   const when =
     dueAt == null ? `48 hours after ${formatEpisodeCasual(weekNumber)} results are posted` : due ? inSentence(due) : null;
   // A Lifeline is settled once saved; a claim still waits on the run.
@@ -179,8 +145,7 @@ function WaiverClaimsStatus({ claims, openSpotCount, dueAt, weekNumber, startWee
       : [openSpotCount > 0 ? null : "None saved", when ? `Next run ${when}` : null].filter(Boolean).join(" · ");
 
   return (
-    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-      <span className="text-sm font-medium text-foreground">Waiver Claims</span>
+    <div className={LINES}>
       {claims.length > 0 ? (
         <ol className="flex flex-col gap-1">
           {claims.map((claim, index) => (
@@ -227,5 +192,43 @@ function WaiverClaimsStatus({ claims, openSpotCount, dueAt, weekNumber, startWee
         </span>
       )}
     </div>
+  );
+}
+
+function TradesStatusLines({ trades, managerNames }: { trades: Moves["trades"]; managerNames: Record<string, string> }) {
+  if (!trades || (trades.offers.length === 0 && trades.acceptedWith.length === 0)) {
+    return <p className={LINES}>No offer waiting on you.</p>;
+  }
+  const name = (managerId: string) => managerNames[managerId] ?? "Someone";
+  return (
+    <ul className={LINES}>
+      {trades.offers.map((offer, index) => (
+        <OfferLine key={index} from={name(offer.from)} expiresAt={offer.expiresAt} />
+      ))}
+      {trades.acceptedWith.map((managerIds, index) => (
+        <li key={index} className="flex gap-1.5">
+          <HourglassIcon aria-hidden className={cn(ICON, "text-accent")} />
+          <span className="min-w-0">
+            <span className="text-foreground">
+              Trade with {managerIds.length > 2 ? `${managerIds.length} managers` : managerIds.map(name).join(" and ")}
+            </span>
+            , accepted · At the run
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function OfferLine({ from, expiresAt }: { from: string; expiresAt: string }) {
+  const ends = useFormattedDeadline(expiresAt);
+  return (
+    <li className="flex gap-1.5 font-semibold text-accent">
+      <CircleDashedIcon aria-hidden className={ICON} />
+      <span className="min-w-0">
+        Offer from {from} is waiting on you
+        {ends && <span className="font-normal text-muted-foreground"> · Ends {inSentence(ends)}</span>}
+      </span>
+    </li>
   );
 }

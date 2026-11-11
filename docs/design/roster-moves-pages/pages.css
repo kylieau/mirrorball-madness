@@ -1,0 +1,68 @@
+.capsub { min-height: 124px; }
+.state { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; color: var(--muted-fg); margin: 14px 0 6px; }
+.phone .page { padding-top: 16px; }
+.g { display: inline-block; width: 16px; font-size: 12px; flex-shrink: 0; }
+.g.ok { color: var(--emerald-text); }
+.g.wait { font-size: 10px; }
+.g.need { color: var(--accent); }
+.gold { color: var(--accent); }
+.mut { color: var(--muted-fg); }
+.xs { font-size: 12px; color: var(--muted-fg); }
+.xs b { color: var(--foreground); }
+.lbl { font-size: 14px; font-weight: 500; }
+.lines { display: flex; flex-direction: column; gap: 3px; }
+.lines > span { display: block; }
+
+/* A: one row per mechanism */
+.mrows { display: flex; flex-direction: column; }
+.mrow { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--hair); }
+.mrow:first-child { border-top: 0; padding-top: 0; }
+.mrow:last-child { padding-bottom: 0; }
+.mrow .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.mrow .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.mrow .name { font-size: 14px; font-weight: 600; }
+.mrow .when { font-size: 12px; color: var(--muted-fg); white-space: nowrap; }
+.mrow .ch { color: var(--accent); font-size: 18px; line-height: 20px; }
+
+/* B: buttons with a dot */
+.btn { position: relative; }
+.dot { position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--card); }
+
+/* Pages */
+.back { font-size: 13px; color: var(--muted-fg); }
+.ptitle { font: 600 24px/1.2 var(--sans); margin: 2px 0 0; }
+.seg { display: flex; gap: 4px; background: var(--muted); border-radius: 10px; padding: 3px; }
+.seg span { position: relative; flex: 1; text-align: center; font-size: 13px; font-weight: 500; color: var(--muted-fg); padding: 6px 0; border-radius: 8px; }
+.seg .on { background: var(--card); color: var(--foreground); box-shadow: 0 0 0 1px var(--border); }
+.seg .dot { top: 4px; right: 8px; box-shadow: none; width: 7px; height: 7px; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fact { background: var(--card); border-radius: 12px; box-shadow: 0 0 0 1px var(--hair); padding: 8px 12px; }
+.fact small { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-fg); }
+.fact b { font-size: 14px; }
+.row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--hair); font-size: 14px; }
+.rows .row:first-child { border-top: 0; padding-top: 0; }
+.rows .row:last-child { padding-bottom: 0; }
+.row .grow { flex: 1; min-width: 0; }
+.row small { display: block; font-size: 12px; color: var(--muted-fg); }
+.rank { font-family: var(--heading); color: var(--muted-fg); width: 14px; }
+.ib { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 8px; display: grid; place-items: center; font-size: 12px; color: var(--muted-fg); }
+.btn.sm { height: 28px; font-size: 12px; padding: 0 10px; }
+.fold { display: flex; justify-content: space-between; align-items: center; background: var(--card); border-radius: 14px; box-shadow: 0 0 0 1px var(--hair); padding: 12px 16px; font-size: 14px; font-weight: 500; }
+.fold small { font-weight: 400; color: var(--muted-fg); font-size: 12px; margin-left: 6px; }
+.fold .ch { color: var(--muted-fg); }
+.swap { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.side { border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.side small { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-fg); }
+.side .add { color: var(--accent); font-size: 12px; }
+.chip { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 2px 8px; background: var(--muted); color: var(--muted-fg); }
+.chip.gold { background: rgba(201,162,75,.18); color: var(--accent); }
+.walltext { font-size: 12.5px; color: var(--muted-fg); display: flex; flex-direction: column; gap: 6px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+
+/* Section 3: the switch with a status word per tab */
+.seg.two span { padding: 5px 0 4px; line-height: 1.25; }
+.seg.two small { display: block; font-size: 10.5px; font-weight: 500; color: var(--muted-fg); }
+.seg.two small.gold { color: var(--accent); }
+.seg.two small.ok { color: var(--emerald-text); }
+.seg .g { width: auto; margin-right: 4px; font-size: 11px; }
+.open { font-size: 13px; font-weight: 600; color: var(--accent); align-self: flex-end; }

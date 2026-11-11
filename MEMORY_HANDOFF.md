@@ -1,6 +1,8 @@
-# Session Handoff — 2026-11-11 PT (Curtain Call podium build pushed; one more run of its SQL; Roster Moves mock next)
+# Session Handoff — 2026-11-11 PT (Roster Moves switch built, awaiting review and Kylie's push; one more run of the podium SQL)
 
 ## 1. Current State
+
+**In focus now: the Roster Moves card and pages, built and uncommitted.** Kylie picked card C1 (the same Lifeline | Recast | Trades switch on the Picks card and on the three pages, a gold dot where something needs her, the selected move's lines and an Open link) over the mock in `docs/design/roster-moves-pages/`. tsc, eslint, 1021 tests and `next build` pass; a scratch league (torn down) verified the card, the three pages, the Claim sheet, a Lifeline save, the trade picker and an accept at 390/360. Not verified: saving a waiver claim from the sheet (the scratch run was already due, see `BACKLOG.md`). `CLAUDE.md` describes it. Codex review was running at handoff; the push needs her yes.
 
 **In focus: Kylie's Nov 11 build, committed and pushed to `main` on Nov 11 with her yes.** She applied `supabase/apply-curtain-call-podium.sql` first; a read-only check found the columns and both RPCs, and regenerated types match the committed file. No live league data was touched.
 
@@ -74,7 +76,7 @@ Rules that still hold:
 
 ## 4. Backlog & Next Steps
 
-1. Kylie runs `supabase/apply-curtain-call-podium.sql` once more (the season check). Then the Roster Moves mock she asked for (the card and its pages on Picks). When Week 11 picks open, look at the live podium form.
+1. Finish the Roster Moves review (Codex findings, UX pass), commit by name (the `src` files in `git status`, `CLAUDE.md`, `BACKLOG.md`, `MEMORY_HANDOFF.md`, `docs/design/roster-moves-pages/`) and push with Kylie's yes. Kylie still runs `supabase/apply-curtain-call-podium.sql` once more (the season check). When Week 11 picks open, look at the live podium form.
 2. Confirm the Vercel deploy of `1974e2f`, and Kylie decides whether to tell the v3 commissioners about the Finale survival amendment.
 3. After the Thu Nov 12 waiver run: read-only check that it ran for the three leagues (`recast_cycles`, nothing in `recast_runs_overdue`).
 4. After E11 is published: `--verify` (command below).

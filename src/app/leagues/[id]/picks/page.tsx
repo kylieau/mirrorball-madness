@@ -6,7 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { RosterCard } from "@/components/roster-card";
-import { RosterMoves, type LifelineStatus, type WaiverStatus } from "@/components/roster-moves";
+import { RosterMoves } from "@/components/roster-moves";
 import { DanceCardLeagueList, type DanceCardLeagueEntry } from "@/components/dance-card-league-list";
 import { CurtainCallCard } from "@/components/curtain-call-card";
 import { PickEmBox } from "@/components/pick-em-box";
@@ -19,6 +19,8 @@ import { DraftStatusCard } from "@/components/draft-status-card";
 import { RecastCatchUpCard } from "@/components/recast-catch-up-card";
 import { LifelineCatchUpCard } from "@/components/lifeline-card";
 import { loadLifelineWeek } from "@/lib/lifeline-week-data";
+import { mapRosterMoveCouples } from "@/lib/league-triage";
+import { loadRosterMoveTabs } from "@/lib/roster-moves-data";
 import { LeaguePageShell } from "@/components/league-page-shell";
 import { loadLeaguePageBase } from "@/lib/league-page-data";
 import { draftDanceScores, excludeReleasedCoupleRows, unpostedDraftDances } from "@/lib/draft-scores";
@@ -74,7 +76,6 @@ export default async function LeaguePicksPage({
     scoringSettings,
     danceCardOn,
     waiversOn,
-    tradesOn,
     curtainCallOn,
     grandFinaleOn,
     members,
@@ -185,6 +186,7 @@ export default async function LeaguePicksPage({
       ? supabase.from("draft_picks").select("id", { count: "exact", head: true }).eq("league_id", id)
       : Promise.resolve({ count: null });
   const lifelinePending = loadLifelineWeek(supabase, base);
+  const rosterMovesPending = loadRosterMoveTabs(supabase, base);
   type LifelinePayoutRow = { manager_id: string; slot_number: number; couple_id: string; weighted_points: number };
   const lifelinePayoutsPending: PromiseLike<{ data: LifelinePayoutRow[] | null }> =
     league.lifeline_enabled && yourRosterWeek
@@ -281,8 +283,8 @@ export default async function LeaguePicksPage({
     otherLeaguePicks,
     draftLineupRows,
     { data: recastCycleRows },
-    { data: waiverClaimRows },
     lifeline,
+    rosterMoveTabs,
   ] = await Promise.all([
     curtainCallWeekId && isLocked
       ? supabase
@@ -309,59 +311,19 @@ export default async function LeaguePicksPage({
     }),
     curtainCallMode === "picks" && curtainCallWeekId && !isLocked ? loadDraftLineup(supabase) : Promise.resolve([] as DraftLineupRow[]),
     recastOpen ? supabase.rpc("recast_next_cycle", { p_league_id: id }) : Promise.resolve({ data: null }),
-    recastOpen
-      ? supabase
-          .from("waiver_claims")
-          .select("couple_id, drop_couple_id")
-          .eq("league_id", id)
-          .eq("manager_id", myTeamId)
-          .eq("status", "pending")
-          .order("priority_order")
-      : Promise.resolve({ data: null }),
     lifelinePending,
+    rosterMovesPending,
   ]);
   const recastCycle = recastCycleRows?.[0];
-  const rosterMoveCoupleName = (coupleId: string) =>
-    allDisplayNames.get(coupleId) ?? { celebrity: "Unknown", pro: "Unknown" };
-  // Picks confirms a saved list without a trip to Recast, so a list that
-  // couldn't be read shows nothing instead of "none saved".
-  const waiverStatus: WaiverStatus | null =
-    recastCycle?.start_week != null && waiverClaimRows
-      ? {
-          claims: waiverClaimRows.map((claim) => ({
-            add: rosterMoveCoupleName(claim.couple_id),
-            drop: claim.drop_couple_id ? rosterMoveCoupleName(claim.drop_couple_id) : null,
-          })),
-          openSpotCount: openRecastSpots,
-          // Null until the week's results are posted.
-          dueAt: recastCycle.due_at as string | null,
-          weekNumber: recastCycle.week_number,
-          startWeek: recastCycle.start_week,
-        }
-      : null;
-  // The same rule as the waiver list: a pick that couldn't be read shows
-  // nothing. A viewer with no dead spot has nothing to confirm.
-  const lifelineStatus: LifelineStatus | null =
-    lifeline?.picksRead && lifeline.slots.length > 0
-      ? {
-          spots: lifeline.slots.map((slot) => ({
-            former: rosterMoveCoupleName(slot.formerCoupleId),
-            pick: slot.pickCoupleId ? rosterMoveCoupleName(slot.pickCoupleId) : null,
-          })),
-          weekNumber: lifeline.week.weekNumber,
-          lockAt: lifeline.lockAt,
-          locked: lifeline.locked,
-        }
-      : null;
-  const lifelineOn = league.lifeline_enabled;
-  const rosterMoves = league.draft_status === "completed" && (lifelineOn || recastOn || tradesOn) && (
+  const rosterMoves = rosterMoveTabs.tabs.length > 0 && !cutoff.pendingRevealEpisode && (
     <RosterMoves
       leagueId={id}
-      lifelineOn={lifelineOn}
-      recastOn={recastOn}
-      tradesOn={tradesOn}
-      lifeline={lifelineStatus}
-      waivers={waiverStatus}
+      tabs={rosterMoveTabs.tabs}
+      moves={mapRosterMoveCouples(
+        rosterMoveTabs.moves,
+        (coupleId) => allDisplayNames.get(coupleId) ?? { celebrity: "Unknown", pro: "Unknown" }
+      )}
+      managerNames={nameByManager}
       from={historyFrom}
     />
   );

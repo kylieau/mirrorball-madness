@@ -4,7 +4,9 @@ import {
   danceCardRosterNames,
   homeLeagueChrome,
   leagueTapHref,
+  defaultRosterMoveTab,
   lifelinePickDue,
+  rosterMoveTabs,
   NO_ROSTER_MOVES,
   picksAction,
   picksButtonLabel,
@@ -177,16 +179,16 @@ describe("buildModuleStack", () => {
 
       it("has none for a league with nothing on, and never before the draft is done", () => {
         expect(moves({})).toEqual([]);
-        expect(moves({ waivers: { adds: [], openSpotCount: 1, dueAt: IN_2D } }, "in_progress")).toEqual([]);
+        expect(moves({ waivers: { claims: [], openSpotCount: 1, dueAt: IN_2D, weekNumber: 9, startWeek: 10 } }, "in_progress")).toEqual([]);
         expect(buildModuleStack(base).every((line) => line.moves.length === 0)).toBe(true);
       });
 
       it("asks for whatever still needs the manager, each with its own clock", () => {
         expect(
           moves({
-            lifeline: { picks: [null], lockAt: IN_5H, locked: false },
-            waivers: { adds: [], openSpotCount: 1, dueAt: IN_2D },
-            trades: { offerExpiries: [IN_2D, IN_20H], acceptedWith: [] },
+            lifeline: { spots: [{ former: c("Alix", "Val"), pick: null }], weekNumber: 10, lockAt: IN_5H, locked: false },
+            waivers: { claims: [], openSpotCount: 1, dueAt: IN_2D, weekNumber: 9, startWeek: 10 },
+            trades: { offers: [{ from: "kim", expiresAt: IN_2D }, { from: "pat", expiresAt: IN_20H }], acceptedWith: [] },
           })
         ).toEqual([
           ["needed", "Need Lifeline pick", "Locks in 5h"],
@@ -198,9 +200,15 @@ describe("buildModuleStack", () => {
       it("confirms what is saved: a Lifeline is settled, a claim and a trade wait on the run", () => {
         expect(
           moves({
-            lifeline: { picks: [c("Maura", "Mark")], lockAt: IN_5H, locked: false },
-            waivers: { adds: [c("Tatyana", "Jan"), c("Jo", "Ezra"), c("Alix", "Val")], openSpotCount: 1, dueAt: null },
-            trades: { offerExpiries: [], acceptedWith: [["Kim"], ["Kim", "Pat"], ["Kim", "Pat", "Lou"]] },
+            lifeline: { spots: [{ former: c("Alix", "Val"), pick: c("Maura", "Mark") }], weekNumber: 10, lockAt: IN_5H, locked: false },
+            waivers: {
+              claims: [c("Tatyana", "Jan"), c("Jo", "Ezra"), c("Alix", "Val")].map((add) => ({ add, drop: null })),
+              openSpotCount: 1,
+              dueAt: null,
+              weekNumber: 9,
+              startWeek: 10,
+            },
+            trades: { offers: [], acceptedWith: [["Kim"], ["Kim", "Pat"], ["Kim", "Pat", "Lou"]] },
           })
         ).toEqual([
           ["saved", "Lifeline: Maura & Mark", "Locks in 5h"],
@@ -212,20 +220,21 @@ describe("buildModuleStack", () => {
       });
 
       it("puts a missing Lifeline above a saved one, with the lock on the first line only", () => {
-        const picks = [c("Maura", "Mark"), null, null];
-        expect(moves({ lifeline: { picks, lockAt: IN_5H, locked: false } })).toEqual([
+        const spots = [c("Maura", "Mark"), null, null].map((pick) => ({ former: c("Alix", "Val"), pick }));
+        expect(moves({ lifeline: { spots, weekNumber: 10, lockAt: IN_5H, locked: false } })).toEqual([
           ["needed", "Need 2 Lifeline picks", "Locks in 5h"],
           ["saved", "Lifeline: Maura & Mark", null],
         ]);
-        expect(moves({ lifeline: { picks, lockAt: IN_5H, locked: true } })).toEqual([
+        expect(moves({ lifeline: { spots, weekNumber: 10, lockAt: IN_5H, locked: true } })).toEqual([
           ["missed", "No Lifeline picks", "Locked"],
           ["saved", "Lifeline: Maura & Mark", null],
         ]);
       });
 
       it("says nothing about waivers with no claim and no open spot, and never counts down a run that is due", () => {
-        expect(moves({ waivers: { adds: [], openSpotCount: 0, dueAt: IN_2D } })).toEqual([]);
-        expect(moves({ waivers: { adds: [], openSpotCount: 2, dueAt: "2026-11-17T19:55:00Z" } })).toEqual([
+        const run = { claims: [], weekNumber: 9, startWeek: 10 };
+        expect(moves({ waivers: { ...run, openSpotCount: 0, dueAt: IN_2D } })).toEqual([]);
+        expect(moves({ waivers: { ...run, openSpotCount: 2, dueAt: "2026-11-17T19:55:00Z" } })).toEqual([
           ["needed", "2 open spots", "Runs soon"],
         ]);
       });
@@ -258,12 +267,17 @@ describe("buildModuleStack", () => {
 
 describe("lifelinePickDue", () => {
   it("is due only while a dead spot has no Lifeline and the lock hasn't passed", () => {
-    const lifeline = { picks: ["a", null], lockAt: LOCK, locked: false };
+    const spot = (former: string, pick: string | null) => ({ former, pick });
+    const lifeline = { spots: [spot("x", "a"), spot("y", null)], weekNumber: 10, lockAt: LOCK, locked: false };
     expect(lifelinePickDue({ ...NO_ROSTER_MOVES, lifeline })).toBe(true);
     expect(lifelinePickDue({ ...NO_ROSTER_MOVES, lifeline: { ...lifeline, locked: true } })).toBe(false);
-    expect(lifelinePickDue({ ...NO_ROSTER_MOVES, lifeline: { ...lifeline, picks: ["a", "b"] } })).toBe(false);
+    expect(lifelinePickDue({ ...NO_ROSTER_MOVES, lifeline: { ...lifeline, spots: [spot("x", "a"), spot("y", "b")] } })).toBe(false);
     expect(
-      lifelinePickDue({ ...NO_ROSTER_MOVES, waivers: { adds: [], openSpotCount: 1, dueAt: null }, trades: { offerExpiries: [LOCK], acceptedWith: [] } })
+      lifelinePickDue({
+        ...NO_ROSTER_MOVES,
+        waivers: { claims: [], openSpotCount: 1, dueAt: null, weekNumber: 9, startWeek: 10 },
+        trades: { offers: [{ from: "kim", expiresAt: LOCK }], acceptedWith: [] },
+      })
     ).toBe(false);
   });
 });
@@ -344,5 +358,49 @@ describe("picksAction", () => {
     expect(picksAction(false, waiting)).toBe("none");
     const off = { curtainCall: { ...base.curtainCall, on: false }, grandFinale: { ...base.grandFinale, on: false } };
     expect(picksAction(false, off)).toBe("none");
+  });
+});
+
+describe("rosterMoveTabs", () => {
+  const ON = { lifeline: true, recast: true, trades: true };
+  const spot = (pick: string | null) => ({ former: "x", pick });
+  const run = { weekNumber: 9, startWeek: 10, dueAt: null };
+
+  it("lists only the mechanisms the league has on, Lifeline then Recast then Trades", () => {
+    expect(rosterMoveTabs({ lifeline: false, recast: true, trades: true }, NO_ROSTER_MOVES).map((tab) => tab.label)).toEqual([
+      "Recast",
+      "Trades",
+    ]);
+    expect(rosterMoveTabs({ lifeline: true, recast: false, trades: false }, NO_ROSTER_MOVES).map((tab) => tab.key)).toEqual(["lifeline"]);
+  });
+
+  it("marks a tab only while something there still needs the viewer", () => {
+    const needs = (moves: Parameters<typeof rosterMoveTabs>[1]) => rosterMoveTabs(ON, moves).map((tab) => tab.needsYou);
+    expect(needs(NO_ROSTER_MOVES)).toEqual([false, false, false]);
+    expect(
+      needs({
+        lifeline: { spots: [spot(null)], weekNumber: 10, lockAt: "2026-11-18T01:00:00Z", locked: false },
+        waivers: { ...run, claims: [], openSpotCount: 1 },
+        trades: { offers: [{ from: "kim", expiresAt: "2026-11-18T01:00:00Z" }], acceptedWith: [] },
+      })
+    ).toEqual([true, true, true]);
+    expect(
+      needs({
+        lifeline: { spots: [spot(null)], weekNumber: 10, lockAt: "2026-11-18T01:00:00Z", locked: true },
+        waivers: { ...run, claims: [{ add: "a", drop: null }], openSpotCount: 1 },
+        trades: { offers: [], acceptedWith: [["kim"]] },
+      })
+    ).toEqual([false, false, false]);
+    expect(needs({ ...NO_ROSTER_MOVES, waivers: { ...run, claims: [], openSpotCount: 0 } })).toEqual([false, false, false]);
+  });
+
+  it("opens on the first tab that needs the viewer, else the first", () => {
+    expect(defaultRosterMoveTab(rosterMoveTabs(ON, NO_ROSTER_MOVES))).toBe("lifeline");
+    expect(
+      defaultRosterMoveTab(
+        rosterMoveTabs(ON, { ...NO_ROSTER_MOVES, trades: { offers: [{ from: "kim", expiresAt: "2026-11-18T01:00:00Z" }], acceptedWith: [] } })
+      )
+    ).toBe("trades");
+    expect(defaultRosterMoveTab([])).toBeNull();
   });
 });

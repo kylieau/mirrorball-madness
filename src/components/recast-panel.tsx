@@ -1,16 +1,15 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDownIcon, ChevronUpIcon, XIcon } from "lucide-react";
 import { saveRecastList } from "@/app/leagues/[id]/waivers/actions";
 import { CoupleNameLink, coupleNameNode } from "@/components/couple-name";
+import { FoldCard } from "@/components/fold-card";
 import { RecastCatchUpCard } from "@/components/recast-catch-up-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { YouPill } from "@/components/you-pill";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatPoints } from "@/lib/format-points";
@@ -24,7 +23,6 @@ import {
   type RecastOrderEntry,
   type RecastWireEntry,
 } from "@/lib/recast";
-import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 
 export type RecastNextRun = {
   weekNumber: number;
@@ -44,12 +42,13 @@ export type RecastLogLine = {
 };
 
 const UNKNOWN_COUPLE: CoupleNameParts = { celebrity: "Unknown", pro: "Unknown" };
-const CHOOSE_COUPLE = "Choose a couple…";
-const CHOOSE_SPOT = "Choose a roster spot…";
 
+const ordinal = (n: number) => `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : Math.min(n % 10, 4) % 4] ?? "th"}`;
+
+// The viewer's list first, then the wire it claims from; the order, the log
+// and the rules fold away under them.
 export function RecastPanel({
   leagueId,
-  closeHref,
   nextRun,
   pendingRevealWeek,
   behind,
@@ -65,7 +64,6 @@ export function RecastPanel({
   log,
 }: {
   leagueId: string;
-  closeHref: string;
   nextRun: RecastNextRun | null;
   pendingRevealWeek: number | null;
   // A viewer who hasn't watched the latest results can't be shown who is
@@ -84,11 +82,9 @@ export function RecastPanel({
   log: RecastLogLine[];
 }) {
   const router = useRouter();
-  const [addCoupleId, setAddCoupleId] = useState("");
-  const [addSlot, setAddSlot] = useState("");
+  const [claiming, setClaiming] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const dueAt = useFormattedDeadline(nextRun?.dueAt);
 
   const from = `/leagues/${leagueId}/waivers`;
   const parts = (coupleId: string) => coupleDisplayNames[coupleId] ?? UNKNOWN_COUPLE;
@@ -103,16 +99,15 @@ export function RecastPanel({
     ) : (
       <>Drop {name(spot.coupleId)}</>
     );
-
-  const wireItems: Record<string, ReactNode> = {
-    "": CHOOSE_COUPLE,
-    ...Object.fromEntries(wire.map((entry) => [entry.coupleId, name(entry.coupleId)])),
+  const rankOnList = (coupleId: string) => {
+    const at = list.findIndex((claim) => claim.coupleId === coupleId);
+    return at === -1 ? null : at + 1;
   };
-  const spotItems: Record<string, ReactNode> = {
-    "": CHOOSE_SPOT,
-    ...Object.fromEntries(spots.map((spot) => [String(spot.slotNumber), spotLabel(spot)])),
-  };
-  const alreadyListed = list.some((claim) => claim.coupleId === addCoupleId && String(claim.slotNumber) === addSlot);
+  // The same couple can be claimed for another spot as a fallback.
+  const listedSlots = (coupleId: string) =>
+    new Set(list.filter((claim) => claim.coupleId === coupleId).map((claim) => claim.slotNumber));
+  const canClaimMore = (coupleId: string) => spots.some((spot) => !listedSlots(coupleId).has(spot.slotNumber));
+  const myTurn = order.findIndex((entry) => entry.managerId === teamId) + 1;
 
   async function save(next: RecastClaim[]) {
     setError(null);
@@ -124,52 +119,32 @@ export function RecastPanel({
     return !result.error;
   }
 
-  async function addClaim() {
-    const spot = spotBySlot.get(Number(addSlot));
-    if (!addCoupleId || !spot) return;
-    const saved = await save([
-      ...list,
-      { coupleId: addCoupleId, slotNumber: spot.slotNumber, dropCoupleId: spot.open ? null : spot.coupleId },
-    ]);
-    if (saved) {
-      setAddCoupleId("");
-      setAddSlot("");
-    }
+  async function claim(coupleId: string, spot: RecastSpot) {
+    setClaiming(null);
+    await save([...list, { coupleId, slotNumber: spot.slotNumber, dropCoupleId: spot.open ? null : spot.coupleId }]);
   }
 
-  const runLine = !nextRun
-    ? "There are no more waiver runs this season."
-    : nextRun.dueAt == null
-      ? `The next waiver run is 48 hours after ${formatEpisodeCasual(nextRun.weekNumber)} results are posted.`
-      : dueAt
-        ? `Next waiver run: ${dueAt}.`
-        : null;
+  const canClaim = !behind && nextRun != null;
 
   return (
-    <div className="flex flex-col gap-3 px-4 py-12">
-      <Link href={closeHref} aria-label="Close" className="self-start text-muted-foreground hover:text-foreground">
-        <XIcon className="size-5" />
-      </Link>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Recast</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Mirrorball&apos;s waiver wire.</p>
-        {runLine && <p className="mt-1 text-sm text-muted-foreground">{runLine}</p>}
-        {nextRun?.startWeek != null && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            A claim that wins starts scoring for you in {formatEpisodeCasual(nextRun.startWeek)}.
-          </p>
-        )}
-      </div>
-
+    <>
       {behind && <RecastCatchUpCard pendingRevealWeek={pendingRevealWeek} />}
+      {!behind && !nextRun && (
+        <Card>
+          <CardHeader>
+            <CardTitle>No Waiver Runs Left</CardTitle>
+            <CardDescription>There is no waiver run after the Finale, so the wire is closed for the season.</CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
-      {!behind && nextRun && (
+      {canClaim && (
         <Card>
           <CardHeader>
             <CardTitle>Your Waiver List</CardTitle>
             <CardDescription>
-              Ranked, and private until the run. Your turn takes the highest claim that can still win; a drop only
-              happens if its claim does.
+              Private until the run. Your turn takes your highest claim that can still win; a drop only happens if its
+              claim does.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
@@ -179,7 +154,9 @@ export function RecastPanel({
               </p>
             )}
             {list.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No claims yet.</p>
+              <p className="text-sm text-muted-foreground">
+                {wire.length > 0 ? "No claims yet. Tap Claim on a couple below." : "No claims yet."}
+              </p>
             ) : (
               <ol className="flex flex-col">
                 {list.map((claim, index) => {
@@ -187,18 +164,18 @@ export function RecastPanel({
                   return (
                     <li
                       key={`${claim.coupleId}:${claim.slotNumber}`}
-                      className="flex items-center gap-3 border-b border-border py-2.5 text-sm last:border-b-0"
+                      className="flex items-center gap-3 border-b border-border py-2.5 text-sm first:pt-0 last:border-b-0 last:pb-0"
                     >
                       <span className="w-5 shrink-0 font-rank text-base text-muted-foreground">{index + 1}</span>
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="font-medium">Add {name(claim.coupleId)}</span>
-                        <span className="text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {claim.dropCoupleId ? (
                             <>Drop {name(claim.dropCoupleId)}</>
                           ) : spot?.coupleId ? (
-                            <>Open spot (was {name(spot.coupleId)})</>
+                            <>For your open spot (was {name(spot.coupleId)})</>
                           ) : (
-                            "Open spot"
+                            "For your open spot"
                           )}
                         </span>
                       </span>
@@ -236,50 +213,6 @@ export function RecastPanel({
                 })}
               </ol>
             )}
-
-            {wire.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No couple is on the wire right now.</p>
-            ) : (
-              <div className="flex flex-col gap-3 border-t border-border pt-3">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="recast-add">Add</Label>
-                  <Select items={wireItems} value={addCoupleId} onValueChange={(v) => setAddCoupleId(v ?? "")}>
-                    <SelectTrigger id="recast-add" className="w-full">
-                      <SelectValue placeholder={CHOOSE_COUPLE} />
-                    </SelectTrigger>
-                    <SelectContent align="start" alignItemWithTrigger={false}>
-                      {wire.map((entry) => (
-                        <SelectItem key={entry.coupleId} value={entry.coupleId}>
-                          {name(entry.coupleId)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="recast-spot">In Place Of</Label>
-                  <Select items={spotItems} value={addSlot} onValueChange={(v) => setAddSlot(v ?? "")}>
-                    <SelectTrigger id="recast-spot" className="w-full">
-                      <SelectValue placeholder={CHOOSE_SPOT} />
-                    </SelectTrigger>
-                    <SelectContent align="start" alignItemWithTrigger={false}>
-                      {spots.map((spot) => (
-                        <SelectItem key={spot.slotNumber} value={String(spot.slotNumber)}>
-                          {spotLabel(spot)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  className="self-start"
-                  disabled={saving || !addCoupleId || !addSlot || alreadyListed}
-                  onClick={() => void addClaim()}
-                >
-                  {saving ? "Saving…" : alreadyListed ? "Already on Your List" : "Add to List"}
-                </Button>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
@@ -306,74 +239,126 @@ export function RecastPanel({
           <CardHeader>
             <CardTitle>The Wire</CardTitle>
             <CardDescription>
-              {wire.length === 1 ? "1 couple you can claim." : `${wire.length} couples you can claim.`}
+              {wire.length === 0
+                ? "No couple is on the wire right now."
+                : wire.length === 1
+                  ? "1 couple you can claim."
+                  : `${wire.length} couples you can claim.`}
             </CardDescription>
           </CardHeader>
           {wire.length > 0 && (
-            <CardContent className="flex flex-col gap-1.5 text-sm [&_a]:no-underline [&_a]:hover:text-accent">
-              {wire.map((entry) => (
-                <div key={entry.coupleId} className="flex items-start justify-between gap-3">
-                  <CoupleNameLink coupleId={entry.coupleId} from={from} {...parts(entry.coupleId)} />
-                  {entry.droppedBy && (
-                    <span className="text-right text-xs text-muted-foreground">
-                      Pending drop · {managerName(entry.droppedBy)}
-                      <br />
-                      Only if their claim wins
+            <CardContent className="flex flex-col text-sm [&_a]:no-underline [&_a]:hover:text-accent">
+              {wire.map((entry) => {
+                const rank = rankOnList(entry.coupleId);
+                return (
+                  <div
+                    key={entry.coupleId}
+                    className="flex items-center justify-between gap-3 border-b border-border py-2.5 first:pt-0 last:border-b-0 last:pb-0"
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <CoupleNameLink coupleId={entry.coupleId} from={from} {...parts(entry.coupleId)} />
+                      {entry.droppedBy && (
+                        <span className="text-xs text-muted-foreground">
+                          {managerName(entry.droppedBy)} may drop them in this run
+                        </span>
+                      )}
                     </span>
-                  )}
-                </div>
-              ))}
+                    {rank != null ? (
+                      <button
+                        type="button"
+                        disabled={saving || !canClaim || !canClaimMore(entry.coupleId)}
+                        onClick={() => setClaiming(entry.coupleId)}
+                        className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground disabled:opacity-100"
+                      >
+                        On your list · {rank}
+                      </button>
+                    ) : (
+                      canClaim &&
+                      spots.length > 0 && (
+                        <Button size="sm" variant="outline" disabled={saving} onClick={() => setClaiming(entry.coupleId)}>
+                          Claim
+                        </Button>
+                      )
+                    )}
+                  </div>
+                );
+              })}
             </CardContent>
           )}
         </Card>
       )}
 
-      {order.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Waiver Order</CardTitle>
-            <CardDescription>
-              Reverse standings{orderThroughWeek != null ? ` through ${formatEpisodeCasual(orderThroughWeek)}` : ""}:
-              lowest season total first, then the lower latest week, then the later draft pick. It is set when the run
-              starts and says nothing about who gets whom.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ol className="flex flex-col">
-              {order.map((entry, index) => (
-                <li
-                  key={entry.managerId}
-                  className="flex items-center gap-3 border-b border-border py-2 text-sm last:border-b-0"
+      <Sheet open={claiming != null} onOpenChange={(open) => !open && setClaiming(null)}>
+        <SheetContent
+          side="bottom"
+          className="max-h-[92vh] gap-3 overflow-y-auto rounded-t-3xl px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+        >
+          <SheetHeader className="px-0">
+            <SheetTitle className="font-heading text-xl font-semibold">
+              {claiming && <>Claim {name(claiming)}</>}
+            </SheetTitle>
+            <SheetDescription>
+              {spots.length === 1
+                ? "They would take this spot. A drop only happens if the claim wins."
+                : "Which spot would they take? A drop only happens if the claim wins."}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col gap-2">
+            {spots.map((spot) => {
+              const listed = claiming != null && listedSlots(claiming).has(spot.slotNumber);
+              return (
+                <Button
+                  key={spot.slotNumber}
+                  variant={spot.open ? "default" : "outline"}
+                  className="justify-start"
+                  disabled={saving || listed}
+                  onClick={() => claiming && void claim(claiming, spot)}
                 >
-                  <span className="w-5 shrink-0 font-rank text-base text-muted-foreground">{index + 1}</span>
-                  <span className="flex min-w-0 flex-1 items-center gap-2 font-medium">
-                    <span className="min-w-0 [overflow-wrap:anywhere]">{managerName(entry.managerId)}</span>
-                    {entry.managerId === teamId && <YouPill />}
-                  </span>
-                  <span className="shrink-0 font-heading">{formatPoints(entry.seasonTotal)}</span>
-                </li>
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
+                  {spotLabel(spot)}
+                  {listed && <span className="ml-auto text-xs font-normal">On your list</span>}
+                </Button>
+              );
+            })}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {order.length > 0 && (
+        <FoldCard title="Waiver Order" note={myTurn > 0 ? `You're ${ordinal(myTurn)} of ${order.length}` : undefined}>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Reverse standings{orderThroughWeek != null ? ` through ${formatEpisodeCasual(orderThroughWeek)}` : ""}: lowest
+            season total first, then the lower latest week, then the later draft pick. It is set when the run starts and
+            says nothing about who gets whom.
+          </p>
+          <ol className="flex flex-col">
+            {order.map((entry, index) => (
+              <li
+                key={entry.managerId}
+                className="flex items-center gap-3 border-b border-border py-2 text-sm first:pt-0 last:border-b-0 last:pb-0"
+              >
+                <span className="w-5 shrink-0 font-rank text-base text-muted-foreground">{index + 1}</span>
+                <span className="flex min-w-0 flex-1 items-center gap-2 font-medium">
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{managerName(entry.managerId)}</span>
+                  {entry.managerId === teamId && <YouPill />}
+                </span>
+                <span className="shrink-0 font-heading">{formatPoints(entry.seasonTotal)}</span>
+              </li>
+            ))}
+          </ol>
+        </FoldCard>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Adds and Drops</CardTitle>
-          <CardDescription>Every claim awarded in this league.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col text-sm [&_a]:no-underline [&_a]:hover:text-accent">
-          {log.length === 0 && <p className="text-muted-foreground">Nothing yet.</p>}
+      <FoldCard title="Adds and Drops" note={log.length === 0 ? "None yet" : `${log.length} in this league`}>
+        <div className="flex flex-col text-sm [&_a]:no-underline [&_a]:hover:text-accent">
+          {log.length === 0 && <p className="text-muted-foreground">No claim has been awarded in this league yet.</p>}
           {log.map((line) => (
-            <div key={line.id} className="flex flex-col border-b border-border py-2.5 last:border-b-0">
+            <div key={line.id} className="flex flex-col border-b border-border py-2.5 first:pt-0 last:border-b-0 last:pb-0">
               <span className="font-medium [overflow-wrap:anywhere]">{managerName(line.managerId)}</span>
               <span>
                 Added <CoupleNameLink coupleId={line.coupleId} from={from} {...parts(line.coupleId)} />
                 {line.dropCoupleId ? (
                   <>
-                    , dropped{" "}
-                    <CoupleNameLink coupleId={line.dropCoupleId} from={from} {...parts(line.dropCoupleId)} />
+                    , dropped <CoupleNameLink coupleId={line.dropCoupleId} from={from} {...parts(line.dropCoupleId)} />
                   </>
                 ) : (
                   " in an open spot"
@@ -385,21 +370,16 @@ export function RecastPanel({
               </span>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </FoldCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>How Recast Works</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="flex list-disc flex-col gap-1.5 pl-4 text-sm text-muted-foreground">
-            {RECAST_RULES.map((rule) => (
-              <li key={rule}>{rule}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-    </div>
+      <FoldCard title="How Recast Works">
+        <ul className="flex list-disc flex-col gap-1.5 pl-4 text-sm text-muted-foreground">
+          {RECAST_RULES.map((rule) => (
+            <li key={rule}>{rule}</li>
+          ))}
+        </ul>
+      </FoldCard>
+    </>
   );
 }

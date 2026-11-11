@@ -46,22 +46,78 @@ export type RosterCouple = { couple: StackCouple; out: boolean };
 // and all three are for a viewer who is behind, since an open spot says a
 // couple went home.
 export type RosterMoves<Couple> = {
-  // One entry per dead roster spot this week: the Lifeline saved for it.
-  lifeline: { picks: (Couple | null)[]; lockAt: string | null; locked: boolean } | null;
-  // The couples the saved list would add, highest claim first. dueAt is null
-  // until the run's week has its results posted.
-  waivers: { adds: Couple[]; openSpotCount: number; dueAt: string | null } | null;
-  // Offers still waiting on the viewer's answer, and who each accepted trade
-  // waiting on the waiver run is with.
-  trades: { offerExpiries: string[]; acceptedWith: string[][] } | null;
+  // One entry per dead roster spot this week: the couple who left it and the
+  // Lifeline saved for it.
+  lifeline: {
+    spots: { former: Couple; pick: Couple | null }[];
+    weekNumber: number;
+    lockAt: string | null;
+    locked: boolean;
+  } | null;
+  // The saved list, highest claim first. dueAt is null until the run's week
+  // has its results posted; startWeek is when a winning claim starts scoring.
+  waivers: {
+    claims: { add: Couple; drop: Couple | null }[];
+    openSpotCount: number;
+    dueAt: string | null;
+    weekNumber: number;
+    startWeek: number;
+  } | null;
+  // Offers still waiting on the viewer's answer (who sent each, when it
+  // lapses), and who each accepted trade waiting on the waiver run is with.
+  trades: { offers: { from: string; expiresAt: string }[]; acceptedWith: string[][] } | null;
 };
 
 export const NO_ROSTER_MOVES: RosterMoves<never> = { lifeline: null, waivers: null, trades: null };
 
+// The same moves with every couple renamed, so a loader can hand out ids and
+// each surface name them its own way.
+export function mapRosterMoveCouples<A, B>(moves: RosterMoves<A>, rename: (couple: A) => B): RosterMoves<B> {
+  return {
+    lifeline: moves.lifeline && {
+      ...moves.lifeline,
+      spots: moves.lifeline.spots.map((spot) => ({ former: rename(spot.former), pick: spot.pick && rename(spot.pick) })),
+    },
+    waivers: moves.waivers && {
+      ...moves.waivers,
+      claims: moves.waivers.claims.map((claim) => ({ add: rename(claim.add), drop: claim.drop && rename(claim.drop) })),
+    },
+    trades: moves.trades,
+  };
+}
+
 // A Lifeline locks and costs points like a pick, so a missing one counts as
 // Picks Due. An open spot or a trade offer doesn't.
 export function lifelinePickDue(moves: RosterMoves<unknown>): boolean {
-  return !!moves.lifeline && !moves.lifeline.locked && moves.lifeline.picks.some((pick) => !pick);
+  return !!moves.lifeline && !moves.lifeline.locked && moves.lifeline.spots.some((spot) => !spot.pick);
+}
+
+export type RosterMoveTabKey = "lifeline" | "recast" | "trades";
+export type RosterMoveTab = { key: RosterMoveTabKey; label: string; needsYou: boolean };
+
+// The switch the Roster Moves card and its pages share: one tab per
+// mechanism the league has on, in the order the card lists them, with a gold
+// dot on each that still needs the viewer (the moves marked "needed").
+export function rosterMoveTabs(
+  on: { lifeline: boolean; recast: boolean; trades: boolean },
+  moves: RosterMoves<unknown>
+): RosterMoveTab[] {
+  const tabs: RosterMoveTab[] = [];
+  if (on.lifeline) tabs.push({ key: "lifeline", label: "Lifeline", needsYou: lifelinePickDue(moves) });
+  if (on.recast) {
+    tabs.push({
+      key: "recast",
+      label: "Recast",
+      needsYou: !!moves.waivers && moves.waivers.claims.length === 0 && moves.waivers.openSpotCount > 0,
+    });
+  }
+  if (on.trades) tabs.push({ key: "trades", label: "Trades", needsYou: !!moves.trades && moves.trades.offers.length > 0 });
+  return tabs;
+}
+
+// The card opens on the first tab that needs the viewer, else the first.
+export function defaultRosterMoveTab(tabs: RosterMoveTab[]): RosterMoveTabKey | null {
+  return (tabs.find((tab) => tab.needsYou) ?? tabs[0])?.key ?? null;
 }
 
 // One visual row: plain text, then a couple the card renders as
@@ -102,14 +158,14 @@ function rosterMoveRows({ lifeline, waivers, trades }: RosterMoves<StackCouple>,
   const rows: MoveRow[] = [];
 
   if (lifeline) {
-    const missing = lifeline.picks.filter((pick) => !pick).length;
+    const missing = lifeline.spots.filter((spot) => !spot.pick).length;
     const missingRow: MoveBody[] =
       missing === 0
         ? []
         : lifeline.locked
           ? [{ ...plain(`No ${plural(missing, "Lifeline pick")}`), mark: "missed" }]
           : [{ ...plain(missing === 1 ? "Need Lifeline pick" : `Need ${missing} Lifeline picks`), mark: "needed" }];
-    const saved = lifeline.picks.flatMap((pick): MoveBody[] =>
+    const saved = lifeline.spots.flatMap(({ pick }): MoveBody[] =>
       pick ? [{ ...named("Lifeline: ", pick), mark: "saved" }] : []
     );
     rows.push(
@@ -121,7 +177,7 @@ function rosterMoveRows({ lifeline, waivers, trades }: RosterMoves<StackCouple>,
   }
 
   if (waivers) {
-    const [top, ...rest] = waivers.adds;
+    const [top, ...rest] = waivers.claims.map((claim) => claim.add);
     const row: MoveBody[] = top
       ? [{ ...named("Add ", top), after: rest.length ? `, +${rest.length} more` : undefined, mark: "waiting" }]
       : waivers.openSpotCount > 0
@@ -136,10 +192,10 @@ function rosterMoveRows({ lifeline, waivers, trades }: RosterMoves<StackCouple>,
   }
 
   if (trades) {
-    const firstExpiry = [...trades.offerExpiries].sort()[0];
+    const firstExpiry = trades.offers.map((offer) => offer.expiresAt).sort()[0];
     if (firstExpiry) {
       rows.push({
-        ...plain(`${trades.offerExpiries.length} ${plural(trades.offerExpiries.length, "trade offer")}`),
+        ...plain(`${trades.offers.length} ${plural(trades.offers.length, "trade offer")}`),
         mark: "needed",
         clock: clockUntil("Ends", firstExpiry, now, "Ends soon"),
       });

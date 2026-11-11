@@ -1,9 +1,11 @@
-import Link from "next/link";
-import { XIcon } from "lucide-react";
 import { LifelineCard, LifelineCatchUpCard } from "@/components/lifeline-card";
+import { RosterMovesFrame, type RosterMovesFact } from "@/components/roster-moves-frame";
+import { RosterMovesUnavailable } from "@/components/roster-moves-unavailable";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { loadLeaguePageBase } from "@/lib/league-page-data";
 import { loadLifelineWeek } from "@/lib/lifeline-week-data";
+import { loadRosterMoveTabs } from "@/lib/roster-moves-data";
+import { rosterMovesBackLabel } from "@/lib/roster-moves-pages";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,9 +21,10 @@ export default async function LifelinePage({
   const supabase = await createClient();
   const base = await loadLeaguePageBase(supabase, id);
   const { league, upcomingEpisode, cutoff } = base;
-  const lifeline = await loadLifelineWeek(supabase, base);
+  const [lifeline, { tabs }] = await Promise.all([loadLifelineWeek(supabase, base), loadRosterMoveTabs(supabase, base)]);
 
   const closeHref = safeRelativePath(from, `/leagues/${id}/picks`);
+  const back = { href: closeHref, label: rosterMovesBackLabel(closeHref, id) };
   if (!lifeline) {
     const reason = !base.danceCardOn
       ? {
@@ -41,29 +44,19 @@ export default async function LifelinePage({
                 title: `Lifeline Starts in ${formatEpisodeCasual(league.lifeline_starts_week ?? upcomingEpisode.week_number)}`,
                 body: "You can pick a couple for an empty roster spot once that week's picks open.",
               };
-    return (
-      <div className="flex flex-col items-center gap-4 px-4 py-24 text-center">
-        <Link href={closeHref} aria-label="Close" className="self-start text-muted-foreground hover:text-foreground">
-          <XIcon className="size-5" />
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">{reason.title}</h1>
-        <p className="text-sm text-muted-foreground">{reason.body}</p>
-      </div>
-    );
+    return <RosterMovesUnavailable back={back} {...reason} />;
   }
 
+  const weekLabel = formatEpisodeCasual(lifeline.week.weekNumber);
+  const facts: RosterMovesFact[] = [
+    lifeline.locked
+      ? { label: weekLabel, at: null, value: "Locked" }
+      : { label: `${weekLabel} locks`, at: lifeline.lockAt, value: "Lock not set" },
+    { label: "Pays", at: null, value: "Half their Dance Card" },
+  ];
+
   return (
-    <div className="flex flex-col gap-3 px-4 py-12">
-      <Link href={closeHref} aria-label="Close" className="self-start text-muted-foreground hover:text-foreground">
-        <XIcon className="size-5" />
-      </Link>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Lifeline</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          A stand-in each week for a roster spot whose couple has gone home. You earn half the stand-in&apos;s Dance
-          Card points.
-        </p>
-      </div>
+    <RosterMovesFrame leagueId={id} back={back} tabs={tabs} selected="lifeline" from={closeHref} facts={facts}>
       {cutoff.pendingRevealEpisode ? (
         <LifelineCatchUpCard pendingRevealWeek={cutoff.pendingRevealEpisode.week_number} />
       ) : (
@@ -71,7 +64,6 @@ export default async function LifelinePage({
           key={`${lifeline.week.id}:${lifeline.locked}:${lifeline.slots.map((slot) => slot.pickCoupleId).join()}`}
           leagueId={id}
           week={lifeline.week}
-          lockAt={lifeline.lockAt}
           isLocked={lifeline.locked}
           slots={lifeline.slots}
           couples={lifeline.couples}
@@ -80,6 +72,6 @@ export default async function LifelinePage({
           historyFrom={`/leagues/${id}/lifeline?from=${encodeURIComponent(closeHref)}`}
         />
       )}
-    </div>
+    </RosterMovesFrame>
   );
 }

@@ -1,7 +1,10 @@
-import Link from "next/link";
-import { XIcon } from "lucide-react";
+import { RosterMovesFrame, type RosterMovesFact } from "@/components/roster-moves-frame";
+import { RosterMovesUnavailable } from "@/components/roster-moves-unavailable";
 import { TradesPanel, type TradeView } from "@/components/trades-panel";
+import { formatEpisodeCasual } from "@/lib/format-week";
 import { loadLeaguePageBase } from "@/lib/league-page-data";
+import { loadRosterMoveTabs } from "@/lib/roster-moves-data";
+import { rosterMovesBackLabel } from "@/lib/roster-moves-pages";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { createClient } from "@/lib/supabase/server";
 import { clearsBeforeRun, offerExpiresAt, tradeLogVisible, type TradeStatus } from "@/lib/trades";
@@ -20,6 +23,7 @@ export default async function TradesPage({
   const { league, myTeamId, cutoff } = base;
 
   const closeHref = safeRelativePath(from, `/leagues/${id}/picks`);
+  const back = { href: closeHref, label: rosterMovesBackLabel(closeHref, id) };
   const unavailable = !base.danceCardOn
     ? {
         title: "Dance Card Isn't On",
@@ -31,19 +35,9 @@ export default async function TradesPage({
         ? { title: "Trades Open After the Draft", body: "There are no rosters to trade from until the draft is complete." }
         : null;
 
-  if (unavailable) {
-    return (
-      <div className="flex flex-col items-center gap-4 px-4 py-24 text-center">
-        <Link href={closeHref} aria-label="Close" className="self-start text-muted-foreground hover:text-foreground">
-          <XIcon className="size-5" />
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">{unavailable.title}</h1>
-        <p className="text-sm text-muted-foreground">{unavailable.body}</p>
-      </div>
-    );
-  }
+  if (unavailable) return <RosterMovesUnavailable back={back} {...unavailable} />;
 
-  const [{ data: deadline }, { data: cycleRows }, { data: cashRoom }, { data: offers }] = await Promise.all([
+  const [{ data: deadline }, { data: cycleRows }, { data: cashRoom }, { data: offers }, { tabs }] = await Promise.all([
     supabase.rpc("trade_deadline", { p_league_id: id }),
     supabase.rpc("recast_next_cycle", { p_league_id: id }),
     supabase.rpc("trade_cash_available", { p_league_id: id }),
@@ -55,6 +49,7 @@ export default async function TradesPage({
         "id, proposed_by, status, result, created_at, expires_at, accepted_at, veto_ends_at, resolved_at, week_number, start_week, trade_parties(manager_id, accepted_at), trade_legs(leg_order, from_manager_id, to_manager_id, couple_id, points), trade_votes(manager_id)"
       )
       .eq("league_id", id),
+    loadRosterMoveTabs(supabase, base),
   ]);
 
   const now = Date.now();
@@ -112,23 +107,33 @@ export default async function TradesPage({
       .sort((a, b) => (celebrityName.get(a) ?? "").localeCompare(celebrityName.get(b) ?? "")),
   }));
 
+  const closed = deadlinePassed || !nextRun;
+  const facts: RosterMovesFact[] = [
+    closed || !deadline ? { label: "Trades", at: null, value: "Closed" } : { label: "Trades close", at: deadline },
+    !nextRun
+      ? { label: "Next run", at: null, value: "None left" }
+      : nextRun.dueAt
+        ? { label: "Next run", at: nextRun.dueAt }
+        : { label: "Next run", at: null, value: `48h after ${formatEpisodeCasual(nextRun.weekNumber)} results` },
+  ];
+
   return (
-    <TradesPanel
-      leagueId={id}
-      closeHref={closeHref}
-      teamId={myTeamId}
-      managerNames={base.nameByManager}
-      coupleDisplayNames={Object.fromEntries(base.allDisplayNames)}
-      behind={behind}
-      pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
-      deadline={deadline ?? null}
-      closed={deadlinePassed || !nextRun}
-      nextRun={nextRun}
-      cashRoom={Number(cashRoom ?? 0)}
-      rosters={behind ? [] : rosters}
-      offers={behind ? [] : trades.filter((trade) => trade.status === "proposed")}
-      waiting={behind ? [] : trades.filter((trade) => trade.status === "accepted")}
-      log={trades.filter((trade) => tradeLogVisible(trade, cutoffWeek, behind))}
-    />
+    <RosterMovesFrame leagueId={id} back={back} tabs={tabs} selected="trades" from={closeHref} facts={facts}>
+      <TradesPanel
+        leagueId={id}
+        teamId={myTeamId}
+        managerNames={base.nameByManager}
+        coupleDisplayNames={Object.fromEntries(base.allDisplayNames)}
+        behind={behind}
+        pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
+        closed={closed}
+        nextRun={nextRun}
+        cashRoom={Number(cashRoom ?? 0)}
+        rosters={behind ? [] : rosters}
+        offers={behind ? [] : trades.filter((trade) => trade.status === "proposed")}
+        waiting={behind ? [] : trades.filter((trade) => trade.status === "accepted")}
+        log={trades.filter((trade) => tradeLogVisible(trade, cutoffWeek, behind))}
+      />
+    </RosterMovesFrame>
   );
 }

@@ -3,7 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { nextPredictedElimination } from "@/lib/grand-finale-pins";
 import type { LeagueHomeSummary } from "@/lib/league-home-summary";
-import { danceCardRosterNames, type ModuleStackInput } from "@/lib/league-triage";
+import { danceCardRosterNames, mapRosterMoveCouples, type ModuleStackInput } from "@/lib/league-triage";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { loadAllCouples } from "@/lib/viewer-season-data";
 
@@ -98,11 +98,10 @@ export async function loadModuleStackInputs(
               }))
             ),
             moves: {
-              lifeline: s.rosterMoves.lifeline && {
-                ...s.rosterMoves.lifeline,
-                picks: s.rosterMoves.lifeline.picks.map(fullNameOf),
-              },
-              waivers: s.rosterMoves.waivers && { ...s.rosterMoves.waivers, adds: named(s.rosterMoves.waivers.adds) },
+              ...mapRosterMoveCouples(
+                s.rosterMoves,
+                (id) => fullNameOf(id) ?? { id, celebrity: "Unknown", pro: "Unknown" }
+              ),
               trades: s.rosterMoves.trades && {
                 ...s.rosterMoves.trades,
                 acceptedWith: s.rosterMoves.trades.acceptedWith.map((managerIds) =>

@@ -1,9 +1,12 @@
-import Link from "next/link";
-import { XIcon } from "lucide-react";
 import { RecastPanel, type RecastSpot } from "@/components/recast-panel";
+import { RosterMovesFrame, type RosterMovesFact } from "@/components/roster-moves-frame";
+import { RosterMovesUnavailable } from "@/components/roster-moves-unavailable";
+import { formatEpisodeCasual } from "@/lib/format-week";
 import { loadLeaguePageBase } from "@/lib/league-page-data";
 import { isRecastMiss, recastDraftRank, recastOrder, recastWire } from "@/lib/recast";
 import { classifyRosterOccupancy } from "@/lib/recast-framing";
+import { loadRosterMoveTabs } from "@/lib/roster-moves-data";
+import { rosterMovesBackLabel } from "@/lib/roster-moves-pages";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,6 +24,7 @@ export default async function WaiversPage({
   const { league, members, myTeamId, cutoff, finaleWeekNumber } = base;
 
   const closeHref = safeRelativePath(from, `/leagues/${id}/picks`);
+  const back = { href: closeHref, label: rosterMovesBackLabel(closeHref, id) };
   const unavailable = !base.danceCardOn
     ? {
         title: "Dance Card Isn't On",
@@ -35,19 +39,9 @@ export default async function WaiversPage({
         ? { title: "Recast Opens After the Draft", body: "There are no rosters to change until the draft is complete." }
         : null;
 
-  if (unavailable) {
-    return (
-      <div className="flex flex-col items-center gap-4 px-4 py-24 text-center">
-        <Link href={closeHref} aria-label="Close" className="self-start text-muted-foreground hover:text-foreground">
-          <XIcon className="size-5" />
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">{unavailable.title}</h1>
-        <p className="text-sm text-muted-foreground">{unavailable.body}</p>
-      </div>
-    );
-  }
+  if (unavailable) return <RosterMovesUnavailable back={back} {...unavailable} />;
 
-  const [{ data: cycleRows }, { data: pendingDrops }, { data: claims }, { data: cycles }] = await Promise.all([
+  const [{ data: cycleRows }, { data: pendingDrops }, { data: claims }, { data: cycles }, { tabs }] = await Promise.all([
     supabase.rpc("recast_next_cycle", { p_league_id: id }),
     supabase.rpc("recast_pending_drops", { p_league_id: id }),
     // RLS returns this team's own claims plus every awarded one.
@@ -56,6 +50,7 @@ export default async function WaiversPage({
       .select("id, manager_id, couple_id, drop_couple_id, slot_number, status, result, priority_order, week_number, start_week")
       .eq("league_id", id),
     supabase.from("recast_cycles").select("week_number").eq("league_id", id),
+    loadRosterMoveTabs(supabase, base),
   ]);
 
   const cycle = cycleRows?.[0];
@@ -116,43 +111,53 @@ export default async function WaiversPage({
     })
   );
 
+  const facts: RosterMovesFact[] = nextRun
+    ? [
+        nextRun.dueAt
+          ? { label: "Next run", at: nextRun.dueAt }
+          : { label: "Next run", at: null, value: `48h after ${formatEpisodeCasual(nextRun.weekNumber)} results` },
+        { label: "Claims start", at: null, value: formatEpisodeCasual(nextRun.startWeek) },
+      ]
+    : [{ label: "Waiver runs", at: null, value: "Done for the season" }];
+
   return (
-    <RecastPanel
-      leagueId={id}
-      closeHref={closeHref}
-      nextRun={nextRun}
-      pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
-      behind={cutoff.pendingRevealEpisode != null}
-      list={ownClaims
-        .filter((claim) => claim.status === "pending")
-        .sort((a, b) => (a.priority_order ?? 0) - (b.priority_order ?? 0))
-        .map((claim) => ({ coupleId: claim.couple_id, slotNumber: claim.slot_number, dropCoupleId: claim.drop_couple_id }))}
-      spots={spots}
-      wire={wire}
-      order={order}
-      orderThroughWeek={cutoffWeek}
-      teamId={myTeamId}
-      managerNames={base.nameByManager}
-      coupleDisplayNames={Object.fromEntries(base.allDisplayNames)}
-      misses={ownClaims
-        .filter((claim) => claim.status === "rejected" && claim.week_number === lastRunWeek)
-        .sort((a, b) => (a.priority_order ?? 0) - (b.priority_order ?? 0))
-        .flatMap((claim) => (isRecastMiss(claim.result) ? [{ coupleId: claim.couple_id, result: claim.result }] : []))}
-      log={(claims ?? [])
-        .filter((claim) => claim.status === "approved" && cutoffWeek != null && claim.week_number <= cutoffWeek)
-        .sort(
-          (a, b) =>
-            b.week_number - a.week_number ||
-            (base.nameByManager[a.manager_id] ?? "").localeCompare(base.nameByManager[b.manager_id] ?? "")
-        )
-        .map((claim) => ({
-          id: claim.id,
-          managerId: claim.manager_id,
-          coupleId: claim.couple_id,
-          dropCoupleId: claim.drop_couple_id,
-          weekNumber: claim.week_number,
-          startWeek: claim.start_week,
-        }))}
-    />
+    <RosterMovesFrame leagueId={id} back={back} tabs={tabs} selected="recast" from={closeHref} facts={facts}>
+      <RecastPanel
+        leagueId={id}
+        nextRun={nextRun}
+        pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
+        behind={cutoff.pendingRevealEpisode != null}
+        list={ownClaims
+          .filter((claim) => claim.status === "pending")
+          .sort((a, b) => (a.priority_order ?? 0) - (b.priority_order ?? 0))
+          .map((claim) => ({ coupleId: claim.couple_id, slotNumber: claim.slot_number, dropCoupleId: claim.drop_couple_id }))}
+        spots={spots}
+        wire={wire}
+        order={order}
+        orderThroughWeek={cutoffWeek}
+        teamId={myTeamId}
+        managerNames={base.nameByManager}
+        coupleDisplayNames={Object.fromEntries(base.allDisplayNames)}
+        misses={ownClaims
+          .filter((claim) => claim.status === "rejected" && claim.week_number === lastRunWeek)
+          .sort((a, b) => (a.priority_order ?? 0) - (b.priority_order ?? 0))
+          .flatMap((claim) => (isRecastMiss(claim.result) ? [{ coupleId: claim.couple_id, result: claim.result }] : []))}
+        log={(claims ?? [])
+          .filter((claim) => claim.status === "approved" && cutoffWeek != null && claim.week_number <= cutoffWeek)
+          .sort(
+            (a, b) =>
+              b.week_number - a.week_number ||
+              (base.nameByManager[a.manager_id] ?? "").localeCompare(base.nameByManager[b.manager_id] ?? "")
+          )
+          .map((claim) => ({
+            id: claim.id,
+            managerId: claim.manager_id,
+            coupleId: claim.couple_id,
+            dropCoupleId: claim.drop_couple_id,
+            weekNumber: claim.week_number,
+            startWeek: claim.start_week,
+          }))}
+      />
+    </RosterMovesFrame>
   );
 }

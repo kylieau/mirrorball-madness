@@ -75,7 +75,7 @@ export async function loadHomeRosterMoves(
     waiversOn
       ? supabase
           .from("waiver_claims")
-          .select("couple_id")
+          .select("couple_id, drop_couple_id")
           .eq("league_id", league.id)
           .eq("manager_id", myTeamId)
           .eq("status", "pending")
@@ -84,7 +84,7 @@ export async function loadHomeRosterMoves(
     tradesOn
       ? supabase
           .from("trade_offers")
-          .select("status, expires_at, trade_parties(manager_id, accepted_at)")
+          .select("status, proposed_by, expires_at, trade_parties(manager_id, accepted_at)")
           .eq("league_id", league.id)
           .in("status", ["proposed", "accepted"])
           .order("created_at")
@@ -119,9 +119,11 @@ export async function loadHomeRosterMoves(
     });
     if (state.kind !== "play") return null;
     return {
-      picks: state.slots.map(
-        (slot) => lifelinePicks.find((pick) => pick.slot_number === slot.slotNumber)?.couple_id ?? null
-      ),
+      spots: state.slots.map((slot) => ({
+        former: slot.coupleId,
+        pick: lifelinePicks.find((pick) => pick.slot_number === slot.slotNumber)?.couple_id ?? null,
+      })),
+      weekNumber: lifelineWeek.week_number,
       lockAt: lifelineLockAt ?? null,
       locked: !!lifelineLockAt && now >= new Date(lifelineLockAt).getTime(),
     };
@@ -132,12 +134,14 @@ export async function loadHomeRosterMoves(
     if (cycle?.start_week == null || !claims) return null;
     const current = slots.filter((slot) => slot.period.endWeek === null);
     return {
-      adds: claims.map((claim) => claim.couple_id),
+      claims: claims.map((claim) => ({ add: claim.couple_id, drop: claim.drop_couple_id })),
       // A spot with no couple at all was emptied by a trade.
       openSpotCount:
         partitionRecastSlots(current, spoiler.cutoffWeek, spoiler.finaleWeekNumber).revealedOpen.length +
         Math.max(0, league.roster_size - current.length),
       dueAt: cycle.due_at as string | null,
+      weekNumber: cycle.week_number,
+      startWeek: cycle.start_week,
     };
   })();
 
@@ -147,11 +151,11 @@ export async function loadHomeRosterMoves(
     return {
       // An offer lapses before the waiver run marks it expired, and once the
       // trade deadline has passed none can be accepted.
-      offerExpiries: mine.flatMap((offer) => {
+      offers: mine.flatMap((offer) => {
         const expiresAt = offerExpiresAt(offer.expires_at, tradeDeadline ?? null);
         const open = !!tradeDeadline && new Date(expiresAt).getTime() > now;
         const answered = offer.trade_parties.some((party) => party.manager_id === myTeamId && party.accepted_at);
-        return offer.status === "proposed" && open && !answered ? [expiresAt] : [];
+        return offer.status === "proposed" && open && !answered ? [{ from: offer.proposed_by, expiresAt }] : [];
       }),
       acceptedWith: mine
         .filter((offer) => offer.status === "accepted")

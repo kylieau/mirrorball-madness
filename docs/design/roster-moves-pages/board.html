@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Roster Moves · the Picks card and its pages</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../picks-roster-moves/mock.css" />
+<link rel="stylesheet" href="pages.css" />
+</head>
+<body>
+
+<div id="board-card">
+<h1 class="board-title">1 · The Roster Moves card on Picks</h1>
+<p class="board-sub">Mocks, not production UI. Couples are real; the league, the managers and the points are made up. A manager whose second couple went home, in a league with Lifeline, Recast and Trades all on. Top: nothing handled yet. Bottom: a Lifeline saved, two waiver claims saved, a trade accepted.</p>
+<div class="board">
+
+<div class="col">
+  <p class="cap">Now</p>
+  <p class="capsub">Three buttons, then the Lifeline and waiver lines in one block under them. Nothing ties a line to its button, the buttons look the same whether or not something is waiting, and Trades has no line at all, so an offer waiting on you is invisible here.</p>
+  <p class="state">Needs you</p>
+  <div class="phone"><div class="page"><div class="card">
+    <div class="card-title">Roster Moves</div>
+    <div class="btn-row"><span class="btn">Lifeline</span><span class="btn">Recast</span><span class="btn">Trades</span></div>
+    <div class="lines"><span class="lbl">Week 10 Lifeline</span><span class="xs gold"><span class="g need">◌</span>1 empty roster spot · No Lifeline saved</span><span class="xs">None saved · Locks today 5 PM PT.</span></div>
+    <div class="lines"><span class="lbl">Waiver Claims</span><span class="xs gold"><span class="g need">◌</span>1 open spot · No waiver claim saved</span><span class="xs"><span class="g wait">⏳</span>Next run Thursday 5 PM PT.</span><span class="xs">Winning claims start scoring in Week 11.</span></div>
+  </div></div></div>
+  <p class="state">All set</p>
+  <div class="phone"><div class="page"><div class="card">
+    <div class="card-title">Roster Moves</div>
+    <div class="btn-row"><span class="btn">Lifeline</span><span class="btn">Recast</span><span class="btn">Trades</span></div>
+    <div class="lines"><span class="lbl">Week 10 Lifeline</span><span class="xs"><span class="g ok">✓</span><b>Maura &amp; Mark</b>, in place of Taylor &amp; Britt</span><span class="xs">Saved · Locks today 5 PM PT.</span></div>
+    <div class="lines"><span class="lbl">Waiver Claims</span><span class="xs"><span class="g wait">⏳</span>1 · Add <b>Tatyana &amp; Jan</b>, open spot</span><span class="xs"><span class="g wait">⏳</span>2 · Add <b>Connor &amp; Rylee</b>, open spot</span><span class="xs">2 saved, waiting on the run · Thursday 5 PM PT.</span><span class="xs">Winning claims start scoring in Week 11.</span></div>
+  </div></div></div>
+</div>
+
+<div class="col">
+  <p class="cap">A · One row per move <span class="rec">Recommended</span></p>
+  <p class="capsub">Each mechanism is one tappable row: its name, its clock on the right, its lines under it, and the whole row opens its page. Gold only on the row that needs you. Trades gets its line (offers waiting on you, trades waiting on the run). The same words as today, and the same lines as the Home card. It keeps its name, Recast; the lines under it say "waiver", like the rest of the in-app copy.</p>
+  <p class="state">Needs you</p>
+  <div class="phone"><div class="page"><div class="card">
+    <div class="card-title">Roster Moves</div>
+    <div class="mrows">
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Lifeline · Week 10</span><span class="when">Locks today 5 PM PT</span></div><span class="xs gold"><span class="g need">◌</span>1 empty roster spot · No Lifeline saved</span></div><span class="ch">›</span></div>
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Recast</span><span class="when">Runs Thursday 5 PM PT</span></div><span class="xs gold"><span class="g need">◌</span>1 open spot · No waiver claim saved</span><span class="xs">Winning claims start scoring in Week 11.</span></div><span class="ch">›</span></div>
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Trades</span><span class="when">Ends in 20h</span></div><span class="xs gold"><span class="g need">◌</span>1 offer from Kim is waiting on you</span></div><span class="ch">›</span></div>
+    </div>
+  </div></div></div>
+  <p class="state">All set</p>
+  <div class="phone"><div class="page"><div class="card">
+    <div class="card-title">Roster Moves</div>
+    <div class="mrows">
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Lifeline · Week 10</span><span class="when">Locks today 5 PM PT</span></div><span class="xs"><span class="g ok">✓</span><b>Maura &amp; Mark</b>, in place of Taylor &amp; Britt</span></div><span class="ch">›</span></div>
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Recast</span><span class="when">Runs Thursday 5 PM PT</span></div><span class="xs"><span class="g wait">⏳</span>1 · Add <b>Tatyana &amp; Jan</b>, open spot</span><span class="xs"><span class="g wait">⏳</span>2 · Add <b>Connor &amp; Rylee</b>, open spot</span><span class="xs">Winning claims start scoring in Week 11.</span></div><span class="ch">›</span></div>
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Trades</span><span class="when">At the run</span></div><span class="xs"><span class="g wait">⏳</span>Trade with Kim, accepted</span></div><span class="ch">›</span></div>
+    </div>
+  </div></div></div>
+</div>
+
+<div class="col">
+  <p class="cap">B · Keep the buttons, add a dot</p>
+  <p class="capsub">The smallest change: the buttons stay, a gold dot marks the one that needs you, each block's label matches its button, and Trades gets a block. Still two places to look (the button, then its lines), and the card gets taller.</p>
+  <p class="state">Needs you</p>
+  <div class="phone"><div class="page"><div class="card">
+    <div class="card-title">Roster Moves</div>
+    <div class="btn-row"><span class="btn">Lifeline<i class="dot"></i></span><span class="btn">Recast<i class="dot"></i></span><span class="btn">Trades<i class="dot"></i></span></div>
+    <div class="lines"><span class="lbl">Lifeline · Week 10</span><span class="xs gold"><span class="g need">◌</span>1 empty roster spot · No Lifeline saved</span><span class="xs">Locks today 5 PM PT.</span></div>
+    <div class="lines"><span class="lbl">Recast</span><span class="xs gold"><span class="g need">◌</span>1 open spot · No waiver claim saved</span><span class="xs">Next run Thursday 5 PM PT. Winning claims start scoring in Week 11.</span></div>
+    <div class="lines"><span class="lbl">Trades</span><span class="xs gold"><span class="g need">◌</span>1 offer from Kim is waiting on you</span><span class="xs">Ends in 20h.</span></div>
+  </div></div></div>
+  <p class="state">All set</p>
+  <div class="phone"><div class="page"><div class="card">
+    <div class="card-title">Roster Moves</div>
+    <div class="btn-row"><span class="btn">Lifeline</span><span class="btn">Recast</span><span class="btn">Trades</span></div>
+    <div class="lines"><span class="lbl">Lifeline · Week 10</span><span class="xs"><span class="g ok">✓</span><b>Maura &amp; Mark</b>, in place of Taylor &amp; Britt</span><span class="xs">Saved · Locks today 5 PM PT.</span></div>
+    <div class="lines"><span class="lbl">Recast</span><span class="xs"><span class="g wait">⏳</span>1 · Add <b>Tatyana &amp; Jan</b>, open spot</span><span class="xs"><span class="g wait">⏳</span>2 · Add <b>Connor &amp; Rylee</b>, open spot</span><span class="xs">Runs Thursday 5 PM PT. Winning claims start scoring in Week 11.</span></div>
+    <div class="lines"><span class="lbl">Trades</span><span class="xs"><span class="g wait">⏳</span>Trade with Kim, accepted · At the run</span></div>
+  </div></div></div>
+</div>
+
+</div>
+</div>
+
+<div id="board-pages">
+<h1 class="board-title">2 · The pages the card opens</h1>
+<p class="board-sub">One shared frame for all three: a back link that says where it goes, a switch between the moves this league has on (gold dot = needs you), the two facts that matter as a strip, then your own to-do first. The rules and the reference lists fold away at the bottom instead of filling the page.</p>
+<div class="board">
+
+<div class="col">
+  <p class="cap">Now · Recast</p>
+  <p class="capsub">A bare ✕, three lines of intro, then five cards of equal weight. A claim is two dropdowns (Add, In Place Of). The Wire repeats the same couples as a read-only list. The order and seven rules bullets are always open, so the page is about four screens long before anything happens.</p>
+  <div class="phone"><div class="page">
+    <span class="back" style="font-size:18px">✕</span>
+    <div><div class="ptitle">Recast</div><div class="walltext" style="margin-top:4px"><span>Mirrorball's waiver wire.</span><span>Next waiver run: Thursday 5 PM PT.</span><span>A claim that wins starts scoring for you in Week 11.</span></div></div>
+    <div class="card"><div><div class="card-title">Your Waiver List</div><div class="card-desc">Ranked, and private until the run. Your turn takes the highest claim that can still win; a drop only happens if its claim does.</div></div><span class="mut">No claims yet.</span>
+      <div class="field"><span class="lbl">Add</span><div class="select">Choose a couple… <span>⌄</span></div></div>
+      <div class="field"><span class="lbl">In Place Of</span><div class="select">Choose a spot… <span>⌄</span></div></div>
+      <span class="btn" style="align-self:flex-start;opacity:.5">Add to List</span></div>
+    <div class="card"><div><div class="card-title">The Wire</div><div class="card-desc">3 couples you can claim.</div></div><div class="walltext"><span>Tatyana &amp; Jan</span><span>Connor &amp; Rylee</span><span>Ezra &amp; Daniella</span></div></div>
+    <div class="card"><div><div class="card-title">Waiver Order</div><div class="card-desc">Reverse standings through Week 9: lowest season total first, then the lower latest week, then the later draft pick. It is set when the run starts and says nothing about who gets whom.</div></div><div class="rows"><div class="row"><span class="rank">1</span><span class="grow">Pat</span><b>301.20</b></div><div class="row"><span class="rank">2</span><span class="grow">Kim</span><b>388.75</b></div><div class="row"><span class="rank">3</span><span class="grow">You</span><b>412.35</b></div></div></div>
+    <div class="card"><div><div class="card-title">Adds and Drops</div><div class="card-desc">Every claim awarded in this league.</div></div><span class="mut">Nothing yet.</span></div>
+    <div class="card"><div class="card-title">How Recast Works</div><div class="walltext"><span>• Recast is Mirrorball's waiver wire. Rank the claims you want: each one fills an open roster spot or swaps out a couple you hold.</span><span>• Waiver lists are private. A waiver run decides every list 48 hours after a week's results are posted, with no commissioner step.</span><span>• Managers take turns in reverse standings order…</span><span class="mut">…four more bullets</span></div></div>
+  </div></div>
+</div>
+
+<div class="col">
+  <p class="cap">Recast <span class="rec">Proposed</span></p>
+  <p class="capsub">The Wire becomes the way to claim: tap Claim on a couple, pick the spot in a small sheet (one choice when there is one open spot), and it lands on your list. No dropdown pair. Your list comes first with its reorder arrows. Order shows your turn in its title and opens on tap; the rules open on tap.</p>
+  <div class="phone"><div class="page">
+    <span class="back">‹ Picks</span>
+    <div class="ptitle">Roster Moves</div>
+    <div class="seg"><span>Lifeline</span><span class="on">Recast</span><span>Trades<i class="dot"></i></span></div>
+    <div class="facts"><div class="fact"><small>Next run</small><b>Thu 5 PM PT</b></div><div class="fact"><small>Claims start</small><b>Week 11</b></div></div>
+    <div class="card"><div><div class="card-title">Your Waiver List</div><div class="card-desc">Private until the run. Your turn takes your highest claim that can still win.</div></div>
+      <div class="rows">
+        <div class="row"><span class="rank">1</span><span class="grow"><b>Tatyana &amp; Jan</b><small>For your open spot</small></span><span class="ib">↑</span><span class="ib">↓</span><span class="ib">✕</span></div>
+        <div class="row"><span class="rank">2</span><span class="grow"><b>Connor &amp; Rylee</b><small>For your open spot</small></span><span class="ib">↑</span><span class="ib">↓</span><span class="ib">✕</span></div>
+      </div></div>
+    <div class="card"><div><div class="card-title">The Wire</div><div class="card-desc">3 couples you can claim.</div></div>
+      <div class="rows">
+        <div class="row"><span class="grow"><b>Tatyana &amp; Jan</b></span><span class="chip">On your list · 1</span></div>
+        <div class="row"><span class="grow"><b>Connor &amp; Rylee</b></span><span class="chip">On your list · 2</span></div>
+        <div class="row"><span class="grow"><b>Ezra &amp; Daniella</b><small>Kim may drop them in this run</small></span><span class="btn sm">Claim</span></div>
+      </div></div>
+    <div class="fold"><span>Waiver Order<small>You're 3rd of 6</small></span><span class="ch">⌄</span></div>
+    <div class="fold"><span>Adds and Drops<small>None yet</small></span><span class="ch">⌄</span></div>
+    <div class="fold"><span>How Recast Works</span><span class="ch">⌄</span></div>
+  </div></div>
+</div>
+
+<div class="col">
+  <p class="cap">Trades <span class="rec">Proposed</span></p>
+  <p class="capsub">Offers waiting on you come first, each read as "You give / You get" instead of a list of legs. Proposing is the same two boxes with an Add line in each, which covers the usual two-team swap; "Add another manager" opens the full who-sends-what form that exists today. Log and rules fold away.</p>
+  <div class="phone"><div class="page">
+    <span class="back">‹ Picks</span>
+    <div class="ptitle">Roster Moves</div>
+    <div class="seg"><span>Lifeline</span><span>Recast</span><span class="on">Trades<i class="dot"></i></span></div>
+    <div class="facts"><div class="fact"><small>Trades close</small><b>Tue 5 PM PT</b></div><div class="fact"><small>Takes effect</small><b>Thu run · Week 11</b></div></div>
+    <div class="card gold"><div><div class="card-title">Offer From Kim</div><div class="card-desc">Ends in 20h. Private until you both accept.</div></div>
+      <div class="swap"><div class="side"><small>You give</small><b>Harry &amp; Jenna</b></div><div class="side"><small>You get</small><b>Maura &amp; Mark</b><span>4.50 pts</span></div></div>
+      <div class="btn-row"><span class="btn primary">Accept</span><span class="btn">Decline</span></div></div>
+    <div class="card"><div><div class="card-title">Propose a Trade</div><div class="card-desc">You can send up to 41.20 pts.</div></div>
+      <div class="field"><span class="lbl">With</span><div class="select">Pat <span>⌄</span></div></div>
+      <div class="swap"><div class="side"><small>You give</small><b>Harry &amp; Jenna</b><span class="add">+ Add a couple or points</span></div><div class="side"><small>You get</small><span class="add">+ Add a couple or points</span></div></div>
+      <span class="xs">+ Add another manager</span>
+      <span class="btn primary" style="align-self:flex-start;opacity:.5">Send Offer</span></div>
+    <div class="fold"><span>Trade Log<small>None yet</small></span><span class="ch">⌄</span></div>
+    <div class="fold"><span>How Trades Work</span><span class="ch">⌄</span></div>
+  </div></div>
+</div>
+
+<div class="col">
+  <p class="cap">Lifeline <span class="rec">Proposed</span></p>
+  <p class="capsub">Same frame. One block per empty spot naming the couple who left it, the choice, and what it pays in plain words. After the lock the league's Lifelines list sits under it, as now. A manager with no empty spot sees only that list and one line saying so.</p>
+  <div class="phone"><div class="page">
+    <span class="back">‹ Picks</span>
+    <div class="ptitle">Roster Moves</div>
+    <div class="seg"><span class="on">Lifeline<i class="dot"></i></span><span>Recast</span><span>Trades<i class="dot"></i></span></div>
+    <div class="facts"><div class="fact"><small>Week 10 locks</small><b>Today 5 PM PT</b></div><div class="fact"><small>Pays</small><b>Half their Dance Card</b></div></div>
+    <div class="card"><div><div class="card-title">Your Week 10 Lifeline</div><div class="card-desc">A stand-in for a roster spot whose couple went home. Pick again each week.</div></div>
+      <div class="field"><span class="lbl">In place of Taylor &amp; Britt</span><div class="select">Choose a couple… <span>⌄</span></div><span class="xs gold"><span class="g need">◌</span>No pick yet</span></div>
+      <span class="btn primary" style="align-self:flex-start;opacity:.5">Save Lifeline</span></div>
+    <div class="fold"><span>League Lifelines<small>Shown once Week 10 locks</small></span><span class="ch">⌄</span></div>
+    <div class="fold"><span>How Lifeline Works</span><span class="ch">⌄</span></div>
+  </div></div>
+</div>
+
+</div>
+</div>
+
+<div id="board-fit">
+<h1 class="board-title">3 · Making the card and the pages match</h1>
+<p class="board-sub">Kylie picked A and the page frame, loves the switch, and finds the jump from a vertical list to a horizontal switch incongruent. Each column: the card on Picks, then the top of the Recast page you land on after tapping Recast.</p>
+<div class="board">
+
+<div class="col">
+  <p class="cap">As picked</p>
+  <p class="capsub">The mismatch: three stacked rows with a › each promise "this row has its own page". The page then shows the same three as side-by-side tabs under a title that repeats the card's. Same set, two shapes, and the row you tapped isn't recognisably the tab you land on.</p>
+  <p class="state">Picks</p>
+  <div class="phone"><div class="page"><div class="card"><div class="card-title">Roster Moves</div><div class="mrows">
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Lifeline · Week 10</span><span class="when">Locks today 5 PM PT</span></div><span class="xs gold"><span class="g need">◌</span>1 empty roster spot · No Lifeline saved</span></div><span class="ch">›</span></div>
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Recast</span><span class="when">Runs Thursday 5 PM PT</span></div><span class="xs gold"><span class="g need">◌</span>1 open spot · No waiver claim saved</span><span class="xs">Winning claims start scoring in Week 11.</span></div><span class="ch">›</span></div>
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Trades</span><span class="when">Ends in 20h</span></div><span class="xs gold"><span class="g need">◌</span>1 offer from Kim is waiting on you</span></div><span class="ch">›</span></div>
+    </div></div></div></div>
+  <p class="state">After tapping Recast</p>
+  <div class="phone"><div class="page"><span class="back">‹ Picks</span><div class="ptitle">Roster Moves</div><div class="seg"><span>Lifeline<i class="dot"></i></span><span class="on">Recast<i class="dot"></i></span><span>Trades<i class="dot"></i></span></div><div class="facts"><div class="fact"><small>Next run</small><b>Thu 5 PM PT</b></div><div class="fact"><small>Claims start</small><b>Week 11</b></div></div>
+    <div class="card"><div><div class="card-title">Your Waiver List</div><div class="card-desc">Private until the run.</div></div><span class="mut">No claims yet. Tap Claim on a couple below.</span></div></div></div>
+</div>
+
+<div class="col">
+  <p class="cap">C · The switch on the card too <span class="rec">Recommended</span></p>
+  <p class="capsub">One control in both places. The card's header is the switch, each tab carrying its status word, so all three still read at a glance. Under it, the selected move's lines (it opens on the first one that needs you) and one Open link. The page has the identical switch in the same spot, on the tab you were on.</p>
+  <p class="state">Picks · needs you</p>
+  <div class="phone"><div class="page"><div class="card"><div class="card-title">Roster Moves</div><div class="seg two"><span>Lifeline<small class="gold">◌ No pick</small></span><span class="on">Recast<small class="gold">◌ Open spot</small></span><span>Trades<small class="gold">◌ 1 offer</small></span></div>
+    <div class="lines"><span class="xs gold"><span class="g need">◌</span>1 open spot · No waiver claim saved</span><span class="xs"><span class="g wait">⏳</span>Runs Thursday 5 PM PT.</span><span class="xs">Winning claims start scoring in Week 11.</span></div>
+    <span class="open">Open Recast ›</span></div></div></div>
+  <p class="state">Picks · all set</p>
+  <div class="phone"><div class="page"><div class="card"><div class="card-title">Roster Moves</div><div class="seg two"><span>Lifeline<small class="ok">✓ Saved</small></span><span class="on">Recast<small class="">⏳ 2 claims</small></span><span>Trades<small class="">⏳ Accepted</small></span></div>
+    <div class="lines"><span class="xs"><span class="g wait">⏳</span>1 · Add <b>Tatyana &amp; Jan</b>, open spot</span><span class="xs"><span class="g wait">⏳</span>2 · Add <b>Connor &amp; Rylee</b>, open spot</span><span class="xs">Runs Thursday 5 PM PT. Winning claims start scoring in Week 11.</span></div>
+    <span class="open">Open Recast ›</span></div></div></div>
+  <p class="state">After tapping Open Recast</p>
+  <div class="phone"><div class="page"><span class="back">‹ Picks</span><div class="ptitle">Roster Moves</div><div class="seg two"><span>Lifeline<small class="gold">◌ No pick</small></span><span class="on">Recast<small class="gold">◌ Open spot</small></span><span>Trades<small class="gold">◌ 1 offer</small></span></div><div class="facts"><div class="fact"><small>Next run</small><b>Thu 5 PM PT</b></div><div class="fact"><small>Claims start</small><b>Week 11</b></div></div>
+    <div class="card"><div><div class="card-title">Your Waiver List</div><div class="card-desc">Private until the run.</div></div><span class="mut">No claims yet. Tap Claim on a couple below.</span></div></div></div>
+</div>
+
+<div class="col">
+  <p class="cap">D · Rows stay, the switch echoes them</p>
+  <p class="capsub">The smallest change: the card keeps A's rows, so every line shows without a tap. The page's tabs keep the rows' order and names and carry the same mark as each row (◌ ✓ ⏳) instead of a dot. Softer than C: it is still a list that turns into tabs.</p>
+  <p class="state">Picks</p>
+  <div class="phone"><div class="page"><div class="card"><div class="card-title">Roster Moves</div><div class="mrows">
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Lifeline · Week 10</span><span class="when">Locks today 5 PM PT</span></div><span class="xs gold"><span class="g need">◌</span>1 empty roster spot · No Lifeline saved</span></div><span class="ch">›</span></div>
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Recast</span><span class="when">Runs Thursday 5 PM PT</span></div><span class="xs gold"><span class="g need">◌</span>1 open spot · No waiver claim saved</span><span class="xs">Winning claims start scoring in Week 11.</span></div><span class="ch">›</span></div>
+      <div class="mrow"><div class="body"><div class="top"><span class="name">Trades</span><span class="when">Ends in 20h</span></div><span class="xs gold"><span class="g need">◌</span>1 offer from Kim is waiting on you</span></div><span class="ch">›</span></div>
+    </div></div></div></div>
+  <p class="state">After tapping Recast</p>
+  <div class="phone"><div class="page"><span class="back">‹ Picks</span><div class="ptitle">Roster Moves</div><div class="seg"><span><span class="g need">◌</span>Lifeline</span><span class="on"><span class="g need">◌</span>Recast</span><span><span class="g need">◌</span>Trades</span></div><div class="facts"><div class="fact"><small>Next run</small><b>Thu 5 PM PT</b></div><div class="fact"><small>Claims start</small><b>Week 11</b></div></div>
+    <div class="card"><div><div class="card-title">Your Waiver List</div><div class="card-desc">Private until the run.</div></div><span class="mut">No claims yet. Tap Claim on a couple below.</span></div></div></div>
+</div>
+
+</div>
+</div>
+
+<div id="board-seg">
+<h1 class="board-title">4 · C, with or without the status word</h1>
+<p class="board-sub">Kylie picked C and asked whether the switch needs its second line. Both variants, in the same two states.</p>
+<div class="board">
+
+<div class="col">
+  <p class="cap">C1 · Plain tabs, a gold dot <span class="rec">Recommended</span></p>
+  <p class="capsub">The tabs are only names, one line tall, the same switch as the pages exactly. A gold dot marks a tab that needs you; a tab with nothing to do has nothing. The lines under the switch carry everything else. You lose the "2 claims" / "Accepted" read on the tabs you are not on, but those were never urgent, and every needs-you is still marked.</p>
+  <p class="state">Needs you</p>
+  <div class="phone"><div class="page"><div class="card"><div class="card-title">Roster Moves</div><div class="seg"><span>Lifeline<i class="dot"></i></span><span class="on">Recast<i class="dot"></i></span><span>Trades<i class="dot"></i></span></div><div class="lines"><span class="xs gold"><span class="g need">◌</span>1 open spot · No waiver claim saved</span><span class="xs"><span class="g wait">⏳</span>Runs Thursday 5 PM PT.</span><span class="xs">Winning claims start scoring in Week 11.</span></div><span class="open">Open Recast ›</span></div></div></div>
+  <p class="state">All set</p>
+  <div class="phone"><div class="page"><div class="card"><div class="card-title">Roster Moves</div><div class="seg"><span>Lifeline</span><span class="on">Recast</span><span>Trades</span></div><div class="lines"><span class="xs"><span class="g wait">⏳</span>1 · Add <b>Tatyana &amp; Jan</b>, open spot</span><span class="xs"><span class="g wait">⏳</span>2 · Add <b>Connor &amp; Rylee</b>, open spot</span><span class="xs">Runs Thursday 5 PM PT. Winning claims start scoring in Week 11.</span></div><span class="open">Open Recast ›</span></div></div></div>
+</div>
+
+<div class="col">
+  <p class="cap">C2 · A status word per tab</p>
+  <p class="capsub">As mocked before. All three read at a glance without a tap, but the tabs are two lines tall, the small text is 10.5px, and the pages would need the same two-line switch to stay identical.</p>
+  <p class="state">Needs you</p>
+  <div class="phone"><div class="page"><div class="card"><div class="card-title">Roster Moves</div><div class="seg two"><span>Lifeline<small class="gold">◌ No pick</small></span><span class="on">Recast<small class="gold">◌ Open spot</small></span><span>Trades<small class="gold">◌ 1 offer</small></span></div><div class="lines"><span class="xs gold"><span class="g need">◌</span>1 open spot · No waiver claim saved</span><span class="xs"><span class="g wait">⏳</span>Runs Thursday 5 PM PT.</span><span class="xs">Winning claims start scoring in Week 11.</span></div><span class="open">Open Recast ›</span></div></div></div>
+  <p class="state">All set</p>
+  <div class="phone"><div class="page"><div class="card"><div class="card-title">Roster Moves</div><div class="seg two"><span>Lifeline<small class="ok">✓ Saved</small></span><span class="on">Recast<small class="">⏳ 2 claims</small></span><span>Trades<small class="">⏳ Accepted</small></span></div><div class="lines"><span class="xs"><span class="g wait">⏳</span>1 · Add <b>Tatyana &amp; Jan</b>, open spot</span><span class="xs"><span class="g wait">⏳</span>2 · Add <b>Connor &amp; Rylee</b>, open spot</span><span class="xs">Runs Thursday 5 PM PT. Winning claims start scoring in Week 11.</span></div><span class="open">Open Recast ›</span></div></div></div>
+</div>
+
+</div>
+</div>
+</body>
+</html>
