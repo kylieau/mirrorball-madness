@@ -53,14 +53,6 @@ Still to do:
   list, a trade offer through accept and veto. Recast, Trades, Roster Moves
   and the Lifeline page were checked with made-up data only.
 
-Review leftovers Kylie saw and passed on ("i think we are good"); don't start
-one without her say-so:
-- The `‹ Picks` back link on the Roster Moves pages is text with no 44px
-  touch area.
-- The same dead spot reads "empty roster spot" for Lifeline and "open spot"
-  for waivers.
-- Recast and Trades couple links drop the Picks weeks on the way back.
-
 Known limits, none fixed:
 - `saveLifelinePicks` clears then sets in two calls, so it isn't atomic.
 - The Equalizer is refused when a manager has no `weekly_manager_scores` row on

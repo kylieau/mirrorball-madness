@@ -35,13 +35,7 @@ export function RosterMovesFrame({
 }) {
   return (
     <div className="flex flex-col gap-3 px-4 py-12">
-      <Link
-        href={back.href}
-        className="flex items-center gap-0.5 self-start text-sm text-muted-foreground no-underline hover:text-foreground"
-      >
-        <ChevronLeftIcon aria-hidden className="size-4" />
-        {back.label}
-      </Link>
+      <RosterMovesBackLink {...back} />
       <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
       {tabs.length > 1 && (
         <RosterMovesSwitch tabs={tabs} selected={selected} hrefFor={(key) => rosterMoveTabHref(leagueId, key, from)} />
@@ -55,6 +49,20 @@ export function RosterMovesFrame({
       )}
       {children}
     </div>
+  );
+}
+
+// The link is one line of small text, so on a touch screen an invisible
+// ::before stretches its hit area to 44px tall.
+export function RosterMovesBackLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="relative flex items-center gap-0.5 self-start text-sm text-muted-foreground no-underline before:absolute before:content-[''] hover:text-foreground pointer-coarse:before:-inset-x-2 pointer-coarse:before:-inset-y-3"
+    >
+      <ChevronLeftIcon aria-hidden className="size-4" />
+      {label}
+    </Link>
   );
 }
 

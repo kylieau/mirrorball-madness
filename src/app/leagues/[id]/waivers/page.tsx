@@ -124,6 +124,7 @@ export default async function WaiversPage({
     <RosterMovesFrame leagueId={id} back={back} tabs={tabs} selected="recast" from={closeHref} facts={facts}>
       <RecastPanel
         leagueId={id}
+        historyFrom={`/leagues/${id}/waivers?from=${encodeURIComponent(closeHref)}`}
         nextRun={nextRun}
         pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
         behind={cutoff.pendingRevealEpisode != null}

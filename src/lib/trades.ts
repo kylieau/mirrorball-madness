@@ -101,7 +101,7 @@ export const TRADE_RULES = [
   "Once everyone accepts, the trade is posted to the league for 24 hours. It is vetoed if more than half of the teams not in it vote to veto.",
   "A trade takes effect at the first waiver run after its veto window closes, before any waiver claims. A traded couple starts scoring for their new manager in the next week that hasn't aired, and keeps scoring for their old one until then.",
   "Points move when the trade takes effect, onto the latest week with results. Across all their trades, a manager can send at most 10% of the points they have earned this season.",
-  "A couple coming in takes the spot of a couple going out, the spot of a couple who has gone home, or an empty spot. A trade goes through whole or not at all: if a couple in it goes home first, nothing moves.",
+  "A couple coming in takes the spot of a couple going out, the spot of a couple who has gone home, or an open spot. A trade goes through whole or not at all: if a couple in it goes home first, nothing moves.",
   "A couple in an open trade can't be in a waiver claim, and a couple in a waiver claim can't be offered in a trade.",
   "An offer expires if not everyone in it has accepted within 48 hours. Trades close at the Semi-Finals lock, and an offer still open then expires too.",
 ];

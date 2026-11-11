@@ -115,7 +115,7 @@ function LifelineStatusLines({ lifeline }: { lifeline: Moves["lifeline"] }) {
           <span className="flex gap-1.5 font-semibold text-accent">
             <CircleDashedIcon aria-hidden className={ICON} />
             <span className="min-w-0">
-              {spots.length === 1 ? "1 empty roster spot" : `${spots.length} empty roster spots`} · No Lifeline saved
+              {spots.length === 1 ? "1 open spot" : `${spots.length} open spots`} · No Lifeline saved
             </span>
           </span>
         )

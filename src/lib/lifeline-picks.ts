@@ -44,7 +44,7 @@ export function lifelineSaveSteps(changes: LifelinePickChange[]): { clear: numbe
 }
 
 export const LIFELINE_RULES = [
-  "A Lifeline stands in for a roster spot whose couple has gone home. Each week, pick one couple still dancing that you don't hold, for each empty spot.",
+  "A Lifeline stands in for a roster spot whose couple has gone home. Each week, pick one couple still dancing that you don't hold, for each open spot.",
   "It pays half of that couple's Dance Card points for the week, whatever happens to them: a couple who goes home that week still pays, and a couple with a bye pays nothing.",
   "Picks lock at the week's Lifeline lock. Until then only you can see yours; once the week locks, the league's Lifelines are listed here.",
   "A spot that gets a new couple, from the waiver wire or a trade, stops needing a Lifeline from the week they start scoring.",

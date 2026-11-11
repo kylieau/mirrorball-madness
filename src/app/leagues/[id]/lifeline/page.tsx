@@ -42,7 +42,7 @@ export default async function LifelinePage({
             ? { title: "Lifeline Is Done for the Season", body: "There are no weeks left to play a Lifeline in." }
             : {
                 title: `Lifeline Starts in ${formatEpisodeCasual(league.lifeline_starts_week ?? upcomingEpisode.week_number)}`,
-                body: "You can pick a couple for an empty roster spot once that week's picks open.",
+                body: "You can pick a couple for an open spot once that week's picks open.",
               };
     return <RosterMovesUnavailable back={back} {...reason} />;
   }

@@ -121,6 +121,7 @@ export default async function TradesPage({
     <RosterMovesFrame leagueId={id} back={back} tabs={tabs} selected="trades" from={closeHref} facts={facts}>
       <TradesPanel
         leagueId={id}
+        historyFrom={`/leagues/${id}/trades?from=${encodeURIComponent(closeHref)}`}
         teamId={myTeamId}
         managerNames={base.nameByManager}
         coupleDisplayNames={Object.fromEntries(base.allDisplayNames)}

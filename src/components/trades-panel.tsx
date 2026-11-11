@@ -70,6 +70,7 @@ function listNames(names: string[]): string {
 // form; the log and the rules fold away under them.
 export function TradesPanel({
   leagueId,
+  historyFrom,
   teamId,
   managerNames,
   coupleDisplayNames,
@@ -84,6 +85,7 @@ export function TradesPanel({
   log,
 }: {
   leagueId: string;
+  historyFrom: string;
   teamId: string;
   managerNames: Record<string, string>;
   coupleDisplayNames: Record<string, CoupleNameParts>;
@@ -118,7 +120,6 @@ export function TradesPanel({
   const [error, setError] = useState<{ at: string; message: string } | null>(null);
   const runText = useFormattedDeadline(nextRun?.dueAt);
 
-  const from = `/leagues/${leagueId}/trades`;
   const parts = (coupleId: string) => coupleDisplayNames[coupleId] ?? UNKNOWN_COUPLE;
   const managerName = (managerId: string) => managerNames[managerId] ?? "Unknown";
   const teamCount = Object.keys(managerNames).length;
@@ -151,7 +152,7 @@ export function TradesPanel({
           {leg.coupleId == null ? (
             `${formatPoints(leg.points ?? 0)} pts`
           ) : linked ? (
-            <CoupleNameLink coupleId={leg.coupleId} from={from} {...parts(leg.coupleId)} />
+            <CoupleNameLink coupleId={leg.coupleId} from={historyFrom} {...parts(leg.coupleId)} />
           ) : (
             coupleNameNode(parts(leg.coupleId))
           )}
@@ -174,7 +175,7 @@ export function TradesPanel({
         <span className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">{label}</span>
         {s?.coupleIds.map((coupleId) => (
           <span key={coupleId} className="font-medium">
-            {linked ? <CoupleNameLink coupleId={coupleId} from={from} {...parts(coupleId)} /> : coupleNameNode(parts(coupleId))}
+            {linked ? <CoupleNameLink coupleId={coupleId} from={historyFrom} {...parts(coupleId)} /> : coupleNameNode(parts(coupleId))}
           </span>
         ))}
         {s && s.points > 0 && <span className="text-muted-foreground">{formatPoints(s.points)} pts</span>}

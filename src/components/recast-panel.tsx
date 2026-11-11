@@ -49,6 +49,7 @@ const ordinal = (n: number) => `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n
 // and the rules fold away under them.
 export function RecastPanel({
   leagueId,
+  historyFrom,
   nextRun,
   pendingRevealWeek,
   behind,
@@ -64,6 +65,7 @@ export function RecastPanel({
   log,
 }: {
   leagueId: string;
+  historyFrom: string;
   nextRun: RecastNextRun | null;
   pendingRevealWeek: number | null;
   // A viewer who hasn't watched the latest results can't be shown who is
@@ -86,7 +88,6 @@ export function RecastPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const from = `/leagues/${leagueId}/waivers`;
   const parts = (coupleId: string) => coupleDisplayNames[coupleId] ?? UNKNOWN_COUPLE;
   const name = (coupleId: string) => coupleNameNode(parts(coupleId));
   const managerName = (managerId: string) => managerNames[managerId] ?? "Unknown";
@@ -256,7 +257,7 @@ export function RecastPanel({
                     className="flex items-center justify-between gap-3 border-b border-border py-2.5 first:pt-0 last:border-b-0 last:pb-0"
                   >
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <CoupleNameLink coupleId={entry.coupleId} from={from} {...parts(entry.coupleId)} />
+                      <CoupleNameLink coupleId={entry.coupleId} from={historyFrom} {...parts(entry.coupleId)} />
                       {entry.droppedBy && (
                         <span className="text-xs text-muted-foreground">
                           {managerName(entry.droppedBy)} may drop them in this run
@@ -355,10 +356,10 @@ export function RecastPanel({
             <div key={line.id} className="flex flex-col border-b border-border py-2.5 first:pt-0 last:border-b-0 last:pb-0">
               <span className="font-medium [overflow-wrap:anywhere]">{managerName(line.managerId)}</span>
               <span>
-                Added <CoupleNameLink coupleId={line.coupleId} from={from} {...parts(line.coupleId)} />
+                Added <CoupleNameLink coupleId={line.coupleId} from={historyFrom} {...parts(line.coupleId)} />
                 {line.dropCoupleId ? (
                   <>
-                    , dropped <CoupleNameLink coupleId={line.dropCoupleId} from={from} {...parts(line.dropCoupleId)} />
+                    , dropped <CoupleNameLink coupleId={line.dropCoupleId} from={historyFrom} {...parts(line.dropCoupleId)} />
                   </>
                 ) : (
                   " in an open spot"

@@ -126,7 +126,7 @@ export function LifelineCard({
           </CardTitle>
           <CardDescription>
             {slots.length === 0
-              ? "You have no empty roster spot this week."
+              ? "You have no open spot this week."
               : `A stand-in for ${several ? "each roster spot" : "a roster spot"} whose couple went home. You earn half their Dance Card points ${
                   week.isFinale ? "in the Finale" : "this week, even if they go home"
                 }. Pick again each week.`}
