@@ -84,10 +84,11 @@ describe("buildLifelinePayouts", () => {
   });
 
   it("pays every Finale couple, whatever its placement", () => {
-    // Fourth's Finale is judges only: 24 × 0.2731 = 6.55. Star's is 8.19
-    // and a fourth survival step, 0.80.
+    // Fourth is entered as Eliminated but survives the Finale like the
+    // podium: 24 × 0.2731 = 6.55 and a fourth survival step, 0.80. Star's
+    // judges are 8.19.
     expect(paid(buildLifelinePayouts(season, [pick("ann", 5, 1, "fourth"), pick("ann", 5, 2, "star")]))).toEqual([
-      { credit: 6.55, survived: false, points: 3.28, weighted_points: 1.64 },
+      { credit: 7.35, survived: true, points: 3.68, weighted_points: 1.84 },
       { credit: 8.99, survived: true, points: 4.5, weighted_points: 2.25 },
     ]);
   });

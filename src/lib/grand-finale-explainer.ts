@@ -95,7 +95,7 @@ export function explainGrandFinaleMethod({
         .map((r) => `${r.off === 0 ? "right week" : `${r.off} ${r.off === 1 ? "week" : "weeks"} off`} → ${formatPoints(r.points)}`)
         .join(", ");
       const zeroAt = Math.ceil(pointsPerCorrect / penalty);
-      return `Earn ${formatPoints(pointsPerCorrect)} pts when a couple goes home the week you had them, minus ${formatPoints(penalty)} for each week you're off (${examples}), down to ${formatPoints(0)} at ${zeroAt} weeks off. A double elimination is one week. In the Finale, each place you're off counts as a week.`;
+      return `Earn ${formatPoints(pointsPerCorrect)} pts when a couple goes home the week you had them, minus ${formatPoints(penalty)} for each week you're off (${examples}), down to ${formatPoints(0)} at ${zeroAt} weeks off. A double elimination is one week. The Finale is one week too, split between its places: with five couples in it, a place off costs a fifth of a week.`;
     }
     case "band_tier": {
       const width = Math.max(1, tierSize ?? 1);

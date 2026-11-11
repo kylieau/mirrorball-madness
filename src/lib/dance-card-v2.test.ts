@@ -10,6 +10,7 @@ import {
   danceCardRule,
   danceCardV3Rule,
   ledgerEntry,
+  survivingCoupleIds,
   weekCredits,
   type DanceCardV2Rule,
   type DanceCardWeek,
@@ -160,6 +161,32 @@ describe("Dance Card v3", () => {
       week(5, [dance("a", "e5", 24)], [{ coupleId: "a", bonusPoints: 0, outcome: "eliminated" }]),
     ];
     expect([...danceCardLedger(weeks, 2, v3).get("a")!.values()].map((e) => e.survivalCents)).toEqual([300, 0, 124, 0]);
+  });
+
+  it("counts the Finale as survived for every finalist, the ones entered as Eliminated included", () => {
+    const out = (coupleId: string, outcome: string) => ({ coupleId, bonusPoints: 0, outcome });
+    const finalists = ["a", "b", "c", "d", "e"];
+    const weeks = [
+      week(2, finalists.map((id) => dance(id, "e2", 24)), finalists.map((id) => safe(id))),
+      week(
+        3,
+        ["a", "b", "c", "d"].map((id) => dance(id, "e3", 24)),
+        [out("a", "winner"), out("b", "runner_up"), out("c", "third_place"), out("d", "eliminated"), out("e", "withdrawn")]
+      ),
+    ];
+    const ledger = danceCardLedger(weeks, 2, v3);
+    // Fourth place gets the same second step as the podium; a withdrawal doesn't.
+    expect(["a", "b", "c", "d", "e"].map((id) => ledgerEntry(ledger, id, 3)?.survivalCents)).toEqual([124, 124, 124, 124, 0]);
+    expect(survivingCoupleIds(weeks[1].outcomes!)).toEqual(new Set(["a", "b", "c", "d"]));
+  });
+
+  it("keeps an elimination out of survival in a week that names no winner, on any of its nights", () => {
+    const outcomes = [
+      { coupleId: "a", bonusPoints: 0, outcome: "safe" },
+      { coupleId: "a", bonusPoints: 0, outcome: "eliminated" },
+      { coupleId: "b", bonusPoints: 0, outcome: "safe" },
+    ];
+    expect(survivingCoupleIds(outcomes)).toEqual(new Set(["b"]));
   });
 
   it("pays the Fantasy Bonus at face value, outside the judges' input", () => {

@@ -151,9 +151,22 @@ export function survivalValueCents(survivalWeeks: number, rule: DanceCardV3Rule)
   return survivalWeeks > 0 ? Math.round(rule.survivalFirst * survivalWeeks ** rule.survivalExponent * 100) : 0;
 }
 
+// The couples a week's settled outcomes count as surviving it under v3: none
+// of the couple's rows is eliminated, withdrawn or bye. The Finale is the
+// exception (Kylie, 2026-11-11): the couples placed below third are entered
+// as Eliminated on the night a winner is named, but they danced the whole
+// season, so every finalist survives it and only a withdrawal or bye doesn't.
+export function survivingCoupleIds(outcomes: { coupleId: string; outcome?: string }[]): Set<string> {
+  const isFinale = outcomes.some((o) => o.outcome === "winner");
+  const out = new Set<string>();
+  for (const { coupleId, outcome } of outcomes) {
+    if (isFinale ? outcome === "withdrawn" || outcome === "bye" : NO_SURVIVAL_OUTCOMES.has(outcome as Outcome)) out.add(coupleId);
+  }
+  return new Set(outcomes.map((o) => o.coupleId).filter((id) => !out.has(id)));
+}
+
 // v3: cumulative counts survival weeks and valueCents is the couple's
-// survival so far. A week survives when the couple has a settled outcome and
-// none of that week's rows is eliminated, withdrawn or bye.
+// survival so far, over the weeks survivingCoupleIds gives it.
 function survivalLedger(weeks: DanceCardWeek[], anchorWeek: number, rule: DanceCardV3Rule): DanceCardLedger {
   const ledger: DanceCardLedger = new Map();
   const survivalWeeks = new Map<string, number>();
@@ -161,16 +174,15 @@ function survivalLedger(weeks: DanceCardWeek[], anchorWeek: number, rule: DanceC
     if (week.weekNumber < anchorWeek) continue;
     const inputs = nightScaledScoresByCouple(week.danceScores);
     const bonuses = new Map<string, number>();
-    const survived = new Map<string, boolean>();
     for (const { coupleId, bonusPoints, outcome } of week.outcomes ?? []) {
       if (outcome === undefined) throw new Error(`Dance Card v3 needs Week ${week.weekNumber}'s outcomes`);
       bonuses.set(coupleId, (bonuses.get(coupleId) ?? 0) + bonusPoints);
-      survived.set(coupleId, (survived.get(coupleId) ?? true) && !NO_SURVIVAL_OUTCOMES.has(outcome as Outcome));
     }
-    for (const coupleId of new Set([...survivalWeeks.keys(), ...inputs.keys(), ...survived.keys()])) {
+    const survived = survivingCoupleIds(week.outcomes ?? []);
+    for (const coupleId of new Set([...survivalWeeks.keys(), ...inputs.keys(), ...bonuses.keys()])) {
       const input = inputs.get(coupleId) ?? 0;
       const before = survivalWeeks.get(coupleId) ?? 0;
-      const after = before + (survived.get(coupleId) ? 1 : 0);
+      const after = before + (survived.has(coupleId) ? 1 : 0);
       survivalWeeks.set(coupleId, after);
       const valueCents = survivalValueCents(after, rule);
       const survivalCents = valueCents - survivalValueCents(before, rule);

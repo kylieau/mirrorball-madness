@@ -65,7 +65,7 @@ describe("explainGrandFinaleMethod", () => {
       distancePenalty: 5.2,
     });
     expect(text).toBe(
-      "Earn 20.70 pts when a couple goes home the week you had them, minus 5.20 for each week you're off (right week → 20.70, 1 week off → 15.50, 2 weeks off → 10.30, 3 weeks off → 5.10), down to 0.00 at 4 weeks off. A double elimination is one week. In the Finale, each place you're off counts as a week."
+      "Earn 20.70 pts when a couple goes home the week you had them, minus 5.20 for each week you're off (right week → 20.70, 1 week off → 15.50, 2 weeks off → 10.30, 3 weeks off → 5.10), down to 0.00 at 4 weeks off. A double elimination is one week. The Finale is one week too, split between its places: with five couples in it, a place off costs a fifth of a week."
     );
   });
 

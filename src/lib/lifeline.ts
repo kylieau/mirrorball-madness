@@ -1,6 +1,11 @@
-import { danceCardLedger, danceCardLedgerRule, type DanceCardLedger, type DanceCardWeek } from "./dance-card-v2";
+import {
+  danceCardLedger,
+  danceCardLedgerRule,
+  survivingCoupleIds,
+  type DanceCardLedger,
+  type DanceCardWeek,
+} from "./dance-card-v2";
 import { roundPoints } from "./format-points";
-import { NO_SURVIVAL_OUTCOMES, type Outcome } from "./scoring";
 import { danceCardPriorWeeks } from "./weekly-score-rows";
 
 // Lifeline (Kylie, 2026-11-10; docs/design/lifeline-recast-trades/): a
@@ -86,13 +91,8 @@ function leagueLifeline(season: LifelineSeason, leagueId: string): LeagueLifelin
   };
 }
 
-// A couple survives a week the way Dance Card v3 counts it: a settled outcome
-// and none of them eliminated, withdrawn or bye.
 function survivedWeek(season: LifelineSeason, coupleId: string, weekNumber: number): boolean {
-  const outcomes = (season.danceCardWeeks.find((w) => w.weekNumber === weekNumber)?.outcomes ?? []).filter(
-    (o) => o.coupleId === coupleId
-  );
-  return outcomes.length > 0 && outcomes.every((o) => !NO_SURVIVAL_OUTCOMES.has(o.outcome as Outcome));
+  return survivingCoupleIds(season.danceCardWeeks.find((w) => w.weekNumber === weekNumber)?.outcomes ?? []).has(coupleId);
 }
 
 // What one Lifeline on this couple is worth that week, unrounded and before

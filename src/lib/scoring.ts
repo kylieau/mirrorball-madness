@@ -566,8 +566,8 @@ export type ResolvedCouple = {
 // Which week each spot of the elimination order falls in: a week that has
 // happened holds the couples it actually sent home (two for a double, none
 // for a week without an elimination), a later week one, and every spot left
-// is the Finale.
-export type SlotWeeks = { weekOf: (position: number) => number; finaleWeek: number };
+// is the Finale. finaleSpots is how many that is.
+export type SlotWeeks = { weekOf: (position: number) => number; finaleWeek: number; finaleSpots: number };
 
 export function slotWeeks(
   couples: { status: string; elimination_week: number | null }[],
@@ -582,12 +582,16 @@ export function slotWeeks(
       outByWeek.set(c.elimination_week, (outByWeek.get(c.elimination_week) ?? 0) + 1);
     }
   }
+  const spotsIn = (week: number) => (week <= completedThroughWeek ? (outByWeek.get(week) ?? 0) : 1);
+  let spotsBeforeFinale = 0;
+  for (let week = 1; week < finaleWeek; week++) spotsBeforeFinale += spotsIn(week);
   return {
     finaleWeek,
+    finaleSpots: Math.max(1, couples.length - spotsBeforeFinale),
     weekOf(position) {
       let spots = 0;
       for (let week = 1; week < finaleWeek; week++) {
-        spots += week <= completedThroughWeek ? (outByWeek.get(week) ?? 0) : 1;
+        spots += spotsIn(week);
         if (position <= spots) return week;
       }
       return finaleWeek;
@@ -607,20 +611,25 @@ type GrandFinaleScoringParams = {
 
 // Distance scoring counts weeks, not spots (Kylie, 2026-11-10): a couple
 // predicted for the week they went home is exact, a double elimination is
-// one week, and a week without an elimination still counts. Inside the
-// Finale, where every place is decided the same night, each place counts.
+// one week, and a week without an elimination still counts. The Finale is
+// one week too, split evenly between its places (Kylie, 2026-11-11): with
+// five couples in it a place off is a fifth of a week, so a couple that made
+// the Finale always pays more than one that went home the week before.
+// `weeks` is what the penalty multiplies; `off` is in `unit` for copy.
 export function grandFinaleDistance(
   predictedPosition: number,
   actual: { start: number; end: number },
-  { weekOf, finaleWeek }: SlotWeeks
-): { off: number; unit: "week" | "place" } {
+  { weekOf, finaleWeek, finaleSpots }: SlotWeeks
+): { off: number; unit: "week" | "place"; weeks: number } {
   const predictedWeek = weekOf(predictedPosition);
   const firstWeek = weekOf(actual.start);
   const lastWeek = weekOf(actual.end);
   if (predictedWeek === finaleWeek && firstWeek === finaleWeek) {
-    return { off: Math.max(actual.start - predictedPosition, predictedPosition - actual.end, 0), unit: "place" };
+    const off = Math.max(actual.start - predictedPosition, predictedPosition - actual.end, 0);
+    return { off, unit: "place", weeks: off / finaleSpots };
   }
-  return { off: Math.max(firstWeek - predictedWeek, predictedWeek - lastWeek, 0), unit: "week" };
+  const off = Math.max(firstWeek - predictedWeek, predictedWeek - lastWeek, 0);
+  return { off, unit: "week", weeks: off };
 }
 
 function grandFinalePointsAt(
@@ -632,8 +641,8 @@ function grandFinalePointsAt(
     return predictedPosition === actualPosition ? pointsPerCorrect : 0;
   }
   if (method === "distance_based") {
-    const { off } = grandFinaleDistance(predictedPosition, { start: actualPosition, end: actualPosition }, slotWeeks);
-    return Math.max(0, pointsPerCorrect - off * (distancePenalty ?? 0));
+    const { weeks } = grandFinaleDistance(predictedPosition, { start: actualPosition, end: actualPosition }, slotWeeks);
+    return Math.max(0, pointsPerCorrect - weeks * (distancePenalty ?? 0));
   }
   const width = tierSize ?? 1;
   const actualBand = bandOf(actualPosition, totalCouples, width);

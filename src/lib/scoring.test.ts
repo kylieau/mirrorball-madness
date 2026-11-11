@@ -1244,16 +1244,37 @@ describe("Grand Finale distance in weeks", () => {
 
   it("counts a double elimination as one week and a week without one as a week", () => {
     // Spot 2 went home in Week 3; spot 1 was Week 1, two weeks earlier.
-    expect(grandFinaleDistance(1, { start: 2, end: 3 }, weeks)).toEqual({ off: 2, unit: "week" });
+    expect(grandFinaleDistance(1, { start: 2, end: 3 }, weeks)).toEqual({ off: 2, unit: "week", weeks: 2 });
     // Spot 4 is Week 4, one week after the double.
     expect(grandFinalePredictionPoints({ ...params, predictedPosition: 4, actualPosition: 2, actualPositionEnd: 3 })).toBe(15);
   });
 
-  it("counts places inside the Finale, and the weeks to it from outside", () => {
-    expect(grandFinaleDistance(8, { start: 6, end: 6 }, weeks)).toEqual({ off: 2, unit: "place" });
+  it("splits the Finale's one week between its places, and counts the weeks to it from outside", () => {
+    // Four couples reach the Finale, so two places off is half a week.
+    expect(weeks.finaleSpots).toBe(4);
+    expect(grandFinaleDistance(8, { start: 6, end: 6 }, weeks)).toEqual({ off: 2, unit: "place", weeks: 0.5 });
+    expect(grandFinalePredictionPoints({ ...params, predictedPosition: 8, actualPosition: 6 })).toBe(17.5);
     // Predicted to win, out in Week 1: four weeks off.
-    expect(grandFinaleDistance(8, { start: 1, end: 1 }, weeks)).toEqual({ off: 4, unit: "week" });
+    expect(grandFinaleDistance(8, { start: 1, end: 1 }, weeks)).toEqual({ off: 4, unit: "week", weeks: 4 });
     expect(grandFinalePredictionPoints({ ...params, predictedPosition: 8, actualPosition: 1 })).toBe(0);
+  });
+
+  it("always pays more for a couple that made the Finale than for one that went home the week before", () => {
+    // A winner pick that finishes last in the Finale against one out in Week 4.
+    const lastInFinale = grandFinalePredictionPoints({ ...params, predictedPosition: 8, actualPosition: 5 });
+    const outTheWeekBefore = grandFinalePredictionPoints({ ...params, predictedPosition: 8, actualPosition: 4 });
+    expect(lastInFinale).toBe(16.25);
+    expect(outTheWeekBefore).toBe(15);
+  });
+
+  it("counts the Finale's spots from the weeks that have happened and one for each still to come", () => {
+    // Sixteen couples, ten out through Week 9, Week 10 still to come, Finale in Week 11.
+    const cast = [
+      ...Array.from({ length: 10 }, (_, i) => ({ status: "eliminated", elimination_week: Math.min(i + 1, 9) })),
+      ...Array.from({ length: 6 }, () => ({ status: "active", elimination_week: null })),
+    ];
+    expect(slotWeeks(cast, { finaleWeek: 11, completedThroughWeek: 9 }).finaleSpots).toBe(5);
+    expect(slotWeeks([], { finaleWeek: 3, completedThroughWeek: 0 }).finaleSpots).toBe(1);
   });
 
   it("caps the best case of a couple still in by weeks too", () => {

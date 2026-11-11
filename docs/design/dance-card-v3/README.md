@@ -43,5 +43,18 @@ placement at the finale, which v3 drops. A league that weights Dance Card far
 above the other modules is the remaining outlier; that is its weights, not
 the formula.
 
+## Amendment: every finalist survives the Finale (Kylie, 2026-11-11)
+
+The show has no elimination on Finale night, only places, but the app enters
+the couples placed below third as Eliminated. Under the frozen wording that
+cost them the Finale's survival step (3.00 × (√10 − √9) = 0.49 for a couple
+that survived every week from Week 2) while the podium got it. In the week a
+winner is named, every couple with an outcome now survives unless it withdrew
+or had a bye (`survivingCoupleIds`). Nothing before the Finale changes, and
+`rate_N` stays as solved: the schedule model still gives fourth place no
+survival that night, a difference of under half a point a season.
+`frozen-rule.json` is the record of the rule as first frozen and is left as
+it was.
+
 Machinery is v2's (`danceCardLedger`, later-week rebuilds, reveal guard,
 `set_dance_card_points`); see `docs/design/dance-card-v2/`.

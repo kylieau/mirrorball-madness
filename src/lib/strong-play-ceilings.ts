@@ -260,7 +260,9 @@ export function solveDanceCardV2Coefficients(exponent: number): { rosterSize: nu
 // Dance Card v3 (docs/design/dance-card-v3/): one judges' rate per roster
 // size, with survival tapering as first × √(survival weeks) on top. The rate
 // is what's left of the ceiling after that survival, over a median seat's
-// judges.
+// judges. couplePath gives fourth place no survival on Finale night, which
+// v3 has paid since 2026-11-11 (survivingCoupleIds): the rates were frozen
+// before that and stay as solved for Season 35.
 export function solveDanceCardV3Rates(survivalFirst: number, survivalExponent: number): { rosterSize: number; rate: number }[] {
   const ceiling = TARGET_SHARE * POINT_SCALE;
   return ROSTER_SIZES.map((rosterSize) => {
