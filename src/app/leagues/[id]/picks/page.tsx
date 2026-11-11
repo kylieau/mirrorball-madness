@@ -330,6 +330,7 @@ export default async function LeaguePicksPage({
           })),
           openSpotCount: openRecastSpots,
           dueAt: recastCycle.due_at,
+          startWeek: recastCycle.start_week,
           waitingOnWeek:
             !recastCycle.results_in && new Date(recastCycle.due_at).getTime() <= Date.now()
               ? recastCycle.week_number
@@ -345,6 +346,7 @@ export default async function LeaguePicksPage({
             former: rosterMoveCoupleName(slot.formerCoupleId),
             pick: slot.pickCoupleId ? rosterMoveCoupleName(slot.pickCoupleId) : null,
           })),
+          weekNumber: lifeline.week.weekNumber,
           lockAt: lifeline.lockAt,
           locked: lifeline.locked,
         }
@@ -776,14 +778,13 @@ export default async function LeaguePicksPage({
               pickTimeLimitSeconds={league.pick_time_limit_seconds}
               onTheClockAutopilot={onTheClockAutopilot}
             />
-            {rosterCouples.length > 0 ? (
+            {rosterCouples.length > 0 && (
               <RosterCard
                 couples={rosterCouples}
                 totalPoints={yourRosterWeekTotalPoints}
                 weekBonusPoints={yourRosterWeekBonusPoints}
                 lifelines={yourLifelines}
                 historyFrom={historyFrom}
-                moves={rosterMoves}
                 carousel={
                   yourRosterWeek ? (
                     <EpisodeCarousel
@@ -814,9 +815,8 @@ export default async function LeaguePicksPage({
                   ) : undefined
                 }
               />
-            ) : (
-              rosterMoves
             )}
+            {rosterMoves}
             {lifeline?.state === "catch-up" && (
               <LifelineCatchUpCard pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null} />
             )}
