@@ -7,7 +7,7 @@
 // a released draft, and it replaces the Spoiler-Free strip on every page
 // that mounts it (Home, Results, Picks, Standings).
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TopBar } from "@/components/top-bar";
@@ -19,13 +19,12 @@ const STRIP_CLASSES =
 
 export function HomeDraftChrome({
   email,
-  actionSlot,
   ...accountSettingsData
-}: AccountSettingsData & { email: string; actionSlot?: ReactNode }) {
+}: AccountSettingsData & { email: string }) {
   return (
     <div className="sticky top-0 z-30 -mx-4 bg-background pt-[env(safe-area-inset-top)]">
       <div className="px-4 py-2">
-        <TopBar {...accountSettingsData} email={email} actionSlot={actionSlot} />
+        <TopBar {...accountSettingsData} email={email} />
       </div>
       <DraftScoresStrip />
     </div>

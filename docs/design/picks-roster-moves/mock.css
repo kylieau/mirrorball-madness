@@ -1,0 +1,85 @@
+/* Picks roster-moves mocks: the app's own tokens (src/app/globals.css). */
+:root {
+  --background: #1e1420;
+  --foreground: #f2e8d8;
+  --card: #271a29;
+  --primary: #c9a24b;
+  --primary-fg: #2a1c10;
+  --muted: #332338;
+  --muted-fg: #9c8296;
+  --accent: #e4c77a;
+  --border: rgba(201, 162, 75, 0.28);
+  --hair: rgba(242, 232, 216, 0.1);
+  --emerald-text: #9fcbac;
+  --desk: #150d18;
+  --heading: "Fraunces", Georgia, serif;
+  --sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--desk); color: var(--foreground); font: 14px/1.4 var(--sans); }
+b, strong { font-weight: 600; }
+
+.board-title { font-family: var(--heading); font-size: 28px; padding: 28px 28px 0; margin: 0; }
+.board-sub { padding: 6px 28px 0; color: var(--muted-fg); max-width: 1100px; margin: 0; }
+.board { display: flex; gap: 36px; padding: 28px; align-items: flex-start; }
+.col { width: 390px; flex-shrink: 0; }
+.cap { font: 600 15px/1.3 var(--sans); color: var(--accent); margin: 0 0 4px; }
+.capsub { font-size: 12.5px; color: var(--muted-fg); margin: 0 0 12px; min-height: 70px; }
+.rec { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--primary-fg); background: var(--primary); border-radius: 999px; padding: 2px 8px; margin-left: 6px; vertical-align: 2px; }
+
+.phone { width: 390px; background: var(--background); border-radius: 28px; box-shadow: 0 0 0 1px var(--hair); overflow: hidden; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
+.wordmark { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; color: var(--muted-fg); }
+.orb { width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #f0d978, #c9a24b 55%, #7a5a1e); }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: var(--primary-fg); display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+.old-actions { display: flex; gap: 8px; align-items: center; }
+.page { padding: 0 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+.h1 { font-family: var(--heading); font-size: 24px; font-weight: 600; margin: 0; }
+.rule { width: 36px; height: 2px; border-radius: 2px; background: var(--primary); margin-top: 8px; }
+.league { margin-top: 8px; font-size: 14px; font-weight: 500; color: var(--muted-fg); }
+.section { display: flex; gap: 6px; align-items: center; font-size: 14px; font-weight: 600; color: var(--accent); border-top: 1px solid var(--border); padding-top: 12px; }
+.fade { color: var(--muted-fg); font-size: 12px; text-align: center; padding: 2px 0; }
+
+.card { background: var(--card); border-radius: 14px; box-shadow: 0 0 0 1px var(--hair); padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+.card.gold { box-shadow: 0 0 0 1px var(--primary); }
+.card-title { font-family: var(--heading); font-size: 16px; font-weight: 500; line-height: 1.3; }
+.card-desc { font-size: 14px; color: var(--muted-fg); margin-top: 4px; }
+.card-desc b { font-family: var(--heading); }
+.carousel { display: flex; align-items: center; justify-content: space-between; color: var(--muted-fg); margin-top: 4px; font-size: 13px; }
+.carousel b { color: var(--foreground); font-weight: 600; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+
+.couple { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; }
+.couple.out { opacity: .6; }
+.couple .n { font-size: 14px; font-weight: 600; }
+.couple .n span { font-weight: 400; }
+.tag { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 700; }
+.tag.safe { background: rgba(76, 122, 90, 0.2); color: var(--emerald-text); }
+.tag.elim { background: var(--muted); color: var(--muted-fg); }
+.couple .p { text-align: right; font-size: 12px; color: var(--muted-fg); }
+.couple .p b { display: block; font-family: var(--heading); font-size: 16px; color: var(--foreground); }
+.line { display: flex; justify-content: space-between; padding: 0 14px; font-size: 12px; color: var(--muted-fg); }
+.line b { font-family: var(--heading); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px; border-radius: 9px; font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: rgba(201, 162, 75, 0.06); color: var(--foreground); white-space: nowrap; }
+.btn.primary { background: var(--primary); color: var(--primary-fg); border-color: transparent; font-weight: 600; }
+.btn-row { display: flex; gap: 8px; }
+.btn-row .btn { flex: 1; }
+
+.hop { display: flex; align-items: center; gap: 12px; border: 1px solid rgba(201, 162, 75, 0.3); border-radius: 16px; padding: 12px 14px; }
+.hop .ic { width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; border: 1px solid rgba(201, 162, 75, 0.4); background: rgba(201, 162, 75, 0.1); color: var(--accent); display: grid; place-items: center; font-size: 14px; }
+.hop .t { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+.hop .t small { display: block; font-size: 12px; font-weight: 400; color: var(--muted-fg); }
+.hop .t small.gold { color: var(--accent); }
+.hop .ch { color: var(--accent); font-size: 18px; line-height: 1; }
+.hops { display: flex; flex-direction: column; gap: 8px; }
+
+.select { display: flex; justify-content: space-between; align-items: center; height: 36px; border: 1px solid var(--border); border-radius: 9px; padding: 0 12px; font-size: 14px; color: var(--muted-fg); background: rgba(201, 162, 75, 0.06); }
+.lock { font-size: 12px; font-style: italic; color: var(--muted-fg); }
+.new { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 12px; }
+
+/* Per-league strip */
+.combo { margin-bottom: 14px; }
+.combo-k { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; color: var(--muted-fg); margin: 0 0 6px; }
+.combo .card { gap: 10px; }
+.none { font-size: 12.5px; color: var(--muted-fg); font-style: italic; }

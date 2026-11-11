@@ -1,12 +1,14 @@
-# Session Handoff — 2026-11-11 (Lifeline / Recast / Trades released to main)
+# Session Handoff — 2026-11-10 PT (Lifeline / Recast / Trades released; entry points moved to Picks)
 
 ## 1. Current State
 
-Lifeline, the Equalizer, Recast v2 and Trades are on `main` (built on `lifeline-recast-trades`, fast-forwarded). Kylie applied the three SQL files and scheduled the cron job on 2026-11-11, then said to commit and push to `main` the same day. **Every switch is off in all five leagues; nothing has been tried against the live project in a browser yet.**
+Lifeline, the Equalizer, Recast v2 and Trades are on `main` and deployed (Vercel Production, `82f8f0a`, confirmed). Kylie applied the three SQL files and scheduled the cron job, then said to commit and push, all on Tue Nov 10 PT during E10's East feed (dates written 2026-11-11 below are UTC). **Every switch is off in all five leagues; nothing has been tried against the live project in a browser yet.**
 
 Checks before the commit (2026-11-11): `npx tsc --noEmit` clean, `npx eslint src scripts` clean, `npm test` 99 files / 985 tests, `rm -rf .next && npm run build` succeeds. (`npm run lint` fails only on `.codex-private/`, another session's directory.)
 
-The Recast and Trades screens, the header and the settings rows were checked in headless chromium at 360px and 390px with made-up data on a temporary route (since removed), because the SQL isn't live. No horizontal overflow, no console errors. The Lifeline turn-on sheet and Picks card have not been browser-checked.
+**Recast and Trades open from Picks now, not the top bar** (Kylie picked mock A, `docs/design/picks-roster-moves/`): `RosterMoves` on Your Fantasy Roster, only the mechanisms that league has on. Checked in headless chromium at 360px and 390px on a temporary fixture route (since removed): both, Recast only, Trades only, neither, and the row on its own; no overflow, no console errors.
+
+The Recast and Trades screens and the settings rows were checked in headless chromium at 360px and 390px with made-up data on a temporary route (since removed), because the SQL isn't live. No horizontal overflow, no console errors. The Lifeline turn-on sheet and Picks card have not been browser-checked.
 
 **Codex reviewed the built code (2026-11-11):** four P1s, no P0 or P2, each reproduced, fixed and covered by a PGlite test (see `BACKLOG.md`). The advisor could not run: the main model, `claude-fable-5-2`, doesn't support it.
 
@@ -15,14 +17,16 @@ The Recast and Trades screens, the header and the settings rows were checked in 
 - **The plan and what was decided while building:** `docs/design/lifeline-recast-trades/plan.md` (As Built, at the end).
 - **CLAUDE.md** has a section each for Lifeline and the Equalizer, Recast v2 and Trades.
 
-**E10 `--verify` is still owed.** E10 (Week 9) aired Tue Nov 10 and is the first live v3 publish. After it is published:
+**E10 `--verify` is still owed.** E10 (Week 9) airs Tue Nov 10 PT and is the first live v3 publish. After it is published:
 `NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`
 Kylie released this build before E10 was published, so E10 will be the first publish through the new plan (`lifelinePayouts` / `lifelineEqualizers`, empty while no league plays). `--verify` matched on all four leagues right after the Lifeline SQL went in.
 
 Hard dates (PT):
-- Release target: Sun Nov 15 or Mon Nov 16.
-- Tue Nov 17, 5 PM: Semi-Finals lock (earliest Lifeline lock; the trade deadline).
-- Thu Nov 19, 5 PM: the only S35 waiver run (claims and trades).
+- Tue Nov 10: E10 (Week 9). Three leagues lock Curtain Call and Lifeline at 8 PM (West), two at 5 PM (East). Lifeline can't be turned on once a league's Week 9 lock has passed until E10 is published.
+- Wed Nov 11, 5 PM: a trade has to be accepted by now to clear its veto window before the first run.
+- Thu Nov 12, 5 PM: first waiver run (Week 9), only for a league with Recast or Trades on before then. Adds and trades start scoring in the Semi-Finals.
+- Tue Nov 17, 5 PM / 8 PM by league: Semi-Finals lock (the trade deadline).
+- Thu Nov 19, 5 PM: last waiver run; adds and trades start in the Finale.
 - Tue Nov 24: the Finale.
 
 ## 2. Changes Made
@@ -43,7 +47,7 @@ Checked afterward with reads only: every function, table and column from the thr
 
 **Routes and actions:** `src/app/leagues/[id]/lifeline/`, `src/app/leagues/[id]/trades/`, `src/app/leagues/[id]/waivers/` (page and actions rewritten), `settings/actions.ts` and `settings/page.tsx`, `picks/page.tsx`, `standings/page.tsx`, `admin/results/enter/page.tsx`, `src/app/(fan)/page.tsx`.
 
-**Components:** new `lifeline-card.tsx`, `lifeline-settings.tsx`, `recast-panel.tsx`, `recast-overdue-notice.tsx`, `trades-panel.tsx`, `trades-settings.tsx`; changed `league-header.tsx`, `league-page-shell.tsx`, `league-modules-form.tsx`, `recast-nudge-card.tsx`, `roster-card.tsx`, `dance-card-league-list.tsx`, `top-bar.tsx`; deleted `waivers-panel.tsx`.
+**Components:** new `lifeline-card.tsx`, `lifeline-settings.tsx`, `recast-panel.tsx`, `recast-overdue-notice.tsx`, `trades-panel.tsx`, `trades-settings.tsx`, `roster-moves.tsx`; changed `league-header.tsx`, `league-page-shell.tsx`, `league-modules-form.tsx`, `recast-nudge-card.tsx`, `roster-card.tsx`, `dance-card-league-list.tsx`, `top-bar.tsx`; deleted `waivers-panel.tsx`.
 
 **Docs:** `docs/design/lifeline-recast-trades/plan.md`, `CLAUDE.md`, `BACKLOG.md`, this file.
 
@@ -64,7 +68,7 @@ Checked afterward with reads only: every function, table and column from the thr
 - 4th and 5th in the Finale earn judges' points and bonus only; Lifeline's Finale pays half the credit whatever the outcome.
 - Recast: claims private until the run; lists don't carry over; turning it on never runs a week already due; the late-run alert is an admin notice on Enter Results.
 - Trades: veto = more than half of the teams not in the trade; at least one couple; up to 12 parts; everything moves at the waiver run; an offer expires after 48 hours or at the Semi-Finals lock; accepted trades can't be backed out of; trade points sit under Dance Card.
-- Header: Recast and Trades are two buttons in the top bar. Under about 390px the wordmark text gives way and only the glyph shows.
+- Recast and Trades are buttons on Your Fantasy Roster on Picks (Kylie, Nov 10), not in the top bar.
 
 **Rules that still hold:**
 - No merge, deploy, live SQL apply or live DB write by the build agent. Kylie applies SQL after an explicit OK.
@@ -76,10 +80,10 @@ Checked afterward with reads only: every function, table and column from the thr
 
 ## 4. Next Steps
 
-1. Confirm the deploy from `main` is live.
-2. After E10 is published (the first publish on this build): run `--verify`.
-3. Kylie uses the build and decides where Recast and Trades should surface (Picks row, one Transactions page).
-4. Browser-check with throwaway accounts against the live project: Lifeline turn-on sheet and Equalizer numbers, a Lifeline pick, a waiver list, a trade offer through accept and veto.
-5. Commissioners opt in before Tue Nov 17, 5 PM PT.
+1. After E10 is published (the first publish on this build): run `--verify`.
+2. Kylie hasn't answered yet: test each transaction in a scratch league (`scripts/qa-screenshots/seed.mjs`; live writes need her yes), and whether the West-lock leagues turn Lifeline on tonight.
+3. Browser-check with throwaway accounts against the live project: Lifeline turn-on sheet and Equalizer numbers, a Lifeline pick, a waiver list, a trade offer through accept and veto.
+4. Commissioners opt in: Recast or Trades before Thu Nov 12, 5 PM PT for the first run; everything before the Semi-Finals lock.
+5. Later, once Kylie has used trades: a Roster Moves card with what is waiting on you (mock C), or one Transactions page.
 
 Open limits are listed in `BACKLOG.md` (Lifeline, Recast and Trades — 2026-11-11).

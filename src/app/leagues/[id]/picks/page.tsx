@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { RosterCard } from "@/components/roster-card";
+import { RosterMoves } from "@/components/roster-moves";
 import { DanceCardLeagueList, type DanceCardLeagueEntry } from "@/components/dance-card-league-list";
 import { CurtainCallCard } from "@/components/curtain-call-card";
 import { PickEmBox } from "@/components/pick-em-box";
@@ -67,6 +68,7 @@ export default async function LeaguePicksPage({
     scoringSettings,
     danceCardOn,
     waiversOn,
+    tradesOn,
     curtainCallOn,
     grandFinaleOn,
     members,
@@ -285,6 +287,9 @@ export default async function LeaguePicksPage({
     revealedRecastSlots.length +
     (league.draft_status === "completed" ? Math.max(0, league.roster_size - ownCurrentSlots.length) : 0);
   const recastOn = danceCardOn && waiversOn;
+  const rosterMoves = league.draft_status === "completed" && (recastOn || tradesOn) && (
+    <RosterMoves leagueId={id} recastOn={recastOn} tradesOn={tradesOn} from={historyFrom} />
+  );
 
   // Peer picks stay behind the lock/deadline checks; RLS gates them too, but
   // the page decides what to show from these flags.
@@ -784,13 +789,14 @@ export default async function LeaguePicksPage({
               pickTimeLimitSeconds={league.pick_time_limit_seconds}
               onTheClockAutopilot={onTheClockAutopilot}
             />
-            {rosterCouples.length > 0 && (
+            {rosterCouples.length > 0 ? (
               <RosterCard
                 couples={rosterCouples}
                 totalPoints={yourRosterWeekTotalPoints}
                 weekBonusPoints={yourRosterWeekBonusPoints}
                 lifelines={yourLifelines}
                 historyFrom={historyFrom}
+                moves={rosterMoves}
                 carousel={
                   yourRosterWeek ? (
                     <EpisodeCarousel
@@ -821,6 +827,8 @@ export default async function LeaguePicksPage({
                   ) : undefined
                 }
               />
+            ) : (
+              rosterMoves
             )}
             {lifelineState.kind === "catch-up" && (
               <LifelineCatchUpCard pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null} />

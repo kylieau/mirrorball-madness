@@ -2,7 +2,7 @@
 
 Revised Tue Nov 10, 2026, evening, after review by the advisor and Codex and after Kylie's answers. Replaces the afternoon plan wherever they differ.
 
-**Status, Wed Nov 11:** all four are built on the `lifeline-recast-trades` branch and pass build, lint and tests. Nothing is committed, pushed or applied live. See As Built at the end for what was decided while building.
+**Status:** all four were released to `main` on Tue Nov 10 PT (Nov 11 UTC, the date used below), during E10's East feed, with the SQL applied and the cron job scheduled. Every switch starts off. See As Built at the end for what was decided while building and what changed with the early release.
 
 ## What Changed From the Afternoon Plan
 
@@ -140,6 +140,12 @@ The screens were checked in a headless browser at 360px and 390px with made-up d
 - An accepted trade can't be backed out of. Failed and vetoed trades show in the league's Trade Log.
 - Trade points show under Dance Card in Score History and count in the Dance Card total on Standings.
 - Trades is independent of Recast. Turning Trades off cancels open offers and accepted trades that haven't taken effect.
+
+### After the Release (Tue Nov 10 PT)
+
+- **Released a week ahead of the dates above**, so the Hard Dates table and "the single S35 run" no longer hold: a league that turns Recast or Trades on before Thu Nov 12, 5 PM PT gets a run then (Week 9; adds and trades start scoring in the Semi-Finals), and every league with either on gets the Thu Nov 19, 5 PM run (start in the Finale). For the Nov 12 run a trade has to be accepted by Wed Nov 11, 5 PM PT, so its veto window closes first.
+- **Lifeline locks with Curtain Call**, so a league whose Week 9 lock hadn't passed could play it for Week 9. Turning it on is refused while an earlier week is unpublished.
+- **Recast and Trades open from Picks, not the top bar** (Kylie, Nov 10; mocks in `docs/design/picks-roster-moves/`, option A): a row of buttons on Your Fantasy Roster, only the ones that league has on.
 
 ### Known Limits
 

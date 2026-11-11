@@ -33,6 +33,7 @@ export function RosterCard({
   weekBonusPoints = 0,
   lifelines = [],
   carousel,
+  moves,
   leagueSection,
   historyFrom,
 }: {
@@ -42,6 +43,7 @@ export function RosterCard({
   // Lifelines settled this week, in total-points units.
   lifelines?: RosterLifeline[];
   carousel?: ReactNode;
+  moves?: ReactNode;
   leagueSection?: ReactNode;
   historyFrom: string;
 }) {
@@ -113,6 +115,7 @@ export function RosterCard({
             <span className="font-heading font-semibold">{formatSignedPoints(line.points)}</span>
           </div>
         ))}
+        {moves}
         {leagueSection}
       </CardContent>
     </Card>

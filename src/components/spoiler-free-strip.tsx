@@ -10,7 +10,7 @@
 // week so the newly revealed episode is the one on screen; a week still being
 // posted stays on the page.
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
@@ -68,13 +68,12 @@ const PILL_CLASSES =
 export function HomeSpoilerChrome({
   state,
   email,
-  actionSlot,
   ...accountSettingsData
-}: AccountSettingsData & { email: string; state: SpoilerFreeStripState; actionSlot?: ReactNode }) {
+}: AccountSettingsData & { email: string; state: SpoilerFreeStripState }) {
   return (
     <div className="sticky top-0 z-30 -mx-4 bg-background pt-[env(safe-area-inset-top)]">
       <div className="px-4 py-2">
-        <TopBar {...accountSettingsData} email={email} actionSlot={actionSlot} />
+        <TopBar {...accountSettingsData} email={email} />
       </div>
       <SpoilerFreeStrip state={state} />
     </div>

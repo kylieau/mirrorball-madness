@@ -28,9 +28,6 @@ export function LeaguePageShell({
           tab={tab}
           leagueId={league.id}
           inviteCode={league.invite_code}
-          danceCardOn={base.danceCardOn}
-          waiversOn={base.waiversOn}
-          tradesOn={base.tradesOn}
           canEdit={base.isCommissioner}
           justCreated={justCreated === "1"}
           scoringConfigured={scoringSettings?.scoring_configured ?? true}
