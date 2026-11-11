@@ -73,6 +73,11 @@ export default async function AdminResultsPage({
       allCoupleDisplayNames={Object.fromEntries(buildCoupleDisplayNames(data.allCouples))}
       judges={data.judges}
       danceStyles={data.danceStyles}
+      specialDanceLabels={Object.fromEntries(
+        Object.values(data.teamsByEpisode)
+          .flat()
+          .map((dance) => [dance.id, { name: dance.name, danceType: dance.danceType }])
+      )}
       episodes={data.episodes}
       weeks={data.weeks}
       danceScores={visible.danceScores}

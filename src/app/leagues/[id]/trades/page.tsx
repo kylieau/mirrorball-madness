@@ -59,7 +59,11 @@ export default async function TradesPage({
 
   const now = Date.now();
   const cycle = cycleRows?.[0];
-  const nextRun = cycle && cycle.start_week != null ? { dueAt: cycle.due_at, startWeek: cycle.start_week } : null;
+  // due_at is null until the run's week has its results posted.
+  const nextRun =
+    cycle && cycle.start_week != null
+      ? { weekNumber: cycle.week_number, dueAt: cycle.due_at as string | null, startWeek: cycle.start_week }
+      : null;
   const deadlinePassed = !deadline || new Date(deadline).getTime() <= now;
   const behind = cutoff.pendingRevealEpisode != null;
   const cutoffWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;

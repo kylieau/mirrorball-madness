@@ -21,7 +21,7 @@ const LIVE_STACK = [
   "apply-draft-release-own-rows", "apply-whole-judge-marks", "apply-special-draft-release",
   "apply-contributor-special-setup", "apply-draft-lineup", "apply-retire-special-leftovers", "apply-episode-rounds",
   "apply-special-dance-label", "apply-dance-card-v2", "apply-dance-card-v3", "apply-lifeline", "apply-recast-v2",
-  "apply-trades",
+  "apply-trades", "apply-recast-after-results",
 ];
 let db: PGlite;
 
@@ -122,6 +122,13 @@ const saveList = (claims: { couple: string; slot: number; drop?: string }[]) =>
   ]);
 const aired = (episode: string, hoursAgo: number) =>
   db.query(`update public.episodes set airs_at = now() - interval '${hoursAgo} hours' where id = $1`, [episode]);
+// A run comes due 48 hours after the week's results are posted.
+const posted = (episode: string, hoursAgo: number) =>
+  db.query(
+    `update public.episodes set results_published_at = now() - interval '${hoursAgo} hours',
+       airs_at = least(airs_at, now() - interval '${hoursAgo + 3} hours') where id = $1`,
+    [episode]
+  );
 // These tests move air times, not the clock, so Trades have to have been on
 // a while: since after Week 8's run came due, which they were too late for.
 const tradesOnAWhile = () => db.query("update public.leagues set trades_on_since = now() - interval '3 days'");
@@ -144,6 +151,8 @@ describe("Trades with points as cash", () => {
   it("are off until the commissioner turns them on, and then run with or without Recast", async () => {
     await saveNight(e09, [a, b, c, d, e, g, h, i, j], [f]);
     await finishWeek(e09);
+    // Week 8's results went up long before Trades were turned on.
+    await posted(e09, 7 * 24);
     await saveNight(e10, [a, b, c, d, e, g, h, i, j]);
     await finishWeek(e10);
 
@@ -249,13 +258,13 @@ describe("Trades with points as cash", () => {
     // Trades keep Week 9's run alive once it is due, but claims can't join
     // it when Recast is turned on after that.
     await asService();
-    await aired(e10, 49);
+    await posted(e10, 49);
     await db.query("update public.leagues set waiver_mode = 'waivers' where id = $1", [league]);
     await asUser(fourth);
     await expect(saveList([{ couple: j, slot: 2, drop: h }])).rejects.toThrow(/run that is already due/);
     await asService();
     await db.query("update public.leagues set waiver_mode = 'locked' where id = $1", [league]);
-    await aired(e10, 47);
+    await posted(e10, 47);
 
     await db.query("update public.leagues set waiver_mode = 'waivers' where id = $1", [league]);
     await asUser(fourth);
@@ -306,7 +315,7 @@ describe("Trades with points as cash", () => {
 
     await asService();
     await vetoWindowOver(cashTrade, threeWay);
-    await aired(e10, 49);
+    await posted(e10, 49);
     expect(await processDue()).toEqual([{ league_id: league, week: 9, awards: 0 }]);
     expect((await db.query("select week_number, start_week, awards, trades from public.recast_cycles")).rows)
       .toEqual([{ week_number: 9, start_week: 10, awards: 0, trades: 2 }]);
@@ -388,7 +397,7 @@ describe("Trades with points as cash", () => {
     expect(points[friend]).toBeCloseTo(points[admin] / 2, 2);
 
     await vetoWindowOver(swap, doomed);
-    await aired(e11, 49);
+    await posted(e11, 49);
     expect(await processDue()).toEqual([{ league_id: league, week: 10, awards: 1 }]);
     expect(await offer(doomed)).toEqual({ status: "failed", result: "not_dancing", week: 10, start: null });
     expect(await offer(swap)).toEqual({ status: "executed", result: null, week: 10, start: 11 });
@@ -428,7 +437,7 @@ describe("Trades with points as cash", () => {
     await expect(propose([{ from: admin, to: fourth, couple: e }])).rejects.toThrow(/trade deadline has passed/);
 
     await asService();
-    await aired(e12, 73);
+    await posted(e12, 73);
     expect(await processDue()).toEqual([{ league_id: league, week: 11, awards: 0 }]);
     expect((await offer(late)).status).toBe("expired");
     expect((await roster(admin)).at(-1)).toEqual({ slot: 2, couple_id: e, source: "trade", start: 10, end: null });

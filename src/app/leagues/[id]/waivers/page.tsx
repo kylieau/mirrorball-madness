@@ -7,8 +7,6 @@ import { classifyRosterOccupancy } from "@/lib/recast-framing";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { createClient } from "@/lib/supabase/server";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 export default async function WaiversPage({
   params,
   searchParams,
@@ -61,16 +59,10 @@ export default async function WaiversPage({
   ]);
 
   const cycle = cycleRows?.[0];
-  const dueTime = cycle ? new Date(cycle.due_at).getTime() : 0;
+  // due_at is null until the run's week has its results posted.
   const nextRun =
     cycle && cycle.start_week != null
-      ? {
-          weekNumber: cycle.week_number,
-          dueAt: cycle.due_at,
-          latestAt: new Date(dueTime + DAY_MS).toISOString(),
-          waitingOnResults: !cycle.results_in && dueTime <= Date.now(),
-          startWeek: cycle.start_week,
-        }
+      ? { weekNumber: cycle.week_number, dueAt: cycle.due_at as string | null, startWeek: cycle.start_week }
       : null;
   const lastRunWeek = Math.max(0, ...(cycles ?? []).map((row) => row.week_number));
   const cutoffWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;

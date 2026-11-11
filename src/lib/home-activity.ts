@@ -29,6 +29,9 @@ export type ActivityTransaction =
 
 export type ActivityWeek = {
   weekNumber: number;
+  // The week's outcomes are published, so even a week where nobody went
+  // home has results to hold back during the West feed.
+  resultsIn?: boolean;
   eliminated: ActivityCouple[];
   scores: ActivityScore[];
   rankMoves?: ActivityRankMove[];
@@ -91,17 +94,19 @@ export function buildRecentActivity({
 
   for (const week of [...weeks].sort((a, b) => b.weekNumber - a.weekNumber)) {
     const weekLabel = formatEpisodeCasual(week.weekNumber);
-    if (week.weekNumber === westWeek && week.eliminated.length > 0) {
+    if (week.weekNumber === westWeek && (week.resultsIn || week.eliminated.length > 0)) {
       lines.push({ key: `w${week.weekNumber}-hidden`, segments: [{ text: `${weekLabel} results are in` }], weekLabel: null });
     } else {
       (week.transactions ?? []).forEach((transaction, i) =>
         lines.push({ key: `w${week.weekNumber}-move-${i}`, segments: transactionSegments(transaction), weekLabel })
       );
-      week.eliminated.forEach(({ coupleId, name }, i) =>
-        lines.push({ key: `w${week.weekNumber}-elim-${i}`, segments: [{ text: name, kind: "couple", coupleId }, { text: " eliminated" }], weekLabel })
-      );
+      // Newest first: the standings moved because of the elimination, which
+      // came after the night's scores.
       (week.rankMoves ?? []).forEach((move, i) =>
         lines.push({ key: `w${week.weekNumber}-rank-${i}`, segments: rankMoveSegments(move), weekLabel })
+      );
+      week.eliminated.forEach(({ coupleId, name }, i) =>
+        lines.push({ key: `w${week.weekNumber}-elim-${i}`, segments: [{ text: name, kind: "couple", coupleId }, { text: " eliminated" }], weekLabel })
       );
     }
     // A dance-off loser's 0 earned nothing, so it gets no line (Results leaves

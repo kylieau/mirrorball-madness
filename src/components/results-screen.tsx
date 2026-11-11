@@ -18,6 +18,8 @@ type DanceScore = {
   couple_id: string;
   dance_style_id: string;
   total_score: number;
+  team_id: string | null;
+  max_score: number | null;
 };
 type JudgeScore = { dance_score_id: string; judge_id: string; score: number };
 type EpisodeResult = {
@@ -78,6 +80,7 @@ export function ResultsScreen({
   allCoupleDisplayNames,
   judges,
   danceStyles,
+  specialDanceLabels,
   episodes,
   weeks,
   danceScores,
@@ -100,6 +103,7 @@ export function ResultsScreen({
   allCoupleDisplayNames: Record<string, CoupleNameParts>;
   judges: ScoringJudge[];
   danceStyles: Named[];
+  specialDanceLabels: Record<string, { name: string; danceType: string }>;
   episodes: Episode[];
   weeks: CompetitionWeek[];
   danceScores: DanceScore[];
@@ -154,6 +158,7 @@ export function ResultsScreen({
         coupleDisplayNames={allCoupleDisplayNames}
         judges={judges}
         danceStyles={danceStyles}
+        specialDanceLabels={specialDanceLabels}
         draftSummariesByEpisode={draftSummariesByEpisode}
         publishedByNames={publishedByNames}
         onNavigateToEpisode={(episodeId) => router.push(`/admin/results/enter?episode=${episodeId}`)}

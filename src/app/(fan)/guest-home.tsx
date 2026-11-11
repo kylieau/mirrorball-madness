@@ -43,6 +43,7 @@ export async function GuestHome({ supabase }: { supabase: SupabaseClient<Databas
     for (const r of episodeResults ?? []) {
       const parts = displayNames.get(r.couple_id);
       const week = activityWeeks.get(weekNumberByEpisodeId.get(r.episode_id) ?? -1);
+      if (week) week.resultsIn = true;
       if (r.outcome === "eliminated" && parts && week) week.eliminated.push({ coupleId: r.couple_id, name: formatCoupleName(parts) });
     }
     for (const d of danceScores) {

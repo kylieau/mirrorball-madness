@@ -105,6 +105,10 @@ describe("clearsBeforeRun", () => {
     expect(clearsBeforeRun("2026-11-20T01:00:00Z", "2026-11-20T01:00:00Z")).toBe(true);
     expect(clearsBeforeRun("2026-11-20T02:00:00Z", "2026-11-20T01:00:00Z")).toBe(false);
   });
+
+  it("clears a run that has no time yet, since it is at least 48 hours off", () => {
+    expect(clearsBeforeRun("2026-11-20T02:00:00Z", null)).toBe(true);
+  });
 });
 
 describe("tradeLogVisible", () => {

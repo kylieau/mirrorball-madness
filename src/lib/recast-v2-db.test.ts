@@ -23,6 +23,7 @@ const LIVE_STACK = [
   "apply-draft-release-own-rows", "apply-whole-judge-marks", "apply-special-draft-release",
   "apply-contributor-special-setup", "apply-draft-lineup", "apply-retire-special-leftovers", "apply-episode-rounds",
   "apply-special-dance-label", "apply-dance-card-v2", "apply-dance-card-v3", "apply-lifeline", "apply-recast-v2",
+  "apply-recast-after-results",
 ];
 let db: PGlite;
 
@@ -110,6 +111,13 @@ const saveList = (claims: Claim[], leagueId = league) =>
   ]);
 const aired = (episode: string, hoursAgo: number) =>
   db.query(`update public.episodes set airs_at = now() - interval '${hoursAgo} hours' where id = $1`, [episode]);
+// A run comes due 48 hours after the week's results are posted.
+const posted = (episode: string, hoursAgo: number) =>
+  db.query(
+    `update public.episodes set results_published_at = now() - interval '${hoursAgo} hours',
+       airs_at = least(airs_at, now() - interval '${hoursAgo + 3} hours') where id = $1`,
+    [episode]
+  );
 const processDue = async () => (await db.query<{ runs: unknown[] }>("select public.process_due_recasts() as runs")).rows[0].runs;
 const claims = async () =>
   (await db.query<{ manager_id: string; couple_id: string; slot: number; drop: string | null; status: string; result: string | null; start: number | null }>(
@@ -128,6 +136,8 @@ describe("Recast as a ranked waiver list", () => {
   it("is off until the commissioner turns it on, and then always runs in reverse standings", async () => {
     await saveNight(e09, [a, b, c, d, e, h, i].map((couple) => ({ couple })).concat([{ couple: f, outcome: "eliminated" }, { couple: g, outcome: "eliminated" }] as never));
     await finishWeek(e09);
+    // Week 8's results went up long before Recast was turned on.
+    await posted(e09, 7 * 24);
     await saveNight(e10, [a, b, c, d, h, i].map((couple) => ({ couple })).concat([{ couple: e, marks: [5, 5, 5] }] as never));
     await finishWeek(e10);
 
@@ -138,6 +148,8 @@ describe("Recast as a ranked waiver list", () => {
     expect((await db.query("select waiver_claim_method from public.leagues where id = $1", [league])).rows).toEqual([{ waiver_claim_method: "reverse_standings" }]);
     expect((await db.query<{ manager_id: string }>("select manager_id from public.recast_order($1) order by list_position", [league])).rows.map((row) => row.manager_id))
       .toEqual([friend, admin, third]);
+    expect(await nextCycle()).toEqual({ week: 9, start: 10, results_in: true, due_in_hours: 48 });
+    await posted(e10, 47);
     expect(await nextCycle()).toEqual({ week: 9, start: 10, results_in: true, due_in_hours: 1 });
   });
 
@@ -219,12 +231,12 @@ describe("Recast as a ranked waiver list", () => {
     expect((await db.query("select * from public.recast_pending_drops($1)", [league])).rows).toEqual([]);
   });
 
-  it("runs once, 48 hours after the week's last night", async () => {
+  it("runs once, 48 hours after the week's results are posted", async () => {
     await asService();
     expect(await processDue()).toEqual([]);
     // These tests move air times, not the clock, so Recast has to have been on a while.
     await db.query("update public.leagues set recast_on_since = now() - interval '60 days'");
-    await aired(e10, 49);
+    await posted(e10, 49);
     expect(await processDue()).toEqual([{ league_id: league, week: 9, awards: 4 }]);
 
     // Friend, first in line, fills their open spot with D. Admin's claim for
@@ -265,17 +277,13 @@ describe("Recast as a ranked waiver list", () => {
     await expect(saveList([{ couple: a, slot: 1, drop: i }])).rejects.toThrow(/dropped that couple in the last waiver run/);
   });
 
-  it("waits up to a day for a week's results, and keeps a drop locked for the next run", async () => {
+  it("never runs before a week's results are posted, however long ago it aired", async () => {
     await asService();
     await db.query(`insert into public.waiver_claims(league_id, couple_id, manager_id, slot_number, week_number, priority_order, drop_couple_id)
       values ($1, $2, $3, 1, 10, 1, $4)`, [league, a, admin, i]);
-    await aired(e11, 49);
-    expect(await nextCycle()).toEqual({ week: 10, start: 11, results_in: false, due_in_hours: -1 });
-    expect(await processDue()).toEqual([]);
-    expect((await db.query("select week_number, results_in, leagues from public.recast_runs_overdue()")).rows).toEqual([{ week_number: 10, results_in: false, leagues: 1 }]);
     await aired(e11, 73);
-    expect(await processDue()).toEqual([{ league_id: league, week: 10, awards: 0 }]);
-    expect((await claims()).find((claim) => claim.couple_id === a && claim.drop === i)).toMatchObject({ status: "rejected", result: "drop_locked" });
+    expect(await nextCycle()).toEqual({ week: 10, start: 11, results_in: false, due_in_hours: null });
+    expect(await processDue()).toEqual([]);
     expect((await db.query("select * from public.recast_runs_overdue()")).rows).toEqual([]);
   });
 
@@ -292,21 +300,32 @@ describe("Recast as a ranked waiver list", () => {
     expect(points[friend]).toBe(points[third]);
     // 30 × 0.2731 against 24 × 0.2731.
     expect(points[admin] - points[third]).toBeCloseTo(1.64, 2);
+
+    // Posted, the run comes due 48 hours later, and the drop lock still holds.
+    expect(await nextCycle()).toEqual({ week: 10, start: 11, results_in: true, due_in_hours: 48 });
+    await posted(e11, 49);
+    expect(await processDue()).toEqual([{ league_id: league, week: 10, awards: 0 }]);
+    expect((await claims()).find((claim) => claim.couple_id === a && claim.drop === i)).toMatchObject({ status: "rejected", result: "drop_locked" });
+    expect((await db.query("select * from public.recast_runs_overdue()")).rows).toEqual([]);
   });
 
   it("treats a two-night week as one run, lifts the drop lock, and never runs for the Finale", async () => {
     await asService();
     await aired(e12a, 71);
     await aired(e12b, 47);
-    expect(await nextCycle()).toEqual({ week: 11, start: 12, results_in: false, due_in_hours: 1 });
+    await posted(e12a, 50);
+    // One night posted isn't the week's results.
+    expect(await nextCycle()).toEqual({ week: 11, start: 12, results_in: false, due_in_hours: null });
     expect(await processDue()).toEqual([]);
 
     // Two runs after dropping A, Admin can claim A again.
     await asUser(admin);
     await saveList([{ couple: a, slot: 1, drop: i }]);
     await asService();
-    await aired(e12a, 97);
-    await aired(e12b, 73);
+    await posted(e12b, 47);
+    expect(await nextCycle()).toEqual({ week: 11, start: 12, results_in: true, due_in_hours: 1 });
+    expect(await processDue()).toEqual([]);
+    await posted(e12b, 49);
     expect(await processDue()).toEqual([{ league_id: league, week: 11, awards: 1 }]);
     expect((await roster(admin)).filter((row) => row.slot === 1).slice(1)).toEqual([
       { slot: 1, couple_id: i, source: "waiver", start: 10, end: 11 }, { slot: 1, couple_id: a, source: "waiver", start: 12, end: null },

@@ -62,10 +62,26 @@ describe("buildRecentActivity", () => {
     expect(lines.map(plain)).toEqual(["Week 2 results are in", "Ava scored 24 on their Waltz", "C & D eliminated"]);
   });
 
-  it("lists a week's overtakes after its eliminations and before its scores", () => {
+  it("holds back a published week with no elimination while the West feed airs", () => {
+    const lines = buildRecentActivity({
+      weeks: [
+        week(2, {
+          resultsIn: true,
+          scores: [{ coupleId: "Ava", celebrity: "Ava", danceStyle: "Waltz", total: 24, at: "2026-09-23T00:05:00Z" }],
+          rankMoves: [{ league: "Alpha", mover: "Kim", passed: ["you"], place: 1 }],
+        }),
+      ],
+      westWeek: 2,
+      extraLines: [],
+    });
+    expect(lines.map(plain)).toEqual(["Week 2 results are in", "Ava scored 24 on their Waltz"]);
+  });
+
+  it("lists a week's overtakes above its eliminations, and those above its scores", () => {
     const lines = buildRecentActivity({
       weeks: [
         week(9, {
+          eliminated: [{ coupleId: "jv", name: "Jenna & Val" }],
           scores: [{ coupleId: "Amber", celebrity: "Amber", danceStyle: "Paso Doble", total: 27, at: "2026-11-11T01:20:00Z" }],
           rankMoves: [
             { league: "Alpha", mover: "You", passed: ["Kim"], place: 2 },
@@ -79,6 +95,7 @@ describe("buildRecentActivity", () => {
     expect(lines.map(plain)).toEqual([
       "You overtook Kim for 2nd in Alpha",
       "Lee & Sam overtook Pat, Ro and you for 1st in Beta",
+      "Jenna & Val eliminated",
       "Amber scored 27 on their Paso Doble",
     ]);
     expect(lines[1].segments.filter((seg) => seg.kind === "manager").map((seg) => seg.text)).toEqual(["Lee & Sam", "Pat", "Ro", "you"]);

@@ -329,12 +329,10 @@ export default async function LeaguePicksPage({
             drop: claim.drop_couple_id ? rosterMoveCoupleName(claim.drop_couple_id) : null,
           })),
           openSpotCount: openRecastSpots,
-          dueAt: recastCycle.due_at,
+          // Null until the week's results are posted.
+          dueAt: recastCycle.due_at as string | null,
+          weekNumber: recastCycle.week_number,
           startWeek: recastCycle.start_week,
-          waitingOnWeek:
-            !recastCycle.results_in && new Date(recastCycle.due_at).getTime() <= Date.now()
-              ? recastCycle.week_number
-              : null,
         }
       : null;
   // The same rule as the waiver list: a pick that couldn't be read shows

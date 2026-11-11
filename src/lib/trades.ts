@@ -77,8 +77,10 @@ export function offerExpiresAt(expiresAt: string, deadline: string | null): stri
 }
 
 // A trade takes effect at the first waiver run after its veto window closes.
-export function clearsBeforeRun(vetoEndsAt: string, runDueAt: string): boolean {
-  return new Date(vetoEndsAt).getTime() <= new Date(runDueAt).getTime();
+// A run with no time yet waits on results and then 48 more hours, so a
+// 24-hour veto window always closes first.
+export function clearsBeforeRun(vetoEndsAt: string, runDueAt: string | null): boolean {
+  return runDueAt == null || new Date(vetoEndsAt).getTime() <= new Date(runDueAt).getTime();
 }
 
 export type TradeLogEntry = { status: TradeStatus; weekNumber: number | null };

@@ -18,6 +18,8 @@ import type { DraftSummary } from "@/lib/results-view-data";
 import { formatPoints } from "@/lib/format-points";
 import { isUnscheduledPlaceholderRow } from "@/lib/episode-participants";
 import { formatEpisodeCasual, formatEpisodeCasualWithTheme, formatEpisodeLabel } from "@/lib/format-week";
+import { IMMUNITY_DANCE_TYPE } from "@/lib/episode-rounds";
+import { specialDanceShortName } from "@/lib/special-dance-names";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 type Named = { id: string; name: string };
@@ -27,6 +29,8 @@ type DanceScore = {
   couple_id: string;
   dance_style_id: string;
   total_score: number;
+  team_id: string | null;
+  max_score: number | null;
 };
 type JudgeScore = { dance_score_id: string; judge_id: string; score: number };
 type EpisodeResult = {
@@ -70,6 +74,7 @@ export function AllResultsView({
   coupleDisplayNames,
   judges,
   danceStyles,
+  specialDanceLabels,
   draftSummariesByEpisode,
   publishedByNames,
   onNavigateToEpisode,
@@ -96,6 +101,8 @@ export function AllResultsView({
   coupleDisplayNames: Record<string, CoupleNameParts>;
   judges: Named[];
   danceStyles: Named[];
+  // Special dances by id, so their rows read by name rather than style.
+  specialDanceLabels: Record<string, { name: string; danceType: string }>;
   draftSummariesByEpisode: Record<string, DraftSummary>;
   publishedByNames: Record<string, string>;
   onNavigateToEpisode: (episodeId: string) => void;
@@ -118,6 +125,15 @@ export function AllResultsView({
     )
   );
   const danceStyleById = new Map(danceStyles.map((d) => [d.id, d.name]));
+  // A special dance's row reads by its name ("Dance-Off 1 · Rumba"); an
+  // immunity bonus wasn't danced, so it has no style.
+  function danceLabel(dance: DanceScore): string {
+    const style = danceStyleById.get(dance.dance_style_id) ?? "Unknown dance";
+    const special = dance.team_id ? specialDanceLabels[dance.team_id] : undefined;
+    if (!special) return style;
+    const name = specialDanceShortName(special);
+    return special.danceType.trim() === IMMUNITY_DANCE_TYPE ? name : `${name} · ${style}`;
+  }
   const judgeById = buildPeopleDisplayNames(judges);
   const couplesById = new Map(couples.map((c) => [c.id, c]));
   const weekById = new Map(weeks.map((week) => [week.id, week]));
@@ -193,7 +209,8 @@ export function AllResultsView({
       <tr className={isLast ? "border-b border-border last:border-b-0" : undefined}>
         <td colSpan={colSpan} className="px-2 pb-1.5 pl-6">
           <div className="text-xs text-muted-foreground">
-            {danceStyleById.get(dance.dance_style_id) ?? "Unknown dance"}: {dance.total_score}
+            {danceLabel(dance)}:{" "}
+            {dance.max_score === 0 ? (dance.total_score < 0 ? `−${-dance.total_score}` : `+${dance.total_score}`) : dance.total_score}
             {scores.length > 0 && (
               <>
                 {" "}

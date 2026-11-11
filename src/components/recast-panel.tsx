@@ -28,10 +28,8 @@ import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 
 export type RecastNextRun = {
   weekNumber: number;
-  dueAt: string;
-  // When a run still waiting on results goes ahead without them.
-  latestAt: string;
-  waitingOnResults: boolean;
+  // Null until the week's results are posted; the run is 48 hours after.
+  dueAt: string | null;
   startWeek: number | null;
 };
 // An open spot with no couple was emptied by a trade.
@@ -91,7 +89,6 @@ export function RecastPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dueAt = useFormattedDeadline(nextRun?.dueAt);
-  const latestAt = useFormattedDeadline(nextRun?.latestAt);
 
   const from = `/leagues/${leagueId}/waivers`;
   const parts = (coupleId: string) => coupleDisplayNames[coupleId] ?? UNKNOWN_COUPLE;
@@ -142,8 +139,8 @@ export function RecastPanel({
 
   const runLine = !nextRun
     ? "There are no more waiver runs this season."
-    : nextRun.waitingOnResults
-      ? `Waiting on ${formatEpisodeCasual(nextRun.weekNumber)} results. The run goes ahead once they're posted${latestAt ? `, or ${latestAt} either way` : ""}.`
+    : nextRun.dueAt == null
+      ? `The next waiver run is 48 hours after ${formatEpisodeCasual(nextRun.weekNumber)} results are posted.`
       : dueAt
         ? `Next waiver run: ${dueAt}.`
         : null;

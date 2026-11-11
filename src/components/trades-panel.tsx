@@ -93,7 +93,7 @@ export function TradesPanel({
   // Past the Semi-Finals lock, or no waiver run left for a trade to take
   // effect at.
   closed: boolean;
-  nextRun: { dueAt: string; startWeek: number } | null;
+  nextRun: { weekNumber: number; dueAt: string | null; startWeek: number } | null;
   // Points the viewer's team can still send this season.
   cashRoom: number;
   // Every team's couples still dancing, the viewer's team first.
@@ -213,9 +213,12 @@ export function TradesPanel({
               ? `Offers have to be accepted by ${deadlineText}, the Semi-Finals lock.`
               : null}
         </p>
-        {!closed && nextRun && runText && (
+        {!closed && nextRun && (nextRun.dueAt == null || runText) && (
           <p className="mt-1 text-sm text-muted-foreground">
-            Next waiver run: {runText}. A trade that takes effect then starts in {formatEpisodeCasual(nextRun.startWeek)}.
+            {nextRun.dueAt == null
+              ? `The next waiver run is 48 hours after ${formatEpisodeCasual(nextRun.weekNumber)} results are posted.`
+              : `Next waiver run: ${runText}.`}{" "}
+            A trade that takes effect then starts in {formatEpisodeCasual(nextRun.startWeek)}.
           </p>
         )}
       </div>

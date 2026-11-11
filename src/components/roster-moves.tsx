@@ -23,11 +23,12 @@ export type WaiverStatus = {
   claims: { add: CoupleNameParts; drop: CoupleNameParts | null }[];
   // Open spots the viewer has watched far enough to see.
   openSpotCount: number;
-  dueAt: string;
+  // Null until the run's week has its results posted; the run is 48 hours after.
+  dueAt: string | null;
+  // The week the run is for.
+  weekNumber: number;
   // The week a winning claim starts scoring.
   startWeek: number;
-  // The week whose results a run that has come due is still waiting on.
-  waitingOnWeek: number | null;
 };
 
 // Lifeline, Recast and Trades are separate commissioner switches, so a league
@@ -165,21 +166,17 @@ function LifelineStatusLines({ spots, weekNumber, lockAt, locked }: LifelineStat
   );
 }
 
-function WaiverClaimsStatus({ claims, openSpotCount, dueAt, startWeek, waitingOnWeek }: WaiverStatus) {
+function WaiverClaimsStatus({ claims, openSpotCount, dueAt, weekNumber, startWeek }: WaiverStatus) {
   const due = useFormattedDeadline(dueAt);
-  const runPart =
-    waitingOnWeek != null
-      ? `The run is waiting on ${formatEpisodeCasual(waitingOnWeek)} results`
-      : due
-        ? `Next run ${inSentence(due)}`
-        : null;
+  const when =
+    dueAt == null ? `48 hours after ${formatEpisodeCasual(weekNumber)} results are posted` : due ? inSentence(due) : null;
   // A Lifeline is settled once saved; a claim still waits on the run.
   const statusLine =
     claims.length > 0
-      ? waitingOnWeek == null && due
-        ? `${claims.length} saved, waiting on the run · ${inSentence(due)}`
-        : [`${claims.length} saved`, runPart].filter(Boolean).join(" · ")
-      : [openSpotCount > 0 ? null : "None saved", runPart].filter(Boolean).join(" · ");
+      ? when
+        ? `${claims.length} saved, waiting on the run · ${when}`
+        : `${claims.length} saved`
+      : [openSpotCount > 0 ? null : "None saved", when ? `Next run ${when}` : null].filter(Boolean).join(" · ");
 
   return (
     <div className="flex flex-col gap-1 text-xs text-muted-foreground">

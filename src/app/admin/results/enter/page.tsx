@@ -65,7 +65,7 @@ export default async function EnterResultsPage({
       {(overdueRuns ?? []).map((run) => (
         <RecastOverdueNotice
           key={run.week_number}
-          run={{ weekNumber: run.week_number, dueAt: run.due_at, resultsIn: run.results_in, leagues: run.leagues }}
+          run={{ weekNumber: run.week_number, leagues: run.leagues }}
         />
       ))}
 
