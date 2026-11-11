@@ -92,6 +92,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
         week_number: liveWeek.week_number,
         theme: liveWeek.theme,
         is_double_elimination_week: liveWeek.is_double_elimination_week,
+        is_finale: liveWeek.is_finale,
         nightsLabel: liveWeek.nightsLabel,
         episodeIds: liveWeek.episodes.map((episode) => episode.id),
       }
@@ -104,6 +105,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
       week_number: week.week_number,
       theme: week.theme,
       is_double_elimination_week: week.is_double_elimination_week,
+      is_finale: week.is_finale,
       nightsLabel: week.nightsLabel,
       results_published_at:
         week.episodes

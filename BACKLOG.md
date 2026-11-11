@@ -2,6 +2,32 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Curtain Call podium and Home card moves — 2026-11-11
+
+Pushed 2026-11-11 (`CLAUDE.md` describes each): Curtain Call's Finale podium,
+the own-dances-first order, the Dance Card weight line on Picks and the roster
+moves lines on the Home league card. `supabase/apply-curtain-call-podium.sql`
+was applied live by Kylie and read back (columns, both RPCs; regenerated types
+match).
+
+Still open:
+- Kylie runs `supabase/apply-curtain-call-podium.sql` once more: after her
+  apply, `submit_podium_prediction` gained a check that every picked couple is
+  in the week's season (Codex review; the app never sends another season's
+  couple, so nothing depends on it). The file is safe to run again.
+- The podium form and recap have run in tests and against made-up data only:
+  Week 11 picks open after Week 10's results (Week 10 airs Nov 17), so look at
+  the live Picks card then. The Home card's move lines were also seen with
+  made-up data only (the scratch league has no Lifeline, Recast or Trades).
+- The podium pays half for one place off, nothing for two
+  (`PODIUM_PLACE_OFF_FRACTION`); the first mock had a third per place. One
+  constant if Kylie wants thirds.
+- At 360px the Home card's "Need Lifeline pick" wraps to two lines.
+- One undrafted, unscored test league is still on Dance Card v1; Kylie said to
+  leave it (2026-11-11).
+- Kylie asked for a mock reworking the Roster Moves card and its pages on
+  Picks, after this build.
+
 ## Finale follow-ups — 2026-11-11
 
 Offered to Kylie, not answered and not built:
@@ -92,7 +118,7 @@ Still to do:
   after it publishes. If Finish Week fails mid-night, a league can't switch
   while scores are posting: un-post first, then `--apply --to v2` or
   `--rollback`.
-- Kylie runs `apply-dance-card-v3-default.sql` (new leagues start on v3).
+- `apply-dance-card-v3-default.sql` is applied live (read back 2026-11-11); one undrafted, unscored test league is still on v1 and stays there (Kylie, 2026-11-11).
 - Kylie looks at a real v3 league on her phone (Score History survival lines,
   Picks Survival & Bonuses row with stored weekly rows).
 - Optional: tell Carrie Ann's Biggest Fans that Dance Card is weighted 8× there,

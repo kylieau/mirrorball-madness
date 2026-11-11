@@ -72,18 +72,15 @@ describe("adaptCurtainCallPick", () => {
   it("blanks couples the viewer no longer sees as competing", () => {
     expect(
       adaptCurtainCallPick(
-        { elim1: "gone", elim2: "b", topScorer: "a" },
+        { elim1: "gone", elim2: "b", podium: ["a", "gone", "b"], topScorer: "a" },
         new Set(["a", "b"])
       )
-    ).toEqual({ elim1: null, elim2: "b", topScorer: "a" });
+    ).toEqual({ elim1: null, elim2: "b", podium: ["a", null, "b"], topScorer: "a" });
   });
 
   it("keeps nulls as null", () => {
-    expect(adaptCurtainCallPick({ elim1: null, elim2: null, topScorer: null }, new Set(["a"]))).toEqual({
-      elim1: null,
-      elim2: null,
-      topScorer: null,
-    });
+    const empty = { elim1: null, elim2: null, podium: [null, null, null] as [null, null, null], topScorer: null };
+    expect(adaptCurtainCallPick(empty, new Set(["a"]))).toEqual(empty);
   });
 });
 

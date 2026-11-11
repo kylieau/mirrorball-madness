@@ -1,12 +1,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { findOwnMembership, isOwnMembership } from "@/lib/acting-manager";
-import { hasCurtainCallPicks } from "@/lib/curtain-call-picks";
+import {
+  CURTAIN_CALL_PICK_COLUMNS,
+  curtainCallPickFromRow,
+  hasCurtainCallPicks,
+  type CurtainCallPick,
+} from "@/lib/curtain-call-picks";
 import { draftWeekManagerScores, scoresReplacingDraftWeek } from "@/lib/draft-scores";
 import { loadDanceCardHistory } from "@/lib/dance-card-history-data";
 import { danceCardRule, usesDanceCardLedger } from "@/lib/dance-card-v2";
 import { loadActiveSeasonId } from "@/lib/viewer-season-data";
-import type { CurtainCallState } from "@/lib/league-triage";
+import { loadHomeRosterMoves } from "@/lib/home-roster-moves-data";
+import { lifelinePickDue, type CurtainCallState, type RosterMoves } from "@/lib/league-triage";
 import type { DanceScore } from "@/lib/scoring";
 import { slotActiveInWeek } from "@/lib/roster-couple-points";
 import { weeklyRankMoves } from "@/lib/league-rank-moves";
@@ -27,10 +33,14 @@ export type LeagueHomeSummary = {
   myTeamId: string;
   curtainCall: {
     state: CurtainCallState;
-    eliminatedCoupleId: string | null;
-    topScorerCoupleId: string | null;
+    // The Finale week asks for a podium in place of the elimination pick.
+    isFinale: boolean;
+    pick: CurtainCallPick;
   };
   grandFinale: { open: boolean; locked: boolean; deadlineAt: string | null; hasPrediction: boolean };
+  // The viewer's Lifeline, waiver list and trades still in play, by couple
+  // and manager id.
+  rosterMoves: RosterMoves<string>;
   recentJoins: { name: string; joinedAt: string }[];
   managerNames: Record<string, string>;
   // The viewer's own team reads as "You" / "you".
@@ -45,7 +55,7 @@ export async function computeLeagueHomeSummary(
   supabase: SupabaseClient<Database>,
   userId: string,
   league: { id: string; name: string },
-  upcomingEpisode: { id: string; week_number: number } | null,
+  upcomingEpisode: { id: string; week_number: number; is_finale: boolean } | null,
   latestCompletedWeekId: string | null,
   latestCompletedResultsPublishedAt: string | null,
   joinCutoffMs: number,
@@ -56,9 +66,16 @@ export async function computeLeagueHomeSummary(
   // Released draft this viewer unlocked. Replaces that week's stored total
   // (a partial live reveal) with judges points from the full draft.
   draftNight: { weekId: string; weekNumber: number; dances: DanceScore[] } | null = null,
-  weekNumberById: Map<string, number> = new Map()
+  weekNumberById: Map<string, number> = new Map(),
+  // A viewer who is behind sees no roster moves: an open spot or a Lifeline
+  // to pick says one of their couples went home.
+  spoiler: { behind: boolean; cutoffWeek: number | null; finaleWeekNumber: number | null } = {
+    behind: false,
+    cutoffWeek: null,
+    finaleWeekNumber: null,
+  }
 ): Promise<LeagueHomeSummary> {
-  const [{ data: scoringSettings }, { data: members }, scores] = await Promise.all([
+  const [{ data: scoringSettings }, { data: members }, scores, { data: leagueRow }] = await Promise.all([
     supabase
       .from("scoring_settings")
       .select(
@@ -73,6 +90,11 @@ export async function computeLeagueHomeSummary(
       )
       .eq("league_id", league.id),
     loadWeeklyStandings(supabase, league.id),
+    supabase
+      .from("leagues")
+      .select("id, draft_status, roster_size, lifeline_enabled, lifeline_starts_week, waiver_mode, trades_enabled")
+      .eq("id", league.id)
+      .maybeSingle(),
   ]);
 
   // A co-manager's auth uid never matches a manager_id/user_id column
@@ -88,13 +110,10 @@ export async function computeLeagueHomeSummary(
   // Everything left needs only the settings and myTeamId above, so it goes out
   // as one round instead of a query per module.
   const scoringDraftNight = draftNight && draftNight.dances.length > 0 && scoringSettings ? draftNight : null;
-  const [{ data: slots }, { data: leagueRow }, { data: grandFinaleDeadlineData }, { data: lockData }, { data: prediction }, { data: ownGrandFinalePick }] =
+  const [{ data: slots }, { data: grandFinaleDeadlineData }, { data: lockData }, { data: prediction }, { data: ownGrandFinalePick }, rosterMoves] =
     await Promise.all([
       scoringDraftNight
         ? supabase.from("roster_slots").select("manager_id, couple_id, start_week, end_week").eq("league_id", league.id)
-        : Promise.resolve({ data: null }),
-      scoringDraftNight && usesDanceCardLedger(scoringSettings?.dance_card_version)
-        ? supabase.from("leagues").select("roster_size").eq("id", league.id).single()
         : Promise.resolve({ data: null }),
       grandFinaleOn
         ? supabase.rpc("effective_grand_finale_deadline", { p_league_id: league.id })
@@ -105,7 +124,7 @@ export async function computeLeagueHomeSummary(
       curtainCallWeekId
         ? supabase
             .from("predictions")
-            .select("predicted_eliminated_couple_id, predicted_top_scorer_couple_id")
+            .select(CURTAIN_CALL_PICK_COLUMNS)
             .eq("league_id", league.id)
             .eq("week_id", curtainCallWeekId)
             .eq("manager_id", myTeamId)
@@ -120,6 +139,7 @@ export async function computeLeagueHomeSummary(
             .limit(1)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      loadHomeRosterMoves(supabase, { league: leagueRow, danceCardOn, myTeamId, week: upcomingEpisode, spoiler }),
     ]);
 
   let draftTotals: Map<string, number> | null = null;
@@ -136,7 +156,10 @@ export async function computeLeagueHomeSummary(
         ? [{ managerId: period.managerId, coupleId: period.coupleId }]
         : [];
     });
-    const rule = leagueRow ? danceCardRule(scoringSettings, leagueRow.roster_size) : null;
+    const rule =
+      leagueRow && usesDanceCardLedger(scoringSettings.dance_card_version)
+        ? danceCardRule(scoringSettings, leagueRow.roster_size)
+        : null;
     const seasonId = rule && rule.version !== "v1" ? await loadActiveSeasonId(supabase) : null;
     const history = rule && rule.version !== "v1" && seasonId ? await loadDanceCardHistory(supabase, seasonId, draftNight.weekNumber + 1) : null;
     const managers = draftWeekManagerScores({
@@ -229,7 +252,7 @@ export async function computeLeagueHomeSummary(
     rank,
     totalMembers: standings.length,
     totalPoints: pointsByManager.get(myTeamId) ?? 0,
-    picksDue: curtainCallPicksDue || grandFinalePicksDue,
+    picksDue: curtainCallPicksDue || grandFinalePicksDue || lifelinePickDue(rosterMoves),
     curtainCallLockAt: lockAt,
     danceCardOn,
     curtainCallOn,
@@ -237,8 +260,8 @@ export async function computeLeagueHomeSummary(
     myTeamId,
     curtainCall: {
       state: curtainCallState,
-      eliminatedCoupleId: ownPrediction?.predicted_eliminated_couple_id ?? null,
-      topScorerCoupleId: ownPrediction?.predicted_top_scorer_couple_id ?? null,
+      isFinale: upcomingEpisode?.is_finale ?? false,
+      pick: curtainCallPickFromRow(ownPrediction),
     },
     grandFinale: {
       open: grandFinaleOn && !grandFinaleLocked,
@@ -246,6 +269,7 @@ export async function computeLeagueHomeSummary(
       deadlineAt: grandFinaleDeadline,
       hasPrediction: hasGrandFinalePrediction,
     },
+    rosterMoves,
     recentJoins: (members ?? [])
       .filter((m) => !isOwnMembership(m, userId) && new Date(m.joined_at).getTime() >= joinCutoffMs)
       .map((m) => ({ name: m.profiles?.display_name ?? "Someone", joinedAt: m.joined_at })),

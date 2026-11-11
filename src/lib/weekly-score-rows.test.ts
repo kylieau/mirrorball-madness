@@ -71,3 +71,38 @@ describe("Grand Finale distance follows the week marked Finale", () => {
     expect(grandFinalePoints([1, 2, 3, 4].map((n) => week(n)))).toBe(2);
   });
 });
+
+describe("Curtain Call's Finale podium at publication", () => {
+  it("pays each place from the predictions row's podium columns", () => {
+    const data = weekOne([week(1), week(2, true)]);
+    const rows = buildWeeklyScoreRows(
+      {
+        ...data,
+        settings: [{ ...data.settings[0], elimination_prediction_points: 12, top_scorer_prediction_points: 0 }],
+        grandFinalePredictions: [],
+        predictions: [
+          {
+            league_id: "league",
+            week_id: "w2",
+            manager_id: "m",
+            predicted_winner_couple_id: "b",
+            predicted_runner_up_couple_id: "d",
+            predicted_third_place_couple_id: "f",
+          },
+        ],
+      } as unknown as WeekScoringData,
+      { id: "w2", week_number: 2, is_double_elimination_week: false },
+      "e1",
+      [
+        { couple_id: "b", outcome: "winner", bonus_points: 0 },
+        { couple_id: "c", outcome: "runner_up", bonus_points: 0 },
+        { couple_id: "d", outcome: "third_place", bonus_points: 0 },
+        { couple_id: "e", outcome: "eliminated", bonus_points: 0 },
+        { couple_id: "f", outcome: "eliminated", bonus_points: 0 },
+      ]
+    );
+    // Five of six couples left: a place pays 12 × 5/6 = 10. Winner exact, the
+    // runner-up pick finished third and the third-place pick fourth (5 each).
+    expect(rows.find((row) => row.manager_id === "m")?.prediction_points).toBe(20);
+  });
+});

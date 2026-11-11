@@ -17,6 +17,10 @@ function plural(count: number, noun: string): string {
   return count > 1 ? `${noun}s` : noun;
 }
 
+// "podium", so Curtain Call's Finale-week call doesn't read as Grand Finale's
+// season-long "winner pick".
+const PODIUM_PICK_NOUNS = ["podium winner pick", "podium runner-up pick", "podium third-place pick"];
+
 // The small "why this couple matters to you" notes on Results, e.g.
 // "On your Alpha and Beta rosters". League phrase sits before the noun so
 // the note scans by league; the noun pluralizes when several leagues share
@@ -25,6 +29,7 @@ function plural(count: number, noun: string): string {
 export function coupleLeagueNotes({
   rosterLeagues = [],
   eliminationPickLeagues = [],
+  podiumPickLeagues = [],
   topScorerPickLeagues = [],
   grandFinaleNextElimLeagues = [],
   grandFinaleWinnerLeagues = [],
@@ -32,6 +37,9 @@ export function coupleLeagueNotes({
 }: {
   rosterLeagues?: string[];
   eliminationPickLeagues?: string[];
+  // Curtain Call's Finale-week podium: the leagues that picked this couple
+  // for each place, in place order (winner, runner-up, third).
+  podiumPickLeagues?: string[][];
   topScorerPickLeagues?: string[];
   // Couple sits in the viewer's own Grand Finale "next predicted
   // elimination" slot for these leagues — any week.
@@ -51,6 +59,11 @@ export function coupleLeagueNotes({
       `Your ${leaguePhrase(eliminationPickLeagues, totalLeagueCount)} ${plural(eliminationPickLeagues.length, "elim pick")}`
     );
   }
+  podiumPickLeagues.forEach((leagues, place) => {
+    if (leagues.length) {
+      notes.push(`Your ${leaguePhrase(leagues, totalLeagueCount)} ${plural(leagues.length, PODIUM_PICK_NOUNS[place])}`);
+    }
+  });
   if (topScorerPickLeagues.length) {
     notes.push(
       `Your ${leaguePhrase(topScorerPickLeagues, totalLeagueCount)} ${plural(topScorerPickLeagues.length, "top-scorer pick")}`

@@ -3,9 +3,12 @@ import {
   classifyTopScorerGuess,
   findEliminatedCoupleIds,
   findTopScorerCoupleIds,
+  podiumPlaceByCouple,
   resolveCurtainCallGuess,
+  resolvePodiumGuess,
   sumDanceScoresByCouple,
   type CurtainCallVerdict,
+  type PodiumPick,
   type RawDanceScore,
 } from "./scoring";
 
@@ -15,9 +18,22 @@ export type PickMatch = {
   points: number;
 };
 
+export type PodiumMatch = {
+  pickId: string | null;
+  // Places between this one and where the pick's couple finished; null with
+  // no pick or a couple that took no place.
+  placesOff: number | null;
+  points: number;
+  // The couple that took this place.
+  actualId: string | null;
+};
+
 export type PastPicksComparison = {
   eliminationPicks: PickMatch[];
   actualEliminatedIds: string[];
+  // The Finale week, in place order, where it stands in for the elimination
+  // picks; null in every other week.
+  podium: PodiumMatch[] | null;
   topScorer: PickMatch;
   actualTopScorerIds: string[];
   predictionPoints: number;
@@ -211,10 +227,25 @@ export function matchTopScorerPick({
   );
 }
 
+export function matchPodiumPicks(
+  podium: PodiumPick,
+  episodeOutcomes: { coupleId: string; outcome: string }[],
+  exactPayout: number
+): PodiumMatch[] {
+  const places = podiumPlaceByCouple(episodeOutcomes);
+  const coupleAt = new Map([...places].map(([coupleId, place]) => [place, coupleId]));
+  return podium.map((pickId, index) => ({
+    pickId,
+    ...resolvePodiumGuess(pickId, index + 1, places, exactPayout),
+    actualId: coupleAt.get(index + 1) ?? null,
+  }));
+}
+
 export function buildPastPicksComparison({
   isDoubleElimination,
   predictedEliminatedCoupleId,
   predictedEliminatedCoupleId2,
+  finalePodium,
   predictedTopScorerCoupleId,
   episodeOutcomes,
   danceScores,
@@ -227,6 +258,8 @@ export function buildPastPicksComparison({
   isDoubleElimination: boolean;
   predictedEliminatedCoupleId: string | null;
   predictedEliminatedCoupleId2: string | null;
+  // The manager's podium pick, given only for the Finale week.
+  finalePodium?: PodiumPick;
   predictedTopScorerCoupleId: string | null;
   episodeOutcomes: { coupleId: string; outcome: string }[];
   danceScores: RawDanceScore[];
@@ -249,6 +282,7 @@ export function buildPastPicksComparison({
       nearMissEnabled,
     }),
     actualEliminatedIds: [...eliminatedCoupleIds],
+    podium: finalePodium ? matchPodiumPicks(finalePodium, episodeOutcomes, eliminationExactPayout) : null,
     topScorer: matchTopScorerPick({
       predictedTopScorerCoupleId,
       danceScores,

@@ -3,7 +3,7 @@ import { buildCouplesLeaderboard } from "./couples-leaderboard";
 import { nextPredictedElimination, type PinnableCouple } from "./grand-finale-pins";
 import type { RosterSlotPeriod } from "./roster-couple-points";
 import type { HistoryWeekData } from "./score-history";
-import type { ScoringSettings } from "./scoring";
+import type { PodiumPick, ScoringSettings } from "./scoring";
 import type { DanceCardRule } from "./dance-card-v2";
 import { spoilerSafeCoupleStatus } from "./spoiler-safe-couple-status";
 
@@ -65,7 +65,13 @@ export function buildCoupleLeagueRows({
   });
 }
 
-export type WeekPick = { leagueId: string; weekNumber: number; eliminatedIds: string[]; topScorerId: string | null };
+export type WeekPick = {
+  leagueId: string;
+  weekNumber: number;
+  eliminatedIds: string[];
+  podiumIds: PodiumPick;
+  topScorerId: string | null;
+};
 
 // Results' gold pick lines for one couple in one shown week, across the
 // viewer's leagues: Curtain Call picks for that week, the Grand Finale
@@ -102,6 +108,9 @@ export function coupleWeekPickNotes({
   return coupleLeagueNotes({
     totalLeagueCount: leagueNames.size,
     eliminationPickLeagues: names(weekPicks.filter((pick) => pick.eliminatedIds.includes(coupleId)).map((pick) => pick.leagueId)),
+    podiumPickLeagues: [0, 1, 2].map((place) =>
+      names(weekPicks.filter((pick) => pick.podiumIds[place] === coupleId).map((pick) => pick.leagueId))
+    ),
     topScorerPickLeagues: names(weekPicks.filter((pick) => pick.topScorerId === coupleId).map((pick) => pick.leagueId)),
     grandFinaleNextElimLeagues: names(orders.filter(([, order]) => nextPredictedElimination(order, clamped) === coupleId).map(([id]) => id)),
     grandFinaleWinnerLeagues: semiFinalOn ? names(orders.filter(([, order]) => order[order.length - 1] === coupleId).map(([id]) => id)) : [],

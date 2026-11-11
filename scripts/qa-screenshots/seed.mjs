@@ -98,7 +98,7 @@ async function up() {
   const { data: season } = await admin.from("seasons").select("id").eq("is_active", true).single();
   const { data: week } = await admin
     .from("competition_weeks")
-    .select("id, week_number, is_double_elimination_week")
+    .select("id, week_number, is_double_elimination_week, is_finale")
     .eq("season_id", season.id)
     .gte("week_number", 1)
     .order("week_number");
@@ -124,13 +124,24 @@ async function up() {
     console.log(`Week ${nextWeek.week_number} is locked; skipping the Curtain Call pick.`);
   }
   if (nextWeek && pickOpen && couples.length >= 3) {
-    await rpc(viewer, "submit_prediction", {
-      p_league_id: league.id,
-      p_week_id: nextWeek.id,
-      p_predicted_eliminated_couple_id: couples[0].id,
-      p_predicted_eliminated_couple_id_2: nextWeek.is_double_elimination_week ? couples[1].id : null,
-      p_predicted_top_scorer_couple_id: couples[2].id,
-    });
+    if (nextWeek.is_finale) {
+      await rpc(viewer, "submit_podium_prediction", {
+        p_league_id: league.id,
+        p_week_id: nextWeek.id,
+        p_winner: couples[0].id,
+        p_runner_up: couples[1].id,
+        p_third: couples[2].id,
+        p_top_scorer: couples[2].id,
+      });
+    } else {
+      await rpc(viewer, "submit_prediction", {
+        p_league_id: league.id,
+        p_week_id: nextWeek.id,
+        p_predicted_eliminated_couple_id: couples[0].id,
+        p_predicted_eliminated_couple_id_2: nextWeek.is_double_elimination_week ? couples[1].id : null,
+        p_predicted_top_scorer_couple_id: couples[2].id,
+      });
+    }
   }
 
   console.log(`League ${league.id} ready. Viewer: ${users.viewer.email}`);

@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import { danceCardRule, danceCardWeekEpisodeIds, usesDanceCardLedger } from "@/lib/dance-card-v2";
 import { buildCoupleHistory, unwatchedRange, type CoupleHistory, type CoupleHistoryWeekInput } from "@/lib/couple-history";
 import { buildCoupleLeagueRows, coupleWeekPickNotes, type CoupleLeagueRow } from "@/lib/couple-leagues";
+import { CURTAIN_CALL_PICK_COLUMNS, curtainCallPickFromRow } from "@/lib/curtain-call-picks";
 import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
 import { formatManagerName } from "@/lib/manager-display";
 import { scoringSettingsFromRow } from "@/lib/scoring";
@@ -99,7 +100,7 @@ async function loadCoupleLeagues({
     resultWeeks.length > 0
       ? supabase
           .from("predictions")
-          .select("league_id, manager_id, week_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
+          .select(`league_id, manager_id, week_id, ${CURTAIN_CALL_PICK_COLUMNS}`)
           .in("league_id", leagueIds)
           .in("manager_id", teamIds)
           .in("week_id", resultWeeks.map((week) => week.id))
@@ -120,12 +121,14 @@ async function loadCoupleLeagues({
   const picks = (predictions ?? []).filter(ownTeamRow).flatMap((row) => {
     const weekNumber = weekNumberById.get(row.week_id);
     if (weekNumber === undefined) return [];
+    const pick = curtainCallPickFromRow(row);
     return [
       {
         leagueId: row.league_id,
         weekNumber,
-        eliminatedIds: [row.predicted_eliminated_couple_id, row.predicted_eliminated_couple_id_2].filter((id): id is string => !!id),
-        topScorerId: row.predicted_top_scorer_couple_id,
+        eliminatedIds: [pick.elim1, pick.elim2].filter((id): id is string => !!id),
+        podiumIds: pick.podium,
+        topScorerId: pick.topScorer,
       },
     ];
   });

@@ -15,6 +15,7 @@ import { findOwnMembership } from "@/lib/acting-manager";
 import { resolvedCoupleCount } from "@/lib/grand-finale-late";
 import { formatManagerName } from "@/lib/manager-display";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
+import { CURTAIN_CALL_PICK_COLUMNS, curtainCallPickFromRow } from "@/lib/curtain-call-picks";
 import { formatEpisodeCasualWithTheme } from "@/lib/format-week";
 import { XIcon } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -414,9 +415,7 @@ async function loadCurtainCallBackfill(
       .eq("season_id", seasonId ?? ""),
     admin
       .from("predictions")
-      .select(
-        "manager_id, week_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id, entered_via"
-      )
+      .select(`manager_id, week_id, entered_via, ${CURTAIN_CALL_PICK_COLUMNS}`)
       .eq("league_id", leagueId),
   ]);
   const weeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
@@ -429,6 +428,7 @@ async function loadCurtainCallBackfill(
       id: week.id,
       label: formatEpisodeCasualWithTheme(week.week_number, week.theme),
       isDouble: week.is_double_elimination_week,
+      isFinale: week.is_finale,
     })),
     defaultWeekId: (weeks.find((week) => week.status !== "completed") ?? weeks.at(-1))?.id ?? null,
     couples: [...displayNames.entries()]
@@ -437,9 +437,7 @@ async function loadCurtainCallBackfill(
     picks: (pickRows ?? []).map((row) => ({
       managerId: row.manager_id,
       weekId: row.week_id,
-      eliminated: row.predicted_eliminated_couple_id,
-      eliminated2: row.predicted_eliminated_couple_id_2,
-      topScorer: row.predicted_top_scorer_couple_id,
+      pick: curtainCallPickFromRow(row),
       backfilled: row.entered_via === "admin_backfill",
     })),
   };

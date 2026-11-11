@@ -41,6 +41,7 @@ export async function loadModuleStackInputs(
     const parts = id ? names.get(id) : undefined;
     return id && parts ? { ...parts, id } : null;
   };
+  const named = (ids: readonly string[]) => ids.flatMap((id) => fullNameOf(id) ?? []);
   const draftStatusByLeague = new Map((leagues ?? []).map((l) => [l.id, l.draft_status]));
   const seasonCouples = couples
     .filter((c) => c.season_id === context.activeSeasonId)
@@ -68,8 +69,9 @@ export async function loadModuleStackInputs(
             state: s.curtainCall.state,
             afterWeek: context.spoilerCutoffWeek,
             lockAt: s.curtainCallLockAt,
-            eliminatedName: fullNameOf(s.curtainCall.eliminatedCoupleId),
-            topScorerName: fullNameOf(s.curtainCall.topScorerCoupleId),
+            eliminatedName: fullNameOf(s.curtainCall.pick.elim1),
+            podiumNames: s.curtainCall.isFinale ? named(s.curtainCall.pick.podium.flatMap((id) => id ?? [])) : null,
+            topScorerName: fullNameOf(s.curtainCall.pick.topScorer),
           },
           danceCard: {
             on: s.danceCardOn,
@@ -95,6 +97,19 @@ export async function loadModuleStackInputs(
                 ),
               }))
             ),
+            moves: {
+              lifeline: s.rosterMoves.lifeline && {
+                ...s.rosterMoves.lifeline,
+                picks: s.rosterMoves.lifeline.picks.map(fullNameOf),
+              },
+              waivers: s.rosterMoves.waivers && { ...s.rosterMoves.waivers, adds: named(s.rosterMoves.waivers.adds) },
+              trades: s.rosterMoves.trades && {
+                ...s.rosterMoves.trades,
+                acceptedWith: s.rosterMoves.trades.acceptedWith.map((managerIds) =>
+                  managerIds.map((managerId) => s.managerNames[managerId] ?? "Someone")
+                ),
+              },
+            },
           },
           grandFinale: {
             on: s.grandFinaleOn,

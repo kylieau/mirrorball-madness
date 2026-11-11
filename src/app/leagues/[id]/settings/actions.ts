@@ -13,6 +13,7 @@ import { loadViewerSeason } from "@/lib/viewer-season-data";
 import { syncSeasonClockAnchor as writeSeasonClockAnchor } from "@/lib/season-clock-sync";
 import { parseLatePercent, percentToLateFactor } from "@/lib/grand-finale-late";
 import type { PickLockCoast } from "@/lib/curtain-call-lock";
+import type { CurtainCallPick } from "@/lib/curtain-call-picks";
 import type { GrandFinaleMethod, TierPayStyle } from "@/lib/scoring";
 
 export async function renameLeague(
@@ -141,30 +142,37 @@ export async function closeGrandFinaleLate(leagueId: string, managerId: string):
 
 export async function backfillCurtainCallPick(
   leagueId: string,
-  pick: {
-    managerId: string;
-    weekId: string;
-    eliminated: string | null;
-    eliminated2: string | null;
-    topScorer: string | null;
-    pickMadeAt: string;
-    reason: string;
-  }
+  entry: { managerId: string; weekId: string; pick: CurtainCallPick; pickMadeAt: string; reason: string }
 ): Promise<{ error: string | null }> {
   const supabase = await createClient();
-  // The RPC is the authority: site admins only, a reason and a pick time in
-  // the past required, couples from the week's season.
-  const { error } = await supabase.rpc("admin_backfill_prediction", {
+  const { data: week } = await supabase
+    .from("competition_weeks")
+    .select("is_finale")
+    .eq("id", entry.weekId)
+    .maybeSingle();
+  // The RPCs are the authority: site admins only, a reason and a pick time in
+  // the past required, couples from the week's season. Generated RPC args are
+  // typed non-null, but SQL takes null for an empty slot.
+  const shared = {
     p_league_id: leagueId,
-    p_week_id: pick.weekId,
-    p_manager_id: pick.managerId,
-    // Generated RPC args are typed non-null, but SQL takes null for an empty slot.
-    p_elimination: pick.eliminated as string,
-    p_elimination_2: pick.eliminated2 as string,
-    p_top_scorer: pick.topScorer as string,
-    p_pick_made_at: pick.pickMadeAt,
-    p_reason: pick.reason,
-  });
+    p_week_id: entry.weekId,
+    p_manager_id: entry.managerId,
+    p_top_scorer: entry.pick.topScorer as string,
+    p_pick_made_at: entry.pickMadeAt,
+    p_reason: entry.reason,
+  };
+  const { error } = week?.is_finale
+    ? await supabase.rpc("admin_backfill_podium_prediction", {
+        ...shared,
+        p_winner: entry.pick.podium[0] as string,
+        p_runner_up: entry.pick.podium[1] as string,
+        p_third: entry.pick.podium[2] as string,
+      })
+    : await supabase.rpc("admin_backfill_prediction", {
+        ...shared,
+        p_elimination: entry.pick.elim1 as string,
+        p_elimination_2: entry.pick.elim2 as string,
+      });
   if (error) return { error: error.message };
 
   revalidatePath(`/leagues/${leagueId}`, "layout");

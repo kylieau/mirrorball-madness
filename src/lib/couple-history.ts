@@ -1,6 +1,12 @@
 import { collapseToNights, judgeCountForDance, MARK_MAX, type DanceScore } from "./scoring";
 import { mergeCoupleOutcomes } from "./competition-week";
-import { isTeamDance, nightDanceLabel, type NightDance, type SpecialDanceLabelInput } from "./night-dance-lines";
+import {
+  isTeamDance,
+  nightDanceLabel,
+  orderNightDances,
+  type NightDance,
+  type SpecialDanceLabelInput,
+} from "./night-dance-lines";
 import { IMMUNITY_DANCE_TYPE } from "./episode-rounds";
 import { specialDanceTypeAndName } from "./special-dance-names";
 
@@ -96,9 +102,10 @@ export function buildCoupleHistory(input: {
   for (const week of [...input.weeks].sort((a, b) => b.weekNumber - a.weekNumber)) {
     const episodeIds = new Set(week.episodeIds);
     const nights = week.episodeIds.flatMap((episodeId): CoupleHistoryNight[] => {
-      const rows = input.dances
-        .filter((dance) => dance.episodeId === episodeId)
-        .sort((a, b) => Number(a.maxScore === 0) - Number(b.maxScore === 0) || Number(!!a.teamId) - Number(!!b.teamId));
+      const rows = orderNightDances(
+        input.dances.filter((dance) => dance.episodeId === episodeId),
+        (dance) => dance
+      );
       const night = nightByEpisode.get(episodeId);
       if (rows.length === 0 || !night) return [];
       return [

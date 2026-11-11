@@ -50,7 +50,12 @@ import {
   defaultPointsPerCorrect,
 } from "@/lib/grand-finale-explainer";
 import { buildLeagueGrandFinalePredictions } from "@/lib/grand-finale-predictions";
-import { hasCurtainCallPicks } from "@/lib/curtain-call-picks";
+import {
+  CURTAIN_CALL_PICK_COLUMNS,
+  curtainCallPickFromRow,
+  hasCurtainCallPicks,
+  type CurtainCallPick,
+} from "@/lib/curtain-call-picks";
 
 export default async function LeaguePicksPage({
   params,
@@ -137,7 +142,7 @@ export default async function LeaguePicksPage({
   const ownPredictionPending = curtainCallWeekId
     ? supabase
         .from("predictions")
-        .select("predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
+        .select(CURTAIN_CALL_PICK_COLUMNS)
         .eq("league_id", id)
         .eq("week_id", curtainCallWeekId)
         .eq("manager_id", myTeamId)
@@ -195,9 +200,7 @@ export default async function LeaguePicksPage({
     ? Promise.all([
         supabase
           .from("predictions")
-          .select(
-            "manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
-          )
+          .select(`manager_id, ${CURTAIN_CALL_PICK_COLUMNS}`)
           .eq("league_id", id)
           .eq("week_id", recapEpisode.id),
         recapEpisodeIds.length > 0
@@ -284,9 +287,7 @@ export default async function LeaguePicksPage({
     curtainCallWeekId && isLocked
       ? supabase
           .from("predictions")
-          .select(
-            "manager_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
-          )
+          .select(`manager_id, ${CURTAIN_CALL_PICK_COLUMNS}`)
           .eq("league_id", id)
           .eq("week_id", curtainCallWeekId)
       : Promise.resolve({ data: null }),
@@ -374,9 +375,7 @@ export default async function LeaguePicksPage({
     .map((p) => ({
       managerId: p.manager_id,
       displayName: nameByManager[p.manager_id] ?? "Unknown",
-      eliminatedId: p.predicted_eliminated_couple_id,
-      eliminatedId2: p.predicted_eliminated_couple_id_2,
-      topScorerId: p.predicted_top_scorer_couple_id,
+      pick: curtainCallPickFromRow(p),
       comparison: null,
     }))
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -641,16 +640,13 @@ export default async function LeaguePicksPage({
       seasonCouples.length
     );
 
-    const comparisonFor = (prediction: {
-      predicted_eliminated_couple_id: string | null;
-      predicted_eliminated_couple_id_2: string | null;
-      predicted_top_scorer_couple_id: string | null;
-    } | undefined, managerId: string) =>
+    const comparisonFor = (pick: CurtainCallPick, managerId: string) =>
       buildPastPicksComparison({
         isDoubleElimination: recapEpisode.is_double_elimination_week,
-        predictedEliminatedCoupleId: prediction?.predicted_eliminated_couple_id ?? null,
-        predictedEliminatedCoupleId2: prediction?.predicted_eliminated_couple_id_2 ?? null,
-        predictedTopScorerCoupleId: prediction?.predicted_top_scorer_couple_id ?? null,
+        predictedEliminatedCoupleId: pick.elim1,
+        predictedEliminatedCoupleId2: pick.elim2,
+        predictedTopScorerCoupleId: pick.topScorer,
+        finalePodium: recapEpisode.is_finale ? pick.podium : undefined,
         episodeOutcomes,
         danceScores,
         predictionPoints:
@@ -663,18 +659,19 @@ export default async function LeaguePicksPage({
       });
 
     const ownPastPrediction = (allPastPredictions ?? []).find((p) => p.manager_id === myTeamId);
-    pastPicksComparison = comparisonFor(ownPastPrediction, myTeamId);
+    pastPicksComparison = comparisonFor(curtainCallPickFromRow(ownPastPrediction), myTeamId);
 
     curtainCallRecapEntries = (allPastPredictions ?? [])
       .filter((p) => p.manager_id !== myTeamId)
-      .map((p) => ({
-        managerId: p.manager_id,
-        displayName: nameByManager[p.manager_id] ?? "Unknown",
-        eliminatedId: p.predicted_eliminated_couple_id,
-        eliminatedId2: p.predicted_eliminated_couple_id_2,
-        topScorerId: p.predicted_top_scorer_couple_id,
-        comparison: comparisonFor(p, p.manager_id),
-      }))
+      .map((p) => {
+        const pick = curtainCallPickFromRow(p);
+        return {
+          managerId: p.manager_id,
+          displayName: nameByManager[p.manager_id] ?? "Unknown",
+          pick,
+          comparison: comparisonFor(pick, p.manager_id),
+        };
+      })
       .sort(
         (a, b) =>
           (b.comparison?.predictionPoints ?? 0) - (a.comparison?.predictionPoints ?? 0) ||
@@ -726,9 +723,10 @@ export default async function LeaguePicksPage({
                   nearMissEnabled={scoringSettings?.curtain_call_near_miss_enabled !== false}
                   coupleDisplayNames={Object.fromEntries(activeDisplayNames)}
                   lineup={pickLineup}
-                  existingPrediction={ownPrediction}
+                  existingPick={curtainCallPickFromRow(ownPrediction)}
                   isLocked={isLocked}
                   isDoubleElimination={upcomingEpisode.is_double_elimination_week}
+                  isFinale={upcomingEpisode.is_finale}
                   otherLeagues={otherLeaguePicks.curtainCall}
                 />
               ) : curtainCallMode === "recap" && curtainCallEpisode ? (
@@ -744,6 +742,7 @@ export default async function LeaguePicksPage({
                   weekId={curtainCallEpisode.id}
                   weekNumber={curtainCallEpisode.week_number}
                   isDoubleElimination={curtainCallEpisode.is_double_elimination_week}
+                  isFinale={curtainCallEpisode.is_finale}
                   coupleDisplayNames={Object.fromEntries(allDisplayNames)}
                   entries={curtainCallPicksEntries}
                   historyFrom={historyFrom}
@@ -755,6 +754,7 @@ export default async function LeaguePicksPage({
                   weekId={curtainCallEpisode.id}
                   weekNumber={curtainCallEpisode.week_number}
                   isDoubleElimination={curtainCallEpisode.is_double_elimination_week}
+                  isFinale={curtainCallEpisode.is_finale}
                   coupleDisplayNames={Object.fromEntries(allDisplayNames)}
                   entries={curtainCallRecapEntries}
                   historyFrom={historyFrom}
@@ -784,6 +784,7 @@ export default async function LeaguePicksPage({
                 couples={rosterCouples}
                 totalPoints={yourRosterWeekTotalPoints}
                 weekBonusPoints={yourRosterWeekBonusPoints}
+                categoryWeight={judgePointsInputs.categoryWeight}
                 lifelines={yourLifelines}
                 historyFrom={historyFrom}
                 carousel={

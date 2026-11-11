@@ -190,6 +190,9 @@ export type Prediction = {
   // both couples going home that week, not just one) — ignored otherwise.
   predictedEliminatedCoupleId2: string | null;
   predictedTopScorerCoupleId: string | null;
+  // The Finale week only, where the podium replaces the elimination pick
+  // (submit_podium_prediction).
+  predictedPodiumCoupleIds?: PodiumPick;
 };
 
 export type WeeklyManagerScore = {
@@ -377,6 +380,76 @@ export function resolveCurtainCallGuess(
   return { verdict: "miss", points: 0 };
 }
 
+// The Finale's Curtain Call (Kylie, 2026-11-11): nobody goes home, so the
+// elimination pick becomes the podium, one pick per place, each worth that
+// week's elimination payout. Every place a pick is off costs this share of
+// it, whatever the In Jeopardy setting.
+export const PODIUM_PLACE_OFF_FRACTION = 0.5;
+
+// [winner, runner-up, third place]
+export type PodiumPick = [string | null, string | null, string | null];
+export const PODIUM_PLACE_LABELS = ["Winner", "Runner-Up", "Third Place"] as const;
+
+const PODIUM_PLACE_BY_OUTCOME: Partial<Record<string, number>> = {
+  winner: 1,
+  runner_up: 2,
+  third_place: 3,
+  eliminated: 4,
+};
+
+// Where each finalist finished, once a winner is named. The show places only
+// three couples, so every other finalist counts as fourth; a couple that
+// withdrew has no place. The last row per couple decides, as in the engine.
+export function podiumPlaceByCouple(outcomes: { coupleId: string; outcome: string }[]): Map<string, number> {
+  const outcomeByCouple = new Map(outcomes.map((o) => [o.coupleId, o.outcome]));
+  const places = new Map<string, number>();
+  if (![...outcomeByCouple.values()].includes("winner")) return places;
+  for (const [coupleId, outcome] of outcomeByCouple) {
+    const place = PODIUM_PLACE_BY_OUTCOME[outcome];
+    if (place) places.set(coupleId, place);
+  }
+  return places;
+}
+
+export function podiumPickPoints(exactPayout: number, placesOff: number): number {
+  return roundPoints(exactPayout * Math.max(0, 1 - placesOff * PODIUM_PLACE_OFF_FRACTION));
+}
+
+// placesOff is null for no pick, a couple with no place, or a podium that
+// isn't settled yet.
+export function resolvePodiumGuess(
+  guessId: string | null,
+  place: number,
+  placeByCouple: Map<string, number>,
+  exactPayout: number
+): { placesOff: number | null; points: number } {
+  const actual = guessId ? placeByCouple.get(guessId) : undefined;
+  if (actual === undefined) return { placesOff: null, points: 0 };
+  const placesOff = Math.abs(actual - place);
+  return { placesOff, points: podiumPickPoints(exactPayout, placesOff) };
+}
+
+export function podiumOffLabel(placesOff: number): string {
+  return `Off ${placesOff} ${placesOff === 1 ? "place" : "places"}`;
+}
+
+export function podiumPreviewCopy(exactPayout: number): string {
+  const parts = [`Each place: ${formatPoints(exactPayout)} pts`];
+  const oneOff = podiumPickPoints(exactPayout, 1);
+  const twoOff = podiumPickPoints(exactPayout, 2);
+  if (oneOff > 0) parts.push(`${formatPoints(oneOff)} pts if one place off`);
+  if (twoOff > 0) parts.push(`${formatPoints(twoOff)} pts if two off`);
+  return parts.join(" · ");
+}
+
+export function podiumRuleNote(): string {
+  const partial = [1, 2]
+    .map((placesOff) => ({ placesOff, percent: podiumPickPoints(100, placesOff) }))
+    .filter(({ percent }) => percent > 0)
+    .map(({ placesOff, percent }) => `${Math.round(percent)}% of it ${placesOff === 1 ? "one place" : "two places"} off`);
+  return `Nobody goes home in the Finale, so the elimination pick becomes the podium: Winner, Runner-Up and Third Place each pay what an elimination pick would that week, or ${partial.join(", ")}.`;
+}
+
 export function curtainCallPreviewCopy({
   kind,
   exactDisplayPoints,
@@ -445,6 +518,7 @@ export function computeWeeklyScores({
   const finalPlacementByCouple = new Map(episodeOutcomes.map((o) => [o.coupleId, o.finalPlacement]));
   const eliminatedCoupleIds = findEliminatedCoupleIds(episodeOutcomes);
   const inJeopardyIds = new Set(inJeopardyCoupleIds);
+  const podiumPlaces = podiumPlaceByCouple(episodeOutcomes);
   const nearMissEnabled = scoringSettings.curtainCallNearMissEnabled;
   const eliminationExact = curtainCallPayout(
     scoringSettings.eliminationPredictionPoints,
@@ -496,6 +570,9 @@ export function computeWeeklyScores({
         nearMissEnabled
       ).points;
     }
+    (p.predictedPodiumCoupleIds ?? []).forEach((coupleId, index) => {
+      points += resolvePodiumGuess(coupleId, index + 1, podiumPlaces, eliminationExact).points;
+    });
     points += resolveCurtainCallGuess(
       classifyTopScorerGuess(p.predictedTopScorerCoupleId, coupleTotalScore),
       topScorerExact,

@@ -19,6 +19,7 @@ import { formatPoints } from "@/lib/format-points";
 import { isUnscheduledPlaceholderRow } from "@/lib/episode-participants";
 import { formatEpisodeCasual, formatEpisodeCasualWithTheme, formatEpisodeLabel } from "@/lib/format-week";
 import { IMMUNITY_DANCE_TYPE } from "@/lib/episode-rounds";
+import { orderNightDances } from "@/lib/night-dance-lines";
 import { specialDanceShortName } from "@/lib/special-dance-names";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -152,7 +153,7 @@ export function AllResultsView({
   }
 
   const danceScoresByEpisodeCouple = new Map<string, DanceScore[]>();
-  for (const ds of danceScores) {
+  for (const ds of orderNightDances(danceScores, (d) => ({ maxScore: d.max_score, teamId: d.team_id }))) {
     const key = `${ds.episode_id}:${ds.couple_id}`;
     const list = danceScoresByEpisodeCouple.get(key) ?? [];
     list.push(ds);

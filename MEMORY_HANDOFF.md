@@ -1,16 +1,26 @@
-# Session Handoff — 2026-11-11 PT (Finale fairness fixes pushed; Curtain Call's Finale pick awaits Kylie)
+# Session Handoff — 2026-11-11 PT (Curtain Call podium build pushed; one more run of its SQL; Roster Moves mock next)
 
 ## 1. Current State
 
-**In focus: Finale fairness (Kylie, Nov 11: "the week rule quirk should not exist", then "agree with your fixes").** On `main` at `1974e2f`, on top of `e2b34a6` (a test pinning Grand Finale distance to the week ticked Finale). Both were pushed with this handoff sync; this session did not confirm the Vercel deploy. No SQL, no live data touched, and no week before the Finale changes, so nothing needs a recompute.
+**In focus: Kylie's Nov 11 build, committed and pushed to `main` on Nov 11 with her yes.** She applied `supabase/apply-curtain-call-podium.sql` first; a read-only check found the columns and both RPCs, and regenerated types match the committed file. No live league data was touched.
+
+- **Curtain Call's Finale podium** (she chose a podium with distance credit): Week 11's elimination pick is Winner, Runner-Up and Third Place, each paying that week's elimination payout (3.23 at defaults), half for one place off, nothing for two (`PODIUM_PLACE_OFF_FRACTION = 0.5`; the first mock had thirds, and she approved the proposal after I said I'd go with half), always on; top scorer unchanged. `supabase/apply-curtain-call-podium.sql` is applied live and rehearsed (`curtain-call-podium-db.test.ts`). **It needs one more run:** after her apply, the Codex review found `submit_podium_prediction` didn't check that picked couples are in the week's season; the check is now in the file and `schema.sql` (safe to run again; the app doesn't depend on it).
+- **Own dances first** wherever a night's dances are listed (`orderNightDances`).
+- **Dance Card weight line** on Picks' roster card when the weight isn't 1.
+- **Home league card roster moves** under Dance Card (`rosterMoveRows`, `loadHomeRosterMoves`); a missing Lifeline counts as Picks Due. Looked at in a browser with made-up data only (a temporary page, deleted); the scratch league has none of the three mechanisms on.
+- **Equalizer in Score History** stays one lump (her "ok thanks"); nothing built.
+
+Checks before the push: `npx tsc --noEmit` and `npx eslint src scripts` clean, `npm test` and `rm -rf .next && npm run build` pass. Live browser check with the scratch league (seeded and removed): Home, Results (own dance first, dance-off under it), Picks, Standings and Manage Leagues render; the regular Week 10 pick saves. Codex review: nothing blocking, the one season-check gap above. Not exercised live: the podium form and recap (Week 11 picks open only after Week 10's results; Week 10 airs Nov 17) and the Home card's move lines.
+
+**Earlier this session, pushed: Finale fairness.**
+
+**Finale fairness (Kylie, Nov 11: "the week rule quirk should not exist", then "agree with your fixes").** On `main` at `1974e2f`, on top of `e2b34a6` (a test pinning Grand Finale distance to the week ticked Finale). Both were pushed with this handoff sync; this session did not confirm the Vercel deploy. No SQL, no live data touched, and no week before the Finale changes, so nothing needs a recompute.
 
 - **Grand Finale distance:** the Finale is one week split evenly between its places (`SlotWeeks.finaleSpots`; `grandFinaleDistance` returns `weeks` for the penalty and keeps `off` / `unit` for Score History's `Off 1 place`). With five finalists a place costs a fifth of a week. A winner pick at 8.33 / 2.08 pays 7.91 for 2nd, 7.50 for 3rd, 7.08 for 4th or 5th, and 6.25 for a Semi-Finals exit (before: 6.25, 4.17, 2.09, 6.25, so 5th in the Finale paid less than going home the week before). League Settings' explainer says so.
 - **Dance Card v3 survival:** every finalist gets the Finale's survival step (0.49 before the Dance Card weight), the couples entered as Eliminated on Finale night included; a withdrawal or bye gets none (`survivingCoupleIds` in `src/lib/dance-card-v2.ts`: a week that names a winner is the Finale; Lifeline's `survived` uses it too). v1 is untouched (it pays 4th and 5th placement points). The v3 rates stay as solved; the amendment is in `docs/design/dance-card-v3/README.md`. This changes the rule the commissioners agreed to, so Kylie may want to tell them before the Finale.
 - **Still true:** 4th and 5th are both entered as Eliminated in the Finale week and share spots, so no module can tell them apart.
 
 Checks on `1974e2f`: `npx tsc --noEmit` and `npx eslint src scripts` clean, `npm test` 100 files / 998 tests, `rm -rf .next && npm run build` succeeds. Not looked at in a browser (the only visible change is the explainer sentence).
-
-**Open question, awaiting Kylie's pick (her idea, Nov 11: "for curtain call's finale, instead of predicting elimination, we predict placement...?"):** today Week 11's card asks for one Eliminated pick plus top scorer, and 4th and 5th both count as correct. Proposed: **(A, recommended)** the Finale week's first pick becomes Winner, paid like the elimination pick at that week's scaling (3.23), top scorer unchanged; **(B)** rank all the finalists, which needs new storage, SQL and a new card, and overlaps Grand Finale. Either needs a mock first, then Codex and UX/UI review before the push, and should be live before Week 11 picks open (after E11's results, about Nov 17). Not started.
 
 **Live state (S35, as last read on Nov 11):**
 - E10 (Week 9) is published; `scripts/dance-card-v2.ts --verify` matched on all four leagues afterward. 6 of 16 couples are still in. Week 10 (E11, Semi-Finals) airs Tue Nov 17; Week 11 (E12) is the Finale, Tue Nov 24.
@@ -27,7 +37,9 @@ Checks on `1974e2f`: `npx tsc --noEmit` and `npx eslint src scripts` clean, `npm
 
 ## 2. Changes Made
 
-All of this session's work is committed on `main`; nothing of ours is uncommitted.
+**The Nov 11 build, committed and pushed:** `supabase/apply-curtain-call-podium.sql`, `supabase/schema.sql`, `src/lib/supabase/types.ts` (matches a regenerate from the live project), `src/lib/curtain-call-podium-db.test.ts`, `src/lib/home-roster-moves-data.ts`, `src/components/league-triage-card.tsx`, `docs/design/curtain-call-finale-podium/`, `docs/design/home-card-roster-moves/`, `scripts/qa-screenshots/seed.mjs`, `CLAUDE.md`, `BACKLOG.md`, this file, and every other modified file under `src/` in `git status`.
+
+Committed and pushed earlier:
 
 - `1974e2f` Finale fairness: `src/lib/scoring.ts`, `dance-card-v2.ts`, `lifeline.ts`, `grand-finale-explainer.ts` and their tests, a comment in `strong-play-ceilings.ts`, `docs/design/dance-card-v3/README.md`, `CLAUDE.md`.
 - `e2b34a6` `src/lib/weekly-score-rows.test.ts` pins the Finale tick; docs record the recompute.
@@ -62,13 +74,13 @@ Rules that still hold:
 
 ## 4. Backlog & Next Steps
 
-1. Kylie picks A or B for Curtain Call's Finale week (above); then mock, build, reviews, push before about Nov 17.
+1. Kylie runs `supabase/apply-curtain-call-podium.sql` once more (the season check). Then the Roster Moves mock she asked for (the card and its pages on Picks). When Week 11 picks open, look at the live podium form.
 2. Confirm the Vercel deploy of `1974e2f`, and Kylie decides whether to tell the v3 commissioners about the Finale survival amendment.
 3. After the Thu Nov 12 waiver run: read-only check that it ran for the three leagues (`recast_cycles`, nothing in `recast_runs_overdue`).
 4. After E11 is published: `--verify` (command below).
-5. Kylie's own: apply `supabase/apply-dance-card-v3-default.sql` (new leagues start on v3).
+5. Done: `supabase/apply-dance-card-v3-default.sql` is applied live (column default read back as v3 on Nov 11), so new leagues start on v3. One undrafted, unscored test league is still on v1; Kylie said to leave it.
 
-Deferred items are in `BACKLOG.md` (Finale follow-ups — 2026-11-11; Lifeline, Recast and Trades — 2026-11-11).
+Deferred items are in `BACKLOG.md` (Curtain Call podium and Home card moves — 2026-11-11; Finale follow-ups — 2026-11-11; Lifeline, Recast and Trades — 2026-11-11).
 
 Next command (after E11 is published):
 `NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`

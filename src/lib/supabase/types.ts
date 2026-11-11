@@ -2062,7 +2062,10 @@ export type Database = {
           pick_made_at: string | null
           predicted_eliminated_couple_id: string | null
           predicted_eliminated_couple_id_2: string | null
+          predicted_runner_up_couple_id: string | null
+          predicted_third_place_couple_id: string | null
           predicted_top_scorer_couple_id: string | null
+          predicted_winner_couple_id: string | null
           submitted_at: string
           week_id: string
         }
@@ -2076,7 +2079,10 @@ export type Database = {
           pick_made_at?: string | null
           predicted_eliminated_couple_id?: string | null
           predicted_eliminated_couple_id_2?: string | null
+          predicted_runner_up_couple_id?: string | null
+          predicted_third_place_couple_id?: string | null
           predicted_top_scorer_couple_id?: string | null
+          predicted_winner_couple_id?: string | null
           submitted_at?: string
           week_id: string
         }
@@ -2090,7 +2096,10 @@ export type Database = {
           pick_made_at?: string | null
           predicted_eliminated_couple_id?: string | null
           predicted_eliminated_couple_id_2?: string | null
+          predicted_runner_up_couple_id?: string | null
+          predicted_third_place_couple_id?: string | null
           predicted_top_scorer_couple_id?: string | null
+          predicted_winner_couple_id?: string | null
           submitted_at?: string
           week_id?: string
         }
@@ -2131,8 +2140,29 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "predictions_predicted_runner_up_couple_id_fkey"
+            columns: ["predicted_runner_up_couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "predictions_predicted_third_place_couple_id_fkey"
+            columns: ["predicted_third_place_couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "predictions_predicted_top_scorer_couple_id_fkey"
             columns: ["predicted_top_scorer_couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "predictions_predicted_winner_couple_id_fkey"
+            columns: ["predicted_winner_couple_id"]
             isOneToOne: false
             referencedRelation: "couples"
             referencedColumns: ["id"]
@@ -2945,6 +2975,42 @@ export type Database = {
     }
     Functions: {
       active_season_id: { Args: never; Returns: string }
+      admin_backfill_podium_prediction: {
+        Args: {
+          p_league_id: string
+          p_manager_id: string
+          p_pick_made_at: string
+          p_reason: string
+          p_runner_up: string
+          p_third: string
+          p_top_scorer: string
+          p_week_id: string
+          p_winner: string
+        }
+        Returns: {
+          entered_by: string | null
+          entered_via: string | null
+          entry_reason: string | null
+          id: string
+          league_id: string
+          manager_id: string
+          pick_made_at: string | null
+          predicted_eliminated_couple_id: string | null
+          predicted_eliminated_couple_id_2: string | null
+          predicted_runner_up_couple_id: string | null
+          predicted_third_place_couple_id: string | null
+          predicted_top_scorer_couple_id: string | null
+          predicted_winner_couple_id: string | null
+          submitted_at: string
+          week_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "predictions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_backfill_prediction: {
         Args: {
           p_elimination: string
@@ -2966,7 +3032,10 @@ export type Database = {
           pick_made_at: string | null
           predicted_eliminated_couple_id: string | null
           predicted_eliminated_couple_id_2: string | null
+          predicted_runner_up_couple_id: string | null
+          predicted_third_place_couple_id: string | null
           predicted_top_scorer_couple_id: string | null
+          predicted_winner_couple_id: string | null
           submitted_at: string
           week_id: string
         }
@@ -3731,6 +3800,39 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      submit_podium_prediction: {
+        Args: {
+          p_league_id: string
+          p_runner_up: string
+          p_third: string
+          p_top_scorer: string
+          p_week_id: string
+          p_winner: string
+        }
+        Returns: {
+          entered_by: string | null
+          entered_via: string | null
+          entry_reason: string | null
+          id: string
+          league_id: string
+          manager_id: string
+          pick_made_at: string | null
+          predicted_eliminated_couple_id: string | null
+          predicted_eliminated_couple_id_2: string | null
+          predicted_runner_up_couple_id: string | null
+          predicted_third_place_couple_id: string | null
+          predicted_top_scorer_couple_id: string | null
+          predicted_winner_couple_id: string | null
+          submitted_at: string
+          week_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "predictions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       submit_prediction: {
         Args: {
           p_league_id: string
@@ -3749,7 +3851,10 @@ export type Database = {
           pick_made_at: string | null
           predicted_eliminated_couple_id: string | null
           predicted_eliminated_couple_id_2: string | null
+          predicted_runner_up_couple_id: string | null
+          predicted_third_place_couple_id: string | null
           predicted_top_scorer_couple_id: string | null
+          predicted_winner_couple_id: string | null
           submitted_at: string
           week_id: string
         }

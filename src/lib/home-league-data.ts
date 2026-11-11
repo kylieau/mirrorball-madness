@@ -23,7 +23,9 @@ export async function loadHomeLeagueData(
   const activeSeasonId = season.seasonId;
   const groupedWeeks = groupEpisodesByWeek(season.weekRows, season.episodeRows);
   const liveWeek = liveCompetitionWeek(groupedWeeks);
-  const upcomingEpisode = liveWeek ? { id: liveWeek.id, week_number: liveWeek.week_number } : null;
+  const upcomingEpisode = liveWeek
+    ? { id: liveWeek.id, week_number: liveWeek.week_number, is_finale: liveWeek.is_finale }
+    : null;
   const completedWeeks = groupedWeeks
     .filter((week) => week.status === "completed")
     .sort((a, b) => b.week_number - a.week_number)
@@ -75,7 +77,12 @@ export async function loadHomeLeagueData(
         joinCutoffMs,
         scoredIds,
         draftNight,
-        weekNumberById
+        weekNumberById,
+        {
+          behind: cutoff.pendingRevealEpisode != null,
+          cutoffWeek: cutoff.effectiveLatestEpisode?.week_number ?? null,
+          finaleWeekNumber: groupedWeeks.find((week) => week.is_finale)?.week_number ?? null,
+        }
       )
     )
   );

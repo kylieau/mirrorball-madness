@@ -19,7 +19,11 @@ import {
   curtainCallPreviewCopy,
   judgeCountForDance,
   nightScaledScoresByCouple,
+  podiumPlaceByCouple,
+  podiumPreviewCopy,
+  podiumRuleNote,
   resolveCurtainCallGuess,
+  resolvePodiumGuess,
   scaledJudgesScore,
   sumDanceScoresByCouple,
   type DanceScore,
@@ -1305,6 +1309,96 @@ describe("grandFinaleBestCasePoints", () => {
   it("is 0 for exact_position once the slot has passed", () => {
     expect(
       grandFinaleBestCasePoints({ ...params, method: "exact_position", predictedPosition: 3, firstOpenPosition: 4 })
+    ).toBe(0);
+  });
+});
+
+describe("Curtain Call's Finale podium", () => {
+  const outcome = (coupleId: string, o: "winner" | "runner_up" | "third_place" | "eliminated" | "withdrawn" | "safe") => ({
+    coupleId,
+    outcome: o,
+    bonusPoints: 0,
+    finalPlacement: null,
+  });
+  const finale = [
+    outcome("first", "winner"),
+    outcome("second", "runner_up"),
+    outcome("third", "third_place"),
+    outcome("fourth", "eliminated"),
+    outcome("fifth", "eliminated"),
+  ];
+  const podiumPoints = (podium: [string | null, string | null, string | null]) =>
+    computeWeeklyScores({
+      scoringSettings: { ...settings, curtainCallNearMissEnabled: false },
+      rosterSlots: [],
+      danceScores: [],
+      episodeOutcomes: finale,
+      predictions: [
+        {
+          managerId: "alice",
+          predictedEliminatedCoupleId: null,
+          predictedEliminatedCoupleId2: null,
+          predictedTopScorerCoupleId: null,
+          predictedPodiumCoupleIds: podium,
+        },
+      ],
+      isDoubleElimination: false,
+      ...noScaling,
+    })[0].predictionPoints;
+
+  it("places the finalists once a winner is named, 4th and 5th both as fourth", () => {
+    expect([...podiumPlaceByCouple(finale)]).toEqual([
+      ["first", 1],
+      ["second", 2],
+      ["third", 3],
+      ["fourth", 4],
+      ["fifth", 4],
+    ]);
+    expect(podiumPlaceByCouple([outcome("fifth", "eliminated"), outcome("first", "safe")]).size).toBe(0);
+    expect(podiumPlaceByCouple([...finale, outcome("fourth", "withdrawn")]).has("fourth")).toBe(false);
+  });
+
+  it("pays each place the elimination payout, whatever the In Jeopardy setting", () => {
+    expect(podiumPoints(["first", "second", "third"])).toBe(60);
+    expect(podiumPoints(["first", null, null])).toBe(20);
+  });
+
+  it("takes half off for each place a pick is off", () => {
+    // Winner pick finished 2nd, runner-up pick finished 1st, third pick 4th.
+    expect(podiumPoints(["second", "first", "fifth"])).toBe(30);
+    // Two places off, and a couple that wasn't placed, pay nothing.
+    expect(podiumPoints(["third", null, "first"])).toBe(0);
+    expect(resolvePodiumGuess("gone", 1, podiumPlaceByCouple(finale), 20)).toEqual({ placesOff: null, points: 0 });
+    expect(resolvePodiumGuess("fourth", 3, podiumPlaceByCouple(finale), 20)).toEqual({ placesOff: 1, points: 10 });
+  });
+
+  it("rounds the half from the unrounded payout", () => {
+    const exact = curtainCallPayout(10.35, 5, 16);
+    expect(resolvePodiumGuess("first", 1, podiumPlaceByCouple(finale), exact).points).toBe(3.23);
+    expect(resolvePodiumGuess("first", 2, podiumPlaceByCouple(finale), exact).points).toBe(1.62);
+    expect(podiumPreviewCopy(exact)).toBe("Each place: 3.23 pts · 1.62 pts if one place off");
+    expect(podiumRuleNote()).toContain("or 50% of it one place off.");
+  });
+
+  it("pays nothing until the winner is named", () => {
+    expect(
+      computeWeeklyScores({
+        scoringSettings: settings,
+        rosterSlots: [],
+        danceScores: [],
+        episodeOutcomes: [outcome("fifth", "eliminated")],
+        predictions: [
+          {
+            managerId: "alice",
+            predictedEliminatedCoupleId: null,
+            predictedEliminatedCoupleId2: null,
+            predictedTopScorerCoupleId: null,
+            predictedPodiumCoupleIds: ["first", "second", "fifth"],
+          },
+        ],
+        isDoubleElimination: false,
+        ...noScaling,
+      })[0].predictionPoints
     ).toBe(0);
   });
 });

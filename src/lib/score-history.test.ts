@@ -193,6 +193,7 @@ function engineWeek(input: ManagerHistoryInput, week: HistoryWeekData) {
             predictedEliminatedCoupleId: prediction.eliminatedCoupleId,
             predictedEliminatedCoupleId2: prediction.eliminatedCoupleId2,
             predictedTopScorerCoupleId: prediction.topScorerCoupleId,
+            predictedPodiumCoupleIds: prediction.podiumCoupleIds,
           },
         ]
       : [],
@@ -350,6 +351,28 @@ describe("buildScoreHistory lines", () => {
     const clamped = buildScoreHistory({ ...base, weeks: weeks.slice(0, 1) });
     expect(clamped.every((l) => l.weekNumber === 1)).toBe(true);
     expect(clamped.some((l) => l.label.includes("1st Place"))).toBe(false);
+  });
+});
+
+describe("Curtain Call's Finale podium", () => {
+  // Whitney won and Ilona was runner-up; Danny went home in Week 2.
+  const input: ManagerHistoryInput = {
+    ...base,
+    predictions: [
+      { weekNumber: 3, eliminatedCoupleId: null, eliminatedCoupleId2: null, topScorerCoupleId: "A", podiumCoupleIds: ["A", "C", "B"] },
+    ],
+  };
+  const lines = buildScoreHistory(input);
+
+  it("names each place that paid and how far off it was, ahead of the top scorer", () => {
+    const week3 = lines.filter((l) => l.weekNumber === 3 && l.module === "curtainCall").map(text);
+    expect(week3).toEqual(["Winner: Whitney · ✓", "Third: Ilona · Off 1 place", "High: Whitney · ✓"]);
+  });
+
+  it("sums to the engine's Curtain Call points", () => {
+    const engine = engineWeek(input, weeks[2])!;
+    expect(engine.predictionPoints).toBeGreaterThan(0);
+    expect(sumLines(lines, 3, "curtainCall")).toBeCloseTo(engine.predictionPoints, 2);
   });
 });
 

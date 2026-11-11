@@ -17,6 +17,7 @@ import { StickyTopBar } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { coupleLeagueNotes } from "@/lib/couple-league-notes";
+import { CURTAIN_CALL_PICK_COLUMNS, curtainCallPickFromRow } from "@/lib/curtain-call-picks";
 import { teamDanceEpisodeIds } from "@/lib/night-dance-lines";
 import { danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
 import { nextPredictedElimination } from "@/lib/grand-finale-pins";
@@ -168,7 +169,7 @@ export default async function ThisWeekPage({
     selectedMode === "results" && selectedWeekId
       ? supabase
           .from("predictions")
-          .select("league_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
+          .select(`league_id, ${CURTAIN_CALL_PICK_COLUMNS}`)
           .in("manager_id", myTeamIds)
           .eq("week_id", selectedWeekId)
           .in("league_id", leagueIds)
@@ -219,16 +220,19 @@ export default async function ThisWeekPage({
   }
 
   const eliminationPickLeaguesByCouple: Record<string, string[]> = {};
+  const podiumPickLeaguesByCouple: Record<string, string[][]> = {};
   const topScorerPickLeaguesByCouple: Record<string, string[]> = {};
   for (const p of pastPredictions ?? []) {
     const leagueName = leagueNameById.get(p.league_id);
     if (!leagueName) continue;
-    for (const coupleId of new Set([p.predicted_eliminated_couple_id, p.predicted_eliminated_couple_id_2])) {
+    const pick = curtainCallPickFromRow(p);
+    for (const coupleId of new Set([pick.elim1, pick.elim2])) {
       if (coupleId) (eliminationPickLeaguesByCouple[coupleId] ??= []).push(leagueName);
     }
-    if (p.predicted_top_scorer_couple_id) {
-      (topScorerPickLeaguesByCouple[p.predicted_top_scorer_couple_id] ??= []).push(leagueName);
-    }
+    pick.podium.forEach((coupleId, place) => {
+      if (coupleId) (podiumPickLeaguesByCouple[coupleId] ??= [[], [], []])[place].push(leagueName);
+    });
+    if (pick.topScorer) (topScorerPickLeaguesByCouple[pick.topScorer] ??= []).push(leagueName);
   }
 
   // Grand Finale stakes, same idea: which couple sits in the viewer's own
@@ -280,6 +284,7 @@ export default async function ThisWeekPage({
   for (const coupleId of new Set([
     ...Object.keys(rosterLeaguesByCouple),
     ...Object.keys(eliminationPickLeaguesByCouple),
+    ...Object.keys(podiumPickLeaguesByCouple),
     ...Object.keys(topScorerPickLeaguesByCouple),
     ...Object.keys(grandFinaleNextElimLeaguesByCouple),
     ...Object.keys(grandFinaleWinnerLeaguesByCouple),
@@ -290,6 +295,7 @@ export default async function ThisWeekPage({
       grandFinaleWinnerLeagues: grandFinaleWinnerLeaguesByCouple[coupleId],
       rosterLeagues: rosterLeaguesByCouple[coupleId],
       eliminationPickLeagues: eliminationPickLeaguesByCouple[coupleId],
+      podiumPickLeagues: podiumPickLeaguesByCouple[coupleId],
       topScorerPickLeagues: topScorerPickLeaguesByCouple[coupleId],
     });
   }

@@ -394,4 +394,37 @@ describe("buildPastPicksComparison", () => {
     expect(comparison.topScorer.verdict).toBe("exact");
     expect(comparison.predictionPoints).toBe(0);
   });
+
+  it("matches each podium place in the Finale and names who took it", () => {
+    const finale = {
+      isDoubleElimination: false,
+      predictedEliminatedCoupleId: null,
+      predictedEliminatedCoupleId2: null,
+      predictedTopScorerCoupleId: null,
+      episodeOutcomes: [
+        { coupleId: "harry", outcome: "winner" },
+        { coupleId: "maura", outcome: "runner_up" },
+        { coupleId: "tatyana", outcome: "third_place" },
+        { coupleId: "amber", outcome: "eliminated" },
+        { coupleId: "ezra", outcome: "eliminated" },
+      ],
+      danceScores: [],
+      predictionPoints: 4.85,
+      nearMissEnabled: false,
+      eliminationExactPayout: 3.23,
+      topScorerExactPayout: 2.16,
+    };
+
+    expect(buildPastPicksComparison({ ...finale, finalePodium: ["harry", "amber", "maura"] }).podium).toEqual([
+      { pickId: "harry", placesOff: 0, points: 3.23, actualId: "harry" },
+      { pickId: "amber", placesOff: 2, points: 0, actualId: "maura" },
+      { pickId: "maura", placesOff: 1, points: 1.62, actualId: "tatyana" },
+    ]);
+    expect(buildPastPicksComparison({ ...finale, finalePodium: [null, null, null] }).podium).toEqual([
+      { pickId: null, placesOff: null, points: 0, actualId: "harry" },
+      { pickId: null, placesOff: null, points: 0, actualId: "maura" },
+      { pickId: null, placesOff: null, points: 0, actualId: "tatyana" },
+    ]);
+    expect(buildPastPicksComparison(finale).podium).toBeNull();
+  });
 });

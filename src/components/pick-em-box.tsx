@@ -23,8 +23,12 @@ import {
   curtainCallNearMissPoints,
   curtainCallPayout,
   curtainCallPreviewCopy,
+  PODIUM_PLACE_LABELS,
+  podiumPreviewCopy,
+  type PodiumPick,
 } from "@/lib/scoring";
 import { adaptCurtainCallPick, defaultSelection, type CurtainCallDestination } from "@/lib/copy-picks";
+import { curtainCallPickMade, type CurtainCallPick } from "@/lib/curtain-call-picks";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
 
@@ -42,8 +46,8 @@ function CoupleSelect({
 }: {
   id: string;
   label: string;
-  value: string;
-  onChange: (coupleId: string) => void;
+  value: string | null;
+  onChange: (coupleId: string | null) => void;
   couples: Couple[];
   nameFor: (coupleId: string) => ReactNode;
   lineup: Record<string, string[]>;
@@ -58,7 +62,7 @@ function CoupleSelect({
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor={id}>{label}</Label>
-      <Select items={items} value={value} onValueChange={(v) => onChange(v ?? "")}>
+      <Select items={items} value={value ?? ""} onValueChange={(v) => onChange(v || null)}>
         <SelectTrigger id={id} className="w-full">
           <SelectValue placeholder={CHOOSE_COUPLE} />
         </SelectTrigger>
@@ -85,6 +89,48 @@ function CoupleSelect({
   );
 }
 
+const PODIUM_QUESTIONS = ["Who wins the Mirrorball?", "Who finishes second?", "Who finishes third?"];
+
+function SavedPickRows({
+  pick,
+  isFinale,
+  nameFor,
+}: {
+  pick: CurtainCallPick;
+  isFinale: boolean;
+  nameFor: (coupleId: string) => ReactNode;
+}) {
+  const named = (coupleId: string | null) => (coupleId ? nameFor(coupleId) : null);
+  const rows = [
+    ...(isFinale
+      ? PODIUM_PLACE_LABELS.map((label, index) => ({ label, value: named(pick.podium[index]) }))
+      : [
+          {
+            label: "Eliminated",
+            value:
+              pick.elim1 && pick.elim2 ? (
+                <>
+                  {nameFor(pick.elim1)} & {nameFor(pick.elim2)}
+                </>
+              ) : (
+                named(pick.elim1)
+              ),
+          },
+        ]),
+    { label: "Top Scorer", value: named(pick.topScorer) },
+  ];
+  return (
+    <div className="flex flex-col gap-1.5 text-sm">
+      {rows.map((row) => (
+        <div key={row.label} className="flex items-center justify-between">
+          <span className="text-muted-foreground">{row.label}</span>
+          <span className="font-medium">{row.value ?? "No Pick"}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function PickEmBox({
   leagueId,
   episode,
@@ -97,9 +143,10 @@ export function PickEmBox({
   nearMissEnabled = true,
   coupleDisplayNames,
   lineup,
-  existingPrediction,
+  existingPick,
   isLocked,
   isDoubleElimination,
+  isFinale,
   otherLeagues,
 }: {
   leagueId: string;
@@ -118,35 +165,23 @@ export function PickEmBox({
   coupleDisplayNames: Record<string, CoupleNameParts>;
   // This week's announced dances per couple, shown in the dropdowns.
   lineup: Record<string, string[]>;
-  existingPrediction: {
-    predicted_eliminated_couple_id: string | null;
-    predicted_eliminated_couple_id_2: string | null;
-    predicted_top_scorer_couple_id: string | null;
-  } | null;
+  existingPick: CurtainCallPick;
   isLocked: boolean;
   isDoubleElimination: boolean;
+  // The Finale has no elimination, so the podium takes the elimination pick's place.
+  isFinale: boolean;
   otherLeagues: CurtainCallDestination[];
 }) {
-  const [eliminatedId, setEliminatedId] = useState(
-    existingPrediction?.predicted_eliminated_couple_id ?? ""
-  );
-  // Only read/rendered when isDoubleElimination -- a normal week's
-  // eliminatedId behavior above is untouched.
-  const [eliminatedId2, setEliminatedId2] = useState(
-    existingPrediction?.predicted_eliminated_couple_id_2 ?? ""
-  );
-  const [topScorerId, setTopScorerId] = useState(
-    existingPrediction?.predicted_top_scorer_couple_id ?? ""
-  );
-  const [savedPick, setSavedPick] = useState(existingPrediction);
+  // elim2 is only read and rendered on a double-elimination week, podium only
+  // in the Finale.
+  const [draft, setDraft] = useState(existingPick);
+  const [savedPick, setSavedPick] = useState(existingPick);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Starts in read-only "here's what you picked" mode whenever a pick
   // already exists (a fresh page load with a saved prediction) — editing
   // reopens the dropdowns, saving successfully closes them again.
-  const [editing, setEditing] = useState(
-    !existingPrediction?.predicted_eliminated_couple_id && !existingPrediction?.predicted_top_scorer_couple_id
-  );
+  const [editing, setEditing] = useState(!curtainCallPickMade(existingPick));
   const [alsoSaveTo, setAlsoSaveTo] = useState(() => defaultSelection(otherLeagues));
   const [otherResults, setOtherResults] = useState<LeagueSaveResult[]>([]);
   const [filledFrom, setFilledFrom] = useState<string | null>(null);
@@ -159,29 +194,35 @@ export function PickEmBox({
     );
   }
 
-  function handleEliminatedChange(slot: 1 | 2, next: string) {
-    if (slot === 1) {
-      setEliminatedId(next);
-      if (next && next === eliminatedId2) setEliminatedId2("");
-      return;
-    }
-    setEliminatedId2(next);
-    if (next && next === eliminatedId) setEliminatedId("");
+  function handleEliminatedChange(slot: 1 | 2, next: string | null) {
+    setDraft((d) =>
+      slot === 1
+        ? { ...d, elim1: next, elim2: next && next === d.elim2 ? null : d.elim2 }
+        : { ...d, elim2: next, elim1: next && next === d.elim1 ? null : d.elim1 }
+    );
   }
 
-  // On a double-elimination week, submit_prediction enforces "both slots
-  // filled or both blank" — mirror that here so Save is disabled on a
-  // half-filled state instead of erroring on submit.
-  const eliminationPickValid =
-    !isDoubleElimination || (!eliminatedId && !eliminatedId2) || (!!eliminatedId && !!eliminatedId2);
+  // A couple can hold one place, so picking one already placed moves it.
+  function handlePodiumChange(place: number, next: string | null) {
+    setDraft((d) => ({
+      ...d,
+      podium: d.podium.map((id, index) => (index === place ? next : id === next ? null : id)) as PodiumPick,
+    }));
+  }
+
+  // submit_prediction wants both slots of a double elimination filled or both
+  // blank, and submit_podium_prediction all three places or none — mirror that
+  // here so Save is disabled on a half-filled state instead of erroring on
+  // submit.
+  const allOrNone = (ids: (string | null)[]) => ids.every(Boolean) || !ids.some(Boolean);
+  const eliminationPickValid = isFinale
+    ? allOrNone(draft.podium)
+    : !isDoubleElimination || allOrNone([draft.elim1, draft.elim2]);
 
   function fillFrom(sourceLeagueId: string) {
     const source = otherLeagues.find((l) => l.id === sourceLeagueId);
     if (!source?.pick) return;
-    const pick = adaptCurtainCallPick(source.pick, new Set(activeCouples.map((c) => c.id)));
-    setEliminatedId(pick.elim1 ?? "");
-    setEliminatedId2(pick.elim2 ?? "");
-    setTopScorerId(pick.topScorer ?? "");
+    setDraft(adaptCurtainCallPick(source.pick, new Set(activeCouples.map((c) => c.id))));
     setFilledFrom(source.name);
   }
 
@@ -190,18 +231,12 @@ export function PickEmBox({
     setOtherResults([]);
     setSubmitting(true);
     try {
-      const results = await submitPredictionToLeagues(
-        [leagueId, ...alsoSaveTo], episode.id,
-        eliminatedId || null, isDoubleElimination ? eliminatedId2 || null : null, topScorerId || null
-      );
+      const pick = { ...draft, elim2: isDoubleElimination ? draft.elim2 : null };
+      const results = await submitPredictionToLeagues([leagueId, ...alsoSaveTo], episode.id, pick);
       const own = results.find((result) => result.leagueId === leagueId);
       if (!own || own.error) setError(own?.error ?? "Could not confirm your save. Please try again.");
       else {
-        setSavedPick({
-          predicted_eliminated_couple_id: eliminatedId || null,
-          predicted_eliminated_couple_id_2: isDoubleElimination ? eliminatedId2 || null : null,
-          predicted_top_scorer_couple_id: topScorerId || null,
-        });
+        setSavedPick(pick);
         setEditing(false);
       }
       setOtherResults(results.filter((result) => result.leagueId !== leagueId));
@@ -213,15 +248,13 @@ export function PickEmBox({
   }
 
   function cancelEditing() {
-    setEliminatedId(savedPick?.predicted_eliminated_couple_id ?? "");
-    setEliminatedId2(savedPick?.predicted_eliminated_couple_id_2 ?? "");
-    setTopScorerId(savedPick?.predicted_top_scorer_couple_id ?? "");
+    setDraft(savedPick);
     setFilledFrom(null);
     setError(null);
     setEditing(false);
   }
 
-  const hasSavedPick = !!savedPick && Object.values(savedPick).some(Boolean);
+  const hasSavedPick = curtainCallPickMade(savedPick);
   const lockLine = isLocked
     ? "Predictions are locked for this week."
     : lockAt && formattedLockAt
@@ -236,12 +269,14 @@ export function PickEmBox({
   const couplesRemaining = activeCouples.length;
   const eliminationExact = curtainCallPayout(eliminationPredictionPoints, couplesRemaining, totalCouples);
   const topScorerExact = curtainCallPayout(topScorerPredictionPoints, couplesRemaining, totalCouples);
-  const eliminationPreview = curtainCallPreviewCopy({
-    kind: "elimination",
-    exactDisplayPoints: eliminationExact,
-    nearMissPoints: curtainCallNearMissPoints(eliminationExact),
-    nearMissEnabled,
-  });
+  const eliminationPreview = isFinale
+    ? podiumPreviewCopy(eliminationExact)
+    : curtainCallPreviewCopy({
+        kind: "elimination",
+        exactDisplayPoints: eliminationExact,
+        nearMissPoints: curtainCallNearMissPoints(eliminationExact),
+        nearMissEnabled,
+      });
   const topScorerPreview = curtainCallPreviewCopy({
     kind: "top_scorer",
     exactDisplayPoints: topScorerExact,
@@ -255,10 +290,17 @@ export function PickEmBox({
     <div className="flex flex-col gap-4">
         {lockLine && <p className="text-sm text-muted-foreground">{lockLine}</p>}
         {categoryWeight !== 1 && !isLocked && <p className="text-xs text-muted-foreground">Previews show module points before your league’s × {categoryWeight} weight.</p>}
-        {isDoubleElimination && !isLocked && (
+        {isFinale && !isLocked ? (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-text">
-            ⚡ Double Elimination — two couples go home tonight, call &apos;em both.
+            🏆 The Finale: nobody goes home tonight, so call the podium.
           </div>
+        ) : (
+          isDoubleElimination &&
+          !isLocked && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-text">
+              ⚡ Double Elimination — two couples go home tonight, call &apos;em both.
+            </div>
+          )
         )}
         {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <OtherLeagueSaveSummary results={otherResults} destinations={otherLeagues} />
@@ -273,35 +315,48 @@ export function PickEmBox({
                 </p>
               )}
               <p className="text-xs text-muted-foreground">{eliminationPreview}</p>
-              {isDoubleElimination ? (
+              {isFinale ? (
+                PODIUM_QUESTIONS.map((question, place) => (
+                  <CoupleSelect
+                    key={question}
+                    id={`podium-${place + 1}`}
+                    label={question}
+                    value={draft.podium[place]}
+                    onChange={(v) => handlePodiumChange(place, v)}
+                    couples={activeCouples}
+                    nameFor={nameFor}
+                    lineup={lineup}
+                  />
+                ))
+              ) : isDoubleElimination ? (
                 <>
                   <CoupleSelect
                     id="eliminated-1"
                     label="Eliminated (1 of 2)"
-                    value={eliminatedId}
+                    value={draft.elim1}
                     onChange={(v) => handleEliminatedChange(1, v)}
                     couples={activeCouples}
                     nameFor={nameFor}
                     lineup={lineup}
-                    excludeId={eliminatedId2 || undefined}
+                    excludeId={draft.elim2 ?? undefined}
                   />
                   <CoupleSelect
                     id="eliminated-2"
                     label="Eliminated (2 of 2)"
-                    value={eliminatedId2}
+                    value={draft.elim2}
                     onChange={(v) => handleEliminatedChange(2, v)}
                     couples={activeCouples}
                     nameFor={nameFor}
                     lineup={lineup}
-                    excludeId={eliminatedId || undefined}
+                    excludeId={draft.elim1 ?? undefined}
                   />
                 </>
               ) : (
                 <CoupleSelect
                   id="eliminated"
                   label="Who goes home?"
-                  value={eliminatedId}
-                  onChange={setEliminatedId}
+                  value={draft.elim1}
+                  onChange={(v) => setDraft((d) => ({ ...d, elim1: v }))}
                   couples={activeCouples}
                   nameFor={nameFor}
                   lineup={lineup}
@@ -311,8 +366,8 @@ export function PickEmBox({
               <CoupleSelect
                 id="top-scorer"
                 label="Who scores highest?"
-                value={topScorerId}
-                onChange={setTopScorerId}
+                value={draft.topScorer}
+                onChange={(v) => setDraft((d) => ({ ...d, topScorer: v }))}
                 couples={activeCouples}
                 nameFor={nameFor}
                 lineup={lineup}
@@ -347,51 +402,13 @@ export function PickEmBox({
                   Edit Picks
                 </Button>
               </div>
-              <div className="flex flex-col gap-1.5 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Eliminated</span>
-                  <span className="font-medium">
-                    {savedPick?.predicted_eliminated_couple_id && savedPick?.predicted_eliminated_couple_id_2 ? (
-                      <>
-                        {nameFor(savedPick?.predicted_eliminated_couple_id)} & {nameFor(savedPick?.predicted_eliminated_couple_id_2)}
-                      </>
-                    ) : savedPick?.predicted_eliminated_couple_id ? (
-                      nameFor(savedPick?.predicted_eliminated_couple_id)
-                    ) : (
-                      "No Pick"
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Top Scorer</span>
-                  <span className="font-medium">{savedPick?.predicted_top_scorer_couple_id ? nameFor(savedPick?.predicted_top_scorer_couple_id) : "No Pick"}</span>
-                </div>
-              </div>
+              <SavedPickRows pick={savedPick} isFinale={isFinale} nameFor={nameFor} />
             </div>
           )
         ) : (
           // Everyone else's picks now live in the League at a Glance list at
           // the bottom of this same card — this is just the viewer's own.
-          <div className="flex flex-col gap-1.5 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Eliminated</span>
-              <span className="font-medium">
-                {savedPick?.predicted_eliminated_couple_id && savedPick?.predicted_eliminated_couple_id_2 ? (
-                  <>
-                    {nameFor(savedPick?.predicted_eliminated_couple_id)} & {nameFor(savedPick?.predicted_eliminated_couple_id_2)}
-                  </>
-                ) : savedPick?.predicted_eliminated_couple_id ? (
-                  nameFor(savedPick?.predicted_eliminated_couple_id)
-                ) : (
-                  "No Pick"
-                )}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Top Scorer</span>
-              <span className="font-medium">{savedPick?.predicted_top_scorer_couple_id ? nameFor(savedPick?.predicted_top_scorer_couple_id) : "No Pick"}</span>
-            </div>
-          </div>
+          <SavedPickRows pick={savedPick} isFinale={isFinale} nameFor={nameFor} />
         )}
     </div>
   );

@@ -51,6 +51,20 @@ function isPointsRow(dance: NightDance): boolean {
   return dance.maxScore === 0;
 }
 
+// Wherever a night's dances are listed, the couple's own come first, special
+// dances under them and a bonus-only row last (Kylie, 2026-11-11), whatever
+// order the rows were posted in.
+export function orderNightDances<T>(
+  dances: T[],
+  read: (dance: T) => { maxScore: number | null; teamId?: string | null }
+): T[] {
+  const rank = (dance: T) => {
+    const { maxScore, teamId } = read(dance);
+    return Number(maxScore === 0) * 2 + Number(!!teamId);
+  };
+  return [...dances].sort((a, b) => rank(a) - rank(b));
+}
+
 // A row tagged with its special dance reads by the dance's short name
 // ("Slaytopia", "Dance-Off 1", "Dance-Off Immunity"), or its kind when the
 // name is not readable (a guest before the episode publishes). An untagged
@@ -93,9 +107,9 @@ export type CoupleDanceSummary = {
   parts: { marks: string[]; bonus: string[] } | null;
 };
 
-// One couple's dances on a Results card, a night at a time in the order
-// given: the lines on the left, and the scores that make up the card total
-// on the right ("40 + 40", "27 +3 bonus").
+// One couple's dances on a Results card, a night at a time: the lines on the
+// left, and the scores that make up the card total on the right ("40 + 40",
+// "27 +3 bonus").
 export function coupleDanceLines(
   dances: NightDance[],
   teamDanceEpisodes: ReadonlySet<string>,
@@ -103,7 +117,7 @@ export function coupleDanceLines(
 ): CoupleDanceSummary {
   const byEpisode = new Map<string, NightDance[]>();
   for (const dance of dances) byEpisode.set(dance.episodeId, [...(byEpisode.get(dance.episodeId) ?? []), dance]);
-  const ordered = [...byEpisode.values()].flat();
+  const ordered = [...byEpisode.values()].flatMap((night) => orderNightDances(night, (dance) => dance));
   const alone = ordered.length < 2;
   const isBonus = (dance: NightDance) => isPointsRow(dance) && !!dance.teamId;
   const marks = ordered.filter((dance) => !isBonus(dance)).map((dance) => trimNumber(dance.totalScore));

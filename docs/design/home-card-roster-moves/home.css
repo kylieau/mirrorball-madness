@@ -1,0 +1,30 @@
+.capsub { min-height: 106px; }
+.state { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; color: var(--muted-fg); margin: 14px 0 6px; }
+.phone .page { padding-top: 16px; }
+.lcard { gap: 12px; }
+.lcard.due { border-left: 3px solid var(--primary); }
+.head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.lname { font-family: var(--heading); font-size: 16px; font-weight: 600; }
+.rank { font-size: 12px; color: var(--muted-fg); margin-top: 2px; }
+.rank b { font-family: var(--heading); }
+.pill { font-size: 11px; font-weight: 600; color: var(--primary-fg); background: var(--primary); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+dl.mstack { margin: 0; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 8px 0; font-size: 14px; }
+.ml { display: grid; grid-template-columns: 7rem 1fr; align-items: start; }
+.ml dt { font-size: 13px; color: var(--muted-fg); white-space: nowrap; }
+.ml dd { margin: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ml dd > span:has(> i) { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ml i { font-size: 12px; color: var(--muted-fg); white-space: nowrap; }
+.gold { color: var(--accent); font-weight: 600; }
+.struck { text-decoration: line-through; }
+.sub { padding-left: 14px; position: relative; }
+.sub::before { content: "↳"; position: absolute; left: 0; color: var(--muted-fg); font-weight: 400; }
+.g { display: inline-block; width: 15px; font-size: 12px; }
+.g.ok { color: var(--emerald-text); }
+.g.wait { font-size: 10px; }
+.g.need { color: var(--accent); }
+.mut { color: var(--muted-fg); }
+.lcard .btn { height: 40px; }
+.gear { flex: 0 0 40px !important; padding: 0; }
+.newrow { outline: 2px dashed var(--accent); outline-offset: 3px; border-radius: 6px; }
+.moves { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.moves > span { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }

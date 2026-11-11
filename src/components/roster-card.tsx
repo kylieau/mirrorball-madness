@@ -31,6 +31,7 @@ export function RosterCard({
   couples,
   totalPoints,
   weekBonusPoints = 0,
+  categoryWeight = 1,
   lifelines = [],
   carousel,
   leagueSection,
@@ -39,6 +40,7 @@ export function RosterCard({
   couples: RosterCouple[];
   totalPoints: number;
   weekBonusPoints?: number;
+  categoryWeight?: number;
   // Lifelines settled this week, in total-points units.
   lifelines?: RosterLifeline[];
   carousel?: ReactNode;
@@ -55,6 +57,9 @@ export function RosterCard({
         {carousel}
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5">
+        {categoryWeight !== 1 && (
+          <p className="text-xs text-muted-foreground">Points include your league’s × {categoryWeight} weight.</p>
+        )}
         {couples.map((c) => {
           const tag = TAG_INFO[c.tag];
           return (

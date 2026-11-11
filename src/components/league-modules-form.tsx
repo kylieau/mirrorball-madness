@@ -53,6 +53,7 @@ import {
   TOP_SCORER_PREDICTION_POINTS_DEFAULT,
 } from "@/lib/scoring-defaults";
 import { formatEpisodeCasual } from "@/lib/format-week";
+import { podiumRuleNote } from "@/lib/scoring";
 import { SCORING_MODULES, scoringModule, type ScoringModuleKey } from "@/lib/scoring-modules";
 import { neutralPointDefaults, redistributeModuleWeights } from "@/lib/scoring-neutral";
 import { BottomNav } from "@/components/bottom-nav";
@@ -667,6 +668,7 @@ export function LeagueModulesForm({
               <SettingRow label="Air Time" value={PICK_LOCK_COAST_ITEMS[predictionLockCoast]} />
               <SettingRow label="Pick 'Em Lock" value={describePickLockOffset(predictionLockHoursBeforeAir)} />
               <p className="pt-2 text-sm text-muted-foreground">{CURTAIN_CALL_PAYOUT_NOTE}</p>
+              <p className="pt-2 text-sm text-muted-foreground">{podiumRuleNote()}</p>
             </div>
           </ScoringModulePanel>
         )}
@@ -1015,6 +1017,7 @@ export function LeagueModulesForm({
               </div>
             </div>
             <p className="text-xs text-muted-foreground">{CURTAIN_CALL_PAYOUT_NOTE}</p>
+            <p className="text-xs text-muted-foreground">{podiumRuleNote()}</p>
           </div>
         </ScoringModulePanel>
       )}

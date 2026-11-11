@@ -11,6 +11,7 @@ import {
   type Outcome,
   type TierPayStyle,
 } from "./scoring";
+import { curtainCallPickFromRow } from "./curtain-call-picks";
 import { eligibleGrandFinalePredictions, scaleGrandFinaleLateFactors } from "./grand-finale-late";
 import { danceCardLedger, danceCardLedgerRule, usesDanceCardLedger, weekCredits, type DanceCardWeek } from "./dance-card-v2";
 
@@ -310,6 +311,7 @@ export function buildWeeklyScoreRows(
               predictedEliminatedCoupleId: p.predicted_eliminated_couple_id,
               predictedEliminatedCoupleId2: p.predicted_eliminated_couple_id_2,
               predictedTopScorerCoupleId: p.predicted_top_scorer_couple_id,
+              predictedPodiumCoupleIds: curtainCallPickFromRow(p).podium,
             }))
           : [],
       isDoubleElimination: week.is_double_elimination_week,

@@ -5,6 +5,7 @@ import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { excludeReleasedCoupleRows, unpostedDraftDances } from "@/lib/draft-scores";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
+import { CURTAIN_CALL_PICK_COLUMNS, curtainCallPickFromRow } from "@/lib/curtain-call-picks";
 import { danceCardRule, danceCardWeekEpisodeIds } from "@/lib/dance-card-v2";
 import {
   buildScoreHistory,
@@ -128,7 +129,7 @@ export async function loadScoreHistory(
       .eq("manager_id", managerId),
     supabase
       .from("predictions")
-      .select("week_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id")
+      .select(`week_id, ${CURTAIN_CALL_PICK_COLUMNS}`)
       .eq("league_id", leagueId)
       .eq("manager_id", managerId)
       .in("week_id", weekIds),
@@ -233,16 +234,17 @@ export async function loadScoreHistory(
       .map((s) => ({ managerId, coupleId: s.couple_id, startWeek: s.start_week, endWeek: s.end_week })),
     predictions: (predictions ?? []).flatMap((p) => {
       const weekNumber = weekNumberById.get(p.week_id);
-      return weekNumber === undefined
-        ? []
-        : [
-            {
-              weekNumber,
-              eliminatedCoupleId: p.predicted_eliminated_couple_id,
-              eliminatedCoupleId2: p.predicted_eliminated_couple_id_2,
-              topScorerCoupleId: p.predicted_top_scorer_couple_id,
-            },
-          ];
+      if (weekNumber === undefined) return [];
+      const pick = curtainCallPickFromRow(p);
+      return [
+        {
+          weekNumber,
+          eliminatedCoupleId: pick.elim1,
+          eliminatedCoupleId2: pick.elim2,
+          topScorerCoupleId: pick.topScorer,
+          podiumCoupleIds: pick.podium,
+        },
+      ];
     }),
     finaleWeek: seasonFinaleWeek(weekRows),
     grandFinalePredictions: (grandFinalePredictions ?? []).map((p) => ({

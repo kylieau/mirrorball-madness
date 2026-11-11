@@ -8,23 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { curtainCallPickFromRow, type CurtainCallPick } from "@/lib/curtain-call-picks";
+import { PODIUM_PLACE_LABELS, type PodiumPick } from "@/lib/scoring";
 
 export type CurtainCallBackfillInput = {
   managers: { userId: string; displayName: string }[];
-  weeks: { id: string; label: string; isDouble: boolean }[];
+  weeks: { id: string; label: string; isDouble: boolean; isFinale: boolean }[];
   defaultWeekId: string | null;
   couples: { id: string; name: string }[];
-  picks: {
-    managerId: string;
-    weekId: string;
-    eliminated: string | null;
-    eliminated2: string | null;
-    topScorer: string | null;
-    backfilled: boolean;
-  }[];
+  picks: { managerId: string; weekId: string; pick: CurtainCallPick; backfilled: boolean }[];
 };
 
 const NONE = "none";
+const NO_PICK = curtainCallPickFromRow(null);
 
 function CoupleSelect({
   id,
@@ -35,14 +31,14 @@ function CoupleSelect({
 }: {
   id: string;
   label: string;
-  value: string;
-  onChange: (value: string) => void;
+  value: string | null;
+  onChange: (coupleId: string | null) => void;
   items: Record<string, string>;
 }) {
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor={id}>{label}</Label>
-      <Select items={items} value={value} onValueChange={(v) => onChange((v as string) ?? NONE)}>
+      <Select items={items} value={value ?? NONE} onValueChange={(v) => onChange(v && v !== NONE ? (v as string) : null)}>
         <SelectTrigger id={id} className="w-full">
           <SelectValue />
         </SelectTrigger>
@@ -73,9 +69,7 @@ export function CurtainCallBackfill({
   const [open, setOpen] = useState(false);
   const [managerId, setManagerId] = useState(managers[0]?.userId ?? "");
   const [weekId, setWeekId] = useState(defaultWeekId ?? weeks[0]?.id ?? "");
-  const [eliminated, setEliminated] = useState(NONE);
-  const [eliminated2, setEliminated2] = useState(NONE);
-  const [topScorer, setTopScorer] = useState(NONE);
+  const [draft, setDraft] = useState(NO_PICK);
   const [madeAt, setMadeAt] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -85,11 +79,14 @@ export function CurtainCallBackfill({
   const coupleItems: Record<string, string> = { [NONE]: "No pick", ...Object.fromEntries(coupleName) };
   const week = weeks.find((w) => w.id === weekId);
   const current = picks.find((p) => p.managerId === managerId && p.weekId === weekId);
+  const named = (label: string, coupleId: string | null) =>
+    coupleId && `${label} ${coupleName.get(coupleId) ?? "?"}`;
   const currentText = current
     ? [
-        current.eliminated && `Eliminated ${coupleName.get(current.eliminated) ?? "?"}`,
-        current.eliminated2 && `and ${coupleName.get(current.eliminated2) ?? "?"}`,
-        current.topScorer && `Top Scorer ${coupleName.get(current.topScorer) ?? "?"}`,
+        named("Eliminated", current.pick.elim1),
+        named("and", current.pick.elim2),
+        ...PODIUM_PLACE_LABELS.map((label, place) => named(label, current.pick.podium[place])),
+        named("Top Scorer", current.pick.topScorer),
       ]
         .filter(Boolean)
         .join(" · ") + (current.backfilled ? " (recorded by an admin)" : "")
@@ -110,9 +107,7 @@ export function CurtainCallBackfill({
     const result = await backfillCurtainCallPick(leagueId, {
       managerId,
       weekId,
-      eliminated: eliminated === NONE ? null : eliminated,
-      eliminated2: week?.isDouble && eliminated2 !== NONE ? eliminated2 : null,
-      topScorer: topScorer === NONE ? null : topScorer,
+      pick: { ...draft, elim2: week?.isDouble ? draft.elim2 : null },
       pickMadeAt: new Date(madeAt).toISOString(),
       reason,
     });
@@ -122,9 +117,7 @@ export function CurtainCallBackfill({
       return;
     }
     setOpen(false);
-    setEliminated(NONE);
-    setEliminated2(NONE);
-    setTopScorer(NONE);
+    setDraft(NO_PICK);
     setMadeAt("");
     setReason("");
     router.refresh();
@@ -195,27 +188,47 @@ export function CurtainCallBackfill({
               </Select>
               <p className="text-xs text-muted-foreground">Current pick: {currentText}</p>
             </div>
-            <CoupleSelect
-              id="backfillEliminated"
-              label="Eliminated"
-              value={eliminated}
-              onChange={setEliminated}
-              items={coupleItems}
-            />
-            {week?.isDouble && (
-              <CoupleSelect
-                id="backfillEliminated2"
-                label="Second Eliminated"
-                value={eliminated2}
-                onChange={setEliminated2}
-                items={coupleItems}
-              />
+            {week?.isFinale ? (
+              PODIUM_PLACE_LABELS.map((label, place) => (
+                <CoupleSelect
+                  key={label}
+                  id={`backfillPodium${place}`}
+                  label={label}
+                  value={draft.podium[place]}
+                  onChange={(coupleId) =>
+                    setDraft((d) => ({
+                      ...d,
+                      podium: d.podium.map((id, index) => (index === place ? coupleId : id)) as PodiumPick,
+                    }))
+                  }
+                  items={coupleItems}
+                />
+              ))
+            ) : (
+              <>
+                <CoupleSelect
+                  id="backfillEliminated"
+                  label="Eliminated"
+                  value={draft.elim1}
+                  onChange={(elim1) => setDraft((d) => ({ ...d, elim1 }))}
+                  items={coupleItems}
+                />
+                {week?.isDouble && (
+                  <CoupleSelect
+                    id="backfillEliminated2"
+                    label="Second Eliminated"
+                    value={draft.elim2}
+                    onChange={(elim2) => setDraft((d) => ({ ...d, elim2 }))}
+                    items={coupleItems}
+                  />
+                )}
+              </>
             )}
             <CoupleSelect
               id="backfillTopScorer"
               label="Top Scorer"
-              value={topScorer}
-              onChange={setTopScorer}
+              value={draft.topScorer}
+              onChange={(topScorer) => setDraft((d) => ({ ...d, topScorer }))}
               items={coupleItems}
             />
             <div className="flex flex-col gap-2">

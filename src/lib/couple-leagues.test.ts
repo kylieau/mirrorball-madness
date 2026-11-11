@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCoupleLeagueRows, coupleWeekPickNotes, type CoupleLeagueInput } from "./couple-leagues";
+import { buildCoupleLeagueRows, coupleWeekPickNotes, type CoupleLeagueInput, type WeekPick } from "./couple-leagues";
 import { buildCouplesLeaderboard } from "./couples-leaderboard";
 import type { ScoringSettings } from "./scoring";
 
@@ -83,18 +83,32 @@ describe("coupleWeekPickNotes", () => {
     ["l1", "Alpha"],
     ["l2", "Beta"],
   ]);
+  const noPodium: WeekPick["podiumIds"] = [null, null, null];
   const notes = (coupleId: string, weekNumber: number, over: Partial<Parameters<typeof coupleWeekPickNotes>[0]> = {}) =>
     coupleWeekPickNotes({ coupleId, weekNumber, finaleWeekNumber: 5, leagueNames, picks: [], grandFinaleOrders: new Map(), couples: cast, ...over });
 
   it("lists that week's Curtain Call picks only, second elimination pick included", () => {
     const picks = [
-      { leagueId: "l1", weekNumber: 2, eliminatedIds: ["A"], topScorerId: "B" },
-      { leagueId: "l2", weekNumber: 2, eliminatedIds: ["C", "A"], topScorerId: null },
-      { leagueId: "l1", weekNumber: 3, eliminatedIds: ["B"], topScorerId: "A" },
+      { leagueId: "l1", weekNumber: 2, eliminatedIds: ["A"], podiumIds: noPodium, topScorerId: "B" },
+      { leagueId: "l2", weekNumber: 2, eliminatedIds: ["C", "A"], podiumIds: noPodium, topScorerId: null },
+      { leagueId: "l1", weekNumber: 3, eliminatedIds: ["B"], podiumIds: noPodium, topScorerId: "A" },
     ];
     expect(notes("A", 2, { picks })).toEqual(["Your all-leagues elim picks"]);
     expect(notes("A", 3, { picks })).toEqual(["Your Alpha top-scorer pick"]);
     expect(notes("B", 2, { picks })).toEqual(["Your Alpha top-scorer pick"]);
+  });
+
+  it("names the place a Finale podium pick was for", () => {
+    const picks: WeekPick[] = [
+      { leagueId: "l1", weekNumber: 5, eliminatedIds: [], podiumIds: ["C", "B", "A"], topScorerId: "C" },
+      { leagueId: "l2", weekNumber: 5, eliminatedIds: [], podiumIds: ["B", "C", "A"], topScorerId: null },
+    ];
+    expect(notes("C", 5, { picks })).toEqual([
+      "Your Alpha podium winner pick",
+      "Your Beta podium runner-up pick",
+      "Your Alpha top-scorer pick",
+    ]);
+    expect(notes("A", 5, { picks })).toEqual(["Your all-leagues podium third-place picks"]);
   });
 
   it("finds the bracket's next elimination as of each week, and the winner pick from the semi-final", () => {

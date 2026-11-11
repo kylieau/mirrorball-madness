@@ -40,6 +40,19 @@ describe("coupleDanceLines", () => {
     expect(coupleDanceLines([team], new Set(), slaytopia).lines).toEqual(["Slaytopia · Zoo"]);
   });
 
+  it("lists a couple's own dance above a special dance and a bonus row last, whatever order they were posted in", () => {
+    const team = { ...dance("Freestyle", 36, "Zoo"), teamId: "t1" };
+    const danceOff = { ...dance("Rumba", 3), teamId: "d1", maxScore: 0 };
+    const named = labels({
+      t1: { name: "Slaytopia", danceType: "Team Dance", scoringMode: "marks" },
+      d1: { name: "Dance-Off 1", danceType: "Dance-Off", scoringMode: "points" },
+    });
+    expect(coupleDanceLines([danceOff, team, dance("Quickstep", 28)], new Set(), named)).toEqual({
+      lines: ["Quickstep", "Slaytopia · Zoo", "Dance-Off 1"],
+      parts: { marks: ["28", "36"], bonus: ["+3"] },
+    });
+  });
+
   it("does not repeat the type before an automatic name", () => {
     const relay = { ...dance("Freestyle", 27), teamId: "t2", maxScore: 30 };
     const named = labels({ t2: { name: "Relay 2", danceType: "Relay", scoringMode: "marks" } });

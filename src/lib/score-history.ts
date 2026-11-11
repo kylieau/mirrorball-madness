@@ -18,11 +18,15 @@ import {
   slotWeeks,
   sumDanceScoresByCouple,
   nightScaledScoresByCouple,
+  podiumOffLabel,
+  podiumPlaceByCouple,
+  resolvePodiumGuess,
   type CategoryWeights,
   type CurtainCallVerdict,
   type DanceScore,
   type GrandFinaleMethod,
   type Outcome,
+  type PodiumPick,
   type ScoringSettings,
   type SlotWeeks,
   type TierPayStyle,
@@ -111,6 +115,8 @@ export type ManagerHistoryInput = {
     eliminatedCoupleId: string | null;
     eliminatedCoupleId2: string | null;
     topScorerCoupleId: string | null;
+    // The Finale week only: winner, runner-up, third place.
+    podiumCoupleIds?: PodiumPick;
   }[];
   grandFinalePredictions: { coupleId: string; predictedPosition: number }[];
   // Set only for a bracket submitted through a late unlock. Couples already
@@ -122,6 +128,7 @@ export type ManagerHistoryInput = {
 };
 
 const ORDINALS = ["1st", "2nd", "3rd", "4th", "5th"];
+const PODIUM_TAGS = ["Winner", "Runner-Up", "Third"];
 
 function trimNumber(n: number): string {
   return String(Math.round(n * 1000) / 1000);
@@ -254,6 +261,20 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
           exact: eliminationExact,
         });
       }
+      const podiumPlaces = podiumPlaceByCouple(week.outcomes);
+      (prediction.podiumCoupleIds ?? []).forEach((coupleId, index) => {
+        const guess = resolvePodiumGuess(coupleId, index + 1, podiumPlaces, eliminationExact);
+        if (guess.placesOff === null) return;
+        push(
+          w,
+          "curtainCall",
+          `podium${index + 1}`,
+          `${PODIUM_TAGS[index]}: ${nameOf(coupleId)}`,
+          guess.points,
+          weight,
+          guess.placesOff === 0 ? HIT_MARK : podiumOffLabel(guess.placesOff)
+        );
+      });
       picks.push({
         key: "top",
         tag: "High",

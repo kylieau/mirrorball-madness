@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CrownIcon, SettingsIcon } from "lucide-react";
+import { CircleCheckIcon, CircleDashedIcon, CrownIcon, HourglassIcon, SettingsIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
   picksButtonLabel,
   showHybridStatusPill,
   type ModuleStackInput,
+  type MoveRow,
   type StackRow,
 } from "@/lib/league-triage";
 
@@ -84,13 +85,11 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
                   )}
                 </>
               );
+              const stacked = line.lines.length > 1 || line.moves.length > 0;
               return (
                 <div
                   key={line.key}
-                  className={cn(
-                    "grid grid-cols-[6.5rem_1fr] gap-0",
-                    line.lines.length > 1 ? "items-start" : "items-baseline"
-                  )}
+                  className={cn("grid grid-cols-[6.5rem_1fr] gap-0", stacked ? "items-start" : "items-baseline")}
                 >
                   <dt className="whitespace-nowrap text-[13px] text-muted-foreground">
                     <span aria-hidden>{scoringModule(line.key).icon}</span> {line.name}
@@ -98,20 +97,16 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
                   <dd
                     className={cn(
                       "min-w-0",
-                      line.lines.length > 1 ? "flex flex-col gap-0.5" : "flex items-baseline justify-between gap-2"
+                      stacked ? "flex flex-col gap-0.5" : "flex items-baseline justify-between gap-2"
                     )}
                   >
-                    {line.lines.length === 1 ? (
-                      <span className={cn(toneClass, "flex-1")}>
-                        <StackRowText row={line.lines[0]} from={from} />
-                        {need}
-                      </span>
-                    ) : (
+                    {stacked ? (
                       line.lines.map((row, i) =>
                         i === 0 ? (
                           <span key={i} className="flex items-baseline justify-between gap-2">
                             <span className={cn(toneClass, "flex-1")}>
                               <StackRowText row={row} from={from} />
+                              {line.lines.length === 1 && need}
                             </span>
                             {status}
                           </span>
@@ -122,8 +117,22 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
                           </span>
                         )
                       )
+                    ) : (
+                      <>
+                        <span className={cn(toneClass, "flex-1")}>
+                          <StackRowText row={line.lines[0]} from={from} />
+                          {need}
+                        </span>
+                        {status}
+                      </>
                     )}
-                    {line.lines.length === 1 && status}
+                    {line.moves.length > 0 && (
+                      <span className="mt-1 flex flex-col gap-0.5">
+                        {line.moves.map((row, i) => (
+                          <MoveRowLine key={i} row={row} from={from} />
+                        ))}
+                      </span>
+                    )}
                   </dd>
                 </div>
               );
@@ -169,6 +178,44 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+const MOVE_ICONS = {
+  needed: CircleDashedIcon,
+  missed: CircleDashedIcon,
+  saved: CircleCheckIcon,
+  waiting: HourglassIcon,
+};
+
+// A roster move under Dance Card: gold while it still needs the manager, a
+// check once a Lifeline is saved, an hourglass while it waits on the waiver run.
+function MoveRowLine({ row, from }: { row: MoveRow; from: string }) {
+  const Icon = MOVE_ICONS[row.mark];
+  return (
+    <span className="flex items-baseline justify-between gap-2">
+      <span
+        className={cn(
+          "flex min-w-0 flex-1 gap-1.5 break-words",
+          row.mark === "needed" && "font-semibold text-accent",
+          row.mark === "missed" && "text-muted-foreground"
+        )}
+      >
+        <Icon
+          aria-hidden
+          className={cn(
+            "size-3.5 shrink-0 translate-y-0.5",
+            row.mark === "saved" && "text-emerald-text",
+            row.mark === "waiting" && "text-accent"
+          )}
+        />
+        <span className="min-w-0">
+          <StackRowText row={row} from={from} />
+          {row.after}
+        </span>
+      </span>
+      {row.clock && <span className="shrink-0 text-xs italic text-muted-foreground">{row.clock}</span>}
+    </span>
   );
 }
 

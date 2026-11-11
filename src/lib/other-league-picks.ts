@@ -3,11 +3,17 @@ import type { Database } from "@/lib/supabase/types";
 import {
   planDestination,
   type CurtainCallDestination,
-  type CurtainCallPick,
   type DraftQueueDestination,
   type GrandFinaleDestination,
   planQueueDestination,
 } from "./copy-picks";
+import {
+  CURTAIN_CALL_PICK_COLUMNS,
+  curtainCallPickFromRow,
+  hasCurtainCallPicks,
+  type CurtainCallPick,
+  type CurtainCallPickRow,
+} from "./curtain-call-picks";
 import { loadViewerMemberships } from "@/lib/viewer-season-data";
 
 type Client = SupabaseClient<Database>;
@@ -60,9 +66,7 @@ export async function loadOtherLeaguePicks(
     curtainCallWeekId
       ? supabase
           .from("predictions")
-          .select(
-            "league_id, predicted_eliminated_couple_id, predicted_eliminated_couple_id_2, predicted_top_scorer_couple_id"
-          )
+          .select(`league_id, ${CURTAIN_CALL_PICK_COLUMNS}`)
           .in("league_id", otherIds)
           .eq("week_id", curtainCallWeekId)
           .in("manager_id", teamIds)
@@ -97,23 +101,13 @@ async function planCurtainCall(
   supabase: Client,
   weekId: string,
   leagues: League[],
-  rows: {
-    league_id: string;
-    predicted_eliminated_couple_id: string | null;
-    predicted_eliminated_couple_id_2: string | null;
-    predicted_top_scorer_couple_id: string | null;
-  }[],
+  rows: (CurtainCallPickRow & { league_id: string })[],
   settings: Settings,
   now: Date
 ): Promise<CurtainCallDestination[]> {
   const pickByLeague = new Map<string, CurtainCallPick>();
   for (const r of rows) {
-    const pick = {
-      elim1: r.predicted_eliminated_couple_id,
-      elim2: r.predicted_eliminated_couple_id_2,
-      topScorer: r.predicted_top_scorer_couple_id,
-    };
-    if (pick.elim1 || pick.elim2 || pick.topScorer) pickByLeague.set(r.league_id, pick);
+    if (hasCurtainCallPicks(r)) pickByLeague.set(r.league_id, curtainCallPickFromRow(r));
   }
 
   return Promise.all(

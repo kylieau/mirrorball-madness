@@ -1,3 +1,4 @@
+import type { CurtainCallPick } from "./curtain-call-picks";
 import { pinEliminatedFirst } from "./grand-finale-pins";
 
 export type DestinationStatus = "ok" | "will_replace" | "module_off" | "locked";
@@ -7,12 +8,6 @@ export type Destination = {
   name: string;
   status: DestinationStatus;
   note: string | null;
-};
-
-export type CurtainCallPick = {
-  elim1: string | null;
-  elim2: string | null;
-  topScorer: string | null;
 };
 
 export type CurtainCallDestination = Destination & { pick: CurtainCallPick | null };
@@ -54,7 +49,12 @@ export function planDestination(input: {
 // viewer, so a source pick can name someone the viewer now sees as gone.
 export function adaptCurtainCallPick(pick: CurtainCallPick, eligibleCoupleIds: Set<string>): CurtainCallPick {
   const keep = (id: string | null) => (id && eligibleCoupleIds.has(id) ? id : null);
-  return { elim1: keep(pick.elim1), elim2: keep(pick.elim2), topScorer: keep(pick.topScorer) };
+  return {
+    elim1: keep(pick.elim1),
+    elim2: keep(pick.elim2),
+    podium: [keep(pick.podium[0]), keep(pick.podium[1]), keep(pick.podium[2])],
+    topScorer: keep(pick.topScorer),
+  };
 }
 
 // Returns null when the source order doesn't cover the whole season cast, so

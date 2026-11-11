@@ -4,11 +4,14 @@ import {
   danceCardRosterNames,
   homeLeagueChrome,
   leagueTapHref,
+  lifelinePickDue,
+  NO_ROSTER_MOVES,
   picksAction,
   picksButtonLabel,
   showHybridStatusPill,
   type ModuleLine,
   type ModuleStackInput,
+  type RosterMoves,
   type StackCouple,
 } from "./league-triage";
 import type { CoupleNameParts } from "./couple-display";
@@ -17,8 +20,8 @@ const LOCK = "2026-09-29T00:00:00Z";
 const c = (celebrity: string, pro: string): StackCouple => ({ celebrity, pro, id: celebrity });
 const joined = (parts: CoupleNameParts) => `${parts.celebrity} & ${parts.pro}`;
 const base: ModuleStackInput = {
-  curtainCall: { on: true, state: "open", afterWeek: 2, lockAt: LOCK, eliminatedName: null, topScorerName: null },
-  danceCard: { on: true, draftStatus: "completed", roster: [{ couple: c("Ava", "Val"), out: false }, { couple: c("Jess", "Alan"), out: false }] },
+  curtainCall: { on: true, state: "open", afterWeek: 2, lockAt: LOCK, eliminatedName: null, podiumNames: null, topScorerName: null },
+  danceCard: { on: true, draftStatus: "completed", roster: [{ couple: c("Ava", "Val"), out: false }, { couple: c("Jess", "Alan"), out: false }], moves: NO_ROSTER_MOVES },
   grandFinale: { on: true, open: true, locked: false, deadlineAt: LOCK, hasPrediction: false, nextElimName: null },
 };
 // Rows as the card reads them: text, then the couple (celebrity in bold).
@@ -101,6 +104,23 @@ describe("buildModuleStack", () => {
       });
     });
 
+    it("asks for the podium in the Finale, one place a line once it's in", () => {
+      expect(line({ podiumNames: [] })).toMatchObject({ lines: ["Need podium & High picks"], tone: "needed" });
+      expect(line({ podiumNames: [], topScorerName: c("Jess", "Alan") })).toMatchObject({
+        lines: ["High: Jess & Alan"],
+        needText: "Need podium",
+      });
+      const podiumNames = [c("Ava", "Val"), c("Jess", "Alan"), c("Priya", "Sasha")];
+      expect(line({ podiumNames })).toMatchObject({
+        lines: ["Win: Ava & Val", "2nd: Jess & Alan", "3rd: Priya & Sasha"],
+        needText: "Need High",
+      });
+      expect(line({ state: "locked", podiumNames, topScorerName: c("Ava", "Val") })).toMatchObject({
+        lines: ["Win: Ava & Val", "2nd: Jess & Alan", "3rd: Priya & Sasha", "High: Ava & Val"],
+        locked: true,
+      });
+    });
+
     it("marks locked, with each pick on its own line or a missed cue", () => {
       expect(line({ state: "locked", eliminatedName: c("Ava", "Val"), topScorerName: c("Jess", "Alan") })).toMatchObject({
         lines: ["Home: Ava & Val", "High: Jess & Alan"],
@@ -118,7 +138,7 @@ describe("buildModuleStack", () => {
 
   describe("Dance Card", () => {
     const line = (draftStatus: string, couples: StackCouple[] = []) =>
-      flat(buildModuleStack({ ...base, danceCard: { on: true, draftStatus, roster: couples.map((couple) => ({ couple, out: false })) } })[1]);
+      flat(buildModuleStack({ ...base, danceCard: { on: true, draftStatus, roster: couples.map((couple) => ({ couple, out: false })), moves: NO_ROSTER_MOVES } })[1]);
 
     it("reports draft status, then each couple on its own line", () => {
       expect(line("not_started")).toMatchObject({ lines: ["Draft not started"], locked: false });
@@ -135,8 +155,80 @@ describe("buildModuleStack", () => {
         { couple: c("Tatyana", "Jan"), out: false },
         { couple: c("Julia", "Ezra"), out: true },
       ];
-      const rows = buildModuleStack({ ...base, danceCard: { on: true, draftStatus: "completed", roster } })[1].lines;
+      const rows = buildModuleStack({ ...base, danceCard: { on: true, draftStatus: "completed", roster, moves: NO_ROSTER_MOVES } })[1].lines;
       expect(rows.map((row) => [row.couple?.celebrity, row.struck])).toEqual([["Tatyana", false], ["Julia", true]]);
+    });
+
+    describe("roster moves", () => {
+      const NOW = new Date("2026-11-17T20:00:00Z");
+      const IN_5H = "2026-11-18T01:00:00Z";
+      const IN_2D = "2026-11-19T20:00:00Z";
+      const IN_20H = "2026-11-18T16:00:00Z";
+      // Each move as the card reads it: its mark, its words, its clock.
+      const moves = (parts: Partial<RosterMoves<StackCouple>>, draftStatus = "completed") =>
+        buildModuleStack(
+          { ...base, danceCard: { ...base.danceCard, draftStatus, moves: { ...NO_ROSTER_MOVES, ...parts } } },
+          NOW
+        )[1].moves.map((row) => [
+          row.mark,
+          row.text + (row.couple ? joined(row.couple) : "") + (row.after ?? ""),
+          row.clock,
+        ]);
+
+      it("has none for a league with nothing on, and never before the draft is done", () => {
+        expect(moves({})).toEqual([]);
+        expect(moves({ waivers: { adds: [], openSpotCount: 1, dueAt: IN_2D } }, "in_progress")).toEqual([]);
+        expect(buildModuleStack(base).every((line) => line.moves.length === 0)).toBe(true);
+      });
+
+      it("asks for whatever still needs the manager, each with its own clock", () => {
+        expect(
+          moves({
+            lifeline: { picks: [null], lockAt: IN_5H, locked: false },
+            waivers: { adds: [], openSpotCount: 1, dueAt: IN_2D },
+            trades: { offerExpiries: [IN_2D, IN_20H], acceptedWith: [] },
+          })
+        ).toEqual([
+          ["needed", "Need Lifeline pick", "Locks in 5h"],
+          ["needed", "1 open spot", "Runs in 2d"],
+          ["needed", "2 trade offers", "Ends in 20h"],
+        ]);
+      });
+
+      it("confirms what is saved: a Lifeline is settled, a claim and a trade wait on the run", () => {
+        expect(
+          moves({
+            lifeline: { picks: [c("Maura", "Mark")], lockAt: IN_5H, locked: false },
+            waivers: { adds: [c("Tatyana", "Jan"), c("Jo", "Ezra"), c("Alix", "Val")], openSpotCount: 1, dueAt: null },
+            trades: { offerExpiries: [], acceptedWith: [["Kim"], ["Kim", "Pat"], ["Kim", "Pat", "Lou"]] },
+          })
+        ).toEqual([
+          ["saved", "Lifeline: Maura & Mark", "Locks in 5h"],
+          ["waiting", "Add Tatyana & Jan, +2 more", "After results"],
+          ["waiting", "Trade with Kim", "At the run"],
+          ["waiting", "Trade with Kim and Pat", "At the run"],
+          ["waiting", "Trade with 3 managers", "At the run"],
+        ]);
+      });
+
+      it("puts a missing Lifeline above a saved one, with the lock on the first line only", () => {
+        const picks = [c("Maura", "Mark"), null, null];
+        expect(moves({ lifeline: { picks, lockAt: IN_5H, locked: false } })).toEqual([
+          ["needed", "Need 2 Lifeline picks", "Locks in 5h"],
+          ["saved", "Lifeline: Maura & Mark", null],
+        ]);
+        expect(moves({ lifeline: { picks, lockAt: IN_5H, locked: true } })).toEqual([
+          ["missed", "No Lifeline picks", "Locked"],
+          ["saved", "Lifeline: Maura & Mark", null],
+        ]);
+      });
+
+      it("says nothing about waivers with no claim and no open spot, and never counts down a run that is due", () => {
+        expect(moves({ waivers: { adds: [], openSpotCount: 0, dueAt: IN_2D } })).toEqual([]);
+        expect(moves({ waivers: { adds: [], openSpotCount: 2, dueAt: "2026-11-17T19:55:00Z" } })).toEqual([
+          ["needed", "2 open spots", "Runs soon"],
+        ]);
+      });
     });
   });
 
@@ -161,6 +253,18 @@ describe("buildModuleStack", () => {
       expect(line({ hasPrediction: true, locked: true, open: false }).lines).toEqual(["Prediction in"]);
       expect(line({ hasPrediction: true, locked: true, open: false })).toMatchObject({ locked: true, locksAt: null });
     });
+  });
+});
+
+describe("lifelinePickDue", () => {
+  it("is due only while a dead spot has no Lifeline and the lock hasn't passed", () => {
+    const lifeline = { picks: ["a", null], lockAt: LOCK, locked: false };
+    expect(lifelinePickDue({ ...NO_ROSTER_MOVES, lifeline })).toBe(true);
+    expect(lifelinePickDue({ ...NO_ROSTER_MOVES, lifeline: { ...lifeline, locked: true } })).toBe(false);
+    expect(lifelinePickDue({ ...NO_ROSTER_MOVES, lifeline: { ...lifeline, picks: ["a", "b"] } })).toBe(false);
+    expect(
+      lifelinePickDue({ ...NO_ROSTER_MOVES, waivers: { adds: [], openSpotCount: 1, dueAt: null }, trades: { offerExpiries: [LOCK], acceptedWith: [] } })
+    ).toBe(false);
   });
 });
 
