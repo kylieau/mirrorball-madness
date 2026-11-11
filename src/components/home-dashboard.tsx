@@ -72,7 +72,7 @@ export function HomeDashboard({
                   key={line.key}
                   className="flex items-baseline justify-between gap-3 border-t border-border py-2.5 text-sm text-muted-foreground first:border-t-0"
                 >
-                  <span>
+                  <span className="min-w-0 wrap-anywhere">
                     {line.segments.map((seg, i) => {
                       const className = cn(
                         seg.kind === "couple" && "font-semibold text-accent/92",
