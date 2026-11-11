@@ -37,6 +37,7 @@ export default async function LeagueStandingsPage({
     scoreRows,
     pointsByManager,
     rosterPointsByManager,
+    storedDanceCardPointsByManager,
     predictionPointsByManager,
     grandFinalePointsByManager,
     standings,
@@ -112,7 +113,8 @@ export default async function LeagueStandingsPage({
           : null,
         danceCard: danceCardOn
           ? roundPoints(
-              (rosterPointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
+              (rosterPointsByManager.get(s.managerId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1) +
+                (storedDanceCardPointsByManager.get(s.managerId) ?? 0)
             )
           : null,
         grandFinale: grandFinaleOn
@@ -153,7 +155,8 @@ export default async function LeagueStandingsPage({
         label: scoringModule("danceCard").name,
         icon: scoringModule("danceCard").icon,
         points: roundPoints(
-          (rosterPointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1)
+          (rosterPointsByManager.get(myTeamId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1) +
+            (storedDanceCardPointsByManager.get(myTeamId) ?? 0)
         ),
       },
       grandFinaleOn && {

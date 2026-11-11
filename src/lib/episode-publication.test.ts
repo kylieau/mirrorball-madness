@@ -100,6 +100,6 @@ describe("publishEpisodeAtomically", () => {
     expect((await publishEpisodeAtomically(admin, "episode", "admin")).error).toContain(
       "active season"
     );
-    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual(["episode_publication_snapshot", "lifeline_publication_inputs"]);
   });
 });

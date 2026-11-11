@@ -8,6 +8,7 @@ describe("coupleHistoryReturn", () => {
     expect(coupleHistoryReturn("/leagues/abc/picks?week=3")).toMatchObject({ label: "Picks", leagueId: "abc" });
     expect(coupleHistoryReturn("/")).toEqual({ href: "/", label: "Home", leagueId: null });
     expect(coupleHistoryReturn("/leagues/abc/waivers")).toEqual({ href: "/leagues/abc/waivers", label: "Recast", leagueId: "abc" });
+    expect(coupleHistoryReturn("/leagues/abc/trades")).toEqual({ href: "/leagues/abc/trades", label: "Trades", leagueId: "abc" });
     expect(coupleHistoryReturn("/leagues")).toEqual({ href: "/leagues", label: "Manage Leagues", leagueId: null });
   });
 

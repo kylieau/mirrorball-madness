@@ -11,6 +11,7 @@ import type { DanceScore } from "@/lib/scoring";
 import { slotActiveInWeek } from "@/lib/roster-couple-points";
 import { weeklyRankMoves } from "@/lib/league-rank-moves";
 import { formatManagerName } from "@/lib/manager-display";
+import { loadWeeklyStandings } from "@/lib/weekly-standings";
 
 export type LeagueHomeSummary = {
   id: string;
@@ -31,6 +32,7 @@ export type LeagueHomeSummary = {
   };
   grandFinale: { open: boolean; locked: boolean; deadlineAt: string | null; hasPrediction: boolean };
   recentJoins: { name: string; joinedAt: string }[];
+  managerNames: Record<string, string>;
   // The viewer's own team reads as "You" / "you".
   rankMoves: { weekNumber: number; mover: string; passed: string[]; place: number }[];
 };
@@ -56,7 +58,7 @@ export async function computeLeagueHomeSummary(
   draftNight: { weekId: string; weekNumber: number; dances: DanceScore[] } | null = null,
   weekNumberById: Map<string, number> = new Map()
 ): Promise<LeagueHomeSummary> {
-  const [{ data: scoringSettings }, { data: members }, { data: scores }] = await Promise.all([
+  const [{ data: scoringSettings }, { data: members }, scores] = await Promise.all([
     supabase
       .from("scoring_settings")
       .select(
@@ -70,10 +72,7 @@ export async function computeLeagueHomeSummary(
         "user_id, co_manager_id, joined_at, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
       )
       .eq("league_id", league.id),
-supabase
-      .from("weekly_manager_scores")
-      .select("week_id, manager_id, roster_points, prediction_points, grand_finale_points, total_points")
-      .eq("league_id", league.id),
+    loadWeeklyStandings(supabase, league.id),
   ]);
 
   // A co-manager's auth uid never matches a manager_id/user_id column
@@ -157,7 +156,7 @@ supabase
           : undefined,
     });
     if (managers.length > 0) {
-      const replaced = scoresReplacingDraftWeek(scores ?? [], draftNight.weekId, managers, scoringSettings);
+      const replaced = scoresReplacingDraftWeek(scores, draftNight.weekId, managers, scoringSettings);
       draftTotals = new Map(
         replaced.filter((row) => row.week_id === draftNight.weekId).map((row) => [row.manager_id, row.total_points])
       );
@@ -166,7 +165,7 @@ supabase
   const draftWeekId = draftTotals ? draftNight!.weekId : null;
 
   const pointsByWeek = new Map<string, Map<string, number>>();
-  for (const row of scores ?? []) {
+  for (const row of scores) {
     if (draftWeekId && row.week_id === draftWeekId) continue;
     if (allowedWeekIds && !allowedWeekIds.has(row.week_id)) continue;
     const week = pointsByWeek.get(row.week_id) ?? new Map<string, number>();
@@ -250,6 +249,7 @@ supabase
     recentJoins: (members ?? [])
       .filter((m) => !isOwnMembership(m, userId) && new Date(m.joined_at).getTime() >= joinCutoffMs)
       .map((m) => ({ name: m.profiles?.display_name ?? "Someone", joinedAt: m.joined_at })),
+    managerNames: Object.fromEntries(managerName),
     rankMoves,
   };
 }

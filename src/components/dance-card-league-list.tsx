@@ -13,6 +13,7 @@ export type DanceCardLeagueEntry = {
   displayName: string;
   weekPoints: number;
   bonusPoints: number;
+  lifelines: (CoupleNameParts & { coupleId: string; points: number })[];
   couples: (CoupleNameParts & { coupleId: string; weeklyPoints: number; tag: "safe" | "eliminated" })[];
 };
 
@@ -72,6 +73,14 @@ export function DanceCardLeagueList({
                     <span className="font-heading font-semibold">{formatSignedPoints(e.bonusPoints)}</span>
                   </div>
                 )}
+                {e.lifelines.map((line) => (
+                  <div key={line.coupleId} className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <span>
+                      Lifeline · <CoupleNameLink coupleId={line.coupleId} from={historyFrom} celebrity={line.celebrity} pro={line.pro} />
+                    </span>
+                    <span className="font-heading font-semibold">{formatSignedPoints(line.points)}</span>
+                  </div>
+                ))}
               </div>
             </AccordionContent>
           </AccordionItem>

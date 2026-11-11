@@ -184,7 +184,16 @@ describe("Dance Card v2 readers", () => {
       { judges_score_category_weight: 2, eliminations_category_weight: 1, bonus_picks_category_weight: 1 }
     );
     expect(replaced).toEqual([
-      { week_id: "w4", manager_id: "m", roster_points: credit(44, 71), prediction_points: 3, grand_finale_points: 1, total_points: Math.round((credit(44, 71) * 2 + 4) * 100) / 100 },
+      {
+        week_id: "w4",
+        manager_id: "m",
+        roster_points: credit(44, 71),
+        prediction_points: 3,
+        grand_finale_points: 1,
+        lifeline_points: 0,
+        transfer_points: 0,
+        total_points: Math.round((credit(44, 71) * 2 + 4) * 100) / 100,
+      },
     ]);
   });
 });

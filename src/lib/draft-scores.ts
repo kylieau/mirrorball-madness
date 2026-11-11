@@ -300,6 +300,10 @@ export type WeekManagerScoreRow = {
   roster_points: number;
   prediction_points: number;
   grand_finale_points: number;
+  // Lifeline (payouts and the Equalizer) and trade transfers, already in
+  // total-points units and inside total_points.
+  lifeline_points?: number;
+  transfer_points?: number;
   total_points: number;
 };
 
@@ -320,17 +324,23 @@ export function scoresReplacingDraftWeek(
       const stored = weights ? rows.find((row) => row.week_id === weekId && row.manager_id === manager.managerId) : undefined;
       const prediction = Number(stored?.prediction_points ?? 0);
       const grandFinale = Number(stored?.grand_finale_points ?? 0);
+      const lifeline = stored?.lifeline_points ?? 0;
+      const transfers = stored?.transfer_points ?? 0;
       return {
         week_id: weekId,
         manager_id: manager.managerId,
         roster_points: manager.rosterPoints,
         prediction_points: prediction,
         grand_finale_points: grandFinale,
+        lifeline_points: lifeline,
+        transfer_points: transfers,
         total_points: stored
           ? roundPoints(
               manager.rosterPoints * weights!.judges_score_category_weight +
                 prediction * weights!.eliminations_category_weight +
-                grandFinale * weights!.bonus_picks_category_weight
+                grandFinale * weights!.bonus_picks_category_weight +
+                lifeline +
+                transfers
             )
           : manager.totalPoints,
       };

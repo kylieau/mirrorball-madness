@@ -17,6 +17,7 @@ import { loadAllCouples, loadTeamsMode, loadViewerMemberships, loadViewerSeason 
 import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
 import { toBannerWeeks } from "@/lib/episode-banner";
 import { isSpoilerSafeActive, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
+import { loadWeeklyStandings } from "@/lib/weekly-standings";
 
 export type LeaguePageBase = Awaited<ReturnType<typeof loadLeaguePageBase>>;
 
@@ -35,7 +36,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     { data: league },
     { data: scoringSettings },
     { data: members },
-    { data: allScores },
+    allScores,
     allCouples,
     accountSettingsData,
     season,
@@ -50,10 +51,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
       )
       .eq("league_id", id)
       .order("joined_at"),
-    supabase
-      .from("weekly_manager_scores")
-      .select("week_id, manager_id, roster_points, prediction_points, grand_finale_points, total_points")
-      .eq("league_id", id),
+    loadWeeklyStandings(supabase, id),
     loadAllCouples(supabase),
     getAccountSettingsData(supabase, user.id),
     loadViewerSeason(supabase, user.id),
@@ -66,6 +64,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
 
   const danceCardOn = scoringSettings?.judges_score_category_enabled ?? true;
   const waiversOn = league.waiver_mode === "waivers";
+  const tradesOn = league.trades_enabled;
   const curtainCallOn = scoringSettings?.eliminations_category_enabled ?? true;
   const grandFinaleOn = scoringSettings?.bonus_picks_category_enabled ?? false;
 
@@ -166,11 +165,14 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
       : [];
   const scoreRows =
     draftNight && draftManagers.length > 0
-      ? scoresReplacingDraftWeek(allScores ?? [], draftNight.weekId, draftManagers, scoringSettings ?? undefined)
-      : (allScores ?? []);
+      ? scoresReplacingDraftWeek(allScores, draftNight.weekId, draftManagers, scoringSettings ?? undefined)
+      : allScores;
 
   const pointsByManager = new Map<string, number>();
   const rosterPointsByManager = new Map<string, number>();
+  // Lifeline and trade transfers: Dance Card points that arrive already
+  // weighted, outside roster_points.
+  const storedDanceCardPointsByManager = new Map<string, number>();
   const predictionPointsByManager = new Map<string, number>();
   const grandFinalePointsByManager = new Map<string, number>();
   const scoresByEpisode: Record<
@@ -181,6 +183,10 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     if (!scoredIds.has(row.week_id) && row.week_id !== draftNight?.weekId) continue;
     pointsByManager.set(row.manager_id, (pointsByManager.get(row.manager_id) ?? 0) + row.total_points);
     rosterPointsByManager.set(row.manager_id, (rosterPointsByManager.get(row.manager_id) ?? 0) + row.roster_points);
+    storedDanceCardPointsByManager.set(
+      row.manager_id,
+      (storedDanceCardPointsByManager.get(row.manager_id) ?? 0) + (row.lifeline_points ?? 0) + (row.transfer_points ?? 0)
+    );
     predictionPointsByManager.set(
       row.manager_id,
       (predictionPointsByManager.get(row.manager_id) ?? 0) + row.prediction_points
@@ -329,6 +335,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     danceCardRule: danceCard ?? ({ version: "v1" } as const),
     danceCardOn,
     waiversOn,
+    tradesOn,
     curtainCallOn,
     grandFinaleOn,
     members,
@@ -352,6 +359,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     scoreRows,
     pointsByManager,
     rosterPointsByManager,
+    storedDanceCardPointsByManager,
     predictionPointsByManager,
     grandFinalePointsByManager,
     standings,

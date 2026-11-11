@@ -1,54 +1,21 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { RecastClaim } from "@/lib/recast";
 import { createClient } from "@/lib/supabase/server";
 
-export async function submitWaiverClaim(
-  leagueId: string,
-  slotNumber: number,
-  coupleId: string
-): Promise<{ error: string | null }> {
+// Replaces the team's whole waiver list, in rank order. The RPC decides who
+// may claim, which couples and spots are valid, and whether a run is left.
+export async function saveRecastList(leagueId: string, claims: RecastClaim[]): Promise<{ error: string | null }> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("submit_waiver_claim", {
+  const { error } = await supabase.rpc("save_recast_list", {
     p_league_id: leagueId,
-    p_slot_number: slotNumber,
-    p_couple_id: coupleId,
+    p_claims: claims.map((claim) => ({
+      couple_id: claim.coupleId,
+      slot_number: claim.slotNumber,
+      drop_couple_id: claim.dropCoupleId,
+    })),
   });
-  if (error) return { error: error.message };
   revalidatePath(`/leagues/${leagueId}`, "layout");
-  return { error: null };
-}
-
-export async function processReverseStandingsWaivers(
-  leagueId: string
-): Promise<{ error: string | null }> {
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("process_reverse_standings_waivers", {
-    p_league_id: leagueId,
-  });
-  if (error) return { error: error.message };
-  revalidatePath(`/leagues/${leagueId}/waivers`);
-  return { error: null };
-}
-
-export async function approveWaiverClaim(
-  leagueId: string,
-  claimId: string
-): Promise<{ error: string | null }> {
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("approve_waiver_claim", { p_claim_id: claimId });
-  if (error) return { error: error.message };
-  revalidatePath(`/leagues/${leagueId}/waivers`);
-  return { error: null };
-}
-
-export async function rejectWaiverClaim(
-  leagueId: string,
-  claimId: string
-): Promise<{ error: string | null }> {
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("reject_waiver_claim", { p_claim_id: claimId });
-  if (error) return { error: error.message };
-  revalidatePath(`/leagues/${leagueId}/waivers`);
-  return { error: null };
+  return { error: error?.message ?? null };
 }

@@ -7,6 +7,7 @@ import { LeagueInfoSection } from "@/components/league-info-section";
 import { LeagueModulesForm } from "@/components/league-modules-form";
 import type { GrandFinaleLateUnlockInput, LateMisser } from "@/components/grand-finale-late-unlock";
 import type { CurtainCallBackfillInput } from "@/components/curtain-call-backfill";
+import type { LifelineSettingsInput } from "@/components/lifeline-settings";
 import { LeaveLeagueButton } from "@/components/leave-league-button";
 import { groupEpisodesByWeek } from "@/lib/competition-week";
 import { safeRelativePath } from "@/lib/safe-relative-path";
@@ -73,7 +74,11 @@ export default async function LeagueSettingsPage({
 
   const isCommissioner = viewerMembership.role === "commissioner";
 
-  const [season, anchorHeld] = await Promise.all([loadSeasonContext(supabase, id), danceCardAnchorHeld(supabase, id, scoringSettings)]);
+  const [season, anchorHeld, lifeline] = await Promise.all([
+    loadSeasonContext(supabase, id),
+    danceCardAnchorHeld(supabase, id, scoringSettings),
+    loadLifelineSettings(supabase, league, scoringSettings, isCommissioner || isSuperAdmin),
+  ]);
   // Same trigger update_scoring_categories enforces server-side — this is
   // just a UI hint to avoid a confusing failed-save, not the source of
   // truth. Computed here (real request-time "now", not a client re-guess)
@@ -163,6 +168,12 @@ export default async function LeagueSettingsPage({
           lateUnlock={buildLateUnlock(grandFinaleLocked, memberRows, lateGrandFinale, isCommissioner || isSuperAdmin, viewerMembership.user_id)}
           curtainCallBackfill={curtainCallBackfill}
           anchorHeld={anchorHeld}
+          lifeline={lifeline}
+          trades={
+            scoringSettings?.judges_score_category_enabled
+              ? { enabled: league.trades_enabled, canEdit: isCommissioner || isSuperAdmin }
+              : null
+          }
         />
       </div>
     </div>
@@ -368,6 +379,8 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
           lateUnlock={buildLateUnlock(grandFinaleLocked, memberRows, late, true)}
           curtainCallBackfill={curtainCallBackfill}
           anchorHeld={false}
+          lifeline={await loadLifelineSettings(admin, league, settings ?? null, true)}
+          trades={settings?.judges_score_category_enabled ? { enabled: league.trades_enabled, canEdit: true } : null}
         />
       </div>
     </div>
@@ -429,6 +442,30 @@ async function loadCurtainCallBackfill(
       topScorer: row.predicted_top_scorer_couple_id,
       backfilled: row.entered_via === "admin_backfill",
     })),
+  };
+}
+
+// Lifeline rides on the week-by-week Dance Card, so only a v2 or v3 league
+// with Dance Card on is offered it.
+async function loadLifelineSettings(
+  supabase: SupabaseClient<Database>,
+  league: Database["public"]["Tables"]["leagues"]["Row"],
+  scoringSettings: { dance_card_version: string; judges_score_category_enabled: boolean } | null,
+  canEdit: boolean
+): Promise<LifelineSettingsInput | null> {
+  if (!scoringSettings?.judges_score_category_enabled || !usesDanceCardLedger(scoringSettings.dance_card_version)) return null;
+  const { count } = league.lifeline_enabled
+    ? await supabase
+        .from("league_point_adjustments")
+        .select("id", { count: "exact", head: true })
+        .eq("league_id", league.id)
+        .eq("kind", "lifeline_equalizer")
+    : { count: 0 };
+  return {
+    enabled: league.lifeline_enabled,
+    startsWeek: league.lifeline_starts_week,
+    equalizerAdded: (count ?? 0) > 0,
+    canEdit,
   };
 }
 

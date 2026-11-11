@@ -1,13 +1,5 @@
 import { spoilerSafeCoupleStatus } from "./spoiler-safe-couple-status";
 
-export type WaiverClaimMethod = "reverse_standings" | "fcfs" | "manual";
-
-export const WAIVER_CLAIM_METHOD_LABELS: Record<WaiverClaimMethod, string> = {
-  reverse_standings: "Reverse Standings",
-  fcfs: "First Come, First Served",
-  manual: "Manual (Commissioner Decides)",
-};
-
 const OPEN_ROSTER_STATUSES = new Set(["eliminated", "withdrawn"]);
 
 export type RosterOccupancy = "occupied" | "revealed-open" | "hidden-open";

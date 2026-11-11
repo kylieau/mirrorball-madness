@@ -1,15 +1,13 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { WaiversPanel } from "@/components/waivers-panel";
-import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
-import { getAccountSettingsData } from "@/lib/account-settings-data";
-import { partitionRecastSlots, type WaiverClaimMethod } from "@/lib/recast-framing";
-import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
-import { groupEpisodesByWeek } from "@/lib/competition-week";
-import { isSpoilerSafeActive } from "@/lib/spoiler-safe-couple-status";
-import { safeRelativePath } from "@/lib/safe-relative-path";
 import { XIcon } from "lucide-react";
+import { RecastPanel, type RecastSpot } from "@/components/recast-panel";
+import { loadLeaguePageBase } from "@/lib/league-page-data";
+import { isRecastMiss, recastDraftRank, recastOrder, recastWire } from "@/lib/recast";
+import { classifyRosterOccupancy } from "@/lib/recast-framing";
+import { safeRelativePath } from "@/lib/safe-relative-path";
+import { createClient } from "@/lib/supabase/server";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default async function WaiversPage({
   params,
@@ -21,202 +19,148 @@ export default async function WaiversPage({
   const { id } = await params;
   const { from } = await searchParams;
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const [{ data: league }, { data: membership }] = await Promise.all([
-    supabase
-      .from("leagues")
-      .select("id, name, waiver_mode, waiver_claim_method")
-      .eq("id", id)
-      .single(),
-    supabase
-      .from("league_members")
-      .select("user_id, role")
-      .eq("league_id", id)
-      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`)
-      .maybeSingle(),
-  ]);
-
-  if (!league) {
-    notFound();
-  }
-
-  // A co-manager's roster/claims live under the primary's user_id.
-  const myTeamId = membership?.user_id ?? user.id;
+  const base = await loadLeaguePageBase(supabase, id);
+  const { league, members, myTeamId, cutoff, finaleWeekNumber } = base;
 
   const closeHref = safeRelativePath(from, `/leagues/${id}/picks`);
-  const closeLink = (
-    <Link
-      href={closeHref}
-      aria-label="Close"
-      className="self-start text-muted-foreground hover:text-foreground"
-    >
-      <XIcon className="size-5" />
-    </Link>
-  );
+  const unavailable = !base.danceCardOn
+    ? {
+        title: "Dance Card Isn't On",
+        body: "This league isn't running the draft and roster module. The commissioner can turn Dance Card on in League Settings.",
+      }
+    : !base.waiversOn
+      ? {
+          title: "Recast Isn't On",
+          body: "This league's rosters are locked. The commissioner can turn on Recast, Mirrorball's waiver wire, in League Settings.",
+        }
+      : league.draft_status !== "completed"
+        ? { title: "Recast Opens After the Draft", body: "There are no rosters to change until the draft is complete." }
+        : null;
 
-  const { data: scoringSettings } = await supabase
-    .from("scoring_settings")
-    .select("judges_score_category_enabled")
-    .eq("league_id", id)
-    .single();
-
-  if (scoringSettings && !scoringSettings.judges_score_category_enabled) {
+  if (unavailable) {
     return (
-      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
-        {closeLink}
-        <h1 className="text-2xl font-semibold tracking-tight">Dance Card isn&apos;t enabled</h1>
-        <p className="text-sm text-muted-foreground">
-          This league isn&apos;t running the draft/roster module — the commissioner
-          can turn Dance Card on in league settings.
-        </p>
+      <div className="flex flex-col items-center gap-4 px-4 py-24 text-center">
+        <Link href={closeHref} aria-label="Close" className="self-start text-muted-foreground hover:text-foreground">
+          <XIcon className="size-5" />
+        </Link>
+        <h1 className="text-2xl font-semibold tracking-tight">{unavailable.title}</h1>
+        <p className="text-sm text-muted-foreground">{unavailable.body}</p>
       </div>
     );
   }
 
-  if (league.waiver_mode !== "waivers") {
-    return (
-      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
-        {closeLink}
-        <h1 className="text-2xl font-semibold tracking-tight">Recast isn&apos;t enabled</h1>
-        <p className="text-sm text-muted-foreground">
-          This league&apos;s roster is locked — the commissioner can enable Recast in
-          league settings.
-        </p>
-      </div>
-    );
-  }
-
-  const { data: activeSeasonId } = await supabase.rpc("active_season_id");
-  const accountSettingsData = await getAccountSettingsData(supabase, user.id);
-
-  const coupleFields =
-    "id, status, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)";
-
-  const [
-    { data: myRosterSlots },
-    { data: allCouplesRaw },
-    { data: rosteredSlots },
-    { data: claims },
-    { data: weekRows },
-    { data: episodeRows },
-  ] = await Promise.all([
-    supabase
-      .from("roster_slots")
-      .select(`slot_number, couples(${coupleFields})`)
-      .eq("league_id", id)
-      .eq("manager_id", myTeamId)
-      .is("end_week", null),
-    supabase.from("couples").select(coupleFields).eq("season_id", activeSeasonId ?? ""),
-    supabase.from("roster_slots").select("couple_id").eq("league_id", id).is("end_week", null),
+  const [{ data: cycleRows }, { data: pendingDrops }, { data: claims }, { data: cycles }] = await Promise.all([
+    supabase.rpc("recast_next_cycle", { p_league_id: id }),
+    supabase.rpc("recast_pending_drops", { p_league_id: id }),
+    // RLS returns this team's own claims plus every awarded one.
     supabase
       .from("waiver_claims")
-      .select(`*, profiles(display_name), couples(${coupleFields})`)
-      .eq("league_id", id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("competition_weeks")
-      .select("id, week_number, theme, is_elimination_week, is_double_elimination_week, is_finale")
-      .eq("season_id", activeSeasonId ?? ""),
-    supabase
-      .from("episodes")
-      .select("id, episode_number, week_id, airs_at, theme, status")
-      .eq("season_id", activeSeasonId ?? ""),
+      .select("id, manager_id, couple_id, drop_couple_id, slot_number, status, result, priority_order, week_number, start_week")
+      .eq("league_id", id),
+    supabase.from("recast_cycles").select("week_number").eq("league_id", id),
   ]);
 
-  const groupedWeeks = groupEpisodesByWeek(weekRows ?? [], episodeRows ?? []);
-  const completedWeeks = groupedWeeks
-    .filter((week) => week.status === "completed")
-    .sort((a, b) => b.week_number - a.week_number)
-    .map((week) => ({ id: week.id, week_number: week.week_number }));
-
-  const cutoff = await resolveSpoilerCutoff(
-    supabase,
-    user.id,
-    activeSeasonId ?? null,
-    accountSettingsData.spoilerFreeMode,
-    completedWeeks
-  );
+  const cycle = cycleRows?.[0];
+  const dueTime = cycle ? new Date(cycle.due_at).getTime() : 0;
+  const nextRun =
+    cycle && cycle.start_week != null
+      ? {
+          weekNumber: cycle.week_number,
+          dueAt: cycle.due_at,
+          latestAt: new Date(dueTime + DAY_MS).toISOString(),
+          waitingOnResults: !cycle.results_in && dueTime <= Date.now(),
+          startWeek: cycle.start_week,
+        }
+      : null;
+  const lastRunWeek = Math.max(0, ...(cycles ?? []).map((row) => row.week_number));
   const cutoffWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;
-  const finaleWeekNumber = groupedWeeks.find((week) => week.is_finale)?.week_number ?? null;
 
-  const allCouples = (allCouplesRaw ?? []).map((c) => ({
-    id: c.id,
-    status: c.status,
-    elimination_week: c.elimination_week,
-    celebrity_name: c.celebrity?.name ?? "Unknown",
-    pro_name: c.pro?.name ?? "Unknown",
-  }));
+  const coupleById = new Map(base.flatCouples.map((couple) => [couple.id, couple]));
+  const currentSlots = base.rosterSlotPeriods.filter((slot) => slot.endWeek == null);
+  const ownSlots = currentSlots.filter((slot) => slot.managerId === myTeamId);
+  // A spot whose couple went home in a week the viewer hasn't watched is
+  // neither offered as open nor as a drop. A spot a trade emptied has no
+  // couple at all.
+  const spots = Array.from({ length: league.roster_size }, (_, index) => index + 1).flatMap((slotNumber): RecastSpot[] => {
+    const slot = ownSlots.find((own) => own.slotNumber === slotNumber);
+    if (!slot) return [{ slotNumber, coupleId: null, open: true }];
+    const couple = coupleById.get(slot.coupleId);
+    if (!couple) return [];
+    const occupancy = classifyRosterOccupancy(
+      { status: couple.status, eliminationWeek: couple.elimination_week },
+      cutoffWeek,
+      finaleWeekNumber
+    );
+    return occupancy === "hidden-open"
+      ? []
+      : [{ slotNumber, coupleId: slot.coupleId, open: occupancy === "revealed-open" }];
+  });
 
-  const displayNames = buildCoupleDisplayNames(allCouples);
-
-  const { revealedOpen, hiddenOpenCount } = partitionRecastSlots(
-    (myRosterSlots ?? [])
-      .filter((s) => s.couples)
-      .map((s) => ({
-        slotNumber: s.slot_number,
-        status: s.couples!.status,
-        eliminationWeek: s.couples!.elimination_week,
-        celebrity: s.couples!.celebrity?.name ?? "Unknown",
-        pro: s.couples!.pro?.name ?? "Unknown",
-        coupleId: s.couples!.id,
-      })),
-    cutoffWeek,
-    finaleWeekNumber
-  );
-
-  const openSlots = revealedOpen.map((s) => ({
-    slotNumber: s.slotNumber,
-    formerCoupleName: formatCoupleName(
-      displayNames.get(s.coupleId) ?? { celebrity: s.celebrity, pro: s.pro }
+  const ownClaims = (claims ?? []).filter((claim) => claim.manager_id === myTeamId);
+  const wire = recastWire({
+    dancingCoupleIds: [...base.activeCouples]
+      .sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name))
+      .map((couple) => couple.id),
+    heldCoupleIds: new Set(currentSlots.map((slot) => slot.coupleId)),
+    pendingDrops: (pendingDrops ?? []).map((drop) => ({ coupleId: drop.couple_id, managerId: drop.manager_id })),
+    teamId: myTeamId,
+    dropLockedCoupleIds: new Set(
+      ownClaims.flatMap((claim) =>
+        claim.status === "approved" && claim.drop_couple_id && claim.week_number === lastRunWeek
+          ? [claim.drop_couple_id]
+          : []
+      )
     ),
-  }));
+  });
 
-  const rosteredCoupleIds = new Set((rosteredSlots ?? []).map((s) => s.couple_id));
-  const availableCouples = allCouples
-    .filter(
-      (c) =>
-        isSpoilerSafeActive(
-          { status: c.status, eliminationWeek: c.elimination_week },
-          cutoffWeek,
-          finaleWeekNumber
-        ) && !rosteredCoupleIds.has(c.id)
-    )
-    .sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
+  const weekNumberById = new Map(base.completedEpisodes.map((week) => [week.id, week.week_number]));
+  const order = recastOrder(
+    (members ?? []).map((member) => ({ managerId: member.user_id, draftRank: recastDraftRank(league, member) })),
+    base.scoreRows.flatMap((row) => {
+      const weekNumber = weekNumberById.get(row.week_id);
+      return weekNumber != null && cutoff.allowedEpisodeIds.has(row.week_id)
+        ? [{ managerId: row.manager_id, weekNumber, totalPoints: row.total_points }]
+        : [];
+    })
+  );
 
   return (
-    <WaiversPanel
+    <RecastPanel
       leagueId={id}
       closeHref={closeHref}
-      claimMethod={league.waiver_claim_method as WaiverClaimMethod}
-      isCommissioner={membership?.role === "commissioner"}
-      openSlots={openSlots}
-      hiddenOpenSlotCount={hiddenOpenCount}
+      nextRun={nextRun}
       pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
-      availableCouples={availableCouples}
-      coupleDisplayNames={Object.fromEntries(displayNames)}
-      claims={(claims ?? []).filter((claim) => cutoffWeek !== null && claim.week_number <= cutoffWeek).map((c) => ({
-        id: c.id,
-        managerName: c.profiles?.display_name ?? "Unknown",
-        coupleName: c.couples
-          ? formatCoupleName(
-              displayNames.get(c.couple_id) ?? {
-                celebrity: c.couples.celebrity?.name ?? "Unknown",
-                pro: c.couples.pro?.name ?? "Unknown",
-              }
-            )
-          : "Unknown",
-        slotNumber: c.slot_number,
-        status: c.status,
-        createdAt: c.created_at,
-      }))}
+      behind={cutoff.pendingRevealEpisode != null}
+      list={ownClaims
+        .filter((claim) => claim.status === "pending")
+        .sort((a, b) => (a.priority_order ?? 0) - (b.priority_order ?? 0))
+        .map((claim) => ({ coupleId: claim.couple_id, slotNumber: claim.slot_number, dropCoupleId: claim.drop_couple_id }))}
+      spots={spots}
+      wire={wire}
+      order={order}
+      orderThroughWeek={cutoffWeek}
+      teamId={myTeamId}
+      managerNames={base.nameByManager}
+      coupleDisplayNames={Object.fromEntries(base.allDisplayNames)}
+      misses={ownClaims
+        .filter((claim) => claim.status === "rejected" && claim.week_number === lastRunWeek)
+        .sort((a, b) => (a.priority_order ?? 0) - (b.priority_order ?? 0))
+        .flatMap((claim) => (isRecastMiss(claim.result) ? [{ coupleId: claim.couple_id, result: claim.result }] : []))}
+      log={(claims ?? [])
+        .filter((claim) => claim.status === "approved" && cutoffWeek != null && claim.week_number <= cutoffWeek)
+        .sort(
+          (a, b) =>
+            b.week_number - a.week_number ||
+            (base.nameByManager[a.manager_id] ?? "").localeCompare(base.nameByManager[b.manager_id] ?? "")
+        )
+        .map((claim) => ({
+          id: claim.id,
+          managerId: claim.manager_id,
+          coupleId: claim.couple_id,
+          dropCoupleId: claim.drop_couple_id,
+          weekNumber: claim.week_number,
+          startWeek: claim.start_week,
+        }))}
     />
   );
 }

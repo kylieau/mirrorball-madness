@@ -5,6 +5,11 @@ import type { Json } from "@/lib/supabase/types";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getAccountSettingsData } from "@/lib/account-settings-data";
+import { groupEpisodesByWeek } from "@/lib/competition-week";
+import { confirmLifeline, loadLifelinePreview, type LifelinePreview } from "@/lib/lifeline-enable";
+import { loadViewerSeason } from "@/lib/viewer-season-data";
 import { syncSeasonClockAnchor as writeSeasonClockAnchor } from "@/lib/season-clock-sync";
 import { parseLatePercent, percentToLateFactor } from "@/lib/grand-finale-late";
 import type { PickLockCoast } from "@/lib/curtain-call-lock";
@@ -184,7 +189,6 @@ export async function demoteMember(
 
 export type LeagueSettingsInput = {
   waiverMode: "locked" | "waivers";
-  waiverClaimMethod: "reverse_standings" | "fcfs" | "manual";
   pickTimeLimitSeconds: number;
   predictionLockHoursBeforeAir: number;
   predictionLockCoast: PickLockCoast;
@@ -201,9 +205,10 @@ export async function updateLeagueSettings(
   const { error } = await supabase.rpc("update_league_settings", {
     p_league_id: leagueId,
     p_waiver_mode: input.waiverMode,
-    // The generated RPC arg type doesn't model that this Postgres param accepts
-    // NULL (required when waiver_mode is "locked"); the DB happily allows it.
-    p_waiver_claim_method: (input.waiverMode === "waivers" ? input.waiverClaimMethod : null) as string,
+    // Recast has one method, reverse standings. The generated RPC arg type
+    // doesn't model that this Postgres param accepts NULL (required when
+    // waiver_mode is "locked"); the DB happily allows it.
+    p_waiver_claim_method: (input.waiverMode === "waivers" ? "reverse_standings" : null) as string,
     p_pick_time_limit_seconds: input.pickTimeLimitSeconds,
     p_prediction_lock_hours_before_air: input.predictionLockHoursBeforeAir,
     p_prediction_lock_coast: input.predictionLockCoast,
@@ -300,4 +305,70 @@ export async function syncSeasonClockAnchor(
     revalidatePath("/", "page");
   }
   return result;
+}
+
+// Who may turn Lifeline on, and whether they may see the numbers yet: the
+// Equalizer and its standings run through the latest published week, so a
+// Spoiler-Free commissioner who is behind catches up first.
+async function lifelineActor(leagueId: string): Promise<{ error: string } | { actorId: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sign in to change Lifeline" };
+
+  const [{ data: commissioner }, { data: profile }, account, season] = await Promise.all([
+    supabase
+      .from("league_members")
+      .select("user_id")
+      .eq("league_id", leagueId)
+      .eq("role", "commissioner")
+      .or(`user_id.eq.${user.id},co_manager_id.eq.${user.id}`)
+      .maybeSingle(),
+    supabase.from("profiles").select("is_super_admin").eq("id", user.id).maybeSingle(),
+    getAccountSettingsData(supabase, user.id),
+    loadViewerSeason(supabase, user.id),
+  ]);
+  if (!commissioner && !profile?.is_super_admin) return { error: "Only a commissioner can turn on Lifeline" };
+
+  const latestCompleted = Math.max(
+    0,
+    ...groupEpisodesByWeek(season.weekRows, season.episodeRows)
+      .filter((week) => week.status === "completed")
+      .map((week) => week.week_number)
+  );
+  if (account.spoilerFreeMode && season.lastWatchedWeek < latestCompleted) {
+    return { error: `Mark Week ${latestCompleted} watched to turn on Lifeline. Its numbers include that week's results.` };
+  }
+  return { actorId: user.id };
+}
+
+export async function previewLifeline(leagueId: string): Promise<{ error: string } | { preview: LifelinePreview }> {
+  const actor = await lifelineActor(leagueId);
+  if ("error" in actor) return actor;
+  return loadLifelinePreview(createAdminClient(), leagueId);
+}
+
+export async function enableLifeline(
+  leagueId: string,
+  token: string,
+  includeEqualizer: boolean
+): Promise<{ error: string | null }> {
+  const actor = await lifelineActor(leagueId);
+  if ("error" in actor) return actor;
+  const result = await confirmLifeline(createAdminClient(), leagueId, actor.actorId, token, includeEqualizer);
+  if (result.error) return result;
+
+  revalidatePath(`/leagues/${leagueId}`, "layout");
+  revalidatePath("/", "page");
+  return { error: null };
+}
+
+export async function disableLifeline(leagueId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("disable_lifeline", { p_league_id: leagueId });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/leagues/${leagueId}`, "layout");
+  return { error: null };
 }

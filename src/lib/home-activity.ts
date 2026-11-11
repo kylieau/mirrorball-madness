@@ -1,3 +1,4 @@
+import { formatPoints } from "./format-points";
 import { formatEpisodeCasual } from "./format-week";
 import { ordinal } from "./ordinal";
 import { IMMUNITY_DANCE_TYPE } from "./episode-rounds";
@@ -17,11 +18,21 @@ export type ActivityScore = {
 
 export type ActivityRankMove = { league: string; mover: string; passed: string[]; place: number };
 
+export type ActivityCouple = { coupleId: string; name: string };
+
+// A roster move a league's waiver run made after the week's results: an
+// awarded claim, or a trade. A trade side is what one manager sent, the first
+// side always sending something.
+export type ActivityTransaction =
+  | { kind: "waiver"; league: string; manager: string; added: ActivityCouple; dropped: ActivityCouple | null }
+  | { kind: "trade"; league: string; sides: { manager: string; couples: ActivityCouple[]; points: number }[] };
+
 export type ActivityWeek = {
   weekNumber: number;
-  eliminated: { coupleId: string; name: string }[];
+  eliminated: ActivityCouple[];
   scores: ActivityScore[];
   rankMoves?: ActivityRankMove[];
+  transactions?: ActivityTransaction[];
 };
 
 export type ActivityDanceRow = {
@@ -65,8 +76,8 @@ export type ActivityLine = { key: string; segments: ActivitySegment[]; weekLabel
 // Weeks arrive already limited to what the viewer may see. `westWeek` is the
 // week whose West feed is still airing: who went home stays behind a single
 // "results are in" line until that window ends, and so do that week's
-// overtakes (published points carry survival and Curtain Call), while posted
-// scores still show.
+// overtakes (published points carry survival and Curtain Call) and roster
+// moves, while posted scores still show.
 export function buildRecentActivity({
   weeks,
   westWeek,
@@ -83,6 +94,9 @@ export function buildRecentActivity({
     if (week.weekNumber === westWeek && week.eliminated.length > 0) {
       lines.push({ key: `w${week.weekNumber}-hidden`, segments: [{ text: `${weekLabel} results are in` }], weekLabel: null });
     } else {
+      (week.transactions ?? []).forEach((transaction, i) =>
+        lines.push({ key: `w${week.weekNumber}-move-${i}`, segments: transactionSegments(transaction), weekLabel })
+      );
       week.eliminated.forEach(({ coupleId, name }, i) =>
         lines.push({ key: `w${week.weekNumber}-elim-${i}`, segments: [{ text: name, kind: "couple", coupleId }, { text: " eliminated" }], weekLabel })
       );
@@ -117,15 +131,59 @@ export function buildRecentActivity({
   return lines;
 }
 
-function rankMoveSegments(move: ActivityRankMove): ActivitySegment[] {
-  const passed = move.passed.flatMap((name, i): ActivitySegment[] => [
-    ...(i === 0 ? [] : [{ text: i === move.passed.length - 1 ? " and " : ", " }]),
-    { text: name, kind: "manager" },
+function listSegments(items: ActivitySegment[]): ActivitySegment[] {
+  return items.flatMap((item, i) => [
+    ...(i === 0 ? [] : [{ text: i === items.length - 1 ? " and " : ", " }]),
+    item,
   ]);
+}
+
+function managerSegment(name: string): ActivitySegment {
+  return { text: name, kind: "manager" };
+}
+
+function coupleSegment({ coupleId, name }: ActivityCouple): ActivitySegment {
+  return { text: name, kind: "couple", coupleId };
+}
+
+function transactionSegments(transaction: ActivityTransaction): ActivitySegment[] {
+  const league: ActivitySegment[] = [{ text: " in " }, { text: transaction.league, kind: "league" }];
+  if (transaction.kind === "waiver") {
+    return [
+      managerSegment(transaction.manager),
+      { text: " added " },
+      coupleSegment(transaction.added),
+      ...(transaction.dropped ? [{ text: " and dropped " }, coupleSegment(transaction.dropped)] : []),
+      ...league,
+    ];
+  }
+  const { sides } = transaction;
+  if (sides.length !== 2) {
+    return [...listSegments(sides.map((side) => managerSegment(side.manager))), { text: " made a trade" }, ...league];
+  }
+  const sent = (side: (typeof sides)[number]) =>
+    listSegments([
+      ...side.couples.map(coupleSegment),
+      ...(side.points > 0 ? [{ text: `${formatPoints(side.points)} pts` }] : []),
+    ]);
+  const [first, second] = sides;
+  const back = sent(second);
   return [
-    { text: move.mover, kind: "manager" },
+    managerSegment(first.manager),
+    { text: " traded " },
+    ...sent(first),
+    { text: " to " },
+    managerSegment(second.manager),
+    ...(back.length > 0 ? [{ text: " for " }, ...back] : []),
+    ...league,
+  ];
+}
+
+function rankMoveSegments(move: ActivityRankMove): ActivitySegment[] {
+  return [
+    managerSegment(move.mover),
     { text: " overtook " },
-    ...passed,
+    ...listSegments(move.passed.map(managerSegment)),
     { text: ` for ${ordinal(move.place)} in ` },
     { text: move.league, kind: "league" },
   ];

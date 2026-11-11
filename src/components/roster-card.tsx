@@ -9,6 +9,8 @@ import type { RosterWeeklyTag } from "@/lib/roster-weekly-points";
 import { IN_JEOPARDY_BADGE, showInJeopardyBadge } from "@/lib/results-outcome";
 import { coupleHistoryHref } from "@/lib/couple-history-link";
 
+export type RosterLifeline = CoupleNameParts & { coupleId: string; points: number };
+
 type RosterCouple = CoupleNameParts & {
   coupleId: string;
   weeklyPoints: number;
@@ -29,6 +31,7 @@ export function RosterCard({
   couples,
   totalPoints,
   weekBonusPoints = 0,
+  lifelines = [],
   carousel,
   leagueSection,
   historyFrom,
@@ -36,6 +39,8 @@ export function RosterCard({
   couples: RosterCouple[];
   totalPoints: number;
   weekBonusPoints?: number;
+  // Lifelines settled this week, in total-points units.
+  lifelines?: RosterLifeline[];
   carousel?: ReactNode;
   leagueSection?: ReactNode;
   historyFrom: string;
@@ -100,6 +105,14 @@ export function RosterCard({
             <span className="font-heading font-semibold">{formatSignedPoints(weekBonusPoints)}</span>
           </div>
         )}
+        {lifelines.map((line) => (
+          <div key={line.coupleId} className="flex items-center justify-between gap-3 px-3.5 text-xs text-muted-foreground">
+            <span>
+              Lifeline · <CoupleName celebrity={line.celebrity} pro={line.pro} />
+            </span>
+            <span className="font-heading font-semibold">{formatSignedPoints(line.points)}</span>
+          </div>
+        ))}
         {leagueSection}
       </CardContent>
     </Card>

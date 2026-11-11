@@ -6,10 +6,18 @@ import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { excludeReleasedCoupleRows, unpostedDraftDances } from "@/lib/draft-scores";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { danceCardRule, danceCardWeekEpisodeIds } from "@/lib/dance-card-v2";
-import { buildScoreHistory, weekResults, type HistoryWeekData, type ScoreHistoryLine } from "@/lib/score-history";
+import {
+  buildScoreHistory,
+  weekResults,
+  withLifelineLines,
+  withTradeLines,
+  type HistoryWeekData,
+  type ScoreHistoryLine,
+} from "@/lib/score-history";
 import { scoringSettingsFromRow, type GrandFinaleMethod, type TierPayStyle } from "@/lib/scoring";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { isOwnMembership } from "@/lib/acting-manager";
+import { formatManagerName } from "@/lib/manager-display";
 import { danceMaxScore, danceScoreColumns } from "@/lib/episode-teams";
 import { loadAllCouples, loadTeamsMode, loadViewerSeason } from "@/lib/viewer-season-data";
 
@@ -25,7 +33,9 @@ export async function loadScoreHistory(
 ): Promise<{ lines: ScoreHistoryLine[]; error: null } | { lines: null; error: string }> {
   const { data: members, error: membersError } = await supabase
     .from("league_members")
-    .select("user_id, co_manager_id")
+    .select(
+      "user_id, co_manager_id, profiles!league_members_user_id_fkey(display_name), co_manager:profiles!league_members_co_manager_id_fkey(display_name)"
+    )
     .eq("league_id", leagueId);
   if (membersError) return { lines: null, error: membersError.message };
   if (!members?.some((m) => isOwnMembership(m, userId))) return { lines: null, error: "Not a member of this league" };
@@ -106,6 +116,8 @@ export async function loadScoreHistory(
     { data: danceRows },
     { data: outcomeRows },
     { data: jeopardyRows },
+    { data: lifelinePayouts },
+    { data: adjustments },
   ] = await Promise.all([
     loadAllCouples(supabase),
     supabase
@@ -136,6 +148,19 @@ export async function loadScoreHistory(
       .in("episode_id", episodeIds),
     supabase.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
     supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id").in("episode_id", episodeIds),
+    supabase
+      .from("lifeline_payouts")
+      .select("week_id, slot_number, couple_id, weighted_points")
+      .eq("league_id", leagueId)
+      .eq("manager_id", managerId)
+      .in("week_id", weekIds),
+    supabase
+      .from("league_point_adjustments")
+      .select("id, kind, week_id, weighted_points, detail")
+      .eq("league_id", leagueId)
+      .eq("manager_id", managerId)
+      .in("kind", ["lifeline_equalizer", "trade_transfer"])
+      .in("week_id", weekIds),
   ]);
   const couples = allCouples.filter((couple) => couple.season_id === seasonId);
   const liveDanceRows = (
@@ -234,5 +259,37 @@ export async function loadScoreHistory(
       : {}),
   });
 
-  return { lines, error: null };
+  const lifeline = {
+    weight: settings.judges_score_category_weight,
+    payouts: (lifelinePayouts ?? []).flatMap((row) => {
+      const weekNumber = weekNumberById.get(row.week_id);
+      return weekNumber === undefined
+        ? []
+        : [{ weekNumber, slotNumber: row.slot_number, coupleId: row.couple_id, weightedPoints: Number(row.weighted_points) }];
+    }),
+    equalizers: (adjustments ?? []).flatMap((row) => {
+      const weekNumber = weekNumberById.get(row.week_id);
+      const weeks = (row.detail as { weeks?: number[] } | null)?.weeks ?? [];
+      return row.kind !== "lifeline_equalizer" || weekNumber === undefined
+        ? []
+        : [{ weekNumber, weightedPoints: Number(row.weighted_points), weeks }];
+    }),
+  };
+  const transfers = (adjustments ?? []).flatMap((row) => {
+    const weekNumber = weekNumberById.get(row.week_id);
+    const otherManagerId = (row.detail as { with?: string } | null)?.with ?? null;
+    return row.kind !== "trade_transfer" || weekNumber === undefined
+      ? []
+      : [{ id: row.id, weekNumber, points: Number(row.weighted_points), otherManagerId }];
+  });
+  const managerNames = new Map(
+    members.map((m) => [
+      m.user_id,
+      formatManagerName({ displayName: m.profiles?.display_name ?? "Unknown", coManagerDisplayName: m.co_manager?.display_name }),
+    ])
+  );
+  return {
+    lines: withTradeLines(withLifelineLines(lines, lifeline, coupleNames), transfers, managerNames),
+    error: null,
+  };
 }

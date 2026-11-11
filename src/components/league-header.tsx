@@ -18,6 +18,7 @@ export function LeagueHeader({
   leagueId,
   danceCardOn,
   waiversOn,
+  tradesOn,
   canEdit,
   inviteCode,
   justCreated,
@@ -33,6 +34,7 @@ export function LeagueHeader({
   leagueId: string;
   danceCardOn: boolean;
   waiversOn: boolean;
+  tradesOn: boolean;
   canEdit: boolean;
   inviteCode: string;
   justCreated: boolean;
@@ -51,18 +53,30 @@ export function LeagueHeader({
   const currentPath = `/leagues/${leagueId}/${tab}`;
   const leagueSettingsHref = `/leagues/${leagueId}/settings?from=${encodeURIComponent(currentPath)}`;
 
-  const recastAction =
-    danceCardOn &&
-    waiversOn && (
-      <Button
-        render={<Link href={`/leagues/${leagueId}/waivers`} />}
-        nativeButton={false}
-        variant="outline"
-        size="sm"
-      >
-        Recast
-      </Button>
-    );
+  const rosterActions = danceCardOn && (waiversOn || tradesOn) && (
+    <>
+      {waiversOn && (
+        <Button
+          render={<Link href={`/leagues/${leagueId}/waivers?from=${encodeURIComponent(currentPath)}`} />}
+          nativeButton={false}
+          variant="outline"
+          size="sm"
+        >
+          Recast
+        </Button>
+      )}
+      {tradesOn && (
+        <Button
+          render={<Link href={`/leagues/${leagueId}/trades?from=${encodeURIComponent(currentPath)}`} />}
+          nativeButton={false}
+          variant="outline"
+          size="sm"
+        >
+          Trades
+        </Button>
+      )}
+    </>
+  );
 
   const pageHeader = (
     <PageHeader title={title}>
@@ -85,7 +99,7 @@ export function LeagueHeader({
     <>
       {draftScoresStrip ? (
         <>
-          <HomeDraftChrome {...accountSettingsData} email={viewerEmail} actionSlot={recastAction} />
+          <HomeDraftChrome {...accountSettingsData} email={viewerEmail} actionSlot={rosterActions} />
           {pageHeader}
         </>
       ) : spoilerFreeStrip ? (
@@ -95,13 +109,13 @@ export function LeagueHeader({
             {...accountSettingsData}
             email={viewerEmail}
             state={spoilerFreeStrip}
-            actionSlot={recastAction}
+            actionSlot={rosterActions}
           />
           {pageHeader}
         </>
       ) : (
         <>
-          <StickyTopBar {...accountSettingsData} email={viewerEmail} actionSlot={recastAction} />
+          <StickyTopBar {...accountSettingsData} email={viewerEmail} actionSlot={rosterActions} />
           {pageHeader}
         </>
       )}

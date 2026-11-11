@@ -1,6 +1,6 @@
 "use client";
 
-import { WAIVER_CLAIM_METHOD_LABELS, type WaiverClaimMethod } from "@/lib/recast-framing";
+import { RECAST_RULES } from "@/lib/recast";
 import { formatPoints } from "@/lib/format-points";
 import { curtainCallLockAt, describePickLockOffset, pickLockFlip, type PickLockCoast, type PickLockFlip, type PickTiming } from "@/lib/curtain-call-lock";
 import { useState } from "react";
@@ -63,6 +63,8 @@ import {
   type GrandFinaleLateUnlockInput,
 } from "@/components/grand-finale-late-unlock";
 import { CurtainCallBackfill, type CurtainCallBackfillInput } from "@/components/curtain-call-backfill";
+import { LifelineSettings, type LifelineSettingsInput } from "@/components/lifeline-settings";
+import { TradesSettings, type TradesSettingsInput } from "@/components/trades-settings";
 import {
   airsAtForWeek,
   explainGrandFinaleDeadline,
@@ -108,7 +110,6 @@ type ScoringSettings = {
 
 type League = {
   waiver_mode: string;
-  waiver_claim_method: string | null;
   pick_time_limit_seconds: number;
   prediction_lock_hours_before_air: number;
   prediction_lock_coast: string;
@@ -169,8 +170,8 @@ const LOCK_DIRECTION_ITEMS: Record<LockDirection, string> = {
 };
 
 const WAIVER_MODE_ITEMS: Record<WaiverMode, string> = {
-  locked: "Locked (No Recast)",
-  waivers: "Recast Enabled",
+  locked: "Off (Rosters Locked)",
+  waivers: "On (Waiver Wire)",
 };
 
 const DRAFT_TYPE_ITEMS: Record<DraftType, string> = {
@@ -193,6 +194,8 @@ export function LeagueModulesForm({
   exitHref,
   lateUnlock,
   curtainCallBackfill,
+  lifeline,
+  trades,
   anchorHeld,
 }: {
   leagueId: string;
@@ -222,6 +225,10 @@ export function LeagueModulesForm({
   lateUnlock: GrandFinaleLateUnlockInput | null;
   // Site admins only; null for everyone else.
   curtainCallBackfill: CurtainCallBackfillInput | null;
+  // Null unless this league's Dance Card can carry Lifeline (v2 or v3).
+  lifeline: LifelineSettingsInput | null;
+  // Null unless Dance Card is on.
+  trades: TradesSettingsInput | null;
   // A Dance Card v2 league with scores this season: its Anchor Week can't
   // move (the database refuses), so Update Anchor isn't offered.
   anchorHeld: boolean;
@@ -284,12 +291,7 @@ export function LeagueModulesForm({
   const [fifthPlacePoints, setFifthPlacePoints] = useState(
     scoringSettings?.fifth_place_points ?? FIFTH_PLACE_POINTS_DEFAULT
   );
-  const [waiverMode, setWaiverMode] = useState<WaiverMode>(
-    (league.waiver_mode as WaiverMode) ?? "reverse_standings"
-  );
-  const [waiverClaimMethod, setWaiverClaimMethod] = useState<WaiverClaimMethod>(
-    (league.waiver_claim_method as WaiverClaimMethod) ?? "reverse_standings"
-  );
+  const [waiverMode, setWaiverMode] = useState<WaiverMode>((league.waiver_mode as WaiverMode) ?? "locked");
   const [pickTimeLimitSeconds, setPickTimeLimitSeconds] = useState(league.pick_time_limit_seconds);
   const [draftType, setDraftType] = useState<DraftType>((league.draft_type as DraftType) ?? "snake");
   const [draftScheduledAt, setDraftScheduledAt] = useState(
@@ -544,7 +546,6 @@ export function LeagueModulesForm({
 
       const leagueInput: LeagueSettingsInput = {
         waiverMode,
-        waiverClaimMethod,
         pickTimeLimitSeconds,
         predictionLockHoursBeforeAir,
         predictionLockCoast,
@@ -602,6 +603,12 @@ export function LeagueModulesForm({
   const lateUnlockNode =
     bonusEnabled && lateUnlock ? <GrandFinaleLateUnlock leagueId={leagueId} {...lateUnlock} /> : null;
   const finaleLocked = Boolean(lateUnlock?.grandFinaleLocked);
+  const danceCardFooter = (
+    <>
+      {lifeline && <LifelineSettings leagueId={leagueId} {...lifeline} />}
+      {trades && <TradesSettings leagueId={leagueId} {...trades} />}
+    </>
+  );
   const curtainCallBackfillNode =
     eliminationsEnabled && curtainCallBackfill ? (
       <CurtainCallBackfill leagueId={leagueId} {...curtainCallBackfill} />
@@ -670,6 +677,7 @@ export function LeagueModulesForm({
             icon={scoringModule("danceCard").icon}
             weight={judgesWeight}
             detailsHint={danceCard.version === "v2" ? "Judges · season curve" : danceCard.version === "v3" ? "Judges · survival" : "Judges · survival · placement"}
+            footer={danceCardFooter}
           >
             <div className="flex flex-col">
               {danceCard.version === "v2" ? (
@@ -704,10 +712,7 @@ export function LeagueModulesForm({
                   <SettingRow label="5th Place Bonus" value={formatPoints(fifthPlacePoints)} />
                 </>
               )}
-              <SettingRow label="Recast Mode" value={WAIVER_MODE_ITEMS[waiverMode]} />
-              {waiverMode === "waivers" && (
-                <SettingRow label="Recast Method" value={WAIVER_CLAIM_METHOD_LABELS[waiverClaimMethod]} />
-              )}
+              <SettingRow label="Recast" value={WAIVER_MODE_ITEMS[waiverMode]} />
               <SettingRow label="Draft Pick Timer" value={`${pickTimeLimitSeconds}s`} />
               <SettingRow label="Draft Type" value={DRAFT_TYPE_ITEMS[draftType]} />
               {draftScheduledAt && (
@@ -1024,6 +1029,7 @@ export function LeagueModulesForm({
           onWeightChange={editWeight(setJudgesWeight)}
           weightDisabled={scoringLocked}
           detailsHint={danceCard.version === "v2" ? "Judges · season curve" : danceCard.version === "v3" ? "Judges · survival" : "Judges · survival · placement"}
+          footer={danceCardFooter}
         >
           <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
@@ -1122,7 +1128,7 @@ export function LeagueModulesForm({
             <div className="border-t border-border pt-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="waiverMode">Recast Mode</Label>
+                  <Label htmlFor="waiverMode">Recast</Label>
                   <Select
                     items={WAIVER_MODE_ITEMS}
                     value={waiverMode}
@@ -1132,8 +1138,8 @@ export function LeagueModulesForm({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="locked">Locked (No Recast)</SelectItem>
-                      <SelectItem value="waivers">Recast Enabled</SelectItem>
+                      <SelectItem value="locked">{WAIVER_MODE_ITEMS.locked}</SelectItem>
+                      <SelectItem value="waivers">{WAIVER_MODE_ITEMS.waivers}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1148,23 +1154,16 @@ export function LeagueModulesForm({
                   />
                 </div>
                 {waiverMode === "waivers" && (
-                  <div className="flex flex-col gap-2 sm:col-span-2">
-                    <Label htmlFor="waiverClaimMethod">Recast Method</Label>
-                    <Select
-                      items={WAIVER_CLAIM_METHOD_LABELS}
-                      value={waiverClaimMethod}
-                      onValueChange={(v) => setWaiverClaimMethod((v as WaiverClaimMethod) ?? "reverse_standings")}
-                    >
-                      <SelectTrigger id="waiverClaimMethod" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="reverse_standings">Reverse Standings</SelectItem>
-                        <SelectItem value="fcfs">First Come, First Served</SelectItem>
-                        <SelectItem value="manual">Manual (Commissioner Decides)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <ul className="flex list-disc flex-col gap-1.5 pl-4 text-xs text-muted-foreground sm:col-span-2">
+                    {RECAST_RULES.map((rule) => (
+                      <li key={rule}>{rule}</li>
+                    ))}
+                  </ul>
+                )}
+                {waiverMode === "locked" && league.waiver_mode === "waivers" && (
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    Turning Recast off clears every waiver list that hasn&apos;t been decided.
+                  </p>
                 )}
               </div>
             </div>

@@ -10,6 +10,7 @@ import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { computeEpisodeBannerState, toBannerWeeks, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
 import { activityScore, buildRecentActivity, type ActivityDanceRow, type ActivityWeek } from "@/lib/home-activity";
+import { homeTransactions } from "@/lib/home-transactions";
 import { danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
 import { HomeSpoilerChrome } from "@/components/spoiler-free-strip";
 import { buildLiveAirChrome } from "@/lib/spoiler-free-strip-state";
@@ -88,7 +89,15 @@ export default async function Home() {
   if (visibleEpisodeIds.length > 0 || draftEpisodeIds.size > 0) {
     // team_id and max_score are selected only once their migrations are applied.
     const teamsMode = await loadTeamsMode(supabase);
-    const [{ data: danceScoreRows }, { data: episodeResults }, specialDanceLabels, couples] = await Promise.all([
+    const leagueIds = summaries.map((summary) => summary.id);
+    const [
+      { data: danceScoreRows },
+      { data: episodeResults },
+      specialDanceLabels,
+      couples,
+      { data: awardedClaims },
+      { data: executedTrades },
+    ] = await Promise.all([
       visibleEpisodeIds.length > 0
         ? supabase
             .from("dance_scores")
@@ -100,6 +109,18 @@ export default async function Home() {
         : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
       loadSpecialDanceLabels(supabase, [...visibleEpisodeIds, ...draftEpisodeIds], teamsMode),
       loadAllCouples(supabase),
+      // RLS returns every awarded claim and every trade that went through in
+      // the viewer's leagues. Both read as none until their SQL is applied.
+      supabase
+        .from("waiver_claims")
+        .select("league_id, manager_id, couple_id, drop_couple_id, week_number")
+        .in("league_id", leagueIds)
+        .eq("status", "approved"),
+      supabase
+        .from("trade_offers")
+        .select("league_id, week_number, trade_legs(leg_order, from_manager_id, to_manager_id, couple_id, points)")
+        .in("league_id", leagueIds)
+        .eq("status", "executed"),
     ]);
     const danceScores = (danceScoreRows ?? []) as unknown as ActivityDanceRow[];
     const displayNames = buildCoupleDisplayNames(
@@ -109,6 +130,42 @@ export default async function Home() {
         pro_name: c.pro?.name ?? "Unknown",
       }))
     );
+    const transactions = homeTransactions({
+      leagues: summaries,
+      claims: (awardedClaims ?? []).map((claim) => ({
+        leagueId: claim.league_id,
+        managerId: claim.manager_id,
+        coupleId: claim.couple_id,
+        dropCoupleId: claim.drop_couple_id,
+        weekNumber: claim.week_number,
+      })),
+      trades: (executedTrades ?? []).flatMap((trade) =>
+        trade.week_number == null
+          ? []
+          : [
+              {
+                leagueId: trade.league_id,
+                weekNumber: trade.week_number,
+                legs: [...trade.trade_legs]
+                  .sort((a, b) => a.leg_order - b.leg_order)
+                  .map((leg) => ({
+                    fromManagerId: leg.from_manager_id,
+                    toManagerId: leg.to_manager_id,
+                    coupleId: leg.couple_id,
+                    points: leg.points == null ? null : Number(leg.points),
+                  })),
+              },
+            ]
+      ),
+      coupleOf: (coupleId) => {
+        const parts = displayNames.get(coupleId);
+        return parts ? { coupleId, name: formatCoupleName(parts) } : null;
+      },
+    });
+    for (const { weekNumber, transaction } of transactions) {
+      const week = activityWeeks.get(weekNumber);
+      if (week) (week.transactions ??= []).push(transaction);
+    }
     for (const r of episodeResults ?? []) {
       const parts = displayNames.get(r.couple_id);
       const week = activityWeeks.get(weekNumberByEpisodeId.get(r.episode_id) ?? -1);

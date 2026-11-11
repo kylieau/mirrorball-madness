@@ -383,6 +383,74 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
 export type HistoryRow = ScoreHistoryLine & { run: number };
 export type HistoryWeekGroup = { weekNumber: number; rows: HistoryRow[] };
 
+export type LifelineHistoryInput = {
+  // The Dance Card category weight the stored amounts were weighted by.
+  weight: number;
+  payouts: { weekNumber: number; slotNumber: number; coupleId: string; weightedPoints: number }[];
+  equalizers: { weekNumber: number; weightedPoints: number; weeks: number[] }[];
+};
+
+// Lifeline's lines come from its stored rows, not the engine: a payout per
+// pick that paid, and the Equalizer in the week it landed on. They join the
+// Dance Card lines of their week.
+export function withLifelineLines(
+  lines: ScoreHistoryLine[],
+  lifeline: LifelineHistoryInput,
+  coupleNames: Map<string, string>
+): ScoreHistoryLine[] {
+  const added: ScoreHistoryLine[] = [
+    ...lifeline.payouts.map((payout) => ({
+      id: `lifeline:${payout.weekNumber}:${payout.slotNumber}`,
+      weekNumber: payout.weekNumber,
+      module: "danceCard" as const,
+      label: `Lifeline: ${coupleNames.get(payout.coupleId) ?? "Unknown"} survives${weightSuffix(lifeline.weight)}`,
+      points: payout.weightedPoints,
+    })),
+    ...lifeline.equalizers.map((equalizer) => {
+      const [first, last] = [equalizer.weeks[0], equalizer.weeks[equalizer.weeks.length - 1]];
+      const span = first === undefined ? "" : first === last ? `, Week ${first}` : `, Weeks ${first} to ${last}`;
+      return {
+        id: `lifeline-equalizer:${equalizer.weekNumber}`,
+        weekNumber: equalizer.weekNumber,
+        module: "danceCard" as const,
+        label: `Lifeline Backfill${span}${weightSuffix(lifeline.weight)}`,
+        points: equalizer.weightedPoints,
+      };
+    }),
+  ].filter((line) => line.points !== 0);
+  return withStoredLines(lines, added);
+}
+
+export type TradeTransferInput = { id: string; weekNumber: number; points: number; otherManagerId: string | null };
+
+// Points a trade moved, on the week they landed on. Trades are roster
+// business, so the lines sit with Dance Card and count in its total; they
+// are never weighted.
+export function withTradeLines(
+  lines: ScoreHistoryLine[],
+  transfers: TradeTransferInput[],
+  managerNames: Map<string, string>
+): ScoreHistoryLine[] {
+  return withStoredLines(
+    lines,
+    transfers
+      .filter((transfer) => transfer.points !== 0)
+      .map((transfer) => ({
+        id: `trade:${transfer.id}`,
+        weekNumber: transfer.weekNumber,
+        module: "danceCard" as const,
+        label: `Trade: points ${transfer.points > 0 ? "from" : "to"} ${managerNames.get(transfer.otherManagerId ?? "") ?? "Unknown"}`,
+        points: transfer.points,
+      }))
+  );
+}
+
+function withStoredLines(lines: ScoreHistoryLine[], added: ScoreHistoryLine[]): ScoreHistoryLine[] {
+  if (added.length === 0) return lines;
+  const moduleOrder = (line: ScoreHistoryLine) => (line.module === "curtainCall" ? 0 : line.module === "danceCard" ? 1 : 2);
+  return [...lines, ...added].sort((a, b) => a.weekNumber - b.weekNumber || moduleOrder(a) - moduleOrder(b));
+}
+
 // Newest week first; within a week, lines stay in the order they were earned
 // (Curtain Call, Dance Card, Grand Finale). `run` accumulates oldest to newest
 // over the lines that pass the filter, so it is the season total for All and

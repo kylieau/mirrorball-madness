@@ -2,6 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "./supabase/types";
 import { buildWeeklyScoreRows, danceCardPriorWeeks, danceCardWeekRows, type WeeklyScoreRow } from "./weekly-score-rows";
 import { usesDanceCardLedger, type DanceCardWeek } from "./dance-card-v2";
+import {
+  buildLifelinePayouts,
+  recomputeLifelineEqualizers,
+  type LifelinePayout,
+  type LifelinePick,
+  type LifelineSeason,
+} from "./lifeline";
 import { roundPoints } from "./format-points";
 import {
   inJeopardyIdsToPersist,
@@ -72,12 +79,22 @@ export type PublicationSnapshot = {
 // v3 (5), because older code would pay those rows wrongly.
 export const PLAN_VERSION = 5;
 export type LaterDanceCardRow = Pick<WeeklyScoreRow, "league_id" | "manager_id" | "week_id" | "roster_points" | "total_points">;
+// lifeline_publication_inputs(): every Lifeline pick and Equalizer of the
+// season. Empty until apply-lifeline.sql is applied and a league plays.
+export type LifelineInputs = {
+  picks: LifelinePick[];
+  equalizers: { id: string; league_id: string; manager_id: string }[];
+};
 export type PublicationPlan = {
   planVersion: number;
   coupleUpdates: Pick<Row<"couples">, "id" | "status" | "elimination_week">[];
   futureEpisodeIds: string[];
   weeklyScores: WeeklyScoreRow[];
   laterDanceCard: LaterDanceCardRow[];
+  // One row per Lifeline pick of this week and every later scored week, and
+  // every Equalizer's amount; apply_lifeline_settlement checks the coverage.
+  lifelinePayouts: LifelinePayout[];
+  lifelineEqualizers: ReturnType<typeof recomputeLifelineEqualizers>;
 };
 
 // Settled bonuses of the published nights among `episodeIds`.
@@ -269,7 +286,8 @@ export function teamScoreRows(
 
 export function buildPublicationPlan(
   snapshot: PublicationSnapshot,
-  episodeId: string
+  episodeId: string,
+  lifeline: LifelineInputs = { picks: [], equalizers: [] }
 ): PublicationPlan {
   const episode = snapshot.episodes.find((e) => e.id === episodeId);
   if (!episode || !snapshot.season || episode.season_id !== snapshot.season.id)
@@ -371,7 +389,8 @@ export function buildPublicationPlan(
   // Teams are checked even on an exhibition night, so a half-scored team
   // never slips through just because nothing is scored.
   const teamRows = teamScoreRows(snapshot, episodeId);
-  if (!week) return { planVersion: PLAN_VERSION, coupleUpdates, futureEpisodeIds, weeklyScores: [], laterDanceCard: [] };
+  if (!week)
+    return { planVersion: PLAN_VERSION, coupleUpdates, futureEpisodeIds, weeklyScores: [], laterDanceCard: [], lifelinePayouts: [], lifelineEqualizers: [] };
   const weekEpisodes = new Set(
     snapshot.episodes.filter((e) => e.week_id === week.id).map((e) => e.id)
   );
@@ -447,7 +466,26 @@ export function buildPublicationPlan(
     ],
   };
   const laterDanceCard = laterDanceCardRows(snapshot, week, thisWeek, couples);
-  return { planVersion: PLAN_VERSION, coupleUpdates, futureEpisodeIds, weeklyScores, laterDanceCard };
+  // The season as it stands once this commits, for every week Lifeline
+  // settles here: this one and the later weeks that already have scores.
+  const settledWeekIds = new Set([week.id, ...(snapshot.laterWeeklyScores ?? []).map((row) => row.week_id)]);
+  const lifelineSeason: LifelineSeason = {
+    weeks: snapshot.weeks,
+    danceCardWeeks: [...danceCardPriorWeeks(snapshot, Infinity).filter((w) => w.weekNumber !== week.week_number), thisWeek],
+    couples,
+    leagues: snapshot.leagues,
+    settings: snapshot.settings,
+    rosters: snapshot.rosters,
+  };
+  return {
+    planVersion: PLAN_VERSION,
+    coupleUpdates,
+    futureEpisodeIds,
+    weeklyScores,
+    laterDanceCard,
+    lifelinePayouts: buildLifelinePayouts(lifelineSeason, lifeline.picks.filter((pick) => settledWeekIds.has(pick.week_id))),
+    lifelineEqualizers: recomputeLifelineEqualizers(lifelineSeason, lifeline.equalizers),
+  };
 }
 
 // A live row as the engine scores it. Snapshots taken before
@@ -477,9 +515,17 @@ export async function publishEpisodeAtomically(
     p_episode_id: episodeId,
   });
   if (error) return { error: error.message };
+  // PGRST202: the function isn't there, so apply-lifeline.sql isn't applied
+  // and no league can be playing Lifeline.
+  const lifeline = await admin.rpc("lifeline_publication_inputs");
+  if (lifeline.error && lifeline.error.code !== "PGRST202") return { error: lifeline.error.message };
   let plan: PublicationPlan;
   try {
-    plan = buildPublicationPlan(data as unknown as PublicationSnapshot, episodeId);
+    plan = buildPublicationPlan(
+      data as unknown as PublicationSnapshot,
+      episodeId,
+      (lifeline.data as unknown as LifelineInputs | null) ?? undefined
+    );
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not prepare publication" };
   }

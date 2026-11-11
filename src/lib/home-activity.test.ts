@@ -84,6 +84,68 @@ describe("buildRecentActivity", () => {
     expect(lines[1].segments.filter((seg) => seg.kind === "manager").map((seg) => seg.text)).toEqual(["Lee & Sam", "Pat", "Ro", "you"]);
   });
 
+  it("lists a week's roster moves ahead of its eliminations", () => {
+    const harry = { coupleId: "harry", name: "Harry & Witney" };
+    const alix = { coupleId: "alix", name: "Alix & Val" };
+    const jo = { coupleId: "jo", name: "Jo & Ezra" };
+    const lines = buildRecentActivity({
+      weeks: [
+        week(9, {
+          eliminated: [{ coupleId: "cd", name: "C & D" }],
+          transactions: [
+            {
+              kind: "trade",
+              league: "Alpha",
+              sides: [
+                { manager: "Kim", couples: [harry], points: 5 },
+                { manager: "you", couples: [alix, jo], points: 0 },
+              ],
+            },
+            { kind: "trade", league: "Alpha", sides: [{ manager: "You", couples: [harry], points: 0 }, { manager: "Pat", couples: [], points: 0 }] },
+            {
+              kind: "trade",
+              league: "Beta",
+              sides: [
+                { manager: "Kim", couples: [harry], points: 0 },
+                { manager: "Pat", couples: [alix], points: 0 },
+                { manager: "you", couples: [], points: 2.5 },
+              ],
+            },
+            { kind: "waiver", league: "Alpha", manager: "You", added: jo, dropped: alix },
+            { kind: "waiver", league: "Beta", manager: "Pat", added: jo, dropped: null },
+          ],
+        }),
+      ],
+      westWeek: null,
+      extraLines: [],
+    });
+    expect(lines.map(plain)).toEqual([
+      "Kim traded Harry & Witney and 5.00 pts to you for Alix & Val and Jo & Ezra in Alpha",
+      "You traded Harry & Witney to Pat in Alpha",
+      "Kim, Pat and you made a trade in Beta",
+      "You added Jo & Ezra and dropped Alix & Val in Alpha",
+      "Pat added Jo & Ezra in Beta",
+      "C & D eliminated",
+    ]);
+    expect(lines[3].segments.filter((seg) => seg.kind === "couple").map((seg) => seg.coupleId)).toEqual(["jo", "alix"]);
+  });
+
+  it("holds the West-airing week's roster moves back with its eliminations", () => {
+    const lines = buildRecentActivity({
+      weeks: [
+        week(9, {
+          eliminated: [{ coupleId: "cd", name: "C & D" }],
+          transactions: [
+            { kind: "waiver", league: "Alpha", manager: "Pat", added: { coupleId: "jo", name: "Jo & Ezra" }, dropped: null },
+          ],
+        }),
+      ],
+      westWeek: 9,
+      extraLines: [],
+    });
+    expect(lines.map(plain)).toEqual(["Week 9 results are in"]);
+  });
+
   it("reads a bonus round in points as earned, signed, in the special dance's short name", () => {
     const lines = buildRecentActivity({
       weeks: [

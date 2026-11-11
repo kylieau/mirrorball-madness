@@ -16,9 +16,10 @@ import { GrandFinaleBox } from "@/components/grand-finale-box";
 import { loadOtherLeaguePicks } from "@/lib/other-league-picks";
 import { DraftStatusCard } from "@/components/draft-status-card";
 import { RecastNudgeCard } from "@/components/recast-nudge-card";
+import { LifelineCard, LifelineCatchUpCard } from "@/components/lifeline-card";
+import { lifelinePicksState } from "@/lib/lifeline-picks";
 import { LeaguePageShell } from "@/components/league-page-shell";
 import { loadLeaguePageBase } from "@/lib/league-page-data";
-import { formatCoupleName } from "@/lib/couple-display";
 import { draftDanceScores, excludeReleasedCoupleRows, unpostedDraftDances } from "@/lib/draft-scores";
 import { danceMaxScore, danceScoreColumns } from "@/lib/episode-teams";
 import { managerIdForPick, type DraftType } from "@/lib/draft";
@@ -82,7 +83,6 @@ export default async function LeaguePicksPage({
     standings,
     latestCompletedWeek,
     nameByManager,
-    rank,
     flatCouples,
     activeCouples,
     seasonCouples,
@@ -176,6 +176,36 @@ export default async function LeaguePicksPage({
     danceCardOn && league.draft_status === "in_progress"
       ? supabase.from("draft_picks").select("id", { count: "exact", head: true }).eq("league_id", id)
       : Promise.resolve({ count: null });
+  // Lifeline plays in the week still to be scored, once the league's first
+  // Lifeline week has come.
+  const lifelineWeek =
+    danceCardOn &&
+    league.lifeline_enabled &&
+    league.draft_status === "completed" &&
+    upcomingEpisode &&
+    upcomingEpisode.week_number >= (league.lifeline_starts_week ?? Infinity)
+      ? upcomingEpisode
+      : null;
+  type LifelinePickRow = { manager_id: string; slot_number: number; couple_id: string };
+  // RLS returns the viewer's own picks before the lock and the league's after it.
+  const lifelinePicksPending: PromiseLike<{ data: LifelinePickRow[] | null }> = lifelineWeek
+    ? supabase
+        .from("lifeline_picks")
+        .select("manager_id, slot_number, couple_id")
+        .eq("league_id", id)
+        .eq("week_id", lifelineWeek.id)
+        .order("slot_number")
+    : Promise.resolve({ data: [] });
+  type LifelinePayoutRow = LifelinePickRow & { weighted_points: number };
+  const lifelinePayoutsPending: PromiseLike<{ data: LifelinePayoutRow[] | null }> =
+    league.lifeline_enabled && yourRosterWeek
+      ? supabase
+          .from("lifeline_payouts")
+          .select("manager_id, slot_number, couple_id, weighted_points")
+          .eq("league_id", id)
+          .eq("week_id", yourRosterWeek.id)
+          .order("slot_number")
+      : Promise.resolve({ data: [] });
   const recapEpisodeIds = recapEpisode?.episodeIds ?? [];
   const recapPending = recapEpisode
     ? Promise.all([
@@ -198,7 +228,12 @@ export default async function LeaguePicksPage({
       ])
     : null;
 
-  const [{ data: grandFinaleDeadlineData }, { data: anchorWeekData }, { data: computedLockAt }] = await Promise.all([
+  const [
+    { data: grandFinaleDeadlineData },
+    { data: anchorWeekData },
+    { data: computedLockAt },
+    { data: lifelineLockAt },
+  ] = await Promise.all([
     grandFinaleOn
       ? supabase.rpc("effective_grand_finale_deadline", { p_league_id: id })
       : Promise.resolve({ data: null }),
@@ -207,6 +242,9 @@ export default async function LeaguePicksPage({
       : Promise.resolve({ data: null }),
     curtainCallWeekId
       ? supabase.rpc("prediction_lock_at", { p_league_id: id, p_week_id: curtainCallWeekId })
+      : Promise.resolve({ data: null }),
+    lifelineWeek
+      ? supabase.rpc("lifeline_lock_at", { p_league_id: id, p_week_id: lifelineWeek.id })
       : Promise.resolve({ data: null }),
   ]);
   const grandFinaleDeadline = grandFinaleDeadlineData ?? null;
@@ -233,26 +271,20 @@ export default async function LeaguePicksPage({
   const isLocked = !!lockAt && new Date() >= new Date(lockAt);
 
   const flatCouplesById = new Map(flatCouples.map((c) => [c.id, c]));
-  const recastSlotSource = rosterSlotPeriods
-    .filter((slot) => slot.managerId === myTeamId && slot.endWeek === null)
-    .flatMap((slot) => {
+  const ownCurrentSlots = rosterSlotPeriods.filter((slot) => slot.managerId === myTeamId && slot.endWeek === null);
+  const { revealedOpen: revealedRecastSlots, hiddenOpenCount: hiddenRecastOpenCount } = partitionRecastSlots(
+    ownCurrentSlots.flatMap((slot) => {
       const couple = flatCouplesById.get(slot.coupleId);
-      return couple
-        ? [
-            {
-              slotNumber: slot.slotNumber,
-              coupleId: slot.coupleId,
-              celebrity: couple.celebrity_name,
-              pro: couple.pro_name,
-              status: couple.status,
-              eliminationWeek: couple.elimination_week,
-            },
-          ]
-        : [];
-    });
-  const { revealedOpen: revealedRecastSlots, hiddenOpenCount: hiddenRecastOpenCount } =
-    partitionRecastSlots(recastSlotSource, latestCompletedWeek, finaleWeekNumber);
-  const recastOn = danceCardOn && waiversOn && revealedRecastSlots.length > 0;
+      return couple ? [{ status: couple.status, eliminationWeek: couple.elimination_week }] : [];
+    }),
+    latestCompletedWeek,
+    finaleWeekNumber
+  );
+  // A spot with no couple at all was emptied by a trade.
+  const openRecastSpots =
+    revealedRecastSlots.length +
+    (league.draft_status === "completed" ? Math.max(0, league.roster_size - ownCurrentSlots.length) : 0);
+  const recastOn = danceCardOn && waiversOn;
 
   // Peer picks stay behind the lock/deadline checks; RLS gates them too, but
   // the page decides what to show from these flags.
@@ -262,6 +294,7 @@ export default async function LeaguePicksPage({
     { data: allGrandFinalePicks },
     otherLeaguePicks,
     draftLineupRows,
+    { data: recastCycleRows },
   ] = await Promise.all([
     curtainCallWeekId && isLocked
       ? supabase
@@ -289,7 +322,12 @@ export default async function LeaguePicksPage({
       now: new Date(),
     }),
     curtainCallMode === "picks" && curtainCallWeekId && !isLocked ? loadDraftLineup(supabase) : Promise.resolve([] as DraftLineupRow[]),
+    recastOn && openRecastSpots > 0
+      ? supabase.rpc("recast_next_cycle", { p_league_id: id })
+      : Promise.resolve({ data: null }),
   ]);
+  // An open spot is only worth a nudge while a waiver run is still to come.
+  const recastOpenSpotCount = recastCycleRows?.[0]?.start_week != null ? openRecastSpots : 0;
   const pickLineup = upcomingEpisode
     ? Object.fromEntries(weekLineup(draftLineupRows, upcomingEpisode, completedEpisodes, cutoff.allowedEpisodeIds))
     : {};
@@ -327,7 +365,64 @@ export default async function LeaguePicksPage({
         })
       : [];
 
-  const [{ data: leagueDanceScores }, { data: leagueBonuses }] = await Promise.all([leagueDanceScoresPending, leagueBonusesPending]);
+  const [{ data: leagueDanceScores }, { data: leagueBonuses }, { data: lifelinePickRows }, { data: lifelinePayoutRows }] =
+    await Promise.all([leagueDanceScoresPending, leagueBonusesPending, lifelinePicksPending, lifelinePayoutsPending]);
+
+  const lifelineLocked = !!lifelineLockAt && new Date() >= new Date(lifelineLockAt);
+  const myLifelineSlots = lifelineWeek
+    ? rosterSlotPeriods
+        .filter((slot) => slot.managerId === myTeamId && slotActiveInWeek(slot, lifelineWeek.week_number))
+        .flatMap((slot) => {
+          const couple = flatCouplesById.get(slot.coupleId);
+          return couple
+            ? [{ slotNumber: slot.slotNumber, coupleId: slot.coupleId, status: couple.status, eliminationWeek: couple.elimination_week }]
+            : [];
+        })
+    : [];
+  const peerLifelinePicks = (lifelinePickRows ?? []).filter((row) => row.manager_id !== myTeamId);
+  const lifelineState = lifelineWeek
+    ? lifelinePicksState({
+        slots: myLifelineSlots,
+        weekNumber: lifelineWeek.week_number,
+        behind: cutoff.pendingRevealEpisode != null,
+        peersHavePicks: lifelineLocked && peerLifelinePicks.length > 0,
+      })
+    : { kind: "none" as const };
+  const lifelineSlots =
+    lifelineState.kind === "play"
+      ? lifelineState.slots.map((slot) => ({
+          slotNumber: slot.slotNumber,
+          formerCoupleId: slot.coupleId,
+          pickCoupleId:
+            (lifelinePickRows ?? []).find((row) => row.manager_id === myTeamId && row.slot_number === slot.slotNumber)
+              ?.couple_id ?? null,
+        }))
+      : [];
+  const myLifelineWeekCoupleIds = new Set(myLifelineSlots.map((slot) => slot.coupleId));
+  const lifelineCouples = activeCouples
+    .filter((couple) => !myLifelineWeekCoupleIds.has(couple.id))
+    .sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
+  const lifelineLeagueEntries = standings
+    .filter((m) => m.managerId !== myTeamId)
+    .map((m) => ({
+      managerId: m.managerId,
+      displayName: m.displayName,
+      coupleIds: peerLifelinePicks.filter((row) => row.manager_id === m.managerId).map((row) => row.couple_id),
+    }))
+    .filter((entry) => entry.coupleIds.length > 0)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  // Lifelines settled in the roster's paged week: a line per pick, and part
+  // of that week's Dance Card points.
+  const lifelinesFor = (managerId: string) =>
+    (lifelinePayoutRows ?? [])
+      .filter((row) => row.manager_id === managerId)
+      .map((row) => ({
+        ...(allDisplayNames.get(row.couple_id) ?? { celebrity: "Unknown", pro: "Unknown" }),
+        coupleId: row.couple_id,
+        points: Number(row.weighted_points),
+      }));
+  const lifelineTotal = (lifelines: { points: number }[]) => lifelines.reduce((sum, line) => sum + line.points, 0);
   const judgePointsInputs = {
     scores: [
       ...excludeReleasedCoupleRows(leagueDanceScores ?? [], draftNight?.releasedCoupleIdsByEpisode ?? {})
@@ -381,7 +476,10 @@ export default async function LeaguePicksPage({
   // Header total on Your Fantasy Roster: this paged week's Dance Card
   // points, not the season-cumulative total — matches the carousel it sits
   // above, same weighting as danceCardLeagueEntries' weekPoints below.
-  const yourRosterWeekTotalPoints = roundPoints(yourRosterWeekRosterPoints * judgePointsInputs.categoryWeight);
+  const yourLifelines = lifelinesFor(myTeamId);
+  const yourRosterWeekTotalPoints = roundPoints(
+    yourRosterWeekRosterPoints * judgePointsInputs.categoryWeight + lifelineTotal(yourLifelines)
+  );
   // Under Dance Card v2 nothing sits outside the couples' credits; under v3
   // survival and the Fantasy Bonus do, as under v1.
   const yourRosterWeekBonusPoints = yourRosterWeek && danceCardRule.version !== "v2"
@@ -470,10 +568,12 @@ export default async function LeaguePicksPage({
         return [{ ...names, coupleId: slot.coupleId, ...clamped }];
       });
       const weekRosterPoints = weekPointsByManager.get(m.managerId) ?? 0;
+      const lifelines = lifelinesFor(m.managerId);
       return {
         managerId: m.managerId,
         displayName: m.displayName,
-        weekPoints: roundPoints(weekRosterPoints * categoryWeight),
+        weekPoints: roundPoints(weekRosterPoints * categoryWeight + lifelineTotal(lifelines)),
+        lifelines,
         bonusPoints:
           danceCardRule.version !== "v2"
             ? weeklyBonusPoints(weekRosterPoints, categoryWeight, couples.map((c) => c.weeklyPoints))
@@ -485,28 +585,6 @@ export default async function LeaguePicksPage({
       (a, b) => b.weekPoints - a.weekPoints || a.displayName.localeCompare(b.displayName)
     );
   }
-
-  let recastOpenSlots: { slotNumber: number; formerCoupleName: string }[] = [];
-  let recastAvailableCouples: { id: string; celebrity_name: string; pro_name: string }[] = [];
-  if (recastOn) {
-    recastOpenSlots = revealedRecastSlots.map((s) => ({
-      slotNumber: s.slotNumber,
-      formerCoupleName: formatCoupleName(allDisplayNames.get(s.coupleId) ?? { celebrity: s.celebrity, pro: s.pro }),
-    }));
-
-    const rosteredCoupleIds = new Set(
-      leagueSlotPeriods.filter((slot) => slot.endWeek === null).map((slot) => slot.coupleId)
-    );
-    recastAvailableCouples = activeCouples
-      .filter((c) => !rosteredCoupleIds.has(c.id))
-      .map((c) => ({ id: c.id, celebrity_name: c.celebrity_name, pro_name: c.pro_name }))
-      .sort((a, b) => a.celebrity_name.localeCompare(b.celebrity_name));
-  }
-
-  // Reverse-standings recast priority is worst-record-first — the lowest
-  // scorer gets priority #1. Only meaningful for that claim method; other
-  // methods (fcfs/manual) have no stable pre-computed priority to show.
-  const recastPriorityRank = standings.length - rank + 1;
 
   let onTheClockName: string | null = null;
   let isMyTurn = false;
@@ -711,6 +789,7 @@ export default async function LeaguePicksPage({
                 couples={rosterCouples}
                 totalPoints={yourRosterWeekTotalPoints}
                 weekBonusPoints={yourRosterWeekBonusPoints}
+                lifelines={yourLifelines}
                 historyFrom={historyFrom}
                 carousel={
                   yourRosterWeek ? (
@@ -743,18 +822,33 @@ export default async function LeaguePicksPage({
                 }
               />
             )}
-            {waiversOn && (
+            {lifelineState.kind === "catch-up" && (
+              <LifelineCatchUpCard pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null} />
+            )}
+            {lifelineWeek && lifelineState.kind === "play" && (
+              <LifelineCard
+                key={`${lifelineWeek.id}:${lifelineLocked}:${lifelineSlots.map((slot) => slot.pickCoupleId).join()}`}
+                leagueId={id}
+                week={{
+                  id: lifelineWeek.id,
+                  weekNumber: lifelineWeek.week_number,
+                  isFinale: lifelineWeek.week_number === finaleWeekNumber,
+                }}
+                lockAt={lifelineLockAt ?? null}
+                isLocked={lifelineLocked}
+                slots={lifelineSlots}
+                couples={lifelineCouples}
+                coupleDisplayNames={Object.fromEntries(allDisplayNames)}
+                leagueEntries={lifelineLeagueEntries}
+                historyFrom={historyFrom}
+              />
+            )}
+            {recastOn && (
               <RecastNudgeCard
                 leagueId={id}
-                openSlots={recastOpenSlots}
+                openSpotCount={recastOpenSpotCount}
                 hiddenOpenSlotCount={hiddenRecastOpenCount}
                 pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
-                availableCouples={recastAvailableCouples}
-                coupleDisplayNames={Object.fromEntries(allDisplayNames)}
-                claimMethod={league.waiver_claim_method}
-                priorityRank={recastPriorityRank}
-                totalManagers={standings.length}
-                historyFrom={historyFrom}
               />
             )}
           </div>

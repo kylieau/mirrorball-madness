@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
+import { RecastOverdueNotice } from "@/components/recast-overdue-notice";
 import { ResultsForm } from "@/components/results-form";
 import { TopBar } from "@/components/top-bar";
 import { userCanProposeResults } from "@/lib/results";
@@ -37,7 +38,12 @@ export default async function EnterResultsPage({
     redirect("/admin/results");
   }
 
-  const data = await loadResultsPageData(supabase, createAdminClient());
+  const [data, { data: overdueRuns }] = await Promise.all([
+    loadResultsPageData(supabase, createAdminClient()),
+    accountSettingsData.isSuperAdmin
+      ? createAdminClient().rpc("recast_runs_overdue")
+      : Promise.resolve({ data: null }),
+  ]);
 
   return (
     <div className="flex w-full flex-col gap-3 px-4 py-4">
@@ -55,6 +61,13 @@ export default async function EnterResultsPage({
           Back to Scores
         </Button>
       </PageHeader>
+
+      {(overdueRuns ?? []).map((run) => (
+        <RecastOverdueNotice
+          key={run.week_number}
+          run={{ weekNumber: run.week_number, dueAt: run.due_at, resultsIn: run.results_in, leagues: run.leagues }}
+        />
+      ))}
 
       <ResultsForm
         canPublish={accountSettingsData.isSuperAdmin}

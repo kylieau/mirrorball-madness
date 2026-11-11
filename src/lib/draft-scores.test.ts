@@ -179,6 +179,38 @@ describe("draft week points", () => {
     expect(replaced.filter((row) => row.week_id === "w3" && row.manager_id === "a")).toHaveLength(1);
   });
 
+  it("keeps a week's stored Lifeline and trade points in the replaced total", () => {
+    const replaced = scoresReplacingDraftWeek(
+      [
+        {
+          week_id: "w3",
+          manager_id: "a",
+          roster_points: 6,
+          prediction_points: 4,
+          grand_finale_points: 0,
+          lifeline_points: 2.25,
+          transfer_points: -1.5,
+          total_points: 8.75,
+        },
+      ],
+      "w3",
+      [{ managerId: "a", rosterPoints: 10, totalPoints: 5 }],
+      { judges_score_category_weight: 0.5, eliminations_category_weight: 1, bonus_picks_category_weight: 1 }
+    );
+    expect(replaced).toEqual([
+      {
+        week_id: "w3",
+        manager_id: "a",
+        roster_points: 10,
+        prediction_points: 4,
+        grand_finale_points: 0,
+        lifeline_points: 2.25,
+        transfer_points: -1.5,
+        total_points: 9.75,
+      },
+    ]);
+  });
+
   it("pays nothing before the anchor week and does not wipe a live week", () => {
     expect(
       draftWeekManagerScores({

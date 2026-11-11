@@ -3,6 +3,8 @@ import {
   buildScoreHistory,
   plannedEliminationWeek,
   groupHistory,
+  withLifelineLines,
+  withTradeLines,
   type HistoryModule,
   type HistoryWeekData,
   type ManagerHistoryInput,
@@ -451,5 +453,70 @@ describe("a week being revealed", () => {
     expect(week3.every((l) => l.module === "danceCard" && l.label.includes("Jdg"))).toBe(true);
     const engine = engineWeek({ ...revealing, predictions: [], grandFinalePredictions: [] }, revealingWeek);
     expect(sumLines(lines, 3, "danceCard")).toBeCloseTo(engine!.rosterPoints, 2);
+  });
+});
+
+describe("withLifelineLines", () => {
+  const line = (weekNumber: number, module: HistoryModule, id: string): ScoreHistoryLine => ({
+    id,
+    weekNumber,
+    module,
+    label: id,
+    points: 1,
+  });
+  const lines = [line(4, "curtainCall", "cc4"), line(4, "danceCard", "dc4"), line(4, "grandFinale", "gf4"), line(5, "danceCard", "dc5")];
+  const names = new Map([["star", "Harry"]]);
+
+  it("adds a line per paid Lifeline and one for the Equalizer, among their week's Dance Card lines", () => {
+    const result = withLifelineLines(
+      lines,
+      {
+        weight: 0.5,
+        payouts: [
+          { weekNumber: 5, slotNumber: 2, coupleId: "star", weightedPoints: 2.25 },
+          { weekNumber: 5, slotNumber: 1, coupleId: "gone", weightedPoints: 0 },
+        ],
+        equalizers: [{ weekNumber: 4, weightedPoints: 5.65, weeks: [3, 4] }],
+      },
+      names
+    );
+    expect(result.map((row) => row.id)).toEqual(["cc4", "dc4", "lifeline-equalizer:4", "gf4", "dc5", "lifeline:5:2"]);
+    expect(result.find((row) => row.id === "lifeline:5:2")).toMatchObject({
+      module: "danceCard",
+      label: "Lifeline: Harry survives × 0.5 Wt",
+      points: 2.25,
+    });
+    expect(result.find((row) => row.id === "lifeline-equalizer:4")?.label).toBe("Lifeline Backfill, Weeks 3 to 4 × 0.5 Wt");
+  });
+
+  it("names a single backfilled week and leaves the lines alone when nothing paid", () => {
+    const [backfill] = withLifelineLines([], { weight: 1, payouts: [], equalizers: [{ weekNumber: 4, weightedPoints: 1.69, weeks: [3] }] }, names);
+    expect(backfill.label).toBe("Lifeline Backfill, Week 3");
+    expect(withLifelineLines(lines, { weight: 1, payouts: [], equalizers: [] }, names)).toBe(lines);
+  });
+});
+
+describe("withTradeLines", () => {
+  const dc4: ScoreHistoryLine = { id: "dc4", weekNumber: 4, module: "danceCard", label: "dc4", points: 1 };
+  const gf4: ScoreHistoryLine = { id: "gf4", weekNumber: 4, module: "grandFinale", label: "gf4", points: 1 };
+  const managers = new Map([["kim", "Kim & Pat"]]);
+
+  it("lists points a trade moved under Dance Card, in the week they landed on", () => {
+    const result = withTradeLines(
+      [dc4, gf4],
+      [
+        { id: "t1", weekNumber: 4, points: -5, otherManagerId: "kim" },
+        { id: "t2", weekNumber: 4, points: 2.5, otherManagerId: "gone" },
+      ],
+      managers
+    );
+    expect(result.map((row) => row.id)).toEqual(["dc4", "trade:t1", "trade:t2", "gf4"]);
+    expect(result[1]).toMatchObject({ module: "danceCard", label: "Trade: points to Kim & Pat", points: -5 });
+    expect(result[2].label).toBe("Trade: points from Unknown");
+  });
+
+  it("leaves the lines alone without a transfer", () => {
+    const lines = [dc4, gf4];
+    expect(withTradeLines(lines, [], managers)).toBe(lines);
   });
 });

@@ -21,11 +21,16 @@ export function TopBar({
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <Link href="/" className="flex h-7 items-center gap-1.5 text-sm font-semibold text-muted-foreground">
-        <Image src="/mark-glyph.png" alt="" width={20} height={20} />
-        Mirrorball Madness
+      {/* When the actions leave no room for the name it wraps to a second
+          line, which the one-line height clips: the glyph alone stays. */}
+      <Link
+        href="/"
+        className="flex h-7 min-w-0 flex-wrap content-start gap-x-1.5 overflow-hidden text-sm font-semibold text-muted-foreground"
+      >
+        <Image src="/mark-glyph.png" alt="" width={20} height={20} className="my-1" />
+        <span className="leading-7 whitespace-nowrap">Mirrorball Madness</span>
       </Link>
-      <div className="flex gap-2">
+      <div className="flex shrink-0 gap-2">
         {actionSlot}
         <AccountSettingsSheet email={email} {...accountSettingsData} />
       </div>

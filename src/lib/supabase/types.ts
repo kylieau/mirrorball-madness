@@ -1736,6 +1736,77 @@ export type Database = {
           },
         ]
       }
+      league_point_adjustments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          detail: Json
+          id: string
+          kind: string
+          league_id: string
+          manager_id: string
+          points: number
+          source_id: string | null
+          week_id: string
+          weighted_points: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          detail?: Json
+          id?: string
+          kind: string
+          league_id: string
+          manager_id: string
+          points: number
+          source_id?: string | null
+          week_id: string
+          weighted_points: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          detail?: Json
+          id?: string
+          kind?: string
+          league_id?: string
+          manager_id?: string
+          points?: number
+          source_id?: string | null
+          week_id?: string
+          weighted_points?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_point_adjustments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_point_adjustments_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_point_adjustments_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_point_adjustments_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "competition_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leagues: {
         Row: {
           commissioner_id: string
@@ -1747,11 +1818,16 @@ export type Database = {
           draft_type: string
           id: string
           invite_code: string
+          lifeline_enabled: boolean
+          lifeline_starts_week: number | null
           name: string
           pick_time_limit_seconds: number
           prediction_lock_coast: string
           prediction_lock_hours_before_air: number
+          recast_on_since: string | null
           roster_size: number
+          trades_enabled: boolean
+          trades_on_since: string | null
           waiver_claim_method: string | null
           waiver_mode: string
         }
@@ -1765,11 +1841,16 @@ export type Database = {
           draft_type?: string
           id?: string
           invite_code: string
+          lifeline_enabled?: boolean
+          lifeline_starts_week?: number | null
           name: string
           pick_time_limit_seconds?: number
           prediction_lock_coast?: string
           prediction_lock_hours_before_air?: number
+          recast_on_since?: string | null
           roster_size?: number
+          trades_enabled?: boolean
+          trades_on_since?: string | null
           waiver_claim_method?: string | null
           waiver_mode?: string
         }
@@ -1783,11 +1864,16 @@ export type Database = {
           draft_type?: string
           id?: string
           invite_code?: string
+          lifeline_enabled?: boolean
+          lifeline_starts_week?: number | null
           name?: string
           pick_time_limit_seconds?: number
           prediction_lock_coast?: string
           prediction_lock_hours_before_air?: number
+          recast_on_since?: string | null
           roster_size?: number
+          trades_enabled?: boolean
+          trades_on_since?: string | null
           waiver_claim_method?: string | null
           waiver_mode?: string
         }
@@ -1797,6 +1883,143 @@ export type Database = {
             columns: ["commissioner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lifeline_payouts: {
+        Row: {
+          computed_at: string
+          couple_id: string
+          credit: number
+          league_id: string
+          manager_id: string
+          points: number
+          slot_number: number
+          survived: boolean
+          week_id: string
+          weighted_points: number
+        }
+        Insert: {
+          computed_at?: string
+          couple_id: string
+          credit: number
+          league_id: string
+          manager_id: string
+          points: number
+          slot_number: number
+          survived: boolean
+          week_id: string
+          weighted_points: number
+        }
+        Update: {
+          computed_at?: string
+          couple_id?: string
+          credit?: number
+          league_id?: string
+          manager_id?: string
+          points?: number
+          slot_number?: number
+          survived?: boolean
+          week_id?: string
+          weighted_points?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lifeline_payouts_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lifeline_payouts_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lifeline_payouts_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lifeline_payouts_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "competition_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lifeline_picks: {
+        Row: {
+          couple_id: string
+          id: string
+          league_id: string
+          manager_id: string
+          picked_by: string
+          slot_number: number
+          updated_at: string
+          week_id: string
+        }
+        Insert: {
+          couple_id: string
+          id?: string
+          league_id: string
+          manager_id: string
+          picked_by: string
+          slot_number: number
+          updated_at?: string
+          week_id: string
+        }
+        Update: {
+          couple_id?: string
+          id?: string
+          league_id?: string
+          manager_id?: string
+          picked_by?: string
+          slot_number?: number
+          updated_at?: string
+          week_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lifeline_picks_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lifeline_picks_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lifeline_picks_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lifeline_picks_picked_by_fkey"
+            columns: ["picked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lifeline_picks_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "competition_weeks"
             referencedColumns: ["id"]
           },
         ]
@@ -1955,6 +2178,51 @@ export type Database = {
           spoiler_free_mode?: boolean
         }
         Relationships: []
+      }
+      recast_cycles: {
+        Row: {
+          awards: number
+          league_id: string
+          processed_at: string
+          start_week: number
+          trades: number
+          week_id: string
+          week_number: number
+        }
+        Insert: {
+          awards?: number
+          league_id: string
+          processed_at?: string
+          start_week: number
+          trades?: number
+          week_id: string
+          week_number: number
+        }
+        Update: {
+          awards?: number
+          league_id?: string
+          processed_at?: string
+          start_week?: number
+          trades?: number
+          week_id?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recast_cycles_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recast_cycles_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "competition_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       roster_slots: {
         Row: {
@@ -2215,47 +2483,281 @@ export type Database = {
           },
         ]
       }
+      trade_legs: {
+        Row: {
+          couple_id: string | null
+          from_manager_id: string
+          id: string
+          leg_order: number
+          points: number | null
+          to_manager_id: string
+          trade_id: string
+        }
+        Insert: {
+          couple_id?: string | null
+          from_manager_id: string
+          id?: string
+          leg_order: number
+          points?: number | null
+          to_manager_id: string
+          trade_id: string
+        }
+        Update: {
+          couple_id?: string | null
+          from_manager_id?: string
+          id?: string
+          leg_order?: number
+          points?: number | null
+          to_manager_id?: string
+          trade_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_legs_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_legs_from_manager_id_fkey"
+            columns: ["from_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_legs_to_manager_id_fkey"
+            columns: ["to_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_legs_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trade_offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trade_offers: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          league_id: string
+          proposed_by: string
+          resolved_at: string | null
+          result: string | null
+          start_week: number | null
+          status: string
+          submitted_by: string
+          veto_ends_at: string | null
+          week_number: number | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          league_id: string
+          proposed_by: string
+          resolved_at?: string | null
+          result?: string | null
+          start_week?: number | null
+          status?: string
+          submitted_by: string
+          veto_ends_at?: string | null
+          week_number?: number | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          league_id?: string
+          proposed_by?: string
+          resolved_at?: string | null
+          result?: string | null
+          start_week?: number | null
+          status?: string
+          submitted_by?: string
+          veto_ends_at?: string | null
+          week_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_offers_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_offers_proposed_by_fkey"
+            columns: ["proposed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_offers_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trade_parties: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          manager_id: string
+          trade_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          manager_id: string
+          trade_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          manager_id?: string
+          trade_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_parties_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_parties_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_parties_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trade_offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trade_votes: {
+        Row: {
+          created_at: string
+          manager_id: string
+          trade_id: string
+          voted_by: string
+        }
+        Insert: {
+          created_at?: string
+          manager_id: string
+          trade_id: string
+          voted_by: string
+        }
+        Update: {
+          created_at?: string
+          manager_id?: string
+          trade_id?: string
+          voted_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_votes_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_votes_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trade_offers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_votes_voted_by_fkey"
+            columns: ["voted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       waiver_claims: {
         Row: {
           couple_id: string
           created_at: string
+          drop_couple_id: string | null
           id: string
           league_id: string
           manager_id: string
           priority_order: number | null
           resolved_at: string | null
+          result: string | null
           slot_number: number
+          start_week: number | null
           status: string
+          submitted_by: string | null
           week_number: number
         }
         Insert: {
           couple_id: string
           created_at?: string
+          drop_couple_id?: string | null
           id?: string
           league_id: string
           manager_id: string
           priority_order?: number | null
           resolved_at?: string | null
+          result?: string | null
           slot_number: number
+          start_week?: number | null
           status?: string
+          submitted_by?: string | null
           week_number: number
         }
         Update: {
           couple_id?: string
           created_at?: string
+          drop_couple_id?: string | null
           id?: string
           league_id?: string
           manager_id?: string
           priority_order?: number | null
           resolved_at?: string | null
+          result?: string | null
           slot_number?: number
+          start_week?: number | null
           status?: string
+          submitted_by?: string | null
           week_number?: number
         }
         Relationships: [
           {
             foreignKeyName: "waiver_claims_couple_id_fkey"
             columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiver_claims_drop_couple_id_fkey"
+            columns: ["drop_couple_id"]
             isOneToOne: false
             referencedRelation: "couples"
             referencedColumns: ["id"]
@@ -2270,6 +2772,13 @@ export type Database = {
           {
             foreignKeyName: "waiver_claims_manager_id_fkey"
             columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiver_claims_submitted_by_fkey"
+            columns: ["submitted_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2397,7 +2906,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      weekly_manager_standings: {
+        Row: {
+          grand_finale_points: number | null
+          league_id: string | null
+          lifeline_points: number | null
+          manager_id: string | null
+          prediction_points: number | null
+          roster_points: number | null
+          total_points: number | null
+          transfer_points: number | null
+          week_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_manager_scores_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_manager_scores_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_manager_scores_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "competition_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       active_season_id: { Args: never; Returns: string }
@@ -2437,6 +2981,10 @@ export type Database = {
         Args: { p_episode_id: string; p_plan: Json }
         Returns: undefined
       }
+      apply_lifeline_settlement: {
+        Args: { p_episode_id: string; p_plan: Json }
+        Returns: undefined
+      }
       apply_round_exception: {
         Args: {
           p_actor_id: string
@@ -2449,27 +2997,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      approve_waiver_claim: {
-        Args: { p_claim_id: string }
-        Returns: {
-          couple_id: string
-          created_at: string
-          id: string
-          league_id: string
-          manager_id: string
-          priority_order: number | null
-          resolved_at: string | null
-          slot_number: number
-          status: string
-          week_number: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "waiver_claims"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
       assert_episode_draft_actor: {
         Args: { p_actor_id: string; p_episode_id: string }
         Returns: undefined
@@ -2478,9 +3005,15 @@ export type Database = {
         Args: { p_episode_id: string; p_plan: Json }
         Returns: undefined
       }
+      assert_trades_open: { Args: { p_league_id: string }; Returns: undefined }
+      can_view_trade: { Args: { p_trade_id: string }; Returns: boolean }
       cancel_account_deletion: { Args: never; Returns: undefined }
       capture_expired_finale_deadlines: {
         Args: { p_league_id?: string }
+        Returns: undefined
+      }
+      clear_lifeline_pick: {
+        Args: { p_league_id: string; p_slot_number: number; p_week_id: string }
         Returns: undefined
       }
       close_grand_finale_late: {
@@ -2548,11 +3081,16 @@ export type Database = {
           draft_type: string
           id: string
           invite_code: string
+          lifeline_enabled: boolean
+          lifeline_starts_week: number | null
           name: string
           pick_time_limit_seconds: number
           prediction_lock_coast: string
           prediction_lock_hours_before_air: number
+          recast_on_since: string | null
           roster_size: number
+          trades_enabled: boolean
+          trades_on_since: string | null
           waiver_claim_method: string | null
           waiver_mode: string
         }
@@ -2573,6 +3111,7 @@ export type Database = {
         Args: { p_league_id: string; p_user_id: string }
         Returns: undefined
       }
+      disable_lifeline: { Args: { p_league_id: string }; Returns: undefined }
       drop_round_unit: { Args: { p_team_id: string }; Returns: undefined }
       drop_round_units: {
         Args: { p_keep: number; p_round_id: string }
@@ -2586,6 +3125,15 @@ export type Database = {
         Args: { p_league_id: string }
         Returns: number
       }
+      enable_lifeline: {
+        Args: {
+          p_actor_id: string
+          p_equalizer: Json
+          p_league_id: string
+          p_starts_week: number
+        }
+        Returns: undefined
+      }
       episode_couple_dance_signature: {
         Args: { p_couple_id: string; p_draft: boolean; p_episode_id: string }
         Returns: Json
@@ -2593,27 +3141,6 @@ export type Database = {
       episode_publication_snapshot: {
         Args: { p_episode_id: string }
         Returns: Json
-      }
-      finalize_waiver_claim: {
-        Args: { p_claim_id: string }
-        Returns: {
-          couple_id: string
-          created_at: string
-          id: string
-          league_id: string
-          manager_id: string
-          priority_order: number | null
-          resolved_at: string | null
-          slot_number: number
-          status: string
-          week_number: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "waiver_claims"
-          isOneToOne: true
-          isSetofReturn: false
-        }
       }
       generate_co_manager_invite_code: {
         Args: { p_league_id: string }
@@ -2643,11 +3170,16 @@ export type Database = {
           draft_type: string
           id: string
           invite_code: string
+          lifeline_enabled: boolean
+          lifeline_starts_week: number | null
           name: string
           pick_time_limit_seconds: number
           prediction_lock_coast: string
           prediction_lock_hours_before_air: number
+          recast_on_since: string | null
           roster_size: number
+          trades_enabled: boolean
+          trades_on_since: string | null
           waiver_claim_method: string | null
           waiver_mode: string
         }
@@ -2670,17 +3202,40 @@ export type Database = {
           draft_type: string
           id: string
           invite_code: string
+          lifeline_enabled: boolean
+          lifeline_starts_week: number | null
           name: string
           pick_time_limit_seconds: number
           prediction_lock_coast: string
           prediction_lock_hours_before_air: number
+          recast_on_since: string | null
           roster_size: number
+          trades_enabled: boolean
+          trades_on_since: string | null
           waiver_claim_method: string | null
           waiver_mode: string
         }
         SetofOptions: {
           from: "*"
           to: "leagues"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      latest_scored_week: {
+        Args: { p_league_id: string }
+        Returns: {
+          id: string
+          is_double_elimination_week: boolean
+          is_elimination_week: boolean
+          is_finale: boolean
+          season_id: string
+          theme: string | null
+          week_number: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "competition_weeks"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2694,6 +3249,24 @@ export type Database = {
         }[]
       }
       leave_league: { Args: { p_league_id: string }; Returns: undefined }
+      lifeline_first_open_week: {
+        Args: { p_league_id: string }
+        Returns: number
+      }
+      lifeline_lock_at: {
+        Args: { p_league_id: string; p_week_id: string }
+        Returns: string
+      }
+      lifeline_publication_inputs: { Args: never; Returns: Json }
+      lifeline_slot_is_dead: {
+        Args: {
+          p_league_id: string
+          p_manager_id: string
+          p_slot_number: number
+          p_week_number: number
+        }
+        Returns: boolean
+      }
       make_auto_draft_pick: {
         Args: { p_league_id: string }
         Returns: {
@@ -2750,14 +3323,76 @@ export type Database = {
         Args: { p_league_id: string; p_week_id: string }
         Returns: string
       }
-      process_reverse_standings_waivers: {
-        Args: { p_league_id: string }
-        Returns: undefined
+      process_due_recasts: { Args: never; Returns: Json }
+      process_league_recast: {
+        Args: {
+          p_league_id: string
+          p_start_week: number
+          p_week_id: string
+          p_week_number: number
+        }
+        Returns: number
       }
       promote_to_commissioner: {
         Args: { p_league_id: string; p_user_id: string }
         Returns: undefined
       }
+      propose_trade: {
+        Args: { p_league_id: string; p_legs: Json }
+        Returns: string
+      }
+      recast_claim_state: {
+        Args: {
+          p_claim: Database["public"]["Tables"]["waiver_claims"]["Row"]
+          p_cycle_weeks: number[]
+        }
+        Returns: string
+      }
+      recast_drop_locked: {
+        Args: {
+          p_couple_id: string
+          p_cycle_weeks: number[]
+          p_league_id: string
+          p_manager_id: string
+        }
+        Returns: boolean
+      }
+      recast_next_cycle: {
+        Args: { p_league_id: string }
+        Returns: {
+          due_at: string
+          results_in: boolean
+          start_week: number
+          week_id: string
+          week_number: number
+        }[]
+      }
+      recast_order: {
+        Args: { p_league_id: string }
+        Returns: {
+          last_week_total: number
+          list_position: number
+          manager_id: string
+          season_total: number
+        }[]
+      }
+      recast_pending_drops: {
+        Args: { p_league_id: string }
+        Returns: {
+          couple_id: string
+          manager_id: string
+        }[]
+      }
+      recast_runs_overdue: {
+        Args: never
+        Returns: {
+          due_at: string
+          leagues: number
+          results_in: boolean
+          week_number: number
+        }[]
+      }
+      recast_runs_since: { Args: { p_league_id: string }; Returns: string }
       record_draft_pick: {
         Args: {
           p_auto_source: string
@@ -2787,27 +3422,6 @@ export type Database = {
         Args: { p_actor_id: string; p_round_id: string }
         Returns: undefined
       }
-      reject_waiver_claim: {
-        Args: { p_claim_id: string }
-        Returns: {
-          couple_id: string
-          created_at: string
-          id: string
-          league_id: string
-          manager_id: string
-          priority_order: number | null
-          resolved_at: string | null
-          slot_number: number
-          status: string
-          week_number: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "waiver_claims"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
       remove_co_manager: {
         Args: { p_league_id: string; p_team_user_id: string }
         Returns: undefined
@@ -2828,11 +3442,16 @@ export type Database = {
           draft_type: string
           id: string
           invite_code: string
+          lifeline_enabled: boolean
+          lifeline_starts_week: number | null
           name: string
           pick_time_limit_seconds: number
           prediction_lock_coast: string
           prediction_lock_hours_before_air: number
+          recast_on_since: string | null
           roster_size: number
+          trades_enabled: boolean
+          trades_on_since: string | null
           waiver_claim_method: string | null
           waiver_mode: string
         }
@@ -2853,11 +3472,32 @@ export type Database = {
         Args: { p_league_id: string }
         Returns: string
       }
+      respond_to_trade: {
+        Args: { p_accept: boolean; p_trade_id: string }
+        Returns: string
+      }
       round_heat_name: {
         Args: { p_heat: number; p_round_type: string; p_unit_count: number }
         Returns: string
       }
       round_special_mode: { Args: { p_scoring: string }; Returns: string }
+      run_league_trades: {
+        Args: {
+          p_league_id: string
+          p_start_week: number
+          p_week_number: number
+        }
+        Returns: number
+      }
+      run_recast_claims: {
+        Args: {
+          p_league_id: string
+          p_order: string[]
+          p_start_week: number
+          p_week_number: number
+        }
+        Returns: number
+      }
       save_episode_draft: { Args: { p_input: Json }; Returns: undefined }
       save_episode_draft_checked: { Args: { p_input: Json }; Returns: Json }
       save_episode_rounds: {
@@ -2867,6 +3507,31 @@ export type Database = {
       save_episode_teams: {
         Args: { p_actor_id: string; p_episode_id: string; p_teams: Json }
         Returns: Json
+      }
+      save_recast_list: {
+        Args: { p_claims: Json; p_league_id: string }
+        Returns: {
+          couple_id: string
+          created_at: string
+          drop_couple_id: string | null
+          id: string
+          league_id: string
+          manager_id: string
+          priority_order: number | null
+          resolved_at: string | null
+          result: string | null
+          slot_number: number
+          start_week: number | null
+          status: string
+          submitted_by: string | null
+          week_number: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "waiver_claims"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       save_round_exception: {
         Args: {
@@ -2952,6 +3617,30 @@ export type Database = {
         Args: { p_couple_ids: string[]; p_league_id: string }
         Returns: undefined
       }
+      set_lifeline_pick: {
+        Args: {
+          p_couple_id: string
+          p_league_id: string
+          p_slot_number: number
+          p_week_id: string
+        }
+        Returns: {
+          couple_id: string
+          id: string
+          league_id: string
+          manager_id: string
+          picked_by: string
+          slot_number: number
+          updated_at: string
+          week_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lifeline_picks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_member_draft_autopilot: {
         Args: { p_enabled: boolean; p_league_id: string; p_user_id: string }
         Returns: boolean
@@ -2978,6 +3667,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_trades_enabled: {
+        Args: { p_enabled: boolean; p_league_id: string }
+        Returns: undefined
+      }
       special_dance_blocker: {
         Args: { p_team_id: string; p_when: string }
         Returns: string
@@ -3001,11 +3694,16 @@ export type Database = {
           draft_type: string
           id: string
           invite_code: string
+          lifeline_enabled: boolean
+          lifeline_starts_week: number | null
           name: string
           pick_time_limit_seconds: number
           prediction_lock_coast: string
           prediction_lock_hours_before_air: number
+          recast_on_since: string | null
           roster_size: number
+          trades_enabled: boolean
+          trades_on_since: string | null
           waiver_claim_method: string | null
           waiver_mode: string
         }
@@ -3062,31 +3760,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      submit_waiver_claim: {
-        Args: {
-          p_couple_id: string
-          p_league_id: string
-          p_slot_number: number
-        }
-        Returns: {
-          couple_id: string
-          created_at: string
-          id: string
-          league_id: string
-          manager_id: string
-          priority_order: number | null
-          resolved_at: string | null
-          slot_number: number
-          status: string
-          week_number: number
-        }
-        SetofOptions: {
-          from: "*"
-          to: "waiver_claims"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
       sync_round_immunity: {
         Args: { p_actor_id: string; p_round_id: string }
         Returns: undefined
@@ -3096,6 +3769,29 @@ export type Database = {
         Returns: string[]
       }
       team_song_key: { Args: { p_song: string }; Returns: string }
+      trade_cash_available: { Args: { p_league_id: string }; Returns: number }
+      trade_cash_room: {
+        Args: {
+          p_count_accepted: boolean
+          p_league_id: string
+          p_manager_id: string
+        }
+        Returns: number
+      }
+      trade_deadline: { Args: { p_league_id: string }; Returns: string }
+      trade_moves: {
+        Args: { p_trade_id: string }
+        Returns: {
+          couple_id: string
+          manager_id: string
+          slot_number: number
+        }[]
+      }
+      trade_problem: {
+        Args: { p_at_run: boolean; p_trade_id: string }
+        Returns: string
+      }
+      trade_problem_text: { Args: { p_problem: string }; Returns: string }
       undo_last_pick: { Args: { p_league_id: string }; Returns: undefined }
       unlock_draft_scores_through: {
         Args: { p_week_number: number }
@@ -3135,11 +3831,16 @@ export type Database = {
           draft_type: string
           id: string
           invite_code: string
+          lifeline_enabled: boolean
+          lifeline_starts_week: number | null
           name: string
           pick_time_limit_seconds: number
           prediction_lock_coast: string
           prediction_lock_hours_before_air: number
+          recast_on_since: string | null
           roster_size: number
+          trades_enabled: boolean
+          trades_on_since: string | null
           waiver_claim_method: string | null
           waiver_mode: string
         }
@@ -3260,6 +3961,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      veto_trade: { Args: { p_trade_id: string }; Returns: string }
       visible_draft_dance_scores: {
         Args: never
         Returns: {
