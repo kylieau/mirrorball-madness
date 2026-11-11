@@ -147,7 +147,7 @@ export function LifelineSettings({
                     <p className="text-xs text-muted-foreground">
                       One-time points for every week a roster spot sat idle before Week {preview.startsWeek} because
                       its couple had gone home: the average Lifeline that week. It shows in Score History as Lifeline
-                      Backfill.
+                      Equalizer.
                     </p>
                     <ul className={cn("flex flex-col", !includeEqualizer && "opacity-50")}>
                       {equalizerRows.map((row) => (

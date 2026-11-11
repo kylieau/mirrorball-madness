@@ -484,12 +484,12 @@ describe("withLifelineLines", () => {
       label: "Lifeline: Harry × 0.5 Wt",
       points: 2.25,
     });
-    expect(result.find((row) => row.id === "lifeline-equalizer:4")?.label).toBe("Lifeline Backfill, Weeks 3 to 4 × 0.5 Wt");
+    expect(result.find((row) => row.id === "lifeline-equalizer:4")?.label).toBe("Lifeline Equalizer, Weeks 3 to 4 × 0.5 Wt");
   });
 
-  it("names a single backfilled week and leaves the lines alone when nothing paid", () => {
+  it("names a single equalized week and leaves the lines alone when nothing paid", () => {
     const [backfill] = withLifelineLines([], { weight: 1, payouts: [], equalizers: [{ weekNumber: 4, weightedPoints: 1.69, weeks: [3] }] }, names);
-    expect(backfill.label).toBe("Lifeline Backfill, Week 3");
+    expect(backfill.label).toBe("Lifeline Equalizer, Week 3");
     expect(withLifelineLines(lines, { weight: 1, payouts: [], equalizers: [] }, names)).toBe(lines);
   });
 });

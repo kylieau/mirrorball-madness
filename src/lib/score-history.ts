@@ -428,7 +428,7 @@ export function withLifelineLines(
         id: `lifeline-equalizer:${equalizer.weekNumber}`,
         weekNumber: equalizer.weekNumber,
         module: "danceCard" as const,
-        label: `Lifeline Backfill${span}${weightSuffix(lifeline.weight)}`,
+        label: `Lifeline Equalizer${span}${weightSuffix(lifeline.weight)}`,
         points: equalizer.weightedPoints,
       };
     }),

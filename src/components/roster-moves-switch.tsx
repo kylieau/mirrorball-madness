@@ -36,7 +36,7 @@ export function RosterMovesSwitch({
 }) {
   if (hrefFor) {
     return (
-      <nav aria-label="Roster moves" className={LIST}>
+      <nav aria-label="Transactions" className={LIST}>
         {tabs.map((tab) => (
           <Link
             key={tab.key}
@@ -52,7 +52,7 @@ export function RosterMovesSwitch({
     );
   }
   return (
-    <div role="tablist" aria-label="Roster moves" className={LIST}>
+    <div role="tablist" aria-label="Transactions" className={LIST}>
       {tabs.map((tab) => (
         <button
           key={tab.key}

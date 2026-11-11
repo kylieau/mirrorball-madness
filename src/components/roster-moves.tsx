@@ -43,7 +43,7 @@ export function RosterMoves({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Roster Moves</CardTitle>
+        <CardTitle>Transactions</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {tabs.length > 1 && <RosterMovesSwitch tabs={tabs} selected={selected} onSelect={setPicked} />}

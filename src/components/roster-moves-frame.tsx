@@ -13,7 +13,7 @@ import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
 export type RosterMovesFact = { label: string; at: string | null; value?: string };
 
 // The frame the Lifeline, Recast and Trades pages share: a back link that
-// says where it goes, the Roster Moves title, the same switch as the Picks
+// says where it goes, the Transactions title, the same switch as the Picks
 // card (on this page's tab), and the two facts that matter as a strip. The
 // page's own to-do comes first under it; reference folds away at the bottom.
 export function RosterMovesFrame({
@@ -42,7 +42,7 @@ export function RosterMovesFrame({
         <ChevronLeftIcon aria-hidden className="size-4" />
         {back.label}
       </Link>
-      <h1 className="text-2xl font-semibold tracking-tight">Roster Moves</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
       {tabs.length > 1 && (
         <RosterMovesSwitch tabs={tabs} selected={selected} hrefFor={(key) => rosterMoveTabHref(leagueId, key, from)} />
       )}

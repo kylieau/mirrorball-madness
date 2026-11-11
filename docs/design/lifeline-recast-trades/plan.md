@@ -66,7 +66,7 @@ Lifeline, the Equalizer and trade cash all add points to standings, so they shar
 - **Computed by a dry-run path** that writes nothing, which also feeds the confirm sheet.
 - **Stored** as one adjustment with its provenance, written onto the latest published week's row at confirm.
   - A later re-publish of an earlier week updates that one adjustment, not earlier totals.
-  - Score History shows `Lifeline Backfill, Weeks 4 to 9: +X.XX`.
+  - Score History shows `Lifeline Equalizer, Weeks 4 to 9: +X.XX`.
 - **Previews name members and standings, so they stay out of the public repo.**
 
 ## Recast
