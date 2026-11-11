@@ -14,7 +14,7 @@ export type { GrandFinaleMethod, TierPayStyle };
 // strong-play ceiling under every option (src/lib/strong-play-ceilings.ts).
 // Exact, distance, and equal bands share one base: a perfect pick pays full
 // credit either way. Graded bands pay a fraction on lower bands, so their
-// base is higher. Distance credit reaches 0 at 4 spots off. There is no
+// base is higher. Distance credit reaches 0 at 4 weeks off. There is no
 // Grand Finale 3/5 cap — weight 1 is a full share, same as the other modules.
 export const GRAND_FINALE_DEFAULT_METHOD: GrandFinaleMethod = "distance_based";
 export const GRAND_FINALE_DEFAULT_TIER_PAY_STYLE: TierPayStyle = "equal";
@@ -92,10 +92,10 @@ export function explainGrandFinaleMethod({
       }
       const examples = distanceCreditTable(pointsPerCorrect, penalty)
         .slice(0, 4)
-        .map((r) => `${r.off === 0 ? "exact" : `${r.off} off`} → ${formatPoints(r.points)}`)
+        .map((r) => `${r.off === 0 ? "right week" : `${r.off} ${r.off === 1 ? "week" : "weeks"} off`} → ${formatPoints(r.points)}`)
         .join(", ");
       const zeroAt = Math.ceil(pointsPerCorrect / penalty);
-      return `Earn ${formatPoints(pointsPerCorrect)} pts for an exact spot, minus ${formatPoints(penalty)} for each spot you're off (${examples}), down to ${formatPoints(0)} at ${zeroAt} off.`;
+      return `Earn ${formatPoints(pointsPerCorrect)} pts when a couple goes home the week you had them, minus ${formatPoints(penalty)} for each week you're off (${examples}), down to ${formatPoints(0)} at ${zeroAt} weeks off. A double elimination is one week. In the Finale, each place you're off counts as a week.`;
     }
     case "band_tier": {
       const width = Math.max(1, tierSize ?? 1);

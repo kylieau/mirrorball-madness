@@ -1,6 +1,6 @@
 import type { Database } from "./supabase/types";
 import { recombinedTotal, scoringDance, settledBonuses, type LaterDanceCardRow, type PublicationSnapshot } from "./episode-publication";
-import { buildWeeklyScoreRows, danceCardPriorWeeks, danceCardWeekRows, type WeeklyScoreRow } from "./weekly-score-rows";
+import { buildWeeklyScoreRows, danceCardPriorWeeks, danceCardWeekRows, seasonFinaleWeek, type WeeklyScoreRow } from "./weekly-score-rows";
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 
@@ -55,6 +55,7 @@ export function danceCardRowsFromLive(
           predictions: [],
           lateUnlocks: [],
           grandFinalePredictions: [],
+          finaleWeekNumber: seasonFinaleWeek(snapshot.weeks),
           danceCardPriorWeeks: priorWeeks,
         },
         week,

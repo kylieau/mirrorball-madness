@@ -107,7 +107,7 @@ export function GrandFinaleBox({
   const locked = isLocked || submittedLate;
 
   const coupleById = new Map(couples.map((c) => [c.id, c]));
-  const rowContext = grandFinaleRowContext(couples);
+  const rowContext = grandFinaleRowContext(couples, scoring);
 
   function nameFor(coupleId: string) {
     const c = coupleById.get(coupleId);

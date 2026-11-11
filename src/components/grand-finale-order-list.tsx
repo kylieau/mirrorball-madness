@@ -13,6 +13,7 @@ import {
   eliminationPositionRanges,
   grandFinaleBestCasePoints,
   grandFinalePredictionPoints,
+  slotWeeks,
   type GrandFinaleMethod,
   type TierPayStyle,
 } from "@/lib/scoring";
@@ -26,6 +27,10 @@ export type GrandFinaleScoring = {
   tierSize: number | null;
   tierPayStyle: TierPayStyle;
   scoringStartsWeek: number;
+  // Distance counts weeks: the season's Finale week, and the last week the
+  // viewer has watched, through which a week's real eliminations are known.
+  finaleWeek: number;
+  completedThroughWeek: number;
 };
 
 export function statusLabel(couple: GrandFinaleCouple): string {
@@ -62,12 +67,14 @@ export function NextEliminationFrame({ children }: { children: ReactNode }) {
   );
 }
 
-// What a row is worth given the season so far. Positions and the open slot
-// come from the viewer's spoiler-clamped couples, same as everything else.
-export function grandFinaleRowContext(couples: GrandFinaleCouple[]) {
+// What a row is worth given the season so far. Positions, the open slot and
+// the week each slot falls in come from the viewer's spoiler-clamped couples,
+// same as everything else.
+export function grandFinaleRowContext(couples: GrandFinaleCouple[], scoring: GrandFinaleScoring) {
   return {
     positionRanges: eliminationPositionRanges(couples),
     firstOpenPosition: pinnedEliminatedIds(couples).length + 1,
+    slotWeeks: slotWeeks(couples, { finaleWeek: scoring.finaleWeek, completedThroughWeek: scoring.completedThroughWeek }),
   };
 }
 
@@ -102,6 +109,7 @@ export function PointsTag({
         predictedPosition,
         actualPosition: range.start,
         actualPositionEnd: range.end,
+        slotWeeks: context.slotWeeks,
       })
     );
     return (
@@ -122,6 +130,7 @@ export function PointsTag({
       totalCouples,
       predictedPosition,
       firstOpenPosition: context.firstOpenPosition,
+      slotWeeks: context.slotWeeks,
     })
   );
   return (
@@ -240,7 +249,7 @@ export function GrandFinaleOrderList({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const coupleById = new Map(couples.map((c) => [c.id, c]));
-  const rowContext = grandFinaleRowContext(couples);
+  const rowContext = grandFinaleRowContext(couples, scoring);
   const highlightId = showNextEliminationHighlight ? nextPredictedElimination(order, couples) : null;
 
   function nameFor(coupleId: string) {

@@ -739,7 +739,7 @@ export function LeagueModulesForm({
               <SettingRow label="Points per Correctly-Placed Couple" value={formatPoints(bonusPicksPointsPerCorrect)} />
               <SettingRow label="Scoring Method" value={METHOD_ITEMS[bonusMethod]} />
               {bonusMethod === "distance_based" && (
-                <SettingRow label="Points Lost per Spot Off" value={formatPoints(bonusDistancePenalty)} />
+                <SettingRow label="Points Lost per Week Off" value={formatPoints(bonusDistancePenalty)} />
               )}
               {bonusMethod === "band_tier" && (
                 <>
@@ -1275,7 +1275,7 @@ export function LeagueModulesForm({
               </div>
               {bonusMethod === "distance_based" && (
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="bonusDistancePenalty">Points Lost per Spot Off</Label>
+                  <Label htmlFor="bonusDistancePenalty">Points Lost per Week Off</Label>
                   <Input
                     id="bonusDistancePenalty"
                     type="number"

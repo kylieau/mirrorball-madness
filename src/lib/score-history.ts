@@ -13,7 +13,9 @@ import {
   curtainCallPayout,
   eliminationPositionRanges,
   findEliminatedCoupleIds,
+  grandFinaleDistance,
   resolveCurtainCallGuess,
+  slotWeeks,
   sumDanceScoresByCouple,
   nightScaledScoresByCouple,
   type CategoryWeights,
@@ -22,6 +24,7 @@ import {
   type GrandFinaleMethod,
   type Outcome,
   type ScoringSettings,
+  type SlotWeeks,
   type TierPayStyle,
 } from "./scoring";
 import type { ScoringModuleKey } from "./scoring-modules";
@@ -114,26 +117,9 @@ export type ManagerHistoryInput = {
   // resolved at that submit never pay. Factor 1 is full weight and stays quiet.
   grandFinaleLateFactor?: number;
   grandFinaleIneligibleCoupleIds?: ReadonlySet<string>;
-  // Every week of the season with its *planned* eliminations. Doubles are only
-  // known once an episode airs, so this is just the default shape; weeks the
-  // viewer can see use the real count instead (see effectiveSchedule).
-  weekSchedule: WeekSlots[];
+  // The season's Finale week, for the week each bracket spot falls in.
+  finaleWeek: number;
 };
-
-export type WeekSlots = { weekNumber: number; eliminations: number };
-
-// Turns an elimination-order spot into the week that spot is planned for by
-// walking the schedule: a double-elimination week holds two spots, a week
-// with no elimination none. Spots past the last elimination are the finale,
-// which returns null.
-export function plannedEliminationWeek(position: number, schedule: WeekSlots[]): number | null {
-  let slotsSoFar = 0;
-  for (const week of [...schedule].sort((a, b) => a.weekNumber - b.weekNumber)) {
-    slotsSoFar += week.eliminations;
-    if (position <= slotsSoFar) return week.weekNumber;
-  }
-  return null;
-}
 
 const ORDINALS = ["1st", "2nd", "3rd", "4th", "5th"];
 
@@ -143,6 +129,23 @@ function trimNumber(n: number): string {
 
 function weightSuffix(weight: number): string {
   return weight === 1 ? "" : ` × ${trimNumber(weight)} Wt`;
+}
+
+// How far a bracket spot was from the real one: weeks under distance
+// scoring (places inside the Finale), else spots.
+function grandFinaleOffLabel(
+  predictedPosition: number,
+  range: { start: number; end: number },
+  method: GrandFinaleMethod,
+  slots: SlotWeeks
+): string {
+  if (method !== "distance_based") {
+    const spots = Math.max(range.start - predictedPosition, predictedPosition - range.end, 0);
+    return spots === 0 ? "Exact" : `Off ${spots}`;
+  }
+  const { off, unit } = grandFinaleDistance(predictedPosition, range, slots);
+  if (off === 0) return "Exact";
+  return `Off ${off} ${unit === "week" ? (off === 1 ? "wk" : "wks") : off === 1 ? "place" : "places"}`;
 }
 
 export const HIT_MARK = "✓";
@@ -179,17 +182,6 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
   const { scoring, categoryWeights, grandFinale, couples, coupleNames } = input;
   const totalCouples = couples.length;
   const positionRanges = eliminationPositionRanges(couples);
-  const visibleWeeks = new Set(input.weeks.map((week) => week.weekNumber));
-  const effectiveSchedule = input.weekSchedule.map((slot) =>
-    visibleWeeks.has(slot.weekNumber)
-      ? {
-          weekNumber: slot.weekNumber,
-          eliminations: couples.filter(
-            (c) => (c.status === "eliminated" || c.status === "withdrawn") && c.elimination_week === slot.weekNumber
-          ).length,
-        }
-      : slot
-  );
   const nameOf = (coupleId: string | null) => (coupleId && coupleNames.get(coupleId)) || "Unknown";
   const lines: ScoreHistoryLine[] = [];
   const danceCardRule = input.danceCardRule ?? { version: "v1" };
@@ -350,6 +342,8 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
 
     const lateFactor = input.grandFinaleLateFactor ?? 1;
     const ineligible = input.grandFinaleIneligibleCoupleIds;
+    // As the engine scored this week: the weeks through it as they happened.
+    const slots = slotWeeks(couples, { finaleWeek: input.finaleWeek, completedThroughWeek: w });
     for (const resolved of resolvedThisWeek) {
       if (ineligible?.has(resolved.coupleId)) continue;
       const prediction = input.grandFinalePredictions.find((p) => p.coupleId === resolved.coupleId);
@@ -361,17 +355,17 @@ export function buildScoreHistory(input: ManagerHistoryInput): ScoreHistoryLine[
           resolvedCouples: [{ coupleId: resolved.coupleId, actualPosition: range.start, actualPositionEnd: range.end }],
           totalCouples,
           ...grandFinale,
+          slotWeeks: slots,
         }).m ?? 0;
-      const plannedWeek = plannedEliminationWeek(prediction.predictedPosition, effectiveSchedule);
-      const spotsOff = Math.max(range.start - prediction.predictedPosition, prediction.predictedPosition - range.end, 0);
+      const predictedWeek = slots.weekOf(prediction.predictedPosition);
       push(
         w,
         "grandFinale",
         `gf:${resolved.coupleId}`,
-        `${nameOf(resolved.coupleId)}: ${plannedWeek === null ? "Finale" : `Elim W${plannedWeek}`}`,
+        `${nameOf(resolved.coupleId)}: ${predictedWeek === input.finaleWeek ? "Finale" : `Elim W${predictedWeek}`}`,
         raw,
         categoryWeights.bonus,
-        spotsOff === 0 ? "Exact" : `Off ${spotsOff}`,
+        grandFinaleOffLabel(prediction.predictedPosition, range, grandFinale.method, slots),
         lateFactor
       );
     }

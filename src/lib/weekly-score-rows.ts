@@ -6,6 +6,7 @@ import {
   eliminationPositionRanges,
   finalPlacementFromRange,
   RESOLVING_OUTCOMES,
+  slotWeeks,
   type GrandFinaleMethod,
   type Outcome,
   type TierPayStyle,
@@ -44,6 +45,9 @@ export type WeekScoringData = {
   predictions: Row<"predictions">[];
   lateUnlocks: Row<"grand_finale_late_unlocks">[];
   grandFinalePredictions: Row<"grand_finale_predictions">[];
+  // The season's Finale week: Grand Finale distance counts weeks, and every
+  // spot after the last regular week is the Finale.
+  finaleWeekNumber: number;
   // Dance Card v2/v3 only. Every earlier week of the season
   // (danceCardPriorWeeks) and this week's settled outcomes, which default to
   // the outcomes scored here; a reveal passes its published sibling nights'
@@ -51,6 +55,11 @@ export type WeekScoringData = {
   danceCardPriorWeeks?: DanceCardWeek[];
   danceCardWeekOutcomes?: { coupleId: string; bonusPoints: number; outcome: string }[];
 };
+
+// The week marked Finale on Schedule, else the season's last week.
+export function seasonFinaleWeek(weeks: Pick<Row<"competition_weeks">, "week_number" | "is_finale">[]): number {
+  return weeks.find((w) => w.is_finale)?.week_number ?? Math.max(0, ...weeks.map((w) => w.week_number));
+}
 
 // Every live week before `beforeWeekNumber`, as the Dance Card ledger reads
 // it: all live dance rows (posted or published) and the outcomes of
@@ -265,6 +274,10 @@ export function buildWeeklyScoreRows(
           tierSize: scoringSettings.bonus_picks_tier_size,
           tierPayStyle: scoringSettings.bonus_picks_tier_pay_style as TierPayStyle,
           pointsPerCorrect: scoringSettings.bonus_picks_points_per_correct,
+          slotWeeks: slotWeeks(seasonCouples ?? [], {
+            finaleWeek: data.finaleWeekNumber,
+            completedThroughWeek: week.week_number,
+          }),
         }),
         lateByManager
       );
@@ -346,6 +359,8 @@ export function danceCardWeekRows(
       predictions: [],
       lateUnlocks: [],
       grandFinalePredictions: [],
+      // Grand Finale isn't scored here.
+      finaleWeekNumber: week.week_number,
     },
     week,
     episodeId,

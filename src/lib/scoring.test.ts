@@ -9,7 +9,9 @@ import {
   eliminationPositionRanges,
   finalPlacementFromRange,
   grandFinaleBestCasePoints,
+  grandFinaleDistance,
   grandFinalePredictionPoints,
+  slotWeeks,
   computeWeeklyScores,
   curtainCallNearMiss2Points,
   curtainCallNearMissPoints,
@@ -23,6 +25,9 @@ import {
   type DanceScore,
   type ScoringSettings,
 } from "./scoring";
+
+// Every spot its own week, as Grand Finale scored before it counted weeks.
+const perSpot = slotWeeks([], { finaleWeek: 100, completedThroughWeek: 0 });
 
 const settings: ScoringSettings = {
   judgesScoreMultiplier: 1,
@@ -1031,6 +1036,7 @@ describe("computeGrandFinalePoints", () => {
       tierSize: null,
       tierPayStyle: "equal",
       pointsPerCorrect: 50,
+      slotWeeks: perSpot,
     });
 
     expect(points.alice).toBe(50);
@@ -1050,6 +1056,7 @@ describe("computeGrandFinalePoints", () => {
       tierSize: null,
       tierPayStyle: "equal",
       pointsPerCorrect: 50,
+      slotWeeks: perSpot,
     });
 
     expect(points.alice).toBe(45); // 1 position off: 50 - 1*5
@@ -1074,6 +1081,7 @@ describe("computeGrandFinalePoints", () => {
       tierSize: 3,
       tierPayStyle: "equal",
       pointsPerCorrect: 50,
+      slotWeeks: perSpot,
     });
 
     expect(points.alice).toBe(100); // both couples in the right band
@@ -1096,6 +1104,7 @@ describe("computeGrandFinalePoints", () => {
       tierSize: 3,
       tierPayStyle: "graded",
       pointsPerCorrect: 100,
+      slotWeeks: perSpot,
     });
 
     expect(points.alice).toBe(175); // band 0 at 100% + band 1 at 75%
@@ -1111,6 +1120,7 @@ describe("computeGrandFinalePoints", () => {
       tierSize: null,
       tierPayStyle: "equal",
       pointsPerCorrect: 50,
+      slotWeeks: perSpot,
     });
 
     expect(points).toEqual({});
@@ -1196,6 +1206,7 @@ describe("grandFinalePredictionPoints", () => {
     tierSize: null,
     tierPayStyle: "equal" as const,
     pointsPerCorrect: 20,
+    slotWeeks: perSpot,
   };
 
   it("credits a prediction inside a multi-couple week's range as exact", () => {
@@ -1207,6 +1218,50 @@ describe("grandFinalePredictionPoints", () => {
   });
 });
 
+describe("Grand Finale distance in weeks", () => {
+  // Week 1 sends one couple home, Week 2 none, Week 3 two; Week 4 is still to
+  // come and Week 5 is the Finale, which holds every spot left (8 couples).
+  const couples = [
+    { status: "eliminated", elimination_week: 1 },
+    { status: "eliminated", elimination_week: 3 },
+    { status: "eliminated", elimination_week: 3 },
+    ...Array.from({ length: 5 }, () => ({ status: "active", elimination_week: null })),
+  ];
+  const weeks = slotWeeks(couples, { finaleWeek: 5, completedThroughWeek: 3 });
+  const params = {
+    totalCouples: 8,
+    method: "distance_based" as const,
+    distancePenalty: 5,
+    tierSize: null,
+    tierPayStyle: "equal" as const,
+    pointsPerCorrect: 20,
+    slotWeeks: weeks,
+  };
+
+  it("puts each spot in the week it falls in: doubles hold two, a week without an elimination none", () => {
+    expect([1, 2, 3, 4, 5, 6, 7, 8].map((spot) => weeks.weekOf(spot))).toEqual([1, 3, 3, 4, 5, 5, 5, 5]);
+  });
+
+  it("counts a double elimination as one week and a week without one as a week", () => {
+    // Spot 2 went home in Week 3; spot 1 was Week 1, two weeks earlier.
+    expect(grandFinaleDistance(1, { start: 2, end: 3 }, weeks)).toEqual({ off: 2, unit: "week" });
+    // Spot 4 is Week 4, one week after the double.
+    expect(grandFinalePredictionPoints({ ...params, predictedPosition: 4, actualPosition: 2, actualPositionEnd: 3 })).toBe(15);
+  });
+
+  it("counts places inside the Finale, and the weeks to it from outside", () => {
+    expect(grandFinaleDistance(8, { start: 6, end: 6 }, weeks)).toEqual({ off: 2, unit: "place" });
+    // Predicted to win, out in Week 1: four weeks off.
+    expect(grandFinaleDistance(8, { start: 1, end: 1 }, weeks)).toEqual({ off: 4, unit: "week" });
+    expect(grandFinalePredictionPoints({ ...params, predictedPosition: 8, actualPosition: 1 })).toBe(0);
+  });
+
+  it("caps the best case of a couple still in by weeks too", () => {
+    // Predicted for spot 1 (Week 1), the earliest it can still go is Week 4.
+    expect(grandFinaleBestCasePoints({ ...params, predictedPosition: 1, firstOpenPosition: 4 })).toBe(5);
+  });
+});
+
 describe("grandFinaleBestCasePoints", () => {
   const params = {
     totalCouples: 16,
@@ -1215,6 +1270,7 @@ describe("grandFinaleBestCasePoints", () => {
     tierSize: null,
     tierPayStyle: "equal" as const,
     pointsPerCorrect: 20,
+    slotWeeks: perSpot,
   };
 
   it("is the full payout while the predicted slot is still open", () => {

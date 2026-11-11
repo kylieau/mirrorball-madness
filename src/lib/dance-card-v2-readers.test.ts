@@ -94,6 +94,7 @@ function storedRosterPoints(version = "v2"): Map<number, number> {
         predictions: [],
         lateUnlocks: [],
         grandFinalePredictions: [],
+        finaleWeekNumber: 99,
         danceCardPriorWeeks: danceCardPriorWeeks(snapshotLike, week.weekNumber),
       },
       { id: `w${week.weekNumber}`, week_number: week.weekNumber, is_double_elimination_week: false },
@@ -146,7 +147,7 @@ describe("Dance Card v2 readers", () => {
       rosterSlots: slots,
       predictions: [],
       grandFinalePredictions: [],
-      weekSchedule: weeks.map((w) => ({ weekNumber: w.weekNumber, eliminations: 1 })),
+      finaleWeek: 99,
     };
     const lines = buildScoreHistory(input).filter((line) => line.module === "danceCard");
     const rate = (points: number, weekInput: number) => String(Math.round((points / weekInput) * 1000) / 1000);
@@ -239,7 +240,7 @@ describe("Dance Card v3 readers", () => {
       rosterSlots: slots,
       predictions: [],
       grandFinalePredictions: [],
-      weekSchedule: weeks.map((w) => ({ weekNumber: w.weekNumber, eliminations: 1 })),
+      finaleWeek: 99,
     }).filter((line) => line.module === "danceCard");
     expect(lines.map((line) => [line.weekNumber, line.label, line.points])).toEqual(
       expect.arrayContaining([
@@ -291,7 +292,7 @@ describe("a two-night week still posting", () => {
       rosterSlots: slots.slice(0, 1),
       predictions: [],
       grandFinalePredictions: [],
-      weekSchedule: [2, 3, 4].map((weekNumber) => ({ weekNumber, eliminations: 1 })),
+      finaleWeek: 99,
     });
     const rate = credit(42, 98) / 56;
     const bonus = Math.round(2 * rate * 100) / 100;

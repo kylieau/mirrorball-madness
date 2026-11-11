@@ -20,6 +20,7 @@ import { isOwnMembership } from "@/lib/acting-manager";
 import { formatManagerName } from "@/lib/manager-display";
 import { danceMaxScore, danceScoreColumns } from "@/lib/episode-teams";
 import { loadAllCouples, loadTeamsMode, loadViewerSeason } from "@/lib/viewer-season-data";
+import { seasonFinaleWeek } from "@/lib/weekly-score-rows";
 
 // Matches the fallback the scoring engine (results.ts) applies, not the Picks UI default.
 const GRAND_FINALE_SCORED_METHOD_FALLBACK: GrandFinaleMethod = "exact_position";
@@ -243,10 +244,7 @@ export async function loadScoreHistory(
             },
           ];
     }),
-    weekSchedule: weekRows.map((week) => ({
-      weekNumber: week.week_number,
-      eliminations: week.is_double_elimination_week ? 2 : week.is_elimination_week ? 1 : 0,
-    })),
+    finaleWeek: seasonFinaleWeek(weekRows),
     grandFinalePredictions: (grandFinalePredictions ?? []).map((p) => ({
       coupleId: p.couple_id,
       predictedPosition: p.predicted_position,

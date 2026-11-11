@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "./supabase/types";
 import { isTeamRow, PLAN_VERSION, recombinedTotal, scoringDance, settledBonuses, teamScoreRows, type PublicationSnapshot, type ScoringDance } from "./episode-publication";
-import { buildWeeklyScoreRows, danceCardPriorWeeks, type WeeklyScoreRow } from "./weekly-score-rows";
+import { buildWeeklyScoreRows, danceCardPriorWeeks, seasonFinaleWeek, type WeeklyScoreRow } from "./weekly-score-rows";
 import { usesDanceCardLedger } from "./dance-card-v2";
 import { roundPoints } from "./format-points";
 import { scaledJudgesScore } from "./scoring";
@@ -28,6 +28,7 @@ function revealWeeklyScores(snapshot: PublicationSnapshot, week: WeekRow, episod
   const judgeRows = (dances: ScoringDance[]) => buildWeeklyScoreRows({
     dances, episodes: snapshot.episodes, outcomes: [], jeopardy: [], couples: snapshot.couples, leagues: snapshot.leagues,
     settings: snapshot.settings, rosters: snapshot.rosters, predictions: [], lateUnlocks: [], grandFinalePredictions: [],
+    finaleWeekNumber: seasonFinaleWeek(snapshot.weeks),
     ...danceCardInputs,
   }, week, episodeId, [], { reveal: true });
   const key = (row: WeeklyScoreRow) => `${row.league_id}:${row.manager_id}`;

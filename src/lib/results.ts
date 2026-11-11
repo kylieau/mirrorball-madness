@@ -2,7 +2,7 @@ import type { PublicationSnapshot } from "./episode-publication";
 import type { Json } from "./supabase/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { buildWeeklyScoreRows, danceCardPriorWeeks } from "@/lib/weekly-score-rows";
+import { buildWeeklyScoreRows, danceCardPriorWeeks, seasonFinaleWeek } from "@/lib/weekly-score-rows";
 import { participantIdsToPersist, selectableCast } from "@/lib/episode-cast";
 import { sortJudgesForDisplay } from "@/lib/couple-display";
 import { resolveGuestJudgeIds } from "@/lib/admin-people";
@@ -226,6 +226,7 @@ export async function recomputeWeekScores(
     couples: snapshot.couples, leagues: snapshot.leagues, settings: snapshot.settings,
     rosters: snapshot.rosters, predictions: snapshot.predictions,
     lateUnlocks: snapshot.lateUnlocks, grandFinalePredictions: snapshot.grandFinalePredictions,
+    finaleWeekNumber: seasonFinaleWeek(snapshot.weeks),
     danceCardPriorWeeks: danceCardPriorWeeks(snapshot, week.week_number),
   }, week, thisEpisodeId, thisEpisodeOutcomeRows);
   const result = await admin.rpc("replace_weekly_scores", { p_episode_id: thisEpisodeId, p_revision: snapshot._revision!, p_rows: rows as unknown as Json });

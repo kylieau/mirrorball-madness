@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "./supabase/types";
-import { buildWeeklyScoreRows, danceCardPriorWeeks, danceCardWeekRows, type WeeklyScoreRow } from "./weekly-score-rows";
+import { buildWeeklyScoreRows, danceCardPriorWeeks, danceCardWeekRows, seasonFinaleWeek, type WeeklyScoreRow } from "./weekly-score-rows";
 import { usesDanceCardLedger, type DanceCardWeek } from "./dance-card-v2";
 import {
   buildLifelinePayouts,
@@ -441,6 +441,7 @@ export function buildPublicationPlan(
       predictions: snapshot.predictions,
       lateUnlocks: snapshot.lateUnlocks,
       grandFinalePredictions: snapshot.grandFinalePredictions,
+      finaleWeekNumber: seasonFinaleWeek(snapshot.weeks),
       danceCardPriorWeeks: danceCardPriorWeeks(snapshot, week.week_number),
     },
     week,

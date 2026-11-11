@@ -563,6 +563,36 @@ export type ResolvedCouple = {
   actualPositionEnd?: number;
 };
 
+// Which week each spot of the elimination order falls in: a week that has
+// happened holds the couples it actually sent home (two for a double, none
+// for a week without an elimination), a later week one, and every spot left
+// is the Finale.
+export type SlotWeeks = { weekOf: (position: number) => number; finaleWeek: number };
+
+export function slotWeeks(
+  couples: { status: string; elimination_week: number | null }[],
+  { finaleWeek, completedThroughWeek }: { finaleWeek: number; completedThroughWeek: number }
+): SlotWeeks {
+  const outByWeek = new Map<number, number>();
+  for (const c of couples) {
+    if ((c.status === "eliminated" || c.status === "withdrawn") && c.elimination_week !== null) {
+      outByWeek.set(c.elimination_week, (outByWeek.get(c.elimination_week) ?? 0) + 1);
+    }
+  }
+  const lastHappened = Math.max(completedThroughWeek, ...outByWeek.keys());
+  return {
+    finaleWeek,
+    weekOf(position) {
+      let spots = 0;
+      for (let week = 1; week < finaleWeek; week++) {
+        spots += week <= lastHappened ? (outByWeek.get(week) ?? 0) : 1;
+        if (position <= spots) return week;
+      }
+      return finaleWeek;
+    },
+  };
+}
+
 type GrandFinaleScoringParams = {
   totalCouples: number;
   method: GrandFinaleMethod;
@@ -570,19 +600,38 @@ type GrandFinaleScoringParams = {
   tierSize: number | null;
   tierPayStyle: TierPayStyle;
   pointsPerCorrect: number;
+  slotWeeks: SlotWeeks;
 };
+
+// Distance scoring counts weeks, not spots (Kylie, 2026-11-10): a couple
+// predicted for the week they went home is exact, a double elimination is
+// one week, and a week without an elimination still counts. Inside the
+// Finale, where every place is decided the same night, each place counts.
+export function grandFinaleDistance(
+  predictedPosition: number,
+  actual: { start: number; end: number },
+  { weekOf, finaleWeek }: SlotWeeks
+): { off: number; unit: "week" | "place" } {
+  const predictedWeek = weekOf(predictedPosition);
+  const firstWeek = weekOf(actual.start);
+  const lastWeek = weekOf(actual.end);
+  if (predictedWeek === finaleWeek && firstWeek === finaleWeek) {
+    return { off: Math.max(actual.start - predictedPosition, predictedPosition - actual.end, 0), unit: "place" };
+  }
+  return { off: Math.max(firstWeek - predictedWeek, predictedWeek - lastWeek, 0), unit: "week" };
+}
 
 function grandFinalePointsAt(
   predictedPosition: number,
   actualPosition: number,
-  { totalCouples, method, distancePenalty, tierSize, tierPayStyle, pointsPerCorrect }: GrandFinaleScoringParams
+  { totalCouples, method, distancePenalty, tierSize, tierPayStyle, pointsPerCorrect, slotWeeks }: GrandFinaleScoringParams
 ): number {
   if (method === "exact_position") {
     return predictedPosition === actualPosition ? pointsPerCorrect : 0;
   }
   if (method === "distance_based") {
-    const distance = Math.abs(predictedPosition - actualPosition);
-    return Math.max(0, pointsPerCorrect - distance * (distancePenalty ?? 0));
+    const { off } = grandFinaleDistance(predictedPosition, { start: actualPosition, end: actualPosition }, slotWeeks);
+    return Math.max(0, pointsPerCorrect - off * (distancePenalty ?? 0));
   }
   const width = tierSize ?? 1;
   const actualBand = bandOf(actualPosition, totalCouples, width);
@@ -676,6 +725,7 @@ export function computeGrandFinalePoints({
   tierSize,
   tierPayStyle,
   pointsPerCorrect,
+  slotWeeks,
 }: {
   predictions: GrandFinalePrediction[];
   resolvedCouples: ResolvedCouple[];
@@ -685,6 +735,7 @@ export function computeGrandFinalePoints({
   tierSize: number | null;
   tierPayStyle: TierPayStyle;
   pointsPerCorrect: number;
+  slotWeeks: SlotWeeks;
 }): Record<string, number> {
   const resolvedByCouple = new Map(resolvedCouples.map((r) => [r.coupleId, r]));
 
@@ -704,6 +755,7 @@ export function computeGrandFinalePoints({
       tierSize,
       tierPayStyle,
       pointsPerCorrect,
+      slotWeeks,
     });
 
     pointsByManager[p.managerId] = (pointsByManager[p.managerId] ?? 0) + points;

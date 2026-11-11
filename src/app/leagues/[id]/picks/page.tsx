@@ -39,6 +39,7 @@ import {
   selectCurtainCallWeek,
 } from "@/lib/past-picks";
 import { couplesRemainingAtWeek, curtainCallPayout, type GrandFinaleMethod, type TierPayStyle } from "@/lib/scoring";
+import { seasonFinaleWeek } from "@/lib/weekly-score-rows";
 import {
   ELIMINATION_PREDICTION_POINTS_DEFAULT,
   TOP_SCORER_PREDICTION_POINTS_DEFAULT,
@@ -240,6 +241,8 @@ export default async function LeaguePicksPage({
     // Before a draft completes, the stored anchor is stale: the draft will
     // freeze it forward to the next unaired week, so price couples on that.
     scoringStartsWeek: anchorWeekData ?? scoringSettings?.judges_score_starts_week ?? 1,
+    finaleWeek: seasonFinaleWeek(groupedWeeks),
+    completedThroughWeek: cutoff.effectiveLatestEpisode?.week_number ?? 0,
   };
   // Section labels (🔮 Curtain Call / 🪩 Dance Card / 🏆 Grand Finale) only
   // earn their keep once there's more than one module on the page to tell

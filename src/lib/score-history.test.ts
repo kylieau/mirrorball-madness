@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   buildScoreHistory,
-  plannedEliminationWeek,
   groupHistory,
   withLifelineLines,
   withTradeLines,
@@ -16,6 +15,7 @@ import {
   eliminationPositionRanges,
   finalPlacementFromRange,
   RESOLVING_OUTCOMES,
+  slotWeeks,
   type CategoryWeights,
   type ScoringSettings,
 } from "./scoring";
@@ -115,16 +115,8 @@ const weeks: HistoryWeekData[] = [
   },
 ];
 
-// Week 2 is planned as a single elimination even though two couples actually
-// went home: a double is only known once it airs.
-const weekSchedule = [
-  { weekNumber: 1, eliminations: 1 },
-  { weekNumber: 2, eliminations: 1 },
-  { weekNumber: 3, eliminations: 0 },
-];
-
 const base: ManagerHistoryInput = {
-  weekSchedule,
+  finaleWeek: 4,
   scoring,
   anchorWeek: 1,
   categoryWeights: { judges: 1, eliminations: 1, bonus: 1 },
@@ -176,6 +168,7 @@ function engineWeek(input: ManagerHistoryInput, week: HistoryWeekData) {
       })),
       totalCouples: total,
       ...input.grandFinale,
+      slotWeeks: slotWeeks(input.couples, { finaleWeek: input.finaleWeek, completedThroughWeek: week.weekNumber }),
     }),
     lateByManager
   );
@@ -301,10 +294,10 @@ describe("buildScoreHistory lines", () => {
     expect(week3).toEqual(["Home: Ilona · 🤏", "High: Ilona · 🤏"]);
   });
 
-  it("credits Grand Finale picks when the couple's position resolves, tagged Exact or by how many spots off", () => {
+  it("credits Grand Finale picks when the couple's position resolves, tagged Exact or by how many weeks off", () => {
     const gf = lines.filter((l) => l.module === "grandFinale");
     expect(gf.find((l) => l.label.includes("Ezra"))).toMatchObject({ weekNumber: 1 });
-    expect(text(gf.find((l) => l.label.includes("Ezra"))!)).toBe("Ezra: Elim W2 · Off 1");
+    expect(text(gf.find((l) => l.label.includes("Ezra"))!)).toBe("Ezra: Elim W2 · Off 1 wk");
     expect(text(gf.find((l) => l.label.includes("Danny"))!)).toBe("Danny: Elim W2 · Exact");
     expect(text(gf.find((l) => l.label.includes("Robert"))!)).toBe("Robert: Elim W2 · Exact");
     expect(gf.find((l) => l.label.includes("Ilona"))).toMatchObject({ weekNumber: 3 });
@@ -357,24 +350,6 @@ describe("buildScoreHistory lines", () => {
     const clamped = buildScoreHistory({ ...base, weeks: weeks.slice(0, 1) });
     expect(clamped.every((l) => l.weekNumber === 1)).toBe(true);
     expect(clamped.some((l) => l.label.includes("1st Place"))).toBe(false);
-  });
-});
-
-describe("plannedEliminationWeek", () => {
-  const schedule = [
-    { weekNumber: 1, eliminations: 1 },
-    { weekNumber: 2, eliminations: 0 },
-    { weekNumber: 3, eliminations: 2 },
-    { weekNumber: 4, eliminations: 1 },
-    { weekNumber: 5, eliminations: 0 },
-  ];
-
-  it("maps each spot to the week that eliminates it, counting doubles and skipping no-elimination weeks", () => {
-    expect([1, 2, 3, 4].map((spot) => plannedEliminationWeek(spot, schedule))).toEqual([1, 3, 3, 4]);
-  });
-
-  it("returns null for spots past the last elimination (the finale)", () => {
-    expect(plannedEliminationWeek(5, schedule)).toBeNull();
   });
 });
 
