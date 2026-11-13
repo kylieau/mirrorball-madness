@@ -48,13 +48,14 @@ weighted Lifeline and trade points, as Standings shows the Dance Card
 total), not reverse total standings, since a claim can only change Dance
 Card points. Built in `supabase/apply-recast-dance-card-order.sql`,
 `recastOrder`, the Waiver Order fold, `RECAST_RULES` and the tests.
-- Apply the SQL only after the Week 9 run stamps `recast_cycles` (due
-  2026-11-13 05:59Z, Thu Nov 12 ~10 PM PT): the pending claims were saved
-  under the old rule, and in both leagues with claims the claimants keep the
-  same relative order either way, so nothing turns on it. Deploy the app with
-  it; until both are live the fold and the run can disagree (display only).
-- The last run of S35 is about 2026-11-19, so the rule decides at most one
-  run this season.
+- Applied live by Kylie on 2026-11-12 (about 5 PM PT), before the Week 9
+  run, and read back: new columns, order matching the Dance Card table in
+  all three leagues. She chose before rather than after, since in both
+  leagues with claims the claimants keep the same relative order either
+  way. The app (`0310b93`) was pushed the same hour; until Vercel has it
+  the fold shows the old order while the run uses the new one.
+- The last run of S35 is about 2026-11-19, so the rule decides tonight's run
+  and one more this season.
 - The Dance Card figure in the fold no longer matches the leaderboard beside
   it; the fold's intro says what it is.
 
