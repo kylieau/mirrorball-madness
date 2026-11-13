@@ -213,7 +213,7 @@ export async function updateLeagueSettings(
   const { error } = await supabase.rpc("update_league_settings", {
     p_league_id: leagueId,
     p_waiver_mode: input.waiverMode,
-    // Recast has one method, reverse standings. The generated RPC arg type
+    // Recast has one method, reverse Dance Card standings. The generated RPC arg type
     // doesn't model that this Postgres param accepts NULL (required when
     // waiver_mode is "locked"); the DB happily allows it.
     p_waiver_claim_method: (input.waiverMode === "waivers" ? "reverse_standings" : null) as string,

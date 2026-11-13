@@ -101,12 +101,19 @@ export default async function WaiversPage({
   });
 
   const weekNumberById = new Map(base.completedEpisodes.map((week) => [week.id, week.week_number]));
+  const danceCardWeight = base.scoringSettings?.judges_score_category_weight ?? 1;
   const order = recastOrder(
     (members ?? []).map((member) => ({ managerId: member.user_id, draftRank: recastDraftRank(league, member) })),
     base.scoreRows.flatMap((row) => {
       const weekNumber = weekNumberById.get(row.week_id);
       return weekNumber != null && cutoff.allowedEpisodeIds.has(row.week_id)
-        ? [{ managerId: row.manager_id, weekNumber, totalPoints: row.total_points }]
+        ? [
+            {
+              managerId: row.manager_id,
+              weekNumber,
+              danceCardPoints: row.roster_points * danceCardWeight + (row.lifeline_points ?? 0) + (row.transfer_points ?? 0),
+            },
+          ]
         : [];
     })
   );

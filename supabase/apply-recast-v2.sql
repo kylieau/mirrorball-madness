@@ -191,7 +191,11 @@ grant execute on function public.recast_next_cycle(uuid) to authenticated, servi
 
 -- Reverse standings: lowest season total first, then the lower most recent
 -- week, then whoever picked later in the draft's first round.
-create or replace function public.recast_order(p_league_id uuid)
+-- apply-recast-dance-card-order.sql redefines this with other return
+-- columns, so a re-apply of this file drops it first and that file goes
+-- after this one again.
+drop function if exists public.recast_order(uuid);
+create function public.recast_order(p_league_id uuid)
 returns table (manager_id uuid, list_position int, season_total numeric, last_week_total numeric)
 language sql
 stable

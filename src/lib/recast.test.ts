@@ -7,8 +7,8 @@ describe("recastOrder", () => {
     { managerId: "second-pick", draftRank: 2 },
     { managerId: "third-pick", draftRank: 3 },
   ];
-  const ids = (totals: [string, number, number][]) =>
-    recastOrder(managers, totals.map(([managerId, weekNumber, totalPoints]) => ({ managerId, weekNumber, totalPoints }))).map(
+  const ids = (points: [string, number, number][]) =>
+    recastOrder(managers, points.map(([managerId, weekNumber, danceCardPoints]) => ({ managerId, weekNumber, danceCardPoints }))).map(
       (entry) => entry.managerId
     );
 
@@ -16,7 +16,7 @@ describe("recastOrder", () => {
     expect(ids([])).toEqual(["third-pick", "second-pick", "first-pick"]);
   });
 
-  it("puts the lowest season total first", () => {
+  it("puts the fewest Dance Card points first", () => {
     expect(ids([["first-pick", 8, 5], ["second-pick", 8, 20], ["third-pick", 8, 12]])).toEqual([
       "first-pick",
       "third-pick",
@@ -44,10 +44,10 @@ describe("recastOrder", () => {
 
   it("reports the totals it ordered by, rounded like every other points total", () => {
     const totals = [
-      { managerId: "first-pick", weekNumber: 8, totalPoints: 0.1 },
-      { managerId: "first-pick", weekNumber: 9, totalPoints: 0.2 },
+      { managerId: "first-pick", weekNumber: 8, danceCardPoints: 0.1 },
+      { managerId: "first-pick", weekNumber: 9, danceCardPoints: 0.2 },
     ];
-    expect(recastOrder(managers, totals)[2]).toEqual({ managerId: "first-pick", seasonTotal: 0.3, lastWeekTotal: 0.2 });
+    expect(recastOrder(managers, totals)[2]).toEqual({ managerId: "first-pick", danceCardTotal: 0.3, lastWeekDanceCard: 0.2 });
   });
 });
 

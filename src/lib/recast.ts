@@ -27,38 +27,38 @@ export function recastDraftRank(
   return index < 0 ? null : index + 1;
 }
 
-export type RecastOrderEntry = { managerId: string; seasonTotal: number; lastWeekTotal: number };
+export type RecastOrderEntry = { managerId: string; danceCardTotal: number; lastWeekDanceCard: number };
 
-// Reverse standings, the order a waiver run takes turns in: lowest season
-// total first, then the lower most recent week, then whoever drafted later.
-// Mirrors recast_order in SQL, which is the one the run uses; this one reads
-// the weeks the viewer can see.
+// Reverse Dance Card standings, mirroring recast_order: a claim can only
+// change Dance Card points, so the wire goes first to the roster that needs
+// it. danceCardPoints is a week's Dance Card total as Standings shows it
+// (roster points at the league's weight plus Lifeline and trade points).
 export function recastOrder(
   managers: { managerId: string; draftRank: number | null }[],
-  weeklyTotals: { managerId: string; weekNumber: number; totalPoints: number }[]
+  weeklyPoints: { managerId: string; weekNumber: number; danceCardPoints: number }[]
 ): RecastOrderEntry[] {
-  const lastWeek = Math.max(...weeklyTotals.map((row) => row.weekNumber));
+  const lastWeek = Math.max(...weeklyPoints.map((row) => row.weekNumber));
   const total = (managerId: string, weekNumber?: number) =>
     roundPoints(
-      weeklyTotals
+      weeklyPoints
         .filter((row) => row.managerId === managerId && (weekNumber == null || row.weekNumber === weekNumber))
-        .reduce((sum, row) => sum + row.totalPoints, 0)
+        .reduce((sum, row) => sum + row.danceCardPoints, 0)
     );
   return managers
     .map((manager) => ({
       managerId: manager.managerId,
       draftRank: manager.draftRank,
-      seasonTotal: total(manager.managerId),
-      lastWeekTotal: total(manager.managerId, lastWeek),
+      danceCardTotal: total(manager.managerId),
+      lastWeekDanceCard: total(manager.managerId, lastWeek),
     }))
     .sort(
       (x, y) =>
-        x.seasonTotal - y.seasonTotal ||
-        x.lastWeekTotal - y.lastWeekTotal ||
+        x.danceCardTotal - y.danceCardTotal ||
+        x.lastWeekDanceCard - y.lastWeekDanceCard ||
         (y.draftRank ?? -Infinity) - (x.draftRank ?? -Infinity) ||
         x.managerId.localeCompare(y.managerId)
     )
-    .map(({ managerId, seasonTotal, lastWeekTotal }) => ({ managerId, seasonTotal, lastWeekTotal }));
+    .map(({ managerId, danceCardTotal, lastWeekDanceCard }) => ({ managerId, danceCardTotal, lastWeekDanceCard }));
 }
 
 export type RecastWireEntry = { coupleId: string; droppedBy: string | null };
@@ -99,7 +99,7 @@ export function moveRecastClaim(list: RecastClaim[], index: number, by: -1 | 1):
 export const RECAST_RULES = [
   "Recast is Mirrorball's waiver wire. Rank the claims you want: each one fills an open roster spot or swaps out a couple you hold.",
   "Waiver lists are private. A waiver run decides every list 48 hours after a week's results are posted, with no commissioner step.",
-  "Managers take turns in reverse standings order: lowest season total first, then the lower latest week, then the later draft pick. A turn awards that manager's highest claim that can still win, and the turns repeat until no claim can.",
+  "Managers take turns in reverse Dance Card order: fewest Dance Card points first (Lifeline and trade points included), then the lower latest week, then the later draft pick. A turn awards that manager's highest claim that can still win, and the turns repeat until no claim can.",
   "A drop only happens if its claim wins. A couple a manager may drop shows on the wire, and anyone else can claim them in the same run.",
   "A new couple starts scoring in the next week that hasn't aired. The couple they replace keeps scoring for their manager until then.",
   "A couple you drop can't be claimed back by you in that run or the next one.",

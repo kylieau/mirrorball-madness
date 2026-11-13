@@ -327,9 +327,9 @@ export function RecastPanel({
       {order.length > 0 && (
         <FoldCard title="Waiver Order" note={myTurn > 0 ? `You're ${ordinal(myTurn)} of ${order.length}` : undefined}>
           <p className="mb-3 text-xs text-muted-foreground">
-            Reverse standings{orderThroughWeek != null ? ` through ${formatEpisodeCasual(orderThroughWeek)}` : ""}: lowest
-            season total first, then the lower latest week, then the later draft pick. It is set when the run starts and
-            says nothing about who gets whom.
+            Reverse Dance Card standings{orderThroughWeek != null ? ` through ${formatEpisodeCasual(orderThroughWeek)}` : ""}:
+            fewest Dance Card points first (Lifeline and trade points included), then the lower latest week, then the
+            later draft pick. It is set when the run starts and says nothing about who gets whom.
           </p>
           <ol className="flex flex-col">
             {order.map((entry, index) => (
@@ -342,7 +342,7 @@ export function RecastPanel({
                   <span className="min-w-0 [overflow-wrap:anywhere]">{managerName(entry.managerId)}</span>
                   {entry.managerId === teamId && <YouPill />}
                 </span>
-                <span className="shrink-0 font-heading">{formatPoints(entry.seasonTotal)}</span>
+                <span className="shrink-0 font-heading">{formatPoints(entry.danceCardTotal)}</span>
               </li>
             ))}
           </ol>

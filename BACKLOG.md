@@ -40,6 +40,24 @@ Offered to Kylie, not answered and not built:
 - `couplePath` in `src/lib/strong-play-ceilings.ts` still gives 4th place no
   Finale survival; re-solve the v3 rates with it for a future season, not S35.
 
+## Waiver order by Dance Card — 2026-11-13
+
+Kylie's call (2026-11-13): the waiver order is reverse Dance Card standings
+(raw `roster_points` × the league's Dance Card weight plus the already
+weighted Lifeline and trade points, as Standings shows the Dance Card
+total), not reverse total standings, since a claim can only change Dance
+Card points. Built in `supabase/apply-recast-dance-card-order.sql`,
+`recastOrder`, the Waiver Order fold, `RECAST_RULES` and the tests.
+- Apply the SQL only after the Week 9 run stamps `recast_cycles` (due
+  2026-11-13 05:59Z, Thu Nov 12 ~10 PM PT): the pending claims were saved
+  under the old rule, and in both leagues with claims the claimants keep the
+  same relative order either way, so nothing turns on it. Deploy the app with
+  it; until both are live the fold and the run can disagree (display only).
+- The last run of S35 is about 2026-11-19, so the rule decides at most one
+  run this season.
+- The Dance Card figure in the fold no longer matches the leaderboard beside
+  it; the fold's intro says what it is.
+
 ## Lifeline, Recast and Trades — 2026-11-11
 
 Released 2026-11-11 (`docs/design/lifeline-recast-trades/plan.md`, As Built):
@@ -57,8 +75,23 @@ the pages, Home card and Recent Activity read right. The league was deleted
 after. Still unchecked:
 - A points leg in a trade, and the open-offer / waiver-claim guard: both
   test offers were refused by an earlier check first. PGlite tests cover them.
-- Lifeline end to end against the live project (the turn-on sheet and
-  Equalizer numbers, a pick, the lock): still made-up data only.
+- Lifeline end to end against the live project. Seen live 2026-11-12 in a
+  scratch league (throwaway accounts, deleted after): the turn-on sheet
+  with an empty Equalizer ("No roster spot sat idle before Week 10"), the
+  enabled Settings row, the Transactions card and Open Lifeline on Picks,
+  the Lifeline page with no open spot, and Turn Off; no console errors.
+  Still made-up data only: Equalizer amounts above zero, a pick, the lock
+  and settlement. A scratch league can't reach them before E11 publishes:
+  the draft only takes couples still dancing, so no spot is dead, and the
+  league has no scored week. **The real leagues already have**: the three
+  West-lock leagues turned Lifeline on from Week 10 with the Equalizer
+  (read 2026-11-13: 16 `lifeline_equalizer` rows, ten Week 10 picks by six
+  managers, every picked couple still dancing). So the lock (Tue
+  2026-11-17) and the settlement inside E11's publish are the first live
+  runs of those paths; `apply_lifeline_settlement` refuses a plan without
+  payouts, and the night is rehearsed in the PGlite tests. After E11
+  publishes, check `lifeline_payouts` against the picks and
+  `scripts/dance-card-v2.ts --verify`.
 - The Home card says "Ends in 1d" for a 48-hour offer (largest unit, floored).
 
 Known limits, none fixed:

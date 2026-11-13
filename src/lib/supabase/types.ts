@@ -3439,10 +3439,10 @@ export type Database = {
       recast_order: {
         Args: { p_league_id: string }
         Returns: {
-          last_week_total: number
+          last_week_dance_card: number
           list_position: number
           manager_id: string
-          season_total: number
+          dance_card_total: number
         }[]
       }
       recast_pending_drops: {

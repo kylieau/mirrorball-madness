@@ -23,7 +23,7 @@ const LIVE_STACK = [
   "apply-draft-release-own-rows", "apply-whole-judge-marks", "apply-special-draft-release",
   "apply-contributor-special-setup", "apply-draft-lineup", "apply-retire-special-leftovers", "apply-episode-rounds",
   "apply-special-dance-label", "apply-dance-card-v2", "apply-dance-card-v3", "apply-lifeline", "apply-recast-v2",
-  "apply-recast-after-results",
+  "apply-recast-after-results", "apply-recast-dance-card-order",
 ];
 let db: PGlite;
 
@@ -153,22 +153,30 @@ describe("Recast as a ranked waiver list", () => {
     expect(await nextCycle()).toEqual({ week: 9, start: 10, results_in: true, due_in_hours: 1 });
   });
 
-  it("breaks ties on the most recent week, then on who drafted later", async () => {
-    const scores = (rows: [string, string, number][]) =>
-      db.query(`insert into public.weekly_manager_scores(league_id, manager_id, week_id, total_points)
-        select $1, (r->>0)::uuid, (r->>1)::uuid, (r->>2)::numeric from jsonb_array_elements($2::jsonb) r`, [tieLeague, JSON.stringify(rows)]);
+  it("orders by Dance Card points, breaking ties on the most recent week, then on who drafted later", async () => {
+    const scores = (rows: [string, string, number, number?][]) =>
+      db.query(`insert into public.weekly_manager_scores(league_id, manager_id, week_id, roster_points, prediction_points, total_points)
+        select $1, (r->>0)::uuid, (r->>1)::uuid, (r->>2)::numeric, coalesce((r->>3)::numeric, 0), (r->>2)::numeric + coalesce((r->>3)::numeric, 0)
+        from jsonb_array_elements($2::jsonb) r`, [tieLeague, JSON.stringify(rows)]);
     // The order the Recast page shows has to be the one the run takes.
     const shownOrder = async () => {
       const { rows: [leagueRow] } = await db.query<{ draft_type: string; custom_pick_order: string[] | null }>(
         "select draft_type, custom_pick_order from public.leagues where id = $1", [tieLeague]);
+      const { rows: [settings] } = await db.query<{ judges_score_category_weight: string }>(
+        "select judges_score_category_weight from public.scoring_settings where league_id = $1", [tieLeague]);
+      const weight = Number(settings.judges_score_category_weight);
       const { rows: members } = await db.query<{ user_id: string; draft_position: number | null }>(
         "select user_id, draft_position from public.league_members where league_id = $1", [tieLeague]);
-      const { rows: totals } = await db.query<{ manager_id: string; week_number: number; total_points: string }>(
-        `select s.manager_id, w.week_number, s.total_points from public.weekly_manager_standings s
+      const { rows: points } = await db.query<{ manager_id: string; week_number: number; roster_points: string; lifeline_points: string; transfer_points: string }>(
+        `select s.manager_id, w.week_number, s.roster_points, s.lifeline_points, s.transfer_points from public.weekly_manager_standings s
          join public.competition_weeks w on w.id = s.week_id where s.league_id = $1`, [tieLeague]);
       return recastOrder(
         members.map((member) => ({ managerId: member.user_id, draftRank: recastDraftRank(leagueRow, member) })),
-        totals.map((row) => ({ managerId: row.manager_id, weekNumber: row.week_number, totalPoints: Number(row.total_points) }))
+        points.map((row) => ({
+          managerId: row.manager_id,
+          weekNumber: row.week_number,
+          danceCardPoints: Number(row.roster_points) * weight + Number(row.lifeline_points) + Number(row.transfer_points),
+        }))
       ).map((entry) => entry.managerId);
     };
     const order = async () => {
@@ -179,14 +187,30 @@ describe("Recast as a ranked waiver list", () => {
     };
     // No scores at all: the custom draft order reversed (it went Third, Admin, Friend).
     expect(await order()).toEqual([friend, admin, third]);
-    // Level on the season; Admin had the lower Week 9, and Friend and Third
-    // are level there too, so Friend, who drafted later, goes ahead of Third.
-    await scores([[admin, week8, 12], [admin, week9, 8], [friend, week8, 10], [friend, week9, 10], [third, week8, 10], [third, week9, 10]]);
-    expect(await order()).toEqual([admin, friend, third]);
+    // Third has the fewest Dance Card points and by far the most points
+    // overall (50 of Curtain Call a week): a claim can't fix those, so Third
+    // goes first. Admin and Friend are level on the season; Admin had the
+    // lower Week 9.
+    await scores([[admin, week8, 12], [admin, week9, 8], [friend, week8, 10], [friend, week9, 10], [third, week8, 9, 50], [third, week9, 9, 50]]);
+    expect(await order()).toEqual([third, admin, friend]);
     // An Equalizer counts: the order reads standings, not the stored totals.
     await db.query(`insert into public.league_point_adjustments(league_id, manager_id, week_id, kind, points, weighted_points)
       values ($1, $2, $3, 'lifeline_equalizer', 1, 1)`, [tieLeague, admin, week8]);
+    expect(await order()).toEqual([third, friend, admin]);
+    // Roster points are stored raw and the Equalizer weighted: Friend's 20.6
+    // raw is under Admin's 20 + 1 at weight 1, but 41.2 is over 41 at weight 2.
+    await db.query("update public.weekly_manager_scores set roster_points = 10.6, total_points = 10.6 where league_id = $1 and manager_id = $2 and week_id = $3", [tieLeague, friend, week8]);
+    expect(await order()).toEqual([third, friend, admin]);
+    await db.query("update public.scoring_settings set judges_score_category_weight = 2 where league_id = $1", [tieLeague]);
+    expect(await order()).toEqual([third, admin, friend]);
+    // Both sides compare in cents: at weight 0.3 Friend's 20.01 raw is 6.003
+    // against Third's 6.00, a tie in cents that Friend's later pick wins.
+    await db.query("update public.scoring_settings set judges_score_category_weight = 0.3 where league_id = $1", [tieLeague]);
+    await db.query("update public.weekly_manager_scores set roster_points = 10, prediction_points = 0, total_points = 10 where league_id = $1 and manager_id = $2", [tieLeague, third]);
+    await db.query("update public.weekly_manager_scores set roster_points = 10, total_points = 10 where league_id = $1 and manager_id = $2 and week_id = $3", [tieLeague, friend, week8]);
+    await db.query("update public.weekly_manager_scores set roster_points = 10.01, total_points = 10.01 where league_id = $1 and manager_id = $2 and week_id = $3", [tieLeague, friend, week9]);
     expect(await order()).toEqual([friend, third, admin]);
+    await db.query("update public.scoring_settings set judges_score_category_weight = 1 where league_id = $1", [tieLeague]);
   });
 
   it("takes a ranked list of fills and paired drops, blind to the rest of the league", async () => {
@@ -391,6 +415,8 @@ describe("Recast as a ranked waiver list", () => {
     await db.query(`insert into public.waiver_claims(id, league_id, couple_id, manager_id, slot_number, week_number, priority_order) values
       ($1, $3, $4, $6, 1, 13, 1), ($2, $3, $5, $6, 1, 13, 2)`, [id(91), id(90), tieLeague, h, i, third]);
     await db.exec(readFileSync("supabase/apply-recast-v2.sql", "utf8"));
+    // The order file goes after it again, as on a live re-apply.
+    await db.exec(readFileSync("supabase/apply-recast-dance-card-order.sql", "utf8"));
     expect((await db.query("select couple_id, priority_order from public.waiver_claims where status = 'pending' order by priority_order")).rows)
       .toEqual([{ couple_id: h, priority_order: 1 }, { couple_id: i, priority_order: 2 }]);
   });
