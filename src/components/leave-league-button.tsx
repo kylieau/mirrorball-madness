@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { leaveLeague } from "@/app/leagues/actions";
+import { removalNote, type RemovalTerms } from "@/lib/remove-manager";
 import { removeCoManager } from "@/app/leagues/[id]/settings/actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ export function LeaveLeagueButton({
   isCoManager = false,
   hasCoManager = false,
   teamUserId,
+  removal,
 }: {
   leagueId: string;
   leagueName: string;
@@ -36,6 +38,8 @@ export function LeaveLeagueButton({
   // their co-manager first, so surface that instead of a confusing error.
   hasCoManager?: boolean;
   teamUserId?: string;
+  // Null before the draft; after it, leaving releases the roster.
+  removal: RemovalTerms | null;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +79,7 @@ export function LeaveLeagueButton({
           <DialogDescription>
             {isCoManager
               ? "You'll lose access to this team. The primary manager keeps the roster and history."
-              : "You'll lose access to this league. Your historical scores stay on the record for the league's own standings."}
+              : removalNote("Your", "you", removal)}
           </DialogDescription>
         </DialogHeader>
         {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}

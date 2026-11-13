@@ -40,6 +40,9 @@ export type RecastLogLine = {
   weekNumber: number;
   startWeek: number | null;
 };
+// A couple a departed manager held, nobody's from weekNumber. The name is
+// as stored at release time, since the league no longer knows them.
+export type RecastReleaseLine = { id: string; managerName: string; coupleId: string; weekNumber: number };
 
 const UNKNOWN_COUPLE: CoupleNameParts = { celebrity: "Unknown", pro: "Unknown" };
 
@@ -63,6 +66,7 @@ export function RecastPanel({
   coupleDisplayNames,
   misses,
   log,
+  releases,
 }: {
   leagueId: string;
   historyFrom: string;
@@ -82,6 +86,7 @@ export function RecastPanel({
   coupleDisplayNames: Record<string, CoupleNameParts>;
   misses: { coupleId: string; result: RecastMiss }[];
   log: RecastLogLine[];
+  releases: RecastReleaseLine[];
 }) {
   const router = useRouter();
   const [claiming, setClaiming] = useState<string | null>(null);
@@ -349,28 +354,49 @@ export function RecastPanel({
         </FoldCard>
       )}
 
-      <FoldCard title="Adds and Drops" note={log.length === 0 ? "None yet" : `${log.length} in this league`}>
+      <FoldCard title="Adds and Drops" note={log.length + releases.length === 0 ? "None yet" : `${log.length + releases.length} in this league`}>
         <div className="flex flex-col text-sm [&_a]:no-underline [&_a]:hover:text-accent">
-          {log.length === 0 && <p className="text-muted-foreground">No claim has been awarded in this league yet.</p>}
-          {log.map((line) => (
-            <div key={line.id} className="flex flex-col border-b border-border py-2.5 first:pt-0 last:border-b-0 last:pb-0">
-              <span className="font-medium [overflow-wrap:anywhere]">{managerName(line.managerId)}</span>
-              <span>
-                Added <CoupleNameLink coupleId={line.coupleId} from={historyFrom} {...parts(line.coupleId)} />
-                {line.dropCoupleId ? (
+          {log.length + releases.length === 0 && <p className="text-muted-foreground">No claim has been awarded in this league yet.</p>}
+          {[
+            ...log.map((line) => ({ key: line.id, week: line.weekNumber, line })),
+            // A release sits with the week before it, the last one the manager held.
+            ...releases.map((release) => ({ key: release.id, week: release.weekNumber - 1, release })),
+          ]
+            .sort((x, y) => y.week - x.week)
+            .map((entry) => (
+              <div key={entry.key} className="flex flex-col border-b border-border py-2.5 first:pt-0 last:border-b-0 last:pb-0">
+                {"release" in entry && entry.release ? (
                   <>
-                    , dropped <CoupleNameLink coupleId={line.dropCoupleId} from={historyFrom} {...parts(line.dropCoupleId)} />
+                    <span className="font-medium [overflow-wrap:anywhere]">{entry.release.managerName}</span>
+                    <span>
+                      Released <CoupleNameLink coupleId={entry.release.coupleId} from={historyFrom} {...parts(entry.release.coupleId)} />
+                    </span>
+                    <span className="text-xs text-muted-foreground">Left the league · free from {formatEpisodeCasual(entry.release.weekNumber)}</span>
                   </>
                 ) : (
-                  " in an open spot"
+                  "line" in entry &&
+                  entry.line && (
+                    <>
+                      <span className="font-medium [overflow-wrap:anywhere]">{managerName(entry.line.managerId)}</span>
+                      <span>
+                        Added <CoupleNameLink coupleId={entry.line.coupleId} from={historyFrom} {...parts(entry.line.coupleId)} />
+                        {entry.line.dropCoupleId ? (
+                          <>
+                            , dropped <CoupleNameLink coupleId={entry.line.dropCoupleId} from={historyFrom} {...parts(entry.line.dropCoupleId)} />
+                          </>
+                        ) : (
+                          " in an open spot"
+                        )}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        After {formatEpisodeCasual(entry.line.weekNumber)}
+                        {entry.line.startWeek != null ? ` · starts ${formatEpisodeCasual(entry.line.startWeek)}` : ""}
+                      </span>
+                    </>
+                  )
                 )}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                After {formatEpisodeCasual(line.weekNumber)}
-                {line.startWeek != null ? ` · starts ${formatEpisodeCasual(line.startWeek)}` : ""}
-              </span>
-            </div>
-          ))}
+              </div>
+            ))}
         </div>
       </FoldCard>
 

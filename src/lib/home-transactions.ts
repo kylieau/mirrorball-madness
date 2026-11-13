@@ -10,6 +10,9 @@ export type AwardedClaim = {
   weekNumber: number;
 };
 export type ExecutedTrade = { leagueId: string; weekNumber: number; legs: TradeLeg[] };
+// One row per couple a departed manager held; the name is as stored at
+// release time, since the league no longer knows them.
+export type ReleasedCouple = { leagueId: string; managerId: string; managerName: string; coupleId: string; weekNumber: number };
 
 // Each league's roster moves for Home's Recent Activity, by the week whose
 // waiver run made them: trades first, as the run settles them, then claims by
@@ -19,11 +22,13 @@ export function homeTransactions({
   leagues,
   claims,
   trades,
+  releases = [],
   coupleOf,
 }: {
   leagues: TransactionLeague[];
   claims: AwardedClaim[];
   trades: ExecutedTrade[];
+  releases?: ReleasedCouple[];
   coupleOf: (coupleId: string) => ActivityCouple | null;
 }): { weekNumber: number; transaction: ActivityTransaction }[] {
   return leagues.flatMap((league) => {
@@ -31,6 +36,29 @@ export function homeTransactions({
       managerId === league.myTeamId ? you : (league.managerNames[managerId] ?? "Someone");
 
     const named = (coupleIds: string[]) => coupleIds.flatMap((coupleId) => coupleOf(coupleId) ?? []);
+
+    // One line per departed manager, their couples together, A–Z by name.
+    const releaseLines = [...new Map(
+      releases
+        .filter((release) => release.leagueId === league.id)
+        .map((release) => [`${release.managerId}:${release.weekNumber}`, release] as const)
+    ).values()]
+      .map((release) => ({
+        weekNumber: release.weekNumber,
+        manager: release.managerId === league.myTeamId ? "You" : release.managerName,
+        couples: named(
+          releases
+            .filter((row) => row.leagueId === league.id && row.managerId === release.managerId && row.weekNumber === release.weekNumber)
+            .map((row) => row.coupleId)
+        ),
+      }))
+      .filter((line) => line.couples.length > 0)
+      .sort((x, y) => x.manager.localeCompare(y.manager))
+      // Under the last week they held the roster, the one with results.
+      .map((line) => ({
+        weekNumber: line.weekNumber - 1,
+        transaction: { kind: "release" as const, league: league.name, manager: line.manager, couples: line.couples },
+      }));
 
     const tradeLines = trades
       .filter((trade) => trade.leagueId === league.id)
@@ -71,6 +99,6 @@ export function homeTransactions({
           : [];
       });
 
-    return [...tradeLines, ...claimLines];
+    return [...tradeLines, ...claimLines, ...releaseLines];
   });
 }

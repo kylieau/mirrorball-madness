@@ -41,7 +41,7 @@ export default async function WaiversPage({
 
   if (unavailable) return <RosterMovesUnavailable back={back} {...unavailable} />;
 
-  const [{ data: cycleRows }, { data: pendingDrops }, { data: claims }, { data: cycles }, { tabs }] = await Promise.all([
+  const [{ data: cycleRows }, { data: pendingDrops }, { data: claims }, { data: cycles }, { tabs }, { data: releaseRows }] = await Promise.all([
     supabase.rpc("recast_next_cycle", { p_league_id: id }),
     supabase.rpc("recast_pending_drops", { p_league_id: id }),
     // RLS returns this team's own claims plus every awarded one.
@@ -51,6 +51,7 @@ export default async function WaiversPage({
       .eq("league_id", id),
     supabase.from("recast_cycles").select("week_number").eq("league_id", id),
     loadRosterMoveTabs(supabase, base),
+    supabase.from("roster_releases").select("id, manager_name, couple_id, week_number").eq("league_id", id),
   ]);
 
   const cycle = cycleRows?.[0];
@@ -165,6 +166,9 @@ export default async function WaiversPage({
             weekNumber: claim.week_number,
             startWeek: claim.start_week,
           }))}
+        releases={(releaseRows ?? [])
+          .filter((release) => cutoffWeek != null && release.week_number - 1 <= cutoffWeek)
+          .map((release) => ({ id: release.id, managerName: release.manager_name, coupleId: release.couple_id, weekNumber: release.week_number }))}
       />
     </RosterMovesFrame>
   );

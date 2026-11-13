@@ -194,7 +194,8 @@ export default async function LeagueStandingsPage({
             ...standing,
             celebrity: names.celebrity,
             pro: names.pro,
-            ownerName: standing.ownerId ? (managerNameById.get(standing.ownerId) ?? "Unknown") : null,
+            // A holder who is no longer a member released the couple.
+            ownerName: standing.ownerId ? (managerNameById.get(standing.ownerId) ?? "Released") : null,
             isViewer: standing.ownerId === myTeamId,
             eliminated: couple.status === "eliminated" || couple.status === "withdrawn",
           };

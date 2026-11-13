@@ -2209,6 +2209,44 @@ export type Database = {
         }
         Relationships: []
       }
+      roster_releases: {
+        Row: {
+          couple_id: string
+          id: string
+          league_id: string
+          manager_id: string
+          manager_name: string
+          released_at: string
+          week_number: number
+        }
+        Insert: {
+          couple_id: string
+          id?: string
+          league_id: string
+          manager_id: string
+          manager_name: string
+          released_at?: string
+          week_number: number
+        }
+        Update: {
+          couple_id?: string
+          id?: string
+          league_id?: string
+          manager_id?: string
+          manager_name?: string
+          released_at?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_releases_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recast_cycles: {
         Row: {
           awards: number

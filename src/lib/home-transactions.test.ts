@@ -62,4 +62,26 @@ describe("homeTransactions", () => {
       })
     ).toEqual([]);
   });
+
+  it("names a departed manager's couples together, under the last week they held", () => {
+    const lines = homeTransactions({
+      leagues: [{ id: "L", name: "Alpha", myTeamId: "me", managerNames: { me: "Me" } }],
+      claims: [],
+      trades: [],
+      releases: [
+        { leagueId: "L", managerId: "kim", managerName: "Kim", coupleId: "c1", weekNumber: 10 },
+        { leagueId: "L", managerId: "kim", managerName: "Kim", coupleId: "c2", weekNumber: 10 },
+        { leagueId: "L", managerId: "me", managerName: "Old Me", coupleId: "c3", weekNumber: 10 },
+        { leagueId: "other", managerId: "kim", managerName: "Kim", coupleId: "c1", weekNumber: 10 },
+      ],
+      coupleOf: (id) => ({ coupleId: id, name: id.toUpperCase() }),
+    });
+    expect(lines).toEqual([
+      {
+        weekNumber: 9,
+        transaction: { kind: "release", league: "Alpha", manager: "Kim", couples: [{ coupleId: "c1", name: "C1" }, { coupleId: "c2", name: "C2" }] },
+      },
+      { weekNumber: 9, transaction: { kind: "release", league: "Alpha", manager: "You", couples: [{ coupleId: "c3", name: "C3" }] } },
+    ]);
+  });
 });

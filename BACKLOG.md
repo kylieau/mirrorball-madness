@@ -40,6 +40,53 @@ Offered to Kylie, not answered and not built:
 - `couplePath` in `src/lib/strong-play-ceilings.ts` still gives 4th place no
   Finale survival; re-solve the v3 rates with it for a future season, not S35.
 
+## Free agency after the waiver run — next season
+
+Kylie (2026-11-12) asked about a second waiver run 24 hours before each
+show and agreed it isn't one: a run then would award from the same start
+week as the post-results run. What she described is football's free
+agency, a first-come add window between the run and the lock (the dropped
+first-come RPC did this). Not for S35 (one run left, about 2026-11-19).
+For S36: free agency after the run until the lock, first come; decide
+whether a couple dropped in that window is instantly claimable or sits on
+the wire until the next run.
+
+## Remove a manager after the draft — 2026-11-12
+
+Built 2026-11-12 (`docs/design/remove-manager/plan.md`, As built;
+CLAUDE.md describes it). **Not applied live and not pushed** at the time of
+writing; Kylie applies `supabase/apply-remove-manager.sql` after
+`apply-trades.sql` and `apply-lifeline.sql`, then the app deploys with it
+(the dialogs' copy and the `roster_releases` reads come up empty until the
+SQL is in; the pre-SQL RPC still only drops the row).
+- The race the triggers close (a pick, claim or offer committing after the
+  removal) has no test: PGlite is single-connection.
+- A correction republish of an earlier week after a removal is argued, not
+  tested (the bracket and aired-week picks stay, so the row recomputes the
+  same); `remove-manager-db.test.ts` has no correction case.
+- The Couples Leaderboard shows a released couple with the points it earned
+  while held, not a what-if, until someone claims it.
+- Not built: a way for a commissioner to hand a released couple to a team
+  in a league with Recast off.
+- On the Trades page a cancelled or failed offer names the departed party
+  through the members map, so they read as "Unknown" there (the Trade Log
+  line itself says the trade didn't go through because a manager left).
+
+## Adversarial audit of the paths not yet run live — offered 2026-11-12
+
+Kylie deferred it (2026-11-12). Scope if picked up: PGlite scenarios shaped
+like the real data plus an independent Codex pass, read-only against live.
+1. The waiver run under the Dance Card order (`run_recast_claims` with four
+   claims on one couple in one league; `run_league_trades` with an offer
+   accepted inside the window; the order is set before trade points move).
+   The first real run was Thu 2026-11-12, 10 PM PT.
+2. Lifeline settlement inside E11's publish (first live run, three leagues,
+   ten picks, Equalizer stored), the lock, and a manager who never picks.
+3. A trade with a points leg: cash cap, `no_scored_week`, never run live.
+4. The Finale chain under this code: podium picks, v3 survival for every
+   finalist, Grand Finale distance split across places, 4th and 5th both
+   entered as Eliminated.
+
 ## Waiver order by Dance Card — 2026-11-13
 
 Kylie's call (2026-11-13): the waiver order is reverse Dance Card standings

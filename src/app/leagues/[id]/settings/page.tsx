@@ -21,6 +21,7 @@ import { XIcon } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { usesDanceCardLedger } from "@/lib/dance-card-v2";
+import { releaseEffectiveWeek, type RemovalTerms } from "@/lib/remove-manager";
 
 export default async function LeagueSettingsPage({
   params,
@@ -90,6 +91,18 @@ export default async function LeagueSettingsPage({
     season.effectiveGrandFinaleDeadline != null &&
     new Date(season.effectiveGrandFinaleDeadline).getTime() <= Date.now();
   const lateGrandFinale = grandFinaleLocked ? await loadLateGrandFinale(supabase, id, season.activeSeasonId) : null;
+  // After the draft, removing a team releases its roster (docs/design/remove-manager/plan.md).
+  const removal: RemovalTerms | null =
+    league.draft_status === "completed" && season.activeSeasonId
+      ? {
+          effectiveWeek: releaseEffectiveWeek(
+            ((await supabase.from("competition_weeks").select("week_number, episodes(airs_at)").eq("season_id", season.activeSeasonId)).data ?? []).map(
+              (week) => ({ weekNumber: week.week_number, airsAt: week.episodes.map((episode) => episode.airs_at) })
+            )
+          ),
+          recastOn: league.waiver_mode === "waivers",
+        }
+      : null;
   const memberRows = (members ?? []).map((m) => ({
     userId: m.user_id,
     displayName: m.profiles?.display_name ?? "Unknown",
@@ -135,6 +148,7 @@ export default async function LeagueSettingsPage({
             };
           })}
           canEdit={isCommissioner}
+          removal={removal}
         />
         <LeagueInfoSection
           leagueId={id}
@@ -152,6 +166,7 @@ export default async function LeagueSettingsPage({
             isCoManager={viewerMembership.user_id !== user.id}
             hasCoManager={viewerMembership.user_id === user.id && viewerMembership.co_manager_id !== null}
             teamUserId={viewerMembership.user_id}
+            removal={removal}
           />
         </LeagueInfoSection>
         <LeagueModulesForm
@@ -355,6 +370,7 @@ async function SuperAdminManagers({ leagueId, closeHref }: { leagueId: string; c
         <LeagueMembersSection
           leagueId={leagueId}
           canEdit={false}
+          removal={null}
           members={(members ?? []).map((m) => ({
             userId: m.user_id,
             displayName: m.profiles?.display_name ?? "Unknown",

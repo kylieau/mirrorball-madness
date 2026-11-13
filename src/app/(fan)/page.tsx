@@ -96,6 +96,7 @@ export default async function Home() {
       couples,
       { data: awardedClaims },
       { data: executedTrades },
+      { data: releasedCouples },
     ] = await Promise.all([
       visibleEpisodeIds.length > 0
         ? supabase
@@ -120,6 +121,7 @@ export default async function Home() {
         .select("league_id, week_number, trade_legs(leg_order, from_manager_id, to_manager_id, couple_id, points)")
         .in("league_id", leagueIds)
         .eq("status", "executed"),
+      supabase.from("roster_releases").select("league_id, manager_id, manager_name, couple_id, week_number").in("league_id", leagueIds),
     ]);
     const danceScores = (danceScoreRows ?? []) as unknown as ActivityDanceRow[];
     const displayNames = buildCoupleDisplayNames(
@@ -156,13 +158,26 @@ export default async function Home() {
               },
             ]
       ),
+      releases: (releasedCouples ?? []).map((release) => ({
+        leagueId: release.league_id,
+        managerId: release.manager_id,
+        managerName: release.manager_name,
+        coupleId: release.couple_id,
+        weekNumber: release.week_number,
+      })),
       coupleOf: (coupleId) => {
         const parts = displayNames.get(coupleId);
         return parts ? { coupleId, name: formatCoupleName(parts) } : null;
       },
     });
     for (const { weekNumber, transaction } of transactions) {
-      const week = activityWeeks.get(weekNumber);
+      // A release sits with the last week they held; if that week has no
+      // night of its own, the nearest earlier one that does.
+      const week =
+        activityWeeks.get(weekNumber) ??
+        (transaction.kind === "release"
+          ? [...activityWeeks.values()].filter((w) => w.weekNumber < weekNumber).sort((x, y) => y.weekNumber - x.weekNumber)[0]
+          : undefined);
       if (week) (week.transactions ??= []).push(transaction);
     }
     for (const r of episodeResults ?? []) {

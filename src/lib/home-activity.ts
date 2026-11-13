@@ -25,7 +25,9 @@ export type ActivityCouple = { coupleId: string; name: string };
 // side always sending something.
 export type ActivityTransaction =
   | { kind: "waiver"; league: string; manager: string; added: ActivityCouple; dropped: ActivityCouple | null }
-  | { kind: "trade"; league: string; sides: { manager: string; couples: ActivityCouple[]; points: number }[] };
+  | { kind: "trade"; league: string; sides: { manager: string; couples: ActivityCouple[]; points: number }[] }
+  // A manager who left or was removed: their couples went to the wire.
+  | { kind: "release"; league: string; manager: string; couples: ActivityCouple[] };
 
 export type ActivityWeek = {
   weekNumber: number;
@@ -153,6 +155,14 @@ function coupleSegment({ coupleId, name }: ActivityCouple): ActivitySegment {
 
 function transactionSegments(transaction: ActivityTransaction): ActivitySegment[] {
   const league: ActivitySegment[] = [{ text: " in " }, { text: transaction.league, kind: "league" }];
+  if (transaction.kind === "release") {
+    return [
+      managerSegment(transaction.manager),
+      { text: " left, releasing " },
+      ...listSegments(transaction.couples.map(coupleSegment)),
+      ...league,
+    ];
+  }
   if (transaction.kind === "waiver") {
     return [
       managerSegment(transaction.manager),

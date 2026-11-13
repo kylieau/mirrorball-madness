@@ -10,6 +10,7 @@ import {
   removeCoManager,
 } from "@/app/leagues/[id]/settings/actions";
 import { formatManagerName } from "@/lib/manager-display";
+import { removalNote, type RemovalTerms } from "@/lib/remove-manager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CopyInviteLinkButton } from "@/components/copy-invite-link-button";
@@ -114,7 +115,7 @@ function DemoteMemberButton({ leagueId, member }: { leagueId: string; member: Me
   );
 }
 
-function RemoveMemberButton({ leagueId, member }: { leagueId: string; member: Member }) {
+function RemoveMemberButton({ leagueId, member, removal }: { leagueId: string; member: Member; removal: RemovalTerms | null }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -137,10 +138,7 @@ function RemoveMemberButton({ leagueId, member }: { leagueId: string; member: Me
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Remove {member.displayName}?</DialogTitle>
-          <DialogDescription>
-            They&apos;ll lose access to this league. Their historical scores stay on the
-            record for the league&apos;s own standings.
-          </DialogDescription>
+          <DialogDescription>{removalNote(`${member.displayName}'s`, "them", removal)}</DialogDescription>
         </DialogHeader>
         {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
         <DialogFooter>
@@ -239,10 +237,13 @@ export function LeagueMembersSection({
   leagueId,
   members,
   canEdit,
+  removal,
 }: {
   leagueId: string;
   members: Member[];
   canEdit: boolean;
+  // Null before the draft, when removing a member only drops their row.
+  removal: RemovalTerms | null;
 }) {
   return (
     <Card>
@@ -271,7 +272,7 @@ export function LeagueMembersSection({
                 ) : (
                   <>
                     <PromoteMemberButton leagueId={leagueId} member={m} />
-                    <RemoveMemberButton leagueId={leagueId} member={m} />
+                    <RemoveMemberButton leagueId={leagueId} member={m} removal={removal} />
                   </>
                 ))}
               {m.isOwnRow && !m.coManagerId && <InviteCoManagerButton leagueId={leagueId} member={m} />}

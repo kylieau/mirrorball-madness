@@ -130,6 +130,7 @@ describe("buildRecentActivity", () => {
             },
             { kind: "waiver", league: "Alpha", manager: "You", added: jo, dropped: alix },
             { kind: "waiver", league: "Beta", manager: "Pat", added: jo, dropped: null },
+            { kind: "release", league: "Alpha", manager: "Kim", couples: [harry, alix] },
           ],
         }),
       ],
@@ -142,6 +143,7 @@ describe("buildRecentActivity", () => {
       "Kim, Pat and you made a trade in Beta",
       "You added Jo & Ezra and dropped Alix & Val in Alpha",
       "Pat added Jo & Ezra in Beta",
+      "Kim left, releasing Harry & Witney and Alix & Val in Alpha",
       "C & D eliminated",
     ]);
     expect(lines[3].segments.filter((seg) => seg.kind === "couple").map((seg) => seg.coupleId)).toEqual(["jo", "alix"]);
