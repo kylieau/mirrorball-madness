@@ -11,6 +11,8 @@ export type CoupleLeaderboardRow = {
   celebrity: string;
   pro: string;
   ownerName: string | null;
+  // "from Week 10" / "Weeks 8–9", when another manager has held the couple too.
+  holdingLabel: string | null;
   isViewer: boolean;
   eliminated: boolean;
   judgesPoints: number;
@@ -43,7 +45,7 @@ export function CouplesLeaderboard({ rows, historyFrom }: { rows: CoupleLeaderbo
         </div>
         <ol className="divide-y divide-border">
           {rows.map((row, i) => (
-            <li key={row.coupleId}>
+            <li key={`${row.coupleId}:${row.ownerName ?? ""}:${row.holdingLabel ?? ""}`}>
               <Link
                 href={coupleHistoryHref(row.coupleId, historyFrom)}
                 className={cn(
@@ -63,9 +65,15 @@ export function CouplesLeaderboard({ rows, historyFrom }: { rows: CoupleLeaderbo
                     <strong className="font-semibold text-foreground">{row.celebrity}</strong>{" "}
                     <span className="text-muted-foreground">&amp; {row.pro}</span>
                   </span>
-                  <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
                     {row.ownerName ?? "Undrafted"}
-                    {row.isViewer && <YouPill />}
+                    {row.holdingLabel && <span className="text-accent"> · {row.holdingLabel}</span>}
+                    {row.isViewer && (
+                      <>
+                        {" "}
+                        <YouPill />
+                      </>
+                    )}
                   </span>
                 </span>
                 <span className="text-right font-heading text-sm font-semibold tabular-nums text-muted-foreground">

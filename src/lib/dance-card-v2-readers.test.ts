@@ -118,7 +118,7 @@ describe("Dance Card v2 readers", () => {
 
   it("Couples Leaderboard rows add up to the stored Dance Card module", () => {
     const standings = buildCouplesLeaderboard({ rule, scoring, anchorWeek: 2, categoryWeight: 2, weeks, couples, slots });
-    expect(standings.find((s) => s.coupleId === "harry")).toEqual({
+    expect(standings.find((s) => s.coupleId === "harry")).toMatchObject({
       coupleId: "harry", ownerId: "m", judgesPoints: value(71) * 2, bonusPoints: 0, totalPoints: value(71) * 2,
     });
     const stored = [...storedRosterPoints().values()].reduce((sum, p) => sum + p, 0) * 2;
@@ -212,7 +212,7 @@ describe("Dance Card v3 readers", () => {
 
   it("Couples Leaderboard splits judges from survival and bonus, adding up to the stored module", () => {
     const standings = buildCouplesLeaderboard({ rule: v3, scoring, anchorWeek: 2, categoryWeight: 2, weeks, couples, slots });
-    expect(standings.find((s) => s.coupleId === "harry")).toEqual({
+    expect(standings.find((s) => s.coupleId === "harry")).toMatchObject({
       coupleId: "harry", ownerId: "m", judgesPoints: 37.68, bonusPoints: 14.4, totalPoints: 52.08,
     });
     expect(standings.reduce((sum, s) => sum + s.totalPoints, 0)).toBeCloseTo((11.2 + 9.79 + 8.33) * 2, 6);

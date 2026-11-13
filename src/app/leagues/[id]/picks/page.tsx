@@ -26,12 +26,13 @@ import { loadLeaguePageBase } from "@/lib/league-page-data";
 import { draftDanceScores, excludeReleasedCoupleRows, unpostedDraftDances } from "@/lib/draft-scores";
 import { danceMaxScore, danceScoreColumns } from "@/lib/episode-teams";
 import { managerIdForPick, type DraftType } from "@/lib/draft";
-import { clampRosterCoupleForWeek, weeklyBonusPoints } from "@/lib/roster-weekly-points";
+import { clampRosterCoupleForWeek, formerCoupleNote, weeklyBonusPoints } from "@/lib/roster-weekly-points";
 import { partitionRecastSlots } from "@/lib/recast-framing";
 import { scoringModule, type ScoringModuleKey } from "@/lib/scoring-modules";
 import { EpisodeCarousel } from "@/components/episode-carousel";
 import { adjacentThisWeekWeeks, rosterWeekHref } from "@/lib/this-week-carousel";
-import { judgePointsThroughWeek, slotActiveInWeek } from "@/lib/roster-couple-points";
+import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
+import { clampSlotsToWeek, formerSlotsForWeek, judgePointsThroughWeek, slotActiveInWeek } from "@/lib/roster-couple-points";
 import { roundPoints } from "@/lib/format-points";
 import { formatManagerName } from "@/lib/manager-display";
 import {
@@ -412,13 +413,23 @@ export default async function LeaguePicksPage({
   // Your Picks → Your roster: the viewer's roster as it stood in the selected
   // week (so a Recast swap reads correctly), that week's points per couple
   // and a running total.
-  const yourSlotsForWeek = leagueSlotPeriods.filter(
-    (slot) =>
-      slot.managerId === myTeamId &&
-      (yourRosterWeek ? slotActiveInWeek(slot, yourRosterWeek.week_number) : slot.endWeek === null)
-  );
+  // With no scored week to page to, the roster is what the viewer may see
+  // as of nothing watched, not the current rows.
+  const yourSlotsForWeek = yourRosterWeek
+    ? leagueSlotPeriods.filter((slot) => slot.managerId === myTeamId && slotActiveInWeek(slot, yourRosterWeek.week_number))
+    : clampSlotsToWeek(leagueSlotPeriods, cutoff.effectiveLatestEpisode?.week_number ?? 0).filter(
+        (slot) => slot.managerId === myTeamId && slot.endWeek === null
+      );
+  // Every period of a couple held in the paged week, so a couple claimed
+  // back keeps what it earned the first time.
+  const heldPeriodsFor = (managerId: string, week: number) => {
+    const held = new Set(
+      leagueSlotPeriods.filter((slot) => slot.managerId === managerId && slotActiveInWeek(slot, week)).map((slot) => slot.coupleId)
+    );
+    return leagueSlotPeriods.filter((slot) => slot.managerId === managerId && held.has(slot.coupleId) && slot.startWeek <= week);
+  };
   const yourRosterPoints = yourRosterWeek
-    ? judgePointsThroughWeek({ ...judgePointsInputs, slots: yourSlotsForWeek, week: yourRosterWeek.week_number })
+    ? judgePointsThroughWeek({ ...judgePointsInputs, slots: heldPeriodsFor(myTeamId, yourRosterWeek.week_number), week: yourRosterWeek.week_number })
     : undefined;
   const yourRosterWeekRosterPoints = yourRosterWeek
     ? scoreRows
@@ -483,6 +494,32 @@ export default async function LeaguePicksPage({
       },
     ];
   });
+  // Couples that left a manager's roster before the paged week keep a
+  // dimmed card with what they earned while held (Kylie, 2026-11-12), so the
+  // totals account for every judges' point the manager has earned.
+  const formerCouplesFor = (managerId: string) => {
+    if (!yourRosterWeek) return [];
+    const week = yourRosterWeek.week_number;
+    const former = formerSlotsForWeek(leagueSlotPeriods, managerId, week, judgePointsInputs.judgesScoreStartsWeek);
+    if (former.length === 0) return [];
+    const points = judgePointsThroughWeek({ ...judgePointsInputs, slots: former.flatMap((f) => f.periods), week });
+    return former.flatMap(({ coupleId, periods }) => {
+      const couple = flatCouplesById.get(coupleId);
+      if (!couple) return [];
+      const lastEnd = Math.max(...periods.map((p) => p.endWeek!));
+      const next = leagueSlotPeriods.find((slot) => slot.coupleId === coupleId && slot.managerId !== managerId && slot.startWeek === lastEnd + 1);
+      const holderNow = leagueSlotPeriods.find((slot) => slot.coupleId === coupleId && slot.managerId !== managerId && slotActiveInWeek(slot, week));
+      const { tag, weeks, note } = formerCoupleNote({
+        periods: periods.map((p) => ({ from: p.startWeek, to: p.endWeek })),
+        next: next ? { source: next.source } : null,
+        holderNow: holderNow ? { name: nameByManager[holderNow.managerId] ?? "Unknown" } : null,
+        status: spoilerSafeCoupleStatus({ status: couple.status, eliminationWeek: couple.elimination_week }, week, finaleWeekNumber),
+      });
+      const names = allDisplayNames.get(coupleId) ?? { celebrity: couple.celebrity_name, pro: couple.pro_name };
+      return [{ ...names, coupleId, tag, weeklyPoints: 0, totalPoints: points.get(coupleId)?.total ?? 0, inJeopardy: false, former: { weeks, note } }];
+    });
+  };
+  const yourFormerCouples = formerCouplesFor(myTeamId);
   const yourRosterNeighbors = yourRosterWeek
     ? adjacentThisWeekWeeks(visibleDanceWeeks, yourRosterWeek.id)
     : { prev: null, next: null };
@@ -506,7 +543,7 @@ export default async function LeaguePicksPage({
       const slotsForWeek = leagueSlotPeriods.filter(
         (slot) => slot.managerId === m.managerId && slotActiveInWeek(slot, yourRosterWeek.week_number)
       );
-      const points = judgePointsThroughWeek({ ...judgePointsInputs, slots: slotsForWeek, week: yourRosterWeek.week_number });
+      const points = judgePointsThroughWeek({ ...judgePointsInputs, slots: heldPeriodsFor(m.managerId, yourRosterWeek.week_number), week: yourRosterWeek.week_number });
       const couples = slotsForWeek.flatMap((slot) => {
         const couple = flatCouplesById.get(slot.coupleId);
         if (!couple) return [];
@@ -524,6 +561,7 @@ export default async function LeaguePicksPage({
         return [{ ...names, coupleId: slot.coupleId, ...clamped }];
       });
       const weekRosterPoints = weekPointsByManager.get(m.managerId) ?? 0;
+      const former = formerCouplesFor(m.managerId).map(({ celebrity, pro, coupleId, tag, weeklyPoints, former }) => ({ celebrity, pro, coupleId, tag, weeklyPoints, former }));
       const lifelines = lifelinesFor(m.managerId);
       return {
         managerId: m.managerId,
@@ -534,7 +572,7 @@ export default async function LeaguePicksPage({
           danceCardRule.version !== "v2"
             ? weeklyBonusPoints(weekRosterPoints, categoryWeight, couples.map((c) => c.weeklyPoints))
             : 0,
-        couples,
+        couples: [...couples, ...former],
       };
     });
     danceCardLeagueEntries.sort(
@@ -743,7 +781,7 @@ export default async function LeaguePicksPage({
             />
             {rosterCouples.length > 0 && (
               <RosterCard
-                couples={rosterCouples}
+                couples={[...rosterCouples, ...yourFormerCouples]}
                 totalPoints={yourRosterWeekTotalPoints}
                 weekBonusPoints={yourRosterWeekBonusPoints}
                 categoryWeight={judgePointsInputs.categoryWeight}

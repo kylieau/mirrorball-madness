@@ -113,13 +113,16 @@ function LeaguesCard({ rows }: { rows: CoupleLeagueRow[] }) {
     <section className="rounded-2xl border border-border bg-card px-3.5 py-3">
       <h2 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">In Your Leagues</h2>
       <div className="mt-1.5 flex flex-col gap-1.5">
-        {rows.map((row) => {
+        {rows.map((row, i) => {
           const yours = row.owner.kind === "you";
+          // A league with more than one holder names itself once.
+          const sameLeague = i > 0 && rows[i - 1].leagueId === row.leagueId;
           return (
-            <div key={row.leagueId} className="flex items-baseline justify-between gap-3 text-sm">
+            <div key={`${row.leagueId}:${i}`} className={cn("flex items-baseline justify-between gap-3 text-sm", sameLeague && "pl-3")}>
               <span className={cn("min-w-0 break-words", !yours && "text-muted-foreground")}>
-                {row.leagueName} ·{" "}
+                {!sameLeague && `${row.leagueName} · `}
                 {row.owner.kind === "you" ? "your roster" : row.owner.kind === "manager" ? `${row.owner.name}'s roster` : "Undrafted"}
+                {row.holdingLabel && <span className="text-xs"> · {row.holdingLabel}</span>}
                 {yours && (
                   <>
                     {" "}

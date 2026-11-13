@@ -46,6 +46,26 @@ const league = (over: Partial<CoupleLeagueInput>): CoupleLeagueInput => ({
 });
 
 describe("buildCoupleLeagueRows", () => {
+  it("gives every holder a row, latest first, with the weeks when the couple changed hands", () => {
+    const rows = buildCoupleLeagueRows({
+      coupleId: "A",
+      weeks,
+      couples,
+      leagues: [
+        league({
+          slots: [
+            { managerId: "me", coupleId: "A", startWeek: 1, endWeek: 1 },
+            { managerId: "pat", coupleId: "A", startWeek: 2, endWeek: null },
+          ],
+        }),
+      ],
+    });
+    expect(rows).toEqual([
+      { leagueId: "L", leagueName: "Alpha", owner: { kind: "manager", name: "Pat & Sam" }, holdingLabel: "from Week 2", judgesPoints: 12 },
+      { leagueId: "L", leagueName: "Alpha", owner: { kind: "you" }, holdingLabel: "Week 1", judgesPoints: 12 },
+    ]);
+  });
+
   it("names the holder: the viewer's own team, another manager, or nobody", () => {
     const rows = buildCoupleLeagueRows({
       coupleId: "A",

@@ -6,6 +6,7 @@ import { cn } from "cn";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CoupleNameLink } from "@/components/couple-name";
 import type { CoupleNameParts } from "@/lib/couple-display";
+import type { RosterWeeklyTag } from "@/lib/roster-weekly-points";
 import { usePersistedState } from "@/lib/use-persisted-state";
 
 export type DanceCardLeagueEntry = {
@@ -14,7 +15,12 @@ export type DanceCardLeagueEntry = {
   weekPoints: number;
   bonusPoints: number;
   lifelines: (CoupleNameParts & { coupleId: string; points: number })[];
-  couples: (CoupleNameParts & { coupleId: string; weeklyPoints: number; tag: "safe" | "eliminated" })[];
+  couples: (CoupleNameParts & {
+    coupleId: string;
+    weeklyPoints: number;
+    tag: RosterWeeklyTag;
+    former?: { weeks: string; note: string | null };
+  })[];
 };
 
 // Lives inside RosterCard's own CardContent, after the viewer's own roster
@@ -57,10 +63,16 @@ export function DanceCardLeagueList({
                 {e.couples.map((c) => (
                   <div
                     key={c.coupleId}
-                    className={cn("flex items-center justify-between gap-3", c.tag === "eliminated" && "opacity-60")}
+                    className={cn("flex items-center justify-between gap-3", (c.tag === "eliminated" || c.former) && "opacity-60")}
                   >
                     <span>
                       <CoupleNameLink coupleId={c.coupleId} from={historyFrom} celebrity={c.celebrity} pro={c.pro} />
+                      {c.former && (
+                        <span className="block text-xs text-muted-foreground">
+                          {c.former.weeks}
+                          {c.former.note && ` · ${c.former.note}`}
+                        </span>
+                      )}
                     </span>
                     <span className="font-heading font-semibold">
                       {formatSignedPoints(c.weeklyPoints)}

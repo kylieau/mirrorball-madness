@@ -7,6 +7,8 @@ import { getStandingMessage } from "@/lib/standings-message";
 import { draftDanceScores, replaceWeekDanceScores } from "@/lib/draft-scores";
 import { scoringModule } from "@/lib/scoring-modules";
 import { buildCouplesLeaderboard } from "@/lib/couples-leaderboard";
+import { clampSlotsToWeek } from "@/lib/roster-couple-points";
+import { holdingWeeksLabel } from "@/lib/roster-weekly-points";
 import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
 import { roundPoints } from "@/lib/format-points";
 import { scoringSettingsFromRow } from "@/lib/scoring";
@@ -49,6 +51,7 @@ export default async function LeagueStandingsPage({
     showLeagueRosters,
     leagueSlotPeriods,
     visibleDanceWeeks,
+    cutoff,
   } = base;
 
   // Rank-change arrows compare current standings to what they'd have been
@@ -186,7 +189,8 @@ export default async function LeagueStandingsPage({
               }
             : null),
           couples: seasonCouplesSpoilerSafe,
-          slots: leagueSlotPeriods,
+          // A holding the viewer hasn't watched up to isn't shown.
+          slots: clampSlotsToWeek(leagueSlotPeriods, cutoff.effectiveLatestEpisode?.week_number ?? 0),
         }).map((standing) => {
           const couple = seasonCouplesSpoilerSafe.find((c) => c.id === standing.coupleId)!;
           const names = allDisplayNames.get(couple.id) ?? { celebrity: couple.celebrity_name, pro: couple.pro_name };
@@ -196,11 +200,17 @@ export default async function LeagueStandingsPage({
             pro: names.pro,
             // A holder who is no longer a member released the couple.
             ownerName: standing.ownerId ? (managerNameById.get(standing.ownerId) ?? "Released") : null,
+            holdingLabel: standing.heldByOthers ? holdingWeeksLabel(standing.holdings) : null,
             isViewer: standing.ownerId === myTeamId,
             eliminated: couple.status === "eliminated" || couple.status === "withdrawn",
           };
         })
-        .sort((a, b) => b.totalPoints - a.totalPoints || a.celebrity.localeCompare(b.celebrity))
+        .sort(
+          (a, b) =>
+            b.totalPoints - a.totalPoints ||
+            a.celebrity.localeCompare(b.celebrity) ||
+            (a.holdings[0]?.from ?? 0) - (b.holdings[0]?.from ?? 0)
+        )
       : null;
 
   return (

@@ -63,6 +63,32 @@ const placements: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 };
 
 const byId = (rows: ReturnType<typeof buildCouplesLeaderboard>) => new Map(rows.map((r) => [r.coupleId, r]));
 
+// A gives a Week 1 holder (m2) its points, then m1 from Week 2 (a trade);
+// C is dropped by m2 after Week 1, claimed by m1 for Week 2.
+const tradedSlots = [
+  { managerId: "m2", coupleId: "A", startWeek: 1, endWeek: 1 },
+  { managerId: "m1", coupleId: "A", startWeek: 2, endWeek: null },
+  { managerId: "m2", coupleId: "B", startWeek: 1, endWeek: null },
+  { managerId: "m2", coupleId: "C", startWeek: 1, endWeek: 1 },
+  { managerId: "m1", coupleId: "C", startWeek: 2, endWeek: null },
+];
+const engineRosterTotal = (managerId: string, rosterSlots: typeof tradedSlots) =>
+  weeks.reduce((sum, week) => {
+    const score = computeWeeklyScores({
+      scoringSettings: scoring,
+      rosterSlots: rosterSlots
+        .filter((s) => s.managerId === managerId && s.startWeek <= week.weekNumber && (s.endWeek ?? 99) >= week.weekNumber)
+        .map((s) => ({ managerId, coupleId: s.coupleId })),
+      danceScores: week.danceScores,
+      episodeOutcomes: week.outcomes.map((o) => ({ ...o, finalPlacement: o.outcome === "safe" ? null : placements[o.coupleId] })),
+      predictions: [],
+      isDoubleElimination: false,
+      couplesRemaining: 4,
+      totalCouples: 4,
+    }).find((s) => s.managerId === managerId);
+    return sum + (score?.rosterPoints ?? 0);
+  }, 0);
+
 describe("buildCouplesLeaderboard", () => {
   const rows = byId(buildCouplesLeaderboard({ scoring, anchorWeek: 1, categoryWeight: 1, weeks, couples, slots }));
 
@@ -109,6 +135,29 @@ describe("buildCouplesLeaderboard", () => {
     }, 0);
     const owned = [...rows.values()].filter((r) => r.ownerId === "m2");
     expect(owned.reduce((sum, r) => sum + r.totalPoints, 0)).toBeCloseTo(engineTotal, 2);
+  });
+
+  it("keeps every holder's points when a couple changes hands, one row each", () => {
+    const rows = buildCouplesLeaderboard({ scoring, anchorWeek: 1, categoryWeight: 1, weeks, couples, slots: tradedSlots });
+    const a = rows.filter((r) => r.coupleId === "A");
+    expect(a).toEqual([
+      expect.objectContaining({ ownerId: "m2", holdings: [{ from: 1, to: 1 }], heldByOthers: true, judgesPoints: 10, bonusPoints: 2 }),
+      expect.objectContaining({ ownerId: "m1", holdings: [{ from: 2, to: null }], heldByOthers: true, judgesPoints: 14, bonusPoints: 12 }),
+    ]);
+    expect(rows.filter((r) => r.coupleId === "B")).toMatchObject([{ ownerId: "m2", heldByOthers: false }]);
+    for (const managerId of ["m1", "m2"]) {
+      const owned = rows.filter((r) => r.ownerId === managerId).reduce((sum, r) => sum + r.totalPoints, 0);
+      expect(owned).toBeCloseTo(engineRosterTotal(managerId, tradedSlots), 2);
+    }
+  });
+
+  it("gives a couple dropped and claimed back by one manager a single row over both periods", () => {
+    const back = [
+      { managerId: "m1", coupleId: "A", startWeek: 1, endWeek: 1 },
+      { managerId: "m1", coupleId: "A", startWeek: 2, endWeek: null },
+    ];
+    const rows = buildCouplesLeaderboard({ scoring, anchorWeek: 1, categoryWeight: 1, weeks, couples, slots: back }).filter((r) => r.coupleId === "A");
+    expect(rows).toMatchObject([{ ownerId: "m1", holdings: [{ from: 1, to: 1 }, { from: 2, to: null }], heldByOthers: false, judgesPoints: 24 }]);
   });
 
   it("gives both couples of a top-five double the better placement's bonus", () => {

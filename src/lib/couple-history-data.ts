@@ -13,6 +13,7 @@ import { liveRefreshWindows, toBannerWeeks, type RefreshWindow } from "@/lib/epi
 import { loadGuestSeason } from "@/lib/guest-season-data";
 import { teamDanceEpisodeIds } from "@/lib/night-dance-lines";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
+import { clampSlotsToWeek } from "@/lib/roster-couple-points";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { loadActiveSeasonId, loadAllCouples, loadTeamsMode, loadViewerMemberships, loadViewerSeason } from "@/lib/viewer-season-data";
@@ -190,10 +191,13 @@ async function loadCoupleLeagues({
           danceCardWeeks: usesDanceCardLedger(setting.dance_card_version) ? (danceCardWeeks ?? undefined) : undefined,
           anchorWeek: setting.judges_score_starts_week,
           categoryWeight: setting.judges_score_category_weight,
-          slots: (slots ?? []).flatMap((slot) =>
-            slot.league_id === leagueId && slot.couple_id
-              ? [{ managerId: slot.manager_id, coupleId: slot.couple_id, startWeek: slot.start_week, endWeek: slot.end_week }]
-              : []
+          slots: clampSlotsToWeek(
+            (slots ?? []).flatMap((slot) =>
+              slot.league_id === leagueId && slot.couple_id
+                ? [{ managerId: slot.manager_id, coupleId: slot.couple_id, startWeek: slot.start_week, endWeek: slot.end_week }]
+                : []
+            ),
+            cutoffWeek ?? 0
           ),
         },
       ];

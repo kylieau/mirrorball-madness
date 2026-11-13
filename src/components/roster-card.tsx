@@ -17,6 +17,9 @@ type RosterCouple = CoupleNameParts & {
   totalPoints?: number;
   tag: RosterWeeklyTag;
   inJeopardy: boolean;
+  // Set on a couple that left this roster before the paged week: the weeks
+  // it was held and, when someone has it now, who.
+  former?: { weeks: string; note: string | null };
 };
 
 // Same tag styling convention as weekly-results-view.tsx's outcomeTag —
@@ -25,6 +28,8 @@ type RosterCouple = CoupleNameParts & {
 const TAG_INFO: Record<RosterWeeklyTag, { label: string; className: string }> = {
   safe: { label: "Safe", className: "bg-emerald/20 text-emerald-text" },
   eliminated: { label: "Eliminated", className: "bg-muted text-muted-foreground" },
+  traded: { label: "Traded", className: "bg-muted text-muted-foreground" },
+  dropped: { label: "Dropped", className: "bg-muted text-muted-foreground" },
 };
 
 export function RosterCard({
@@ -68,13 +73,19 @@ export function RosterCard({
               href={coupleHistoryHref(c.coupleId, historyFrom)}
               className={cn(
                 "flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3.5 py-3 transition-colors hover:border-primary/60 active:bg-muted/40",
-                c.tag === "eliminated" && "opacity-60"
+                (c.tag === "eliminated" || c.former) && "opacity-60"
               )}
             >
               <div>
                 <p className="text-sm font-semibold">
                   <CoupleName celebrity={c.celebrity} pro={c.pro} />
                 </p>
+                {c.former && (
+                  <p className="mb-1 text-xs text-muted-foreground">
+                    {c.former.weeks}
+                    {c.former.note && ` · ${c.former.note}`}
+                  </p>
+                )}
                 <span className={cn("inline-block rounded-full px-2 py-0.5 text-[10px] font-bold", tag.className)}>
                   {tag.label}
                 </span>

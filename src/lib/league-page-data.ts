@@ -81,7 +81,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
   // has a roster, not only when the roster cards show.
   const allLeagueSlotsPending = supabase
     .from("roster_slots")
-    .select("slot_number, manager_id, couple_id, start_week, end_week")
+    .select("slot_number, manager_id, couple_id, start_week, end_week, source")
     .eq("league_id", id)
     .order("slot_number");
   const groupedWeeks = groupEpisodesByWeek(season.weekRows, season.episodeRows);
@@ -276,6 +276,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
       coupleId: r.couple_id,
       startWeek: r.start_week,
       endWeek: r.end_week,
+      source: r.source,
     }));
   const leagueSlotPeriods = showLeagueRosters ? rosterSlotPeriods : [];
 

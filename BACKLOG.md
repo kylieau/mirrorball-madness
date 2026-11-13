@@ -2,6 +2,20 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## A couple that changed hands — 2026-11-13
+
+Built 2026-11-13 (`docs/design/roster-history/plan.md`, As built; CLAUDE.md
+describes it): the Couples Leaderboard has one row per holder, Picks keeps
+former couples as dimmed cards, holdings are clamped to the viewer's cutoff.
+Reviewed by the advisor and Codex (plan and code; no P1 in the code). App
+only, deployed with this push.
+- Visible change for a viewer who is behind: the leaderboard now hides a
+  holding they haven't reached, where before it named the open period's
+  holder (a trade showed before they had watched it).
+- Not seen live: a real trade or claim under this code. The first is the
+  Kylie league's trade executing Fri 2026-11-13 evening.
+- The Released and what-if rows carry no weeks label.
+
 ## Trades take effect when the veto window closes — 2026-11-12
 
 Built 2026-11-12 (`docs/design/trade-execution/plan.md`; CLAUDE.md describes

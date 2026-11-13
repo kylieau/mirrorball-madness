@@ -4,7 +4,7 @@ import {
   computeCoupleWeeklyPoints,
   deriveCoupleWeeklyTag,
   weeklyBonusPoints,
-} from "./roster-weekly-points";
+ formerCoupleNote, holdingWeeksLabel } from "./roster-weekly-points";
 
 describe("computeCoupleWeeklyPoints", () => {
   it("applies the judges' score multiplier and the category weight, to two decimals", () => {
@@ -91,5 +91,42 @@ describe("weeklyBonusPoints", () => {
   it("is zero when nothing beyond judges' points was earned, and never negative", () => {
     expect(weeklyBonusPoints(0, 2, [])).toBe(0);
     expect(weeklyBonusPoints(1, 1, [3])).toBe(0);
+  });
+});
+
+describe("holdingWeeksLabel", () => {
+  it("names an open holding, a range, one week, and a couple held twice", () => {
+    expect(holdingWeeksLabel([{ from: 10, to: null }])).toBe("from Week 10");
+    expect(holdingWeeksLabel([{ from: 8, to: 9 }])).toBe("Weeks 8–9");
+    expect(holdingWeeksLabel([{ from: 9, to: 9 }])).toBe("Week 9");
+    expect(holdingWeeksLabel([{ from: 2, to: 3 }, { from: 6, to: null }])).toBe("Weeks 2–3, from 6");
+  });
+});
+
+describe("formerCoupleNote", () => {
+  const periods = [{ from: 8, to: 9 }];
+  it("says traded when the period after theirs began by trade, and names the holder now", () => {
+    expect(formerCoupleNote({ periods, next: { source: "trade" }, holderNow: { name: "Pat" }, status: "active" })).toEqual({
+      tag: "traded",
+      weeks: "Weeks 8–9",
+      note: "now with Pat",
+    });
+  });
+  it("says eliminated once the couple has gone home, naming nobody", () => {
+    expect(formerCoupleNote({ periods, next: { source: "waiver" }, holderNow: { name: "Pat" }, status: "eliminated" })).toEqual({
+      tag: "eliminated",
+      weeks: "Weeks 8–9",
+      note: null,
+    });
+  });
+  it("says dropped otherwise, naming the holder now when there is one", () => {
+    expect(formerCoupleNote({ periods, next: { source: "waiver" }, holderNow: { name: "Pat" }, status: "active" })).toEqual({
+      tag: "dropped",
+      weeks: "Weeks 8–9",
+      note: "now with Pat",
+    });
+    expect(formerCoupleNote({ periods, next: null, holderNow: null, status: "active" })).toMatchObject({ tag: "dropped", note: null });
+    // Kim dropped them; Pat claimed and later traded them on: still a drop for Kim.
+    expect(formerCoupleNote({ periods, next: { source: "waiver" }, holderNow: { name: "Lou" }, status: "active" })).toMatchObject({ tag: "dropped", note: "now with Lou" });
   });
 });

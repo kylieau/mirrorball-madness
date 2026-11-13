@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { judgePointsThroughWeek, slotActiveInWeek } from "./roster-couple-points";
+import { clampSlotsToWeek, formerSlotsForWeek, judgePointsThroughWeek, slotActiveInWeek } from "./roster-couple-points";
 
 const base = { judgesScoreStartsWeek: 1, week: 3, multiplier: 2, categoryWeight: 1 };
 const slot = (coupleId: string, startWeek: number, endWeek: number | null = null) => ({
@@ -76,5 +76,83 @@ describe("judgePointsThroughWeek", () => {
       ],
     });
     expect(points.get("a")).toEqual({ week: 24, total: 24 + 27 + 24 });
+  });
+});
+
+describe("judgePointsThroughWeek over more than one period", () => {
+  it("adds a couple's periods up, so a couple claimed back keeps its earlier points", () => {
+    const points = judgePointsThroughWeek({
+      ...base,
+      week: 4,
+      slots: [slot("a", 1, 2), slot("a", 4)],
+      scores: [score("a", 1, 10), score("a", 2, 10), score("a", 3, 99), score("a", 4, 10)],
+    });
+    expect(points.get("a")).toEqual({ week: 20, total: 60 });
+  });
+
+  it("rounds a couple's points once over its periods, not once per period", () => {
+    // Two periods of 3.6875 each: 7.375 → 7.38 when rounded once; per period it would be 3.69 + 3.69 = 7.38 only by luck, and 7.37 for other halves.
+    const points = judgePointsThroughWeek({
+      ...base,
+      multiplier: 1,
+      categoryWeight: 0.5,
+      week: 2,
+      slots: [slot("a", 1, 1), slot("a", 2)],
+      scores: [score("a", 1, 7.375), score("a", 2, 7.375)],
+    });
+    expect(points.get("a")).toEqual({ week: 3.69, total: 7.38 });
+  });
+});
+
+describe("clampSlotsToWeek", () => {
+  const periods = [
+    { managerId: "kim", coupleId: "a", startWeek: 1, endWeek: 9 },
+    { managerId: "pat", coupleId: "a", startWeek: 10, endWeek: null },
+    { managerId: "lou", coupleId: "b", startWeek: 11, endWeek: null },
+  ];
+
+  it("shows a holding that starts the week after the cutoff, and hides later ones", () => {
+    // Week 9 scored: tonight's claims start Week 10 and are public already.
+    expect(clampSlotsToWeek(periods, 9)).toEqual(periods.slice(0, 2));
+  });
+
+  it("keeps a holding open past the cutoff, and hides the one that replaced it", () => {
+    expect(clampSlotsToWeek(periods, 8)).toEqual([{ managerId: "kim", coupleId: "a", startWeek: 1, endWeek: null }]);
+  });
+
+  it("keeps every draft holding before anything is scored", () => {
+    const draft = [{ managerId: "kim", coupleId: "a", startWeek: 1, endWeek: null }];
+    expect(clampSlotsToWeek(draft, 0)).toEqual(draft);
+  });
+});
+
+describe("formerSlotsForWeek", () => {
+  const periods = [
+    { managerId: "kim", coupleId: "a", startWeek: 1, endWeek: 9 },
+    { managerId: "pat", coupleId: "a", startWeek: 10, endWeek: null },
+    { managerId: "kim", coupleId: "b", startWeek: 2, endWeek: 3 },
+    { managerId: "kim", coupleId: "b", startWeek: 6, endWeek: 7 },
+    { managerId: "kim", coupleId: "c", startWeek: 1, endWeek: 4 },
+    { managerId: "kim", coupleId: "c", startWeek: 8, endWeek: null },
+    { managerId: "kim", coupleId: "d", startWeek: 1, endWeek: 2 },
+  ];
+
+  it("lists the couples that left before the paged week, newest end first, every period together", () => {
+    expect(formerSlotsForWeek(periods, "kim", 10, 3)).toEqual([
+      { coupleId: "a", periods: [periods[0]] },
+      { coupleId: "b", periods: [periods[2], periods[3]] },
+    ]);
+  });
+
+  it("treats a couple held again in the paged week as current, and skips periods before the Anchor Week", () => {
+    // c is held in Week 10; d ended before the Anchor Week and never scored.
+    expect(formerSlotsForWeek(periods, "kim", 10, 3).map((f) => f.coupleId)).toEqual(["a", "b"]);
+    expect(formerSlotsForWeek(periods, "kim", 10, 1).map((f) => f.coupleId)).toEqual(["a", "b", "d"]);
+  });
+
+  it("shows nothing for a week inside the holding", () => {
+    // In Week 9 a is still Kim's and c is held again, so only b and d have left.
+    expect(formerSlotsForWeek(periods, "kim", 9, 1).map((f) => f.coupleId)).toEqual(["b", "d"]);
+    expect(formerSlotsForWeek(periods, "kim", 2, 1)).toEqual([]);
   });
 });

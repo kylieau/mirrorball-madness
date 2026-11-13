@@ -5,6 +5,7 @@ import type { RosterSlotPeriod } from "./roster-couple-points";
 import type { HistoryWeekData } from "./score-history";
 import type { PodiumPick, ScoringSettings } from "./scoring";
 import type { DanceCardRule } from "./dance-card-v2";
+import { holdingWeeksLabel } from "./roster-weekly-points";
 import { spoilerSafeCoupleStatus } from "./spoiler-safe-couple-status";
 
 export type CoupleLeagueInput = {
@@ -26,13 +27,16 @@ export type CoupleLeagueRow = {
   leagueId: string;
   leagueName: string;
   owner: { kind: "you" } | { kind: "manager"; name: string } | { kind: "undrafted" };
+  // The weeks held, when another manager in the league has held the couple too.
+  holdingLabel: string | null;
   judgesPoints: number;
 };
 
-// One row per league for the couple page's In Your Leagues card: who holds
-// the couple and its judges' points there, read off the same Couples
-// Leaderboard row Standings shows (an undrafted couple's points are its
-// what-if from the Anchor Week).
+// One row per holder per league for the couple page's In Your Leagues card:
+// who has held the couple and its judges' points for them, read off the same
+// Couples Leaderboard rows Standings shows (an undrafted couple's points are
+// its what-if from the Anchor Week). Within a league the latest holder comes
+// first. Pass slots already clamped to the viewer's cutoff.
 export function buildCoupleLeagueRows({
   coupleId,
   weeks,
@@ -45,7 +49,7 @@ export function buildCoupleLeagueRows({
   leagues: CoupleLeagueInput[];
 }): CoupleLeagueRow[] {
   return leagues.flatMap((league) => {
-    const standing = buildCouplesLeaderboard({
+    return buildCouplesLeaderboard({
       rule: league.rule,
       scoring: league.scoring,
       anchorWeek: league.anchorWeek,
@@ -53,15 +57,24 @@ export function buildCoupleLeagueRows({
       weeks: league.danceCardWeeks ?? weeks,
       couples,
       slots: league.slots,
-    }).find((row) => row.coupleId === coupleId);
-    if (!standing) return [];
-    const owner: CoupleLeagueRow["owner"] =
-      standing.ownerId === null
-        ? { kind: "undrafted" }
-        : standing.ownerId === league.myTeamId
-          ? { kind: "you" }
-          : { kind: "manager", name: league.managerNames.get(standing.ownerId) ?? "Unknown" };
-    return [{ leagueId: league.id, leagueName: league.name, owner, judgesPoints: standing.judgesPoints }];
+    })
+      .filter((row) => row.coupleId === coupleId)
+      .sort((a, b) => (b.holdings.at(-1)?.from ?? 0) - (a.holdings.at(-1)?.from ?? 0))
+      .map((standing) => {
+        const owner: CoupleLeagueRow["owner"] =
+          standing.ownerId === null
+            ? { kind: "undrafted" }
+            : standing.ownerId === league.myTeamId
+              ? { kind: "you" }
+              : { kind: "manager", name: league.managerNames.get(standing.ownerId) ?? "Unknown" };
+        return {
+          leagueId: league.id,
+          leagueName: league.name,
+          owner,
+          holdingLabel: standing.heldByOthers ? holdingWeeksLabel(standing.holdings) : null,
+          judgesPoints: standing.judgesPoints,
+        };
+      });
   });
 }
 
