@@ -1,3 +1,5 @@
+import { releaseEffectiveWeek } from "./remove-manager";
+
 export type TradeLeg = { fromManagerId: string; toManagerId: string; coupleId: string | null; points: number | null };
 
 export type TradeStatus =
@@ -10,7 +12,7 @@ export type TradeStatus =
   | "failed"
   | "expired";
 
-export type TradeFailure = "not_dancing" | "not_held" | "no_room" | "cash_cap" | "left_league" | "no_scored_week";
+export type TradeFailure = "not_dancing" | "not_held" | "no_room" | "cash_cap" | "left_league" | "no_scored_week" | "no_week_left";
 
 export const TRADE_FAILURE_COPY: Record<TradeFailure, string> = {
   not_dancing: "A couple in it was no longer dancing.",
@@ -19,6 +21,7 @@ export const TRADE_FAILURE_COPY: Record<TradeFailure, string> = {
   cash_cap: "A manager no longer had the points to send.",
   left_league: "A manager in it had left the league.",
   no_scored_week: "There was no week with results to move the points onto.",
+  no_week_left: "The season ended before it could take effect.",
 };
 
 export function isTradeFailure(result: string | null): result is TradeFailure {
@@ -76,11 +79,31 @@ export function offerExpiresAt(expiresAt: string, deadline: string | null): stri
   return deadline && new Date(deadline).getTime() < new Date(expiresAt).getTime() ? deadline : expiresAt;
 }
 
-// A trade takes effect at the first waiver run after its veto window closes.
-// A run with no time yet waits on results and then 48 more hours, so a
-// 24-hour veto window always closes first.
-export function clearsBeforeRun(vetoEndsAt: string, runDueAt: string | null): boolean {
-  return runDueAt == null || new Date(vetoEndsAt).getTime() <= new Date(runDueAt).getTime();
+// The scheduled job executes a cleared trade within a quarter hour of its
+// window closing, so the week it lands in is read a tick later.
+export const TRADE_TICK_MS = 15 * 60 * 1000;
+export const VETO_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export type TradeWeek = { weekNumber: number; nights: { airsAt: string | null; published: boolean }[] };
+
+// The week a trade clearing at vetoEndsAt moves couples from: the first week
+// whose first night hasn't aired when the job next runs (a tick after the
+// window closes, or now for a window already closed; a removal's rule). A
+// trade executes only once every night that has aired is published, so a
+// window closing after a curtain and before Finish Week waits on that
+// week's results, which `waitsFor` names.
+export function tradeEffectiveWeek(
+  weeks: TradeWeek[],
+  vetoEndsAt: string | Date,
+  now: Date = new Date()
+): { week: number; waitsFor: number | null; aired: boolean } {
+  const at = new Date(Math.max(new Date(vetoEndsAt).getTime() + TRADE_TICK_MS, now.getTime()));
+  const airs = weeks.map((week) => ({ weekNumber: week.weekNumber, airsAt: week.nights.map((night) => night.airsAt) }));
+  const week = releaseEffectiveWeek(airs, at);
+  const pending = weeks
+    .filter((w) => w.nights.some((night) => night.airsAt != null && new Date(night.airsAt).getTime() <= at.getTime() && !night.published))
+    .map((w) => w.weekNumber);
+  return { week, waitsFor: pending.length > 0 ? Math.max(...pending) : null, aired: week !== releaseEffectiveWeek(airs, now) };
 }
 
 export type TradeLogEntry = { status: TradeStatus; weekNumber: number | null };
@@ -99,7 +122,7 @@ export const TRADE_RULES = [
   "A trade moves couples between rosters and can include points. It has to move at least one couple, and it can be between more than two managers.",
   "Every manager in a trade has to accept it. Until they all have, only they can see it, and any of them can decline.",
   "Once everyone accepts, the trade is posted to the league for 24 hours. It is vetoed if more than half of the teams not in it vote to veto.",
-  "A trade takes effect at the first waiver run after its veto window closes, before any waiver claims. A traded couple starts scoring for their new manager in the next week that hasn't aired, and keeps scoring for their old one until then.",
+  "A trade takes effect when its veto window closes, or once that week's results are posted if the show has aired by then. A traded couple starts scoring for their new manager in the next week that hasn't aired, and keeps scoring for their old one until then.",
   "Points move when the trade takes effect, onto the latest week with results. Across all their trades, a manager can send at most 10% of the points they have earned this season.",
   "A couple coming in takes the spot of a couple going out, the spot of a couple who has gone home, or an open spot. A trade goes through whole or not at all: if a couple in it goes home first, nothing moves.",
   "A couple in an open trade can't be in a waiver claim, and a couple in a waiver claim can't be offered in a trade.",

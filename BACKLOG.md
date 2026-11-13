@@ -2,6 +2,30 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Trades take effect when the veto window closes — 2026-11-12
+
+Built 2026-11-12 (`docs/design/trade-execution/plan.md`; CLAUDE.md describes
+it). Kylie applied `supabase/apply-trade-execution.sql` live after the Week
+9 waiver run on 2026-11-12 (the cron job is unchanged); the app deploys with
+the next push. The one accepted offer at the time executes on the first
+tick after its window closes, Fri 2026-11-13 about 7:30 PM PT, for Week 10.
+- The same-tick order case (a due run and a clearing trade with points
+  that would reverse two claimants' priority) is settled by ordering, the
+  runs before the trades inside `process_due_recasts`; no test of it.
+- `assert_trades_open`'s "no week left" refusal is behind the deadline
+  check, so no test reaches it. Also untested (Codex, code review): a waiver
+  run coming due inside the publish gap, and a trade with a points leg
+  executing outside a run.
+- Codex's code review (2026-11-12): no P1, two P2s, both fixed (the page
+  reads an overdue window at the next tick, not its end; the hold copy is
+  per night, so a two-night week between its nights doesn't say it waits).
+- Execution is up to 15 minutes after the window closes; the page's time
+  is the window end.
+- Seen in the scratch league (throwaways, deleted after): the Home card
+  row, both Transactions card lines, the Trades page copy and the facts
+  strip, no console errors. Not seen live: a trade clearing and moving
+  couples outside a run.
+
 ## Curtain Call podium and Home card moves — 2026-11-11
 
 Pushed 2026-11-11 (`CLAUDE.md` describes each): Curtain Call's Finale podium,
@@ -54,11 +78,11 @@ the wire until the next run.
 ## Remove a manager after the draft — 2026-11-12
 
 Built 2026-11-12 (`docs/design/remove-manager/plan.md`, As built;
-CLAUDE.md describes it). **Not applied live and not pushed** at the time of
-writing; Kylie applies `supabase/apply-remove-manager.sql` after
-`apply-trades.sql` and `apply-lifeline.sql`, then the app deploys with it
-(the dialogs' copy and the `roster_releases` reads come up empty until the
-SQL is in; the pre-SQL RPC still only drops the row).
+CLAUDE.md describes it). Pushed as `06f4b02` and
+`supabase/apply-remove-manager.sql` applied live by Kylie on 2026-11-12
+(`roster_releases` and `league_departures` read back present and empty). Her
+apply predates the file's service-role grant on `release_effective_week`,
+which nothing in the app calls; the file is safe to run again.
 - The race the triggers close (a pick, claim or offer committing after the
   removal) has no test: PGlite is single-connection.
 - A correction republish of an earlier week after a removal is argued, not
@@ -154,11 +178,8 @@ Known limits, none fixed:
 - A member with no roster rows could claim into slots 1..roster_size.
 - A proposed trade offer holds its couples out of their owner's waiver drops
   until it is declined, cancelled or lapses (48 hours).
-- A trade accepted less than 24 hours before a run waits for the next run. In
-  S35 the Semi-Finals deadline comes two days before the only run, so every
-  accepted trade clears in time; a season with a later deadline would need
-  this looked at.
-- The waiver order is set before trade points move in the same run (no test).
+- A trade accepted less than 24 hours before a run waited for the next run
+  until 2026-11-12 (trades now take effect when the window closes).
 - With Recast off and Trades on, Trades copy still says "waiver run".
 - Not built: a Lifeline need line / Picks Due on the Home league card, and
   Lifeline lines on Standings' roster card.

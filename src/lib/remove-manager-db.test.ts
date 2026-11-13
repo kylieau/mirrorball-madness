@@ -27,6 +27,7 @@ const LIVE_STACK = [
   "apply-contributor-special-setup", "apply-draft-lineup", "apply-retire-special-leftovers", "apply-episode-rounds",
   "apply-special-dance-label", "apply-dance-card-v2", "apply-dance-card-v3", "apply-lifeline", "apply-recast-v2",
   "apply-trades", "apply-recast-after-results", "apply-recast-dance-card-order", "apply-remove-manager",
+  "apply-trade-execution",
 ];
 let db: PGlite;
 

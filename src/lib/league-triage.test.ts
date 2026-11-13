@@ -188,7 +188,7 @@ describe("buildModuleStack", () => {
           moves({
             lifeline: { spots: [{ former: c("Alix", "Val"), pick: null }], weekNumber: 10, lockAt: IN_5H, locked: false },
             waivers: { claims: [], openSpotCount: 1, dueAt: IN_2D, weekNumber: 9, startWeek: 10 },
-            trades: { offers: [{ from: "kim", expiresAt: IN_2D }, { from: "pat", expiresAt: IN_20H }], acceptedWith: [] },
+            trades: { offers: [{ from: "kim", expiresAt: IN_2D }, { from: "pat", expiresAt: IN_20H }], accepted: [], vetoes: [] },
           })
         ).toEqual([
           ["needed", "Need Lifeline pick", "Locks in 5h"],
@@ -208,15 +208,35 @@ describe("buildModuleStack", () => {
               weekNumber: 9,
               startWeek: 10,
             },
-            trades: { offers: [], acceptedWith: [["Kim"], ["Kim", "Pat"], ["Kim", "Pat", "Lou"]] },
+            trades: {
+              offers: [],
+              accepted: [["Kim"], ["Kim", "Pat"], ["Kim", "Pat", "Lou"]].map((names) => ({ with: names, vetoEndsAt: IN_20H })),
+              vetoes: [],
+            },
           })
         ).toEqual([
           ["saved", "Lifeline: Maura & Mark", "Locks in 5h"],
           ["waiting", "Add Tatyana & Jan, +2 more", "After results"],
-          ["waiting", "Trade with Kim", "At the run"],
-          ["waiting", "Trade with Kim and Pat", "At the run"],
-          ["waiting", "Trade with 3 managers", "At the run"],
+          ["waiting", "Trade with Kim", "Clears in 20h"],
+          ["waiting", "Trade with Kim and Pat", "Clears in 20h"],
+          ["waiting", "Trade with 3 managers", "Clears in 20h"],
         ]);
+      });
+
+      it("asks everyone outside a trade to vote while its window is open, until they have", () => {
+        const vetoes = [
+          { between: ["Kim", "Pat"], vetoEndsAt: IN_2D, voted: false },
+          { between: ["Lou", "Kim"], vetoEndsAt: IN_20H, voted: false },
+        ];
+        expect(moves({ lifeline: null, waivers: null, trades: { offers: [], accepted: [], vetoes } })).toEqual([
+          ["needed", "2 trades up for veto", "Ends in 20h"],
+        ]);
+        expect(
+          moves({ lifeline: null, waivers: null, trades: { offers: [], accepted: [], vetoes: [vetoes[0], { ...vetoes[1], voted: true }] } })
+        ).toEqual([["needed", "Trade up for veto", "Ends in 2d"]]);
+        expect(
+          moves({ lifeline: null, waivers: null, trades: { offers: [], accepted: [], vetoes: vetoes.map((veto) => ({ ...veto, voted: true })) } })
+        ).toEqual([]);
       });
 
       it("puts a missing Lifeline above a saved one, with the lock on the first line only", () => {
@@ -276,7 +296,7 @@ describe("lifelinePickDue", () => {
       lifelinePickDue({
         ...NO_ROSTER_MOVES,
         waivers: { claims: [], openSpotCount: 1, dueAt: null, weekNumber: 9, startWeek: 10 },
-        trades: { offers: [{ from: "kim", expiresAt: LOCK }], acceptedWith: [] },
+        trades: { offers: [{ from: "kim", expiresAt: LOCK }], accepted: [], vetoes: [] },
       })
     ).toBe(false);
   });
@@ -381,14 +401,14 @@ describe("rosterMoveTabs", () => {
       needs({
         lifeline: { spots: [spot(null)], weekNumber: 10, lockAt: "2026-11-18T01:00:00Z", locked: false },
         waivers: { ...run, claims: [], openSpotCount: 1 },
-        trades: { offers: [{ from: "kim", expiresAt: "2026-11-18T01:00:00Z" }], acceptedWith: [] },
+        trades: { offers: [{ from: "kim", expiresAt: "2026-11-18T01:00:00Z" }], accepted: [], vetoes: [] },
       })
     ).toEqual([true, true, true]);
     expect(
       needs({
         lifeline: { spots: [spot(null)], weekNumber: 10, lockAt: "2026-11-18T01:00:00Z", locked: true },
         waivers: { ...run, claims: [{ add: "a", drop: null }], openSpotCount: 1 },
-        trades: { offers: [], acceptedWith: [["kim"]] },
+        trades: { offers: [], accepted: [{ with: ["kim"], vetoEndsAt: "2026-11-18T01:00:00Z" }], vetoes: [{ between: ["pat", "lou"], vetoEndsAt: "2026-11-18T01:00:00Z", voted: true }] },
       })
     ).toEqual([false, false, false]);
     expect(needs({ ...NO_ROSTER_MOVES, waivers: { ...run, claims: [], openSpotCount: 0 } })).toEqual([false, false, false]);
@@ -398,7 +418,7 @@ describe("rosterMoveTabs", () => {
     expect(defaultRosterMoveTab(rosterMoveTabs(ON, NO_ROSTER_MOVES))).toBe("lifeline");
     expect(
       defaultRosterMoveTab(
-        rosterMoveTabs(ON, { ...NO_ROSTER_MOVES, trades: { offers: [{ from: "kim", expiresAt: "2026-11-18T01:00:00Z" }], acceptedWith: [] } })
+        rosterMoveTabs(ON, { ...NO_ROSTER_MOVES, trades: { offers: [{ from: "kim", expiresAt: "2026-11-18T01:00:00Z" }], accepted: [], vetoes: [] } })
       )
     ).toBe("trades");
     expect(defaultRosterMoveTab([])).toBeNull();

@@ -7,7 +7,7 @@ import { loadRosterMoveTabs } from "@/lib/roster-moves-data";
 import { rosterMovesBackLabel } from "@/lib/roster-moves-pages";
 import { safeRelativePath } from "@/lib/safe-relative-path";
 import { createClient } from "@/lib/supabase/server";
-import { clearsBeforeRun, offerExpiresAt, tradeLogVisible, type TradeStatus } from "@/lib/trades";
+import { offerExpiresAt, tradeEffectiveWeek, tradeLogVisible, VETO_WINDOW_MS, type TradeStatus, type TradeWeek } from "@/lib/trades";
 
 export default async function TradesPage({
   params,
@@ -37,9 +37,8 @@ export default async function TradesPage({
 
   if (unavailable) return <RosterMovesUnavailable back={back} {...unavailable} />;
 
-  const [{ data: deadline }, { data: cycleRows }, { data: cashRoom }, { data: offers }, { tabs }] = await Promise.all([
+  const [{ data: deadline }, { data: cashRoom }, { data: offers }, { tabs }] = await Promise.all([
     supabase.rpc("trade_deadline", { p_league_id: id }),
-    supabase.rpc("recast_next_cycle", { p_league_id: id }),
     supabase.rpc("trade_cash_available", { p_league_id: id }),
     // RLS returns the offers this team is part of plus every one the whole
     // trade accepted.
@@ -53,12 +52,15 @@ export default async function TradesPage({
   ]);
 
   const now = Date.now();
-  const cycle = cycleRows?.[0];
-  // due_at is null until the run's week has its results posted.
-  const nextRun =
-    cycle && cycle.start_week != null
-      ? { weekNumber: cycle.week_number, dueAt: cycle.due_at as string | null, startWeek: cycle.start_week }
-      : null;
+  const weeks: TradeWeek[] = base.groupedWeeks.map((week) => ({
+    weekNumber: week.week_number,
+    nights: week.episodes.map((episode) => ({ airsAt: episode.airs_at, published: episode.results_published_at != null })),
+  }));
+  // A trade accepted now clears a day from now; the last week it can land in
+  // is the Finale.
+  const startWeek = tradeEffectiveWeek(weeks, new Date(now + VETO_WINDOW_MS), new Date(now)).week;
+  const lastWeek = base.finaleWeekNumber ?? Math.max(0, ...weeks.map((week) => week.weekNumber));
+  const noWeekLeft = startWeek > lastWeek;
   const deadlinePassed = !deadline || new Date(deadline).getTime() <= now;
   const behind = cutoff.pendingRevealEpisode != null;
   const cutoffWeek = cutoff.effectiveLatestEpisode?.week_number ?? null;
@@ -80,7 +82,7 @@ export default async function TradesPage({
         expiresAt,
         vetoEndsAt: offer.veto_ends_at,
         vetoOpen: offer.veto_ends_at != null && new Date(offer.veto_ends_at).getTime() > now,
-        clearsNextRun: offer.veto_ends_at && nextRun ? clearsBeforeRun(offer.veto_ends_at, nextRun.dueAt) : null,
+        effect: offer.veto_ends_at ? tradeEffectiveWeek(weeks, offer.veto_ends_at, new Date(now)) : null,
         weekNumber: offer.week_number,
         startWeek: offer.start_week,
         legs: [...offer.trade_legs]
@@ -107,14 +109,10 @@ export default async function TradesPage({
       .sort((a, b) => (celebrityName.get(a) ?? "").localeCompare(celebrityName.get(b) ?? "")),
   }));
 
-  const closed = deadlinePassed || !nextRun;
+  const closed = deadlinePassed || noWeekLeft;
   const facts: RosterMovesFact[] = [
     closed || !deadline ? { label: "Trades", at: null, value: "Closed" } : { label: "Trades close", at: deadline },
-    !nextRun
-      ? { label: "Next run", at: null, value: "None left" }
-      : nextRun.dueAt
-        ? { label: "Next run", at: nextRun.dueAt }
-        : { label: "Next run", at: null, value: `48h after ${formatEpisodeCasual(nextRun.weekNumber)} results` },
+    { label: "Couples move", at: null, value: noWeekLeft ? "No week left" : formatEpisodeCasual(startWeek) },
   ];
 
   return (
@@ -128,7 +126,8 @@ export default async function TradesPage({
         behind={behind}
         pendingRevealWeek={cutoff.pendingRevealEpisode?.week_number ?? null}
         closed={closed}
-        nextRun={nextRun}
+        noWeekLeft={noWeekLeft}
+        startWeek={startWeek}
         cashRoom={Number(cashRoom ?? 0)}
         rosters={behind ? [] : rosters}
         offers={behind ? [] : trades.filter((trade) => trade.status === "proposed")}

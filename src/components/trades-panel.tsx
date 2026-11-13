@@ -28,7 +28,7 @@ import {
   type TradeLeg,
   type TradeStatus,
 } from "@/lib/trades";
-import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
+import { inSentence, useFormattedDeadline } from "@/lib/use-browser-time-zone";
 
 export type TradeView = {
   id: string;
@@ -37,10 +37,10 @@ export type TradeView = {
   result: string | null;
   expiresAt: string;
   vetoEndsAt: string | null;
-  // Whether the league can still vote, and whether the window closes in time
-  // for the next waiver run (null without one).
+  // Whether the league can still vote, and the week the trade moves couples
+  // from once the window closes (null unless accepted).
   vetoOpen: boolean;
-  clearsNextRun: boolean | null;
+  effect: { week: number; waitsFor: number | null; aired: boolean } | null;
   weekNumber: number | null;
   startWeek: number | null;
   legs: TradeLeg[];
@@ -77,7 +77,8 @@ export function TradesPanel({
   behind,
   pendingRevealWeek,
   closed,
-  nextRun,
+  noWeekLeft,
+  startWeek,
   cashRoom,
   rosters,
   offers,
@@ -93,10 +94,11 @@ export function TradesPanel({
   // still dancing, so offers and rosters wait until they catch up.
   behind: boolean;
   pendingRevealWeek: number | null;
-  // Past the Semi-Finals lock, or no waiver run left for a trade to take
-  // effect at.
+  // Past the Semi-Finals lock, or no week left for a trade to take effect in.
   closed: boolean;
-  nextRun: { weekNumber: number; dueAt: string | null; startWeek: number } | null;
+  noWeekLeft: boolean;
+  // The week a trade accepted now would move couples from.
+  startWeek: number;
   // Points the viewer's team can still send this season.
   cashRoom: number;
   // Every team's couples still dancing, the viewer's team first.
@@ -118,7 +120,6 @@ export function TradesPanel({
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ at: string; message: string } | null>(null);
-  const runText = useFormattedDeadline(nextRun?.dueAt);
 
   const parts = (coupleId: string) => coupleDisplayNames[coupleId] ?? UNKNOWN_COUPLE;
   const managerName = (managerId: string) => managerNames[managerId] ?? "Unknown";
@@ -348,14 +349,14 @@ export function TradesPanel({
           <CardHeader>
             <CardTitle>Up for Veto</CardTitle>
             <CardDescription>
-              Accepted by everyone in them. The league has 24 hours to veto a trade before it can take effect.
+              Accepted by everyone in them. The league has 24 hours to veto a trade; then it takes effect.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col text-sm">
             {waiting.map((trade) => (
               <div key={trade.id} className="flex flex-col gap-2 border-b border-border py-3 first:pt-0 last:border-b-0 last:pb-0">
                 {tradeBody(trade, true)}
-                <VetoStatus trade={trade} votesNeeded={vetoVotesNeeded(teamCount, trade.parties.length)} runText={runText} />
+                <VetoStatus trade={trade} votesNeeded={vetoVotesNeeded(teamCount, trade.parties.length)} />
                 {errorAt(trade.id)}
                 {trade.vetoOpen &&
                   vetoVotesNeeded(teamCount, trade.parties.length) != null &&
@@ -381,7 +382,7 @@ export function TradesPanel({
           <CardHeader>
             <CardTitle>Trades Are Closed</CardTitle>
             <CardDescription>
-              {nextRun ? "Offers closed at the Semi-Finals lock." : "There is no waiver run left for a trade to take effect at."}
+              {noWeekLeft ? "There is no week left for a trade to take effect in." : "Offers closed at the Semi-Finals lock."}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -393,7 +394,7 @@ export function TradesPanel({
             <CardTitle>Propose a Trade</CardTitle>
             <CardDescription>
               {cashRoom > 0 ? `You can send up to ${formatPoints(cashRoom)} pts.` : "You have no points to send right now."}
-              {nextRun && ` A trade that goes through starts in ${formatEpisodeCasual(nextRun.startWeek)}.`}
+              {` A trade that goes through starts in ${formatEpisodeCasual(startWeek)}.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
@@ -627,21 +628,25 @@ function OfferStatus({ offer, nameOf }: { offer: TradeView; nameOf: (managerId: 
   );
 }
 
-function VetoStatus({ trade, votesNeeded, runText }: { trade: TradeView; votesNeeded: number | null; runText: string }) {
+function VetoStatus({ trade, votesNeeded }: { trade: TradeView; votesNeeded: number | null }) {
   const vetoEndsAt = useFormattedDeadline(trade.vetoEndsAt);
   const votes =
     votesNeeded == null
       ? "Every team is in this trade, so there is no one to veto it."
       : `${trade.vetoVotes.length} of the ${votesNeeded} veto ${votesNeeded === 1 ? "vote" : "votes"} it would take.`;
-  const effect =
-    trade.clearsNextRun == null
-      ? null
-      : trade.clearsNextRun
-        ? `Takes effect at the next waiver run${runText ? `, ${runText}` : ""}.`
-        : "Its veto window closes after the next waiver run, so it takes effect at the one after.";
+  const effect = trade.effect && tradeEffectCopy(trade.effect, trade.vetoOpen);
   return (
     <p className="text-xs text-muted-foreground">
-      {trade.vetoOpen ? `Veto window closes ${vetoEndsAt}.` : "Veto window closed."} {votes} {effect}
+      {trade.vetoOpen ? `Veto window closes ${inSentence(vetoEndsAt)}.` : "Veto window closed."} {votes} {effect}
     </p>
   );
+}
+
+// When the trade moves couples, and from which week: a window closing after
+// a curtain lands in the week after, and waits for that night's results.
+function tradeEffectCopy({ week, waitsFor, aired }: NonNullable<TradeView["effect"]>, vetoOpen: boolean): string {
+  const target = formatEpisodeCasual(week);
+  if (waitsFor != null) return `Takes effect once ${formatEpisodeCasual(waitsFor)}'s results are posted, for ${target}.`;
+  const when = vetoOpen ? "then" : "shortly";
+  return aired ? `Takes effect ${when}, for ${target}, since ${formatEpisodeCasual(week - 1)} will have aired.` : `Takes effect ${when}, for ${target}.`;
 }

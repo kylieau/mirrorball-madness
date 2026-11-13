@@ -84,7 +84,7 @@ export async function loadHomeRosterMoves(
     tradesOn
       ? supabase
           .from("trade_offers")
-          .select("status, proposed_by, expires_at, trade_parties(manager_id, accepted_at)")
+          .select("status, proposed_by, expires_at, veto_ends_at, trade_parties(manager_id, accepted_at), trade_votes(manager_id)")
           .eq("league_id", league.id)
           .in("status", ["proposed", "accepted"])
           .order("created_at")
@@ -147,7 +147,11 @@ export async function loadHomeRosterMoves(
 
   const trades = ((): RosterMoves<string>["trades"] => {
     if (!offers) return null;
-    const mine = offers.filter((offer) => offer.trade_parties.some((party) => party.manager_id === myTeamId));
+    const partyIds = (offer: (typeof offers)[number]) => offer.trade_parties.map((party) => party.manager_id);
+    const mine = offers.filter((offer) => partyIds(offer).includes(myTeamId));
+    // A window that has closed is a trade waiting on the next tick, not a vote.
+    const windowOpen = (offer: (typeof offers)[number]) =>
+      offer.status === "accepted" && offer.veto_ends_at != null && new Date(offer.veto_ends_at).getTime() > now;
     return {
       // An offer lapses before the waiver run marks it expired, and once the
       // trade deadline has passed none can be accepted.
@@ -157,9 +161,16 @@ export async function loadHomeRosterMoves(
         const answered = offer.trade_parties.some((party) => party.manager_id === myTeamId && party.accepted_at);
         return offer.status === "proposed" && open && !answered ? [{ from: offer.proposed_by, expiresAt }] : [];
       }),
-      acceptedWith: mine
-        .filter((offer) => offer.status === "accepted")
-        .map((offer) => offer.trade_parties.map((party) => party.manager_id).filter((id) => id !== myTeamId)),
+      accepted: mine
+        .filter((offer) => offer.status === "accepted" && offer.veto_ends_at != null)
+        .map((offer) => ({ with: partyIds(offer).filter((id) => id !== myTeamId), vetoEndsAt: offer.veto_ends_at as string })),
+      vetoes: offers
+        .filter((offer) => !partyIds(offer).includes(myTeamId) && windowOpen(offer))
+        .map((offer) => ({
+          between: partyIds(offer),
+          vetoEndsAt: offer.veto_ends_at as string,
+          voted: offer.trade_votes.some((vote) => vote.manager_id === myTeamId),
+        })),
     };
   })();
 

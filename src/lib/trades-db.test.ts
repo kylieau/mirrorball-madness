@@ -22,6 +22,7 @@ const LIVE_STACK = [
   "apply-contributor-special-setup", "apply-draft-lineup", "apply-retire-special-leftovers", "apply-episode-rounds",
   "apply-special-dance-label", "apply-dance-card-v2", "apply-dance-card-v3", "apply-lifeline", "apply-recast-v2",
   "apply-trades", "apply-recast-after-results", "apply-recast-dance-card-order", "apply-remove-manager",
+  "apply-trade-execution",
 ];
 let db: PGlite;
 
@@ -133,6 +134,7 @@ const posted = (episode: string, hoursAgo: number) =>
 // a while: since after Week 8's run came due, which they were too late for.
 const tradesOnAWhile = () => db.query("update public.leagues set trades_on_since = now() - interval '3 days'");
 const processDue = async () => (await db.query<{ runs: unknown[] }>("select public.process_due_recasts() as runs")).rows[0].runs;
+const processTrades = async () => (await db.query<{ runs: unknown[] }>("select public.process_due_trades() as runs")).rows[0].runs;
 const roster = async (managerId: string) =>
   (await db.query<{ slot: number; couple_id: string; source: string; start: number; end: number | null }>(
     `select slot_number as slot, couple_id, source, start_week as start, end_week as end
@@ -359,6 +361,35 @@ describe("Trades with points as cash", () => {
     expect((await db.query("select public.trade_cash_available($1) as room", [league])).rows).toEqual([{ room: null }]);
   });
 
+  it("takes effect when its veto window closes, without waiting for a run", async () => {
+    await asService();
+    await vetoWindowOver(swap);
+    // A night has aired and isn't published: who is still dancing is stale,
+    // so the trade waits. An exhibition night never gets results and doesn't
+    // hold it.
+    await aired(e11, 1);
+    expect(await processDue()).toEqual([]);
+    expect(await offer(swap)).toEqual({ status: "accepted", result: null, week: null, start: null });
+    await db.query("update public.episodes set airs_at = now() + interval '5 days' where id = $1", [e11]);
+    await db.query(
+      "insert into public.episodes (id, season_id, week_id, episode_number, airs_at) values ($1, $2, null, 99, now() - interval '1 hour')",
+      [id(99), season]
+    );
+    expect(await processTrades()).toEqual([{ league_id: league, trades: 1, start_week: 10 }]);
+    await db.query("delete from public.episodes where id = $1", [id(99)]);
+
+    // Couples move from the first week that hasn't aired; no run was made.
+    expect(await offer(swap)).toEqual({ status: "executed", result: null, week: 9, start: 10 });
+    expect((await roster(admin)).filter((row) => row.slot === 1)).toEqual([
+      { slot: 1, couple_id: a, source: "draft", start: 1, end: 9 }, { slot: 1, couple_id: c, source: "trade", start: 10, end: null },
+    ]);
+    expect((await roster(third)).filter((row) => row.slot === 2)).toEqual([
+      { slot: 2, couple_id: c, source: "draft", start: 1, end: 9 }, { slot: 2, couple_id: a, source: "trade", start: 10, end: null },
+    ]);
+    expect((await db.query("select count(*)::int as n from public.recast_cycles")).rows).toEqual([{ n: 1 }]);
+    expect(await processTrades()).toEqual([]);
+  });
+
   it("lets an offer lapse when not everyone accepts within 48 hours", async () => {
     await asUser(admin);
     stale = await propose([{ from: admin, to: friend, couple: e }]);
@@ -396,19 +427,12 @@ describe("Trades with points as cash", () => {
     expect(points[admin]).toBe(points[third]);
     expect(points[friend]).toBeCloseTo(points[admin] / 2, 2);
 
-    await vetoWindowOver(swap, doomed);
+    await vetoWindowOver(doomed);
     await posted(e11, 49);
     expect(await processDue()).toEqual([{ league_id: league, week: 10, awards: 1 }]);
     expect(await offer(doomed)).toEqual({ status: "failed", result: "not_dancing", week: 10, start: null });
-    expect(await offer(swap)).toEqual({ status: "executed", result: null, week: 10, start: 11 });
     expect((await offer(stale)).status).toBe("expired");
     expect(await transfers(week10)).toEqual({ [admin]: 0, [friend]: 0, [third]: 0, [fourth]: 0 });
-    expect((await roster(admin)).filter((row) => row.slot === 1)).toEqual([
-      { slot: 1, couple_id: a, source: "draft", start: 1, end: 10 }, { slot: 1, couple_id: c, source: "trade", start: 11, end: null },
-    ]);
-    expect((await roster(third)).filter((row) => row.slot === 2)).toEqual([
-      { slot: 2, couple_id: c, source: "draft", start: 1, end: 10 }, { slot: 2, couple_id: a, source: "trade", start: 11, end: null },
-    ]);
     expect((await roster(friend)).filter((row) => row.slot === 2)).toEqual([
       { slot: 2, couple_id: e, source: "draft", start: 1, end: 9 }, { slot: 2, couple_id: i, source: "waiver", start: 11, end: null },
     ]);
@@ -430,6 +454,9 @@ describe("Trades with points as cash", () => {
 
     await asUser(admin);
     const late = await propose([{ from: admin, to: fourth, couple: e }]);
+    const last = await propose([{ from: admin, to: fourth, couple: c }]);
+    await asUser(fourth);
+    expect(await respond(last, true)).toBe("accepted");
     await asService();
     await aired(e12, 1);
     await asUser(fourth);
@@ -441,5 +468,15 @@ describe("Trades with points as cash", () => {
     expect(await processDue()).toEqual([{ league_id: league, week: 11, awards: 0 }]);
     expect((await offer(late)).status).toBe("expired");
     expect((await roster(admin)).at(-1)).toEqual({ slot: 2, couple_id: e, source: "trade", start: 10, end: null });
+
+    // A window closing once the Finale has aired leaves no week to move
+    // couples from; it waits for the Finale's results, then fails.
+    expect((await offer(last)).status).toBe("accepted");
+    await vetoWindowOver(last);
+    await aired(e13, 1);
+    expect(await processTrades()).toEqual([]);
+    await posted(e13, 1);
+    expect(await processTrades()).toEqual([]);
+    expect(await offer(last)).toEqual({ status: "failed", result: "no_week_left", week: 12, start: null });
   });
 });

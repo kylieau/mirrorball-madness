@@ -104,9 +104,14 @@ export async function loadModuleStackInputs(
               ),
               trades: s.rosterMoves.trades && {
                 ...s.rosterMoves.trades,
-                acceptedWith: s.rosterMoves.trades.acceptedWith.map((managerIds) =>
-                  managerIds.map((managerId) => s.managerNames[managerId] ?? "Someone")
-                ),
+                accepted: s.rosterMoves.trades.accepted.map((trade) => ({
+                  ...trade,
+                  with: trade.with.map((managerId) => s.managerNames[managerId] ?? "Someone"),
+                })),
+                vetoes: s.rosterMoves.trades.vetoes.map((veto) => ({
+                  ...veto,
+                  between: veto.between.map((managerId) => s.managerNames[managerId] ?? "Someone"),
+                })),
               },
             },
           },

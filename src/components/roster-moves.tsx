@@ -11,7 +11,7 @@ import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { defaultRosterMoveTab, type RosterMoves as RosterMovesState, type RosterMoveTab } from "@/lib/league-triage";
 import { rosterMoveTabHref } from "@/lib/roster-moves-pages";
-import { useFormattedDeadline } from "@/lib/use-browser-time-zone";
+import { inSentence, useFormattedDeadline } from "@/lib/use-browser-time-zone";
 
 type Moves = RosterMovesState<CoupleNameParts>;
 
@@ -68,12 +68,6 @@ export function RosterMoves({
 
 const ICON = "mt-px size-3.5 shrink-0";
 const LINES = "flex flex-col gap-1 text-xs text-muted-foreground";
-
-// The card's lines are sentences, so a relative day reads in lower case there
-// ("locks today 8 PM PT") while it stays a label elsewhere.
-function inSentence(formatted: string): string {
-  return formatted.replace(/^(Today|Tomorrow) /, (day) => day.toLowerCase());
-}
 
 function LifelineStatusLines({ lifeline }: { lifeline: Moves["lifeline"] }) {
   const formattedLockAt = useFormattedDeadline(lifeline?.lockAt);
@@ -196,27 +190,67 @@ function WaiverClaimsStatus({ waivers }: { waivers: Moves["waivers"] }) {
 }
 
 function TradesStatusLines({ trades, managerNames }: { trades: Moves["trades"]; managerNames: Record<string, string> }) {
-  if (!trades || (trades.offers.length === 0 && trades.acceptedWith.length === 0)) {
+  if (!trades || (trades.offers.length === 0 && trades.accepted.length === 0 && trades.vetoes.length === 0)) {
     return <p className={LINES}>No offer waiting on you.</p>;
   }
   const name = (managerId: string) => managerNames[managerId] ?? "Someone";
+  const names = (managerIds: string[]) =>
+    managerIds.length > 2 ? `${managerIds.length} managers` : managerIds.map(name).join(" and ");
   return (
     <ul className={LINES}>
       {trades.offers.map((offer, index) => (
         <OfferLine key={index} from={name(offer.from)} expiresAt={offer.expiresAt} />
       ))}
-      {trades.acceptedWith.map((managerIds, index) => (
-        <li key={index} className="flex gap-1.5">
-          <HourglassIcon aria-hidden className={cn(ICON, "text-accent")} />
-          <span className="min-w-0">
-            <span className="text-foreground">
-              Trade with {managerIds.length > 2 ? `${managerIds.length} managers` : managerIds.map(name).join(" and ")}
-            </span>
-            , accepted · At the run
-          </span>
-        </li>
+      {trades.vetoes.map((veto, index) => (
+        <VetoLine key={index} between={names(veto.between)} vetoEndsAt={veto.vetoEndsAt} voted={veto.voted} />
+      ))}
+      {trades.accepted.map((trade, index) => (
+        <AcceptedLine key={index} with={names(trade.with)} vetoEndsAt={trade.vetoEndsAt} />
       ))}
     </ul>
+  );
+}
+
+// Everyone outside a trade gets a say for 24 hours, so an open window is a
+// gold line until the viewer has voted; their own accepted trade waits on
+// the window, not on a run.
+function VetoLine({ between, vetoEndsAt, voted }: { between: string; vetoEndsAt: string; voted: boolean }) {
+  const ends = useFormattedDeadline(vetoEndsAt);
+  // "Kim and Pat's trade", but "the trade between 3 managers".
+  const trade = between.endsWith(" managers") ? `the trade between ${between}` : `${between}'s trade`;
+  if (voted) {
+    return (
+      <li className="flex gap-1.5">
+        <HourglassIcon aria-hidden className={cn(ICON, "text-accent")} />
+        <span className="min-w-0">
+          <span className="text-foreground">{trade}</span>, up for veto · You voted
+        </span>
+      </li>
+    );
+  }
+  return (
+    <li className="flex gap-1.5 font-semibold text-accent">
+      <CircleDashedIcon aria-hidden className={ICON} />
+      <span className="min-w-0">
+        {trade} is up for veto
+        {ends && <span className="font-normal text-muted-foreground"> · Ends {inSentence(ends)}</span>}
+      </span>
+    </li>
+  );
+}
+
+// A window that has closed on a live night waits for the results.
+function AcceptedLine({ with: withNames, vetoEndsAt }: { with: string; vetoEndsAt: string }) {
+  const clears = useFormattedDeadline(vetoEndsAt);
+  const past = new Date(vetoEndsAt).getTime() <= Date.now();
+  return (
+    <li className="flex gap-1.5">
+      <HourglassIcon aria-hidden className={cn(ICON, "text-accent")} />
+      <span className="min-w-0">
+        <span className="text-foreground">Trade with {withNames}</span>, accepted
+        {past ? " · Clears once results are posted" : clears && ` · Clears ${inSentence(clears)}`}
+      </span>
+    </li>
   );
 }
 

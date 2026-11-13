@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  clearsBeforeRun,
+  tradeEffectiveWeek,
   isTradeFailure,
   tradeDraftProblem,
   tradeLogVisible,
@@ -99,18 +99,6 @@ describe("vetoVotesNeeded", () => {
   });
 });
 
-describe("clearsBeforeRun", () => {
-  it("compares the veto window with the run", () => {
-    expect(clearsBeforeRun("2026-11-18T01:00:00Z", "2026-11-20T01:00:00Z")).toBe(true);
-    expect(clearsBeforeRun("2026-11-20T01:00:00Z", "2026-11-20T01:00:00Z")).toBe(true);
-    expect(clearsBeforeRun("2026-11-20T02:00:00Z", "2026-11-20T01:00:00Z")).toBe(false);
-  });
-
-  it("clears a run that has no time yet, since it is at least 48 hours off", () => {
-    expect(clearsBeforeRun("2026-11-20T02:00:00Z", null)).toBe(true);
-  });
-});
-
 describe("tradeLogVisible", () => {
   it("never lists a trade that is still open", () => {
     expect(tradeLogVisible({ status: "proposed", weekNumber: null }, 9, false)).toBe(false);
@@ -135,5 +123,44 @@ describe("isTradeFailure", () => {
     expect(isTradeFailure("not_dancing")).toBe(true);
     expect(isTradeFailure("in_other_trade")).toBe(false);
     expect(isTradeFailure(null)).toBe(false);
+  });
+});
+
+describe("tradeEffectiveWeek", () => {
+  const night = (airsAt: string, published = false) => ({ airsAt, published });
+  const weeks = [
+    { weekNumber: 9, nights: [night("2026-11-11T01:00:00Z", true)] },
+    { weekNumber: 10, nights: [night("2026-11-18T01:00:00Z")] },
+    { weekNumber: 11, nights: [night("2026-11-25T01:00:00Z")] },
+  ];
+  const now = new Date("2026-11-13T05:00:00Z");
+
+  it("moves couples from the first week that hasn't aired a tick after the window closes", () => {
+    expect(tradeEffectiveWeek(weeks, "2026-11-14T05:00:00Z", now)).toEqual({ week: 10, waitsFor: null, aired: false });
+    // 4:50 PM PT Tuesday: the tick lands after the 5 PM curtain.
+    expect(tradeEffectiveWeek(weeks, "2026-11-18T00:50:00Z", now)).toEqual({ week: 11, waitsFor: 10, aired: true });
+  });
+
+  it("reads a window that has already closed at the next tick, not at its end", () => {
+    // Closed Monday, still unexecuted on Tuesday night: it lands after the curtain.
+    expect(tradeEffectiveWeek(weeks, "2026-11-16T05:00:00Z", new Date("2026-11-18T02:00:00Z"))).toEqual({
+      week: 11,
+      waitsFor: 10,
+      aired: false,
+    });
+  });
+
+  it("waits only on a night that has aired and isn't posted", () => {
+    const twoNights = [
+      weeks[0],
+      { weekNumber: 10, nights: [night("2026-11-17T01:00:00Z", true), night("2026-11-18T01:00:00Z")] },
+      weeks[2],
+    ];
+    // Between the nights: the first is posted, the second hasn't aired.
+    expect(tradeEffectiveWeek(twoNights, "2026-11-17T12:00:00Z", new Date("2026-11-17T11:00:00Z"))).toEqual({
+      week: 11,
+      waitsFor: null,
+      aired: false,
+    });
   });
 });

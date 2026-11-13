@@ -64,8 +64,14 @@ export type RosterMoves<Couple> = {
     startWeek: number;
   } | null;
   // Offers still waiting on the viewer's answer (who sent each, when it
-  // lapses), and who each accepted trade waiting on the waiver run is with.
-  trades: { offers: { from: string; expiresAt: string }[]; acceptedWith: string[][] } | null;
+  // lapses), the viewer's accepted trades (who with, when the veto window
+  // closes) and the league's other trades up for veto (whose, when the window
+  // closes, whether the viewer has voted).
+  trades: {
+    offers: { from: string; expiresAt: string }[];
+    accepted: { with: string[]; vetoEndsAt: string }[];
+    vetoes: { between: string[]; vetoEndsAt: string; voted: boolean }[];
+  } | null;
 };
 
 export const NO_ROSTER_MOVES: RosterMoves<never> = { lifeline: null, waivers: null, trades: null };
@@ -111,7 +117,13 @@ export function rosterMoveTabs(
       needsYou: !!moves.waivers && moves.waivers.claims.length === 0 && moves.waivers.openSpotCount > 0,
     });
   }
-  if (on.trades) tabs.push({ key: "trades", label: "Trades", needsYou: !!moves.trades && moves.trades.offers.length > 0 });
+  if (on.trades) {
+    tabs.push({
+      key: "trades",
+      label: "Trades",
+      needsYou: !!moves.trades && (moves.trades.offers.length > 0 || moves.trades.vetoes.some((veto) => !veto.voted)),
+    });
+  }
   return tabs;
 }
 
@@ -200,12 +212,21 @@ function rosterMoveRows({ lifeline, waivers, trades }: RosterMoves<StackCouple>,
         clock: clockUntil("Ends", firstExpiry, now, "Ends soon"),
       });
     }
+    const unvoted = trades.vetoes.filter((veto) => !veto.voted);
+    const firstWindow = unvoted.map((veto) => veto.vetoEndsAt).sort()[0];
+    if (firstWindow) {
+      rows.push({
+        ...plain(unvoted.length === 1 ? "Trade up for veto" : `${unvoted.length} trades up for veto`),
+        mark: "needed",
+        clock: clockUntil("Ends", firstWindow, now, "Ends soon"),
+      });
+    }
     rows.push(
-      ...trades.acceptedWith.map(
-        (names): MoveRow => ({
+      ...trades.accepted.map(
+        ({ with: names, vetoEndsAt }): MoveRow => ({
           ...plain(`Trade with ${names.length > 2 ? `${names.length} managers` : names.join(" and ")}`),
           mark: "waiting",
-          clock: "At the run",
+          clock: clockUntil("Clears", vetoEndsAt, now, "Clears soon"),
         })
       )
     );

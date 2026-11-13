@@ -124,3 +124,9 @@ export function nextTuesdayAt8pmEasternForInput(): string {
 
   return utcIsoToLocalInput(new Date(guessUtc - (readBackAsUtc - guessUtc)).toISOString());
 }
+
+// A card's lines are sentences, so a relative day reads in lower case there
+// ("locks today 8 PM PT") while it stays a label elsewhere.
+export function inSentence(formatted: string): string {
+  return formatted.replace(/^(Today|Tomorrow) /, (day) => day.toLowerCase());
+}
