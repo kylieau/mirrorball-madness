@@ -2,10 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { NO_ROSTER_MOVES, type RosterMoves } from "@/lib/league-triage";
 import { lifelinePicksState } from "@/lib/lifeline-picks";
+import { recastWire } from "@/lib/recast";
 import { partitionRecastSlots } from "@/lib/recast-framing";
 import { slotActiveInWeek } from "@/lib/roster-couple-points";
+import { isSpoilerSafeActive } from "@/lib/spoiler-safe-couple-status";
 import { offerExpiresAt } from "@/lib/trades";
-import { loadAllCouples } from "@/lib/viewer-season-data";
+import { loadActiveSeasonId, loadAllCouples } from "@/lib/viewer-season-data";
 
 export type RosterMovesLeague = {
   id: string;
@@ -55,6 +57,11 @@ export async function loadHomeRosterMoves(
     { data: claims },
     { data: offers },
     { data: tradeDeadline },
+    { data: leagueHeldRows },
+    { data: pendingDrops },
+    { data: lastRunDrops },
+    { data: runs },
+    seasonId,
   ] = await Promise.all([
     supabase
       .from("roster_slots")
@@ -90,6 +97,22 @@ export async function loadHomeRosterMoves(
           .order("created_at")
       : none,
     tradesOn ? supabase.rpc("trade_deadline", { p_league_id: league.id }) : none,
+    waiversOn
+      ? supabase.from("roster_slots").select("couple_id").eq("league_id", league.id).is("end_week", null)
+      : none,
+    waiversOn ? supabase.rpc("recast_pending_drops", { p_league_id: league.id }) : none,
+    // The viewer can't claim back a couple they dropped in the last run.
+    waiversOn
+      ? supabase
+          .from("waiver_claims")
+          .select("drop_couple_id, week_number")
+          .eq("league_id", league.id)
+          .eq("manager_id", myTeamId)
+          .eq("status", "approved")
+          .not("drop_couple_id", "is", null)
+      : none,
+    waiversOn ? supabase.from("recast_cycles").select("week_number").eq("league_id", league.id) : none,
+    loadActiveSeasonId(supabase),
   ]);
 
   const coupleById = new Map(couples.map((couple) => [couple.id, couple]));
@@ -133,12 +156,36 @@ export async function loadHomeRosterMoves(
     const cycle = cycleRows?.[0];
     if (cycle?.start_week == null || !claims) return null;
     const current = slots.filter((slot) => slot.period.endWeek === null);
+    // The Recast page's wire.
+    const lastRunWeek = Math.max(0, ...(runs ?? []).map((row) => row.week_number));
+    const wire = recastWire({
+      dancingCoupleIds: couples
+        .filter(
+          (couple) =>
+            couple.season_id === seasonId &&
+            isSpoilerSafeActive(
+              { status: couple.status, eliminationWeek: couple.elimination_week },
+              spoiler.cutoffWeek,
+              spoiler.finaleWeekNumber
+            )
+        )
+        .map((couple) => couple.id),
+      heldCoupleIds: new Set((leagueHeldRows ?? []).flatMap((row) => (row.couple_id ? [row.couple_id] : []))),
+      pendingDrops: (pendingDrops ?? []).map((drop) => ({ coupleId: drop.couple_id, managerId: drop.manager_id })),
+      teamId: myTeamId,
+      dropLockedCoupleIds: new Set(
+        (lastRunDrops ?? []).flatMap((row) =>
+          row.drop_couple_id && row.week_number === lastRunWeek ? [row.drop_couple_id] : []
+        )
+      ),
+    });
     return {
       claims: claims.map((claim) => ({ add: claim.couple_id, drop: claim.drop_couple_id })),
       // A spot with no couple at all was emptied by a trade.
       openSpotCount:
         partitionRecastSlots(current, spoiler.cutoffWeek, spoiler.finaleWeekNumber).revealedOpen.length +
         Math.max(0, league.roster_size - current.length),
+      wireCount: wire.length,
       dueAt: cycle.due_at as string | null,
       weekNumber: cycle.week_number,
       startWeek: cycle.start_week,

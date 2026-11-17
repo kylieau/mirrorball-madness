@@ -6,9 +6,8 @@ import { loadLeaguePageBase } from "@/lib/league-page-data";
 import { getStandingMessage } from "@/lib/standings-message";
 import { draftDanceScores, replaceWeekDanceScores } from "@/lib/draft-scores";
 import { scoringModule } from "@/lib/scoring-modules";
-import { buildCouplesLeaderboard } from "@/lib/couples-leaderboard";
+import { buildCouplesSeasonLeaderboard } from "@/lib/couples-leaderboard";
 import { clampSlotsToWeek } from "@/lib/roster-couple-points";
-import { holdingWeeksLabel } from "@/lib/roster-weekly-points";
 import { loadCoupleWeekResults } from "@/lib/couples-leaderboard-data";
 import { roundPoints } from "@/lib/format-points";
 import { scoringSettingsFromRow } from "@/lib/scoring";
@@ -172,12 +171,12 @@ export default async function LeagueStandingsPage({
     ]
   ).filter((c) => c !== false);
 
-  // Standings → Couples Leaderboard: every cast couple ranked by what it has
-  // earned for its manager, undrafted ones as a what-if.
+  // Standings → Couples Leaderboard: every cast couple once, ranked by its
+  // season from the Anchor Week, with who holds it now.
   const managerNameById = new Map(standings.map((s) => [s.managerId, s.displayName]));
   const couplesLeaderboard =
     showLeagueRosters && scoringSettings
-      ? buildCouplesLeaderboard({
+      ? buildCouplesSeasonLeaderboard({
           rule: base.danceCardRule,
           scoring: scoringSettingsFromRow(scoringSettings),
           anchorWeek: scoringSettings.judges_score_starts_week,
@@ -194,22 +193,21 @@ export default async function LeagueStandingsPage({
         }).map((standing) => {
           const couple = seasonCouplesSpoilerSafe.find((c) => c.id === standing.coupleId)!;
           const names = allDisplayNames.get(couple.id) ?? { celebrity: couple.celebrity_name, pro: couple.pro_name };
+          // A holder who is no longer a member released the couple.
+          const ownerName = standing.ownerId ? (managerNameById.get(standing.ownerId) ?? null) : null;
           return {
             ...standing,
             celebrity: names.celebrity,
             pro: names.pro,
-            // A holder who is no longer a member released the couple.
-            ownerName: standing.ownerId ? (managerNameById.get(standing.ownerId) ?? "Released") : null,
-            holdingLabel: standing.heldByOthers ? holdingWeeksLabel(standing.holdings) : null,
+            ownerName: standing.ownerId ? (ownerName ?? "Released") : null,
+            holdingLabel: ownerName ? standing.ownerLabel : null,
             isViewer: standing.ownerId === myTeamId,
             eliminated: couple.status === "eliminated" || couple.status === "withdrawn",
           };
         })
         .sort(
           (a, b) =>
-            b.totalPoints - a.totalPoints ||
-            a.celebrity.localeCompare(b.celebrity) ||
-            (a.holdings[0]?.from ?? 0) - (b.holdings[0]?.from ?? 0)
+            b.totalPoints - a.totalPoints || a.celebrity.localeCompare(b.celebrity)
         )
       : null;
 

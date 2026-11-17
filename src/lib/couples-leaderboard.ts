@@ -1,5 +1,6 @@
 import { roundPoints } from "./format-points";
 import type { RosterSlotPeriod } from "./roster-couple-points";
+import { holdingWeeksLabel } from "./roster-weekly-points";
 import type { HistoryWeekData } from "./score-history";
 import { danceCardLedger, heldCreditCents, type DanceCardRule } from "./dance-card-v2";
 import {
@@ -122,4 +123,34 @@ export function buildCouplesLeaderboard({
   return rows.map((row, key) =>
     standing(row, roundPoints((judgesRaw.get(key) ?? 0) * categoryWeight), roundPoints((bonusRaw.get(key) ?? 0) * categoryWeight))
   );
+}
+
+export type CoupleSeasonStanding = Omit<CoupleStanding, "holdings" | "heldByOthers"> & {
+  // "since Week 10" for a holder who didn't draft the couple, "Weeks 1–9"
+  // for the last holder of a couple nobody holds now.
+  ownerLabel: string | null;
+};
+
+// Standings' Couples Leaderboard: each couple once, with its whole season
+// from the Anchor Week whoever held it, and the holder now (Kylie,
+// 2026-11-17: a couple isn't listed twice; the couple page keeps every
+// holder's own points). A couple nobody holds now names its last holder.
+export function buildCouplesSeasonLeaderboard(
+  args: Parameters<typeof buildCouplesLeaderboard>[0]
+): CoupleSeasonStanding[] {
+  return buildCouplesLeaderboard({ ...args, slots: [] }).map(({ coupleId, judgesPoints, bonusPoints, totalPoints }) => {
+    const row = { coupleId, judgesPoints, bonusPoints, totalPoints };
+    const periods = args.slots.filter((slot) => slot.coupleId === coupleId).sort((a, b) => a.startWeek - b.startWeek);
+    const last = periods.at(-1);
+    if (!last) return { ...row, ownerId: null, ownerLabel: null };
+    // The holder's latest unbroken run, which may span several periods.
+    let from = last.startWeek;
+    for (const period of periods.slice(0, -1).reverse()) {
+      if (period.managerId !== last.managerId || period.endWeek === null || period.endWeek < from - 1) break;
+      from = period.startWeek;
+    }
+    const ownerLabel =
+      last.endWeek === null ? (from > 1 ? `since Week ${from}` : null) : holdingWeeksLabel([{ from, to: last.endWeek }]);
+    return { ...row, ownerId: last.managerId, ownerLabel };
+  });
 }

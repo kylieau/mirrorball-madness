@@ -179,7 +179,7 @@ describe("buildModuleStack", () => {
 
       it("has none for a league with nothing on, and never before the draft is done", () => {
         expect(moves({})).toEqual([]);
-        expect(moves({ waivers: { claims: [], openSpotCount: 1, dueAt: IN_2D, weekNumber: 9, startWeek: 10 } }, "in_progress")).toEqual([]);
+        expect(moves({ waivers: { claims: [], openSpotCount: 1, wireCount: 1, dueAt: IN_2D, weekNumber: 9, startWeek: 10 } }, "in_progress")).toEqual([]);
         expect(buildModuleStack(base).every((line) => line.moves.length === 0)).toBe(true);
       });
 
@@ -187,7 +187,7 @@ describe("buildModuleStack", () => {
         expect(
           moves({
             lifeline: { spots: [{ former: c("Alix", "Val"), pick: null }], weekNumber: 10, lockAt: IN_5H, locked: false },
-            waivers: { claims: [], openSpotCount: 1, dueAt: IN_2D, weekNumber: 9, startWeek: 10 },
+            waivers: { claims: [], openSpotCount: 1, wireCount: 1, dueAt: IN_2D, weekNumber: 9, startWeek: 10 },
             trades: { offers: [{ from: "kim", expiresAt: IN_2D }, { from: "pat", expiresAt: IN_20H }], accepted: [], vetoes: [] },
           })
         ).toEqual([
@@ -203,7 +203,7 @@ describe("buildModuleStack", () => {
             lifeline: { spots: [{ former: c("Alix", "Val"), pick: c("Maura", "Mark") }], weekNumber: 10, lockAt: IN_5H, locked: false },
             waivers: {
               claims: [c("Tatyana", "Jan"), c("Jo", "Ezra"), c("Alix", "Val")].map((add) => ({ add, drop: null })),
-              openSpotCount: 1,
+              openSpotCount: 1, wireCount: 1,
               dueAt: null,
               weekNumber: 9,
               startWeek: 10,
@@ -253,8 +253,10 @@ describe("buildModuleStack", () => {
 
       it("says nothing about waivers with no claim and no open spot, and never counts down a run that is due", () => {
         const run = { claims: [], weekNumber: 9, startWeek: 10 };
-        expect(moves({ waivers: { ...run, openSpotCount: 0, dueAt: IN_2D } })).toEqual([]);
-        expect(moves({ waivers: { ...run, openSpotCount: 2, dueAt: "2026-11-17T19:55:00Z" } })).toEqual([
+        expect(moves({ waivers: { ...run, openSpotCount: 0, wireCount: 1, dueAt: IN_2D } })).toEqual([]);
+        // An open spot with nobody to claim for it asks nothing of the viewer.
+        expect(moves({ waivers: { ...run, openSpotCount: 1, wireCount: 0, dueAt: IN_2D } })).toEqual([]);
+        expect(moves({ waivers: { ...run, openSpotCount: 2, wireCount: 1, dueAt: "2026-11-17T19:55:00Z" } })).toEqual([
           ["needed", "2 open spots", "Runs soon"],
         ]);
       });
@@ -295,7 +297,7 @@ describe("lifelinePickDue", () => {
     expect(
       lifelinePickDue({
         ...NO_ROSTER_MOVES,
-        waivers: { claims: [], openSpotCount: 1, dueAt: null, weekNumber: 9, startWeek: 10 },
+        waivers: { claims: [], openSpotCount: 1, wireCount: 1, dueAt: null, weekNumber: 9, startWeek: 10 },
         trades: { offers: [{ from: "kim", expiresAt: LOCK }], accepted: [], vetoes: [] },
       })
     ).toBe(false);
@@ -384,7 +386,7 @@ describe("picksAction", () => {
 describe("rosterMoveTabs", () => {
   const ON = { lifeline: true, recast: true, trades: true };
   const spot = (pick: string | null) => ({ former: "x", pick });
-  const run = { weekNumber: 9, startWeek: 10, dueAt: null };
+  const run = { weekNumber: 9, startWeek: 10, dueAt: null, wireCount: 1 };
 
   it("lists only the mechanisms the league has on, Lifeline then Recast then Trades", () => {
     expect(rosterMoveTabs({ lifeline: false, recast: true, trades: true }, NO_ROSTER_MOVES).map((tab) => tab.label)).toEqual([
@@ -412,6 +414,7 @@ describe("rosterMoveTabs", () => {
       })
     ).toEqual([false, false, false]);
     expect(needs({ ...NO_ROSTER_MOVES, waivers: { ...run, claims: [], openSpotCount: 0 } })).toEqual([false, false, false]);
+    expect(needs({ ...NO_ROSTER_MOVES, waivers: { ...run, claims: [], openSpotCount: 1, wireCount: 0 } })).toEqual([false, false, false]);
   });
 
   it("opens on the first tab that needs the viewer, else the first", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCouplesLeaderboard } from "./couples-leaderboard";
+import { buildCouplesLeaderboard, buildCouplesSeasonLeaderboard } from "./couples-leaderboard";
 import { computeWeeklyScores, type ScoringSettings } from "./scoring";
 
 const scoring: ScoringSettings = {
@@ -186,5 +186,38 @@ describe("buildCouplesLeaderboard", () => {
     );
     expect(doubleRows.get("C")?.bonusPoints).toBe(scoring.secondPlacePoints);
     expect(doubleRows.get("D")?.bonusPoints).toBe(scoring.secondPlacePoints);
+  });
+});
+
+describe("buildCouplesSeasonLeaderboard", () => {
+  const args = { scoring, anchorWeek: 1, categoryWeight: 1, weeks, couples };
+
+  it("lists each couple once with its whole season, whoever held it", () => {
+    const rows = buildCouplesSeasonLeaderboard({ ...args, slots: tradedSlots });
+    expect(rows.map((row) => row.coupleId)).toEqual(["A", "B", "C", "D"]);
+    const whatIf = byId(buildCouplesLeaderboard({ ...args, slots: [] }));
+    for (const row of rows) expect(row.totalPoints).toBe(whatIf.get(row.coupleId)?.totalPoints);
+  });
+
+  it("names the holder now, since when when they didn't draft it, else the last holder and their weeks", () => {
+    const rows = new Map(
+      buildCouplesSeasonLeaderboard({
+        ...args,
+        slots: [
+          // Traded to m1 for Week 2.
+          { managerId: "m2", coupleId: "A", startWeek: 1, endWeek: 1 },
+          { managerId: "m1", coupleId: "A", startWeek: 2, endWeek: null },
+          // Two periods of m2's, back to back, read as one run.
+          { managerId: "m2", coupleId: "B", startWeek: 1, endWeek: 1 },
+          { managerId: "m2", coupleId: "B", startWeek: 2, endWeek: null },
+          // Dropped after going home.
+          { managerId: "m2", coupleId: "C", startWeek: 1, endWeek: 2 },
+        ],
+      }).map((row) => [row.coupleId, [row.ownerId, row.ownerLabel]])
+    );
+    expect(rows.get("A")).toEqual(["m1", "since Week 2"]);
+    expect(rows.get("B")).toEqual(["m2", null]);
+    expect(rows.get("C")).toEqual(["m2", "Weeks 1–2"]);
+    expect(rows.get("D")).toEqual([null, null]);
   });
 });

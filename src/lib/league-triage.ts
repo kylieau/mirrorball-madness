@@ -59,6 +59,9 @@ export type RosterMoves<Couple> = {
   waivers: {
     claims: { add: Couple; drop: Couple | null }[];
     openSpotCount: number;
+    // Couples the viewer could claim: still dancing and on no roster, or
+    // offered as another manager's drop.
+    wireCount: number;
     dueAt: string | null;
     weekNumber: number;
     startWeek: number;
@@ -92,6 +95,11 @@ export function mapRosterMoveCouples<A, B>(moves: RosterMoves<A>, rename: (coupl
   };
 }
 
+// An open spot only needs the viewer while there is a couple to claim for it.
+export function openSpotsToFill(waivers: NonNullable<RosterMoves<unknown>["waivers"]>): number {
+  return waivers.wireCount > 0 ? waivers.openSpotCount : 0;
+}
+
 // A Lifeline locks and costs points like a pick, so a missing one counts as
 // Picks Due. An open spot or a trade offer doesn't.
 export function lifelinePickDue(moves: RosterMoves<unknown>): boolean {
@@ -114,7 +122,7 @@ export function rosterMoveTabs(
     tabs.push({
       key: "recast",
       label: "Recast",
-      needsYou: !!moves.waivers && moves.waivers.claims.length === 0 && moves.waivers.openSpotCount > 0,
+      needsYou: !!moves.waivers && moves.waivers.claims.length === 0 && openSpotsToFill(moves.waivers) > 0,
     });
   }
   if (on.trades) {
@@ -192,7 +200,7 @@ function rosterMoveRows({ lifeline, waivers, trades }: RosterMoves<StackCouple>,
     const [top, ...rest] = waivers.claims.map((claim) => claim.add);
     const row: MoveBody[] = top
       ? [{ ...named("Add ", top), after: rest.length ? `, +${rest.length} more` : undefined, mark: "waiting" }]
-      : waivers.openSpotCount > 0
+      : openSpotsToFill(waivers) > 0
         ? [{ ...plain(`${waivers.openSpotCount} ${plural(waivers.openSpotCount, "open spot")}`), mark: "needed" }]
         : [];
     rows.push(

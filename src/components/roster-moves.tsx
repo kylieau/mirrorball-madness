@@ -9,7 +9,7 @@ import { RosterMovesSwitch } from "@/components/roster-moves-switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasual } from "@/lib/format-week";
-import { defaultRosterMoveTab, type RosterMoves as RosterMovesState, type RosterMoveTab } from "@/lib/league-triage";
+import { defaultRosterMoveTab, openSpotsToFill, type RosterMoves as RosterMovesState, type RosterMoveTab } from "@/lib/league-triage";
 import { rosterMoveTabHref } from "@/lib/roster-moves-pages";
 import { inSentence, useFormattedDeadline } from "@/lib/use-browser-time-zone";
 
@@ -161,14 +161,16 @@ function WaiverClaimsStatus({ waivers }: { waivers: Moves["waivers"] }) {
             </li>
           ))}
         </ol>
+      ) : openSpotsToFill(waivers) > 0 ? (
+        <span className="flex gap-1.5 font-semibold text-accent">
+          <CircleDashedIcon aria-hidden className={ICON} />
+          <span className="min-w-0">
+            {openSpotCount === 1 ? "1 open spot" : `${openSpotCount} open spots`} · No waiver claim saved
+          </span>
+        </span>
       ) : (
         openSpotCount > 0 && (
-          <span className="flex gap-1.5 font-semibold text-accent">
-            <CircleDashedIcon aria-hidden className={ICON} />
-            <span className="min-w-0">
-              {openSpotCount === 1 ? "1 open spot" : `${openSpotCount} open spots`} · No waiver claim saved
-            </span>
-          </span>
+          <span>{openSpotCount === 1 ? "1 open spot" : `${openSpotCount} open spots`} · No couple free to claim yet</span>
         )
       )}
       {statusLine && (
