@@ -41,6 +41,7 @@ export function RosterCard({
   carousel,
   leagueSection,
   historyFrom,
+  notScoredYet = false,
 }: {
   couples: RosterCouple[];
   totalPoints: number;
@@ -51,13 +52,21 @@ export function RosterCard({
   carousel?: ReactNode;
   leagueSection?: ReactNode;
   historyFrom: string;
+  // The paged week is still to come: who holds what, no points yet.
+  notScoredYet?: boolean;
 }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Your Fantasy Roster</CardTitle>
         <CardDescription>
-          <span className="font-heading font-semibold">{formatPoints(totalPoints)}</span> pts this week
+          {notScoredYet ? (
+            "Not scored yet"
+          ) : (
+            <>
+              <span className="font-heading font-semibold">{formatPoints(totalPoints)}</span> pts this week
+            </>
+          )}
         </CardDescription>
         {carousel}
       </CardHeader>
@@ -101,15 +110,26 @@ export function RosterCard({
                 )}
               </div>
               <div className="shrink-0 text-right text-xs text-muted-foreground">
-                <span className="block font-heading text-base font-semibold text-foreground">
-                  {formatSignedPoints(c.weeklyPoints)}
-                </span>
-                {c.totalPoints !== undefined ? (
+                {notScoredYet ? (
                   <>
-                    <span className="font-heading font-semibold">{formatPoints(c.totalPoints)}</span> total
+                    <span className="block font-heading text-base font-semibold text-foreground">
+                      {formatPoints(c.totalPoints ?? 0)}
+                    </span>
+                    total
                   </>
                 ) : (
-                  "this wk"
+                  <>
+                    <span className="block font-heading text-base font-semibold text-foreground">
+                      {formatSignedPoints(c.weeklyPoints)}
+                    </span>
+                    {c.totalPoints !== undefined ? (
+                      <>
+                        <span className="font-heading font-semibold">{formatPoints(c.totalPoints)}</span> total
+                      </>
+                    ) : (
+                      "this wk"
+                    )}
+                  </>
                 )}
               </div>
             </Link>

@@ -32,11 +32,14 @@ export function DanceCardLeagueList({
   weekId,
   entries,
   historyFrom,
+  notScoredYet = false,
 }: {
   leagueId: string;
   weekId: string;
   entries: DanceCardLeagueEntry[];
   historyFrom: string;
+  // The week is still to come: each manager's couples, no points.
+  notScoredYet?: boolean;
 }) {
   const [expanded, setExpanded] = usePersistedState<string[]>(`dc-league-expanded:${leagueId}:${weekId}`, []);
 
@@ -53,9 +56,11 @@ export function DanceCardLeagueList({
                   {e.displayName.charAt(0).toUpperCase()}
                 </span>
                 <span className="min-w-0 break-words">{e.displayName}</span>
-                <span className="ml-auto shrink-0 pr-2 text-xs font-normal text-muted-foreground">
-                  <span className="font-heading font-semibold">{formatSignedPoints(e.weekPoints)}</span> pts
-                </span>
+                {!notScoredYet && (
+                  <span className="ml-auto shrink-0 pr-2 text-xs font-normal text-muted-foreground">
+                    <span className="font-heading font-semibold">{formatSignedPoints(e.weekPoints)}</span> pts
+                  </span>
+                )}
               </span>
             </AccordionTrigger>
             <AccordionContent className="[&_a]:no-underline [&_a]:hover:text-accent">
@@ -74,9 +79,11 @@ export function DanceCardLeagueList({
                         </span>
                       )}
                     </span>
-                    <span className="font-heading font-semibold">
-                      {formatSignedPoints(c.weeklyPoints)}
-                    </span>
+                    {!notScoredYet && (
+                      <span className="font-heading font-semibold">
+                        {formatSignedPoints(c.weeklyPoints)}
+                      </span>
+                    )}
                   </div>
                 ))}
                 {e.bonusPoints > 0 && (

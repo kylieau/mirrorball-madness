@@ -410,6 +410,57 @@ describe("Recast as a ranked waiver list", () => {
     expect(await holderOf(b)).toBe(admin);
   });
 
+  it("hands out one claim per manager a round, so a crowded run reaches everyone in order", async () => {
+    await asService();
+    const crowded = id(95);
+    await db.query(`insert into public.leagues(id, name, invite_code, commissioner_id, roster_size, draft_type) values ($1, 'Crowded', 'CROWDED', $2, 2, 'snake')`, [crowded, admin]);
+    await db.query(`insert into public.league_members(league_id, user_id, role, draft_position) values
+      ($1, $2, 'commissioner', 1), ($1, $3, 'manager', 2), ($1, $4, 'manager', 3), ($1, $5, 'manager', 4)`, [crowded, admin, friend, third, outsider]);
+    // Outsider has two empty spots, Third one beside A, Friend holds B and C,
+    // Admin two empty spots. D, E, H and I are undrafted and still dancing.
+    await db.query(`insert into public.roster_slots(league_id, manager_id, slot_number, couple_id, source, start_week) values
+      ($1, $2, 1, $4, 'draft', 1), ($1, $3, 1, $5, 'draft', 1), ($1, $3, 2, $6, 'draft', 1)`, [crowded, third, friend, a, b, c]);
+    const lists: [string, [string, number, string | null][]][] = [
+      [outsider, [[d, 1, null], [e, 2, null], [h, 2, null]]],
+      [third, [[e, 2, null], [h, 2, null]]],
+      [friend, [[d, 2, c], [i, 1, b]]],
+      [admin, [[d, 1, null], [c, 1, null], [b, 1, null]]],
+    ];
+    for (const [managerId, list] of lists) {
+      for (const [n, [couple, slot, drop]] of list.entries()) {
+        await db.query(`insert into public.waiver_claims(league_id, couple_id, manager_id, slot_number, week_number, priority_order, drop_couple_id)
+          values ($1, $2, $3, $4, 9, $5, $6)`, [crowded, couple, managerId, slot, n + 1, drop]);
+      }
+    }
+    const awards = (await db.query<{ awards: number }>("select public.run_recast_claims($1, 9, 10, $2) as awards", [crowded, [outsider, third, friend, admin]])).rows[0].awards;
+
+    // Round 1: Outsider takes D. Third, next, takes E before Outsider's second
+    // claim comes up. Friend loses D, so C stays; their next drops B for I,
+    // and Admin, who lost D and couldn't have C, takes the freed B.
+    // Round 2: Outsider's E is gone, so H fills their second spot.
+    expect(awards).toBe(5);
+    expect((await db.query<{ manager_id: string; couple_id: string; result: string }>(
+      "select manager_id, couple_id, result from public.waiver_claims where league_id = $1 order by manager_id, priority_order", [crowded])).rows
+      .map((row) => [row.manager_id, row.couple_id, row.result])).toEqual([
+      [admin, d, "taken"], [admin, c, "taken"], [admin, b, "awarded"],
+      [friend, d, "taken"], [friend, i, "awarded"],
+      [third, e, "awarded"], [third, h, "slot_filled"],
+      [outsider, d, "awarded"], [outsider, e, "taken"], [outsider, h, "awarded"],
+    ]);
+    const current = (await db.query<{ manager_id: string; slot: number; couple_id: string; start: number }>(
+      `select manager_id, slot_number as slot, couple_id, start_week as start from public.roster_slots
+       where league_id = $1 and end_week is null order by manager_id, slot_number`, [crowded])).rows
+      .map((row) => [row.manager_id, row.slot, row.couple_id, row.start]);
+    expect(current).toEqual([
+      [admin, 1, b, 10],
+      [friend, 1, i, 10], [friend, 2, c, 1],
+      [third, 1, a, 1], [third, 2, e, 10],
+      [outsider, 1, d, 10], [outsider, 2, h, 10],
+    ]);
+    // Nobody holds a couple twice.
+    expect(new Set(current.map((row) => row[2])).size).toBe(current.length);
+  });
+
   it("keeps saved lists in their order when the migration is applied again", async () => {
     await asService();
     // The first choice has the later id: renumbering by age would swap them.

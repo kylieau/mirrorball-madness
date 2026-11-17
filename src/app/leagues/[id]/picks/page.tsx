@@ -109,15 +109,34 @@ export default async function LeaguePicksPage({
 
   const curtainCallWeekId = upcomingEpisode && curtainCallOn ? upcomingEpisode.id : null;
 
-  const latestVisibleDanceWeek = visibleDanceWeeks[visibleDanceWeeks.length - 1] ?? null;
+  // The week still to be scored is the roster carousel's last page, so a
+  // couple won on waivers or by trade shows as soon as it is the viewer's
+  // (Kylie, 2026-11-17). A holding is public once the week before it is
+  // watched, the Couples Leaderboard's rule, so a viewer who is behind
+  // doesn't get the page.
+  const watchedThroughWeek = cutoff.effectiveLatestEpisode?.week_number ?? 0;
+  const comingRosterWeek =
+    upcomingEpisode &&
+    visibleDanceWeeks.length > 0 &&
+    upcomingEpisode.week_number === watchedThroughWeek + 1 &&
+    !visibleDanceWeeks.some((w) => w.id === upcomingEpisode.id)
+      ? upcomingEpisode
+      : null;
+  const rosterCarouselWeeks = comingRosterWeek ? [...visibleDanceWeeks, comingRosterWeek] : visibleDanceWeeks;
   const yourRosterWeek =
-    visibleDanceWeeks.find((w) => w.id === rosterWeekParam) ?? latestVisibleDanceWeek;
+    rosterCarouselWeeks.find((w) => w.id === rosterWeekParam) ?? rosterCarouselWeeks[rosterCarouselWeeks.length - 1] ?? null;
+  // Nothing on the coming week's page is scored yet, even where a reveal has
+  // written rows the viewer hasn't opted into.
+  const rosterWeekIsComing = !!comingRosterWeek && yourRosterWeek?.id === comingRosterWeek.id;
   // Couple pages opened from here come back to the same Curtain Call and roster weeks.
   const historyFrom = yourRosterWeek
     ? rosterWeekHref(id, yourRosterWeek.id, weekParam)
     : `/leagues/${id}/picks${weekParam ? `?week=${weekParam}` : ""}`;
-  const yourRosterWeekEpisodeIds =
-    groupedWeeks.find((w) => w.id === yourRosterWeek?.id)?.episodes.map((e) => e.id) ?? [];
+  // A two-night week settles In Jeopardy and Lifeline at its first night's
+  // publish, so the coming page reads neither.
+  const yourRosterWeekEpisodeIds = rosterWeekIsComing
+    ? []
+    : (groupedWeeks.find((w) => w.id === yourRosterWeek?.id)?.episodes.map((e) => e.id) ?? []);
 
   const episodeWeekNumber = new Map<string, number>();
   for (const week of groupedWeeks) {
@@ -190,7 +209,7 @@ export default async function LeaguePicksPage({
   const rosterMovesPending = loadRosterMoveTabs(supabase, base);
   type LifelinePayoutRow = { manager_id: string; slot_number: number; couple_id: string; weighted_points: number };
   const lifelinePayoutsPending: PromiseLike<{ data: LifelinePayoutRow[] | null }> =
-    league.lifeline_enabled && yourRosterWeek
+    league.lifeline_enabled && yourRosterWeek && !rosterWeekIsComing
       ? supabase
           .from("lifeline_payouts")
           .select("manager_id, slot_number, couple_id, weighted_points")
@@ -415,6 +434,9 @@ export default async function LeaguePicksPage({
   // and a running total.
   // With no scored week to page to, the roster is what the viewer may see
   // as of nothing watched, not the current rows.
+  // Outcomes as far as the viewer has watched: the paged week, or the week
+  // before the coming one.
+  const rosterCutoffWeek = rosterWeekIsComing ? watchedThroughWeek : (yourRosterWeek?.week_number ?? 0);
   const yourSlotsForWeek = yourRosterWeek
     ? leagueSlotPeriods.filter((slot) => slot.managerId === myTeamId && slotActiveInWeek(slot, yourRosterWeek.week_number))
     : clampSlotsToWeek(leagueSlotPeriods, cutoff.effectiveLatestEpisode?.week_number ?? 0).filter(
@@ -431,7 +453,7 @@ export default async function LeaguePicksPage({
   const yourRosterPoints = yourRosterWeek
     ? judgePointsThroughWeek({ ...judgePointsInputs, slots: heldPeriodsFor(myTeamId, yourRosterWeek.week_number), week: yourRosterWeek.week_number })
     : undefined;
-  const yourRosterWeekRosterPoints = yourRosterWeek
+  const yourRosterWeekRosterPoints = yourRosterWeek && !rosterWeekIsComing
     ? scoreRows
         .filter(
           (row) =>
@@ -459,10 +481,10 @@ export default async function LeaguePicksPage({
           return clampRosterCoupleForWeek(
             { status: couple.status, eliminationWeek: couple.elimination_week },
             {
-              cutoffWeek: yourRosterWeek.week_number,
+              cutoffWeek: rosterCutoffWeek,
               finaleWeekNumber,
               weekNumber: yourRosterWeek.week_number,
-              rawWeeklyPoints: yourRosterPoints?.get(slot.coupleId)?.week ?? 0,
+              rawWeeklyPoints: rosterWeekIsComing ? 0 : (yourRosterPoints?.get(slot.coupleId)?.week ?? 0),
             }
           ).weeklyPoints;
         })
@@ -478,10 +500,10 @@ export default async function LeaguePicksPage({
     const clamped = clampRosterCoupleForWeek(
       { status: couple.status, eliminationWeek: couple.elimination_week },
       {
-        cutoffWeek: yourRosterWeek?.week_number ?? null,
+        cutoffWeek: yourRosterWeek ? rosterCutoffWeek : null,
         finaleWeekNumber,
         weekNumber: yourRosterWeek?.week_number ?? null,
-        rawWeeklyPoints: points?.week ?? 0,
+        rawWeeklyPoints: rosterWeekIsComing ? 0 : (points?.week ?? 0),
       }
     );
     return [
@@ -513,7 +535,7 @@ export default async function LeaguePicksPage({
         periods: periods.map((p) => ({ from: p.startWeek, to: p.endWeek })),
         next: next ? { source: next.source } : null,
         holderNow: holderNow ? { name: nameByManager[holderNow.managerId] ?? "Unknown" } : null,
-        status: spoilerSafeCoupleStatus({ status: couple.status, eliminationWeek: couple.elimination_week }, week, finaleWeekNumber),
+        status: spoilerSafeCoupleStatus({ status: couple.status, eliminationWeek: couple.elimination_week }, rosterCutoffWeek, finaleWeekNumber),
       });
       const names = allDisplayNames.get(coupleId) ?? { celebrity: couple.celebrity_name, pro: couple.pro_name };
       return [{ ...names, coupleId, tag, weeklyPoints: 0, totalPoints: points.get(coupleId)?.total ?? 0, inJeopardy: false, former: { weeks, note } }];
@@ -521,7 +543,7 @@ export default async function LeaguePicksPage({
   };
   const yourFormerCouples = formerCouplesFor(myTeamId);
   const yourRosterNeighbors = yourRosterWeek
-    ? adjacentThisWeekWeeks(visibleDanceWeeks, yourRosterWeek.id)
+    ? adjacentThisWeekWeeks(rosterCarouselWeeks, yourRosterWeek.id)
     : { prev: null, next: null };
 
   // Your Picks → League at a Glance: every manager's roster points for this
@@ -534,7 +556,7 @@ export default async function LeaguePicksPage({
     const weekPointsByManager = new Map<string, number>();
     for (const row of scoreRows) {
       const weekNumber = weekNumberById.get(row.week_id);
-      if (weekNumber !== yourRosterWeek.week_number) continue;
+      if (rosterWeekIsComing || weekNumber !== yourRosterWeek.week_number) continue;
       weekPointsByManager.set(row.manager_id, (weekPointsByManager.get(row.manager_id) ?? 0) + row.roster_points);
     }
     const categoryWeight = scoringSettings?.judges_score_category_weight ?? 1;
@@ -552,10 +574,10 @@ export default async function LeaguePicksPage({
         const clamped = clampRosterCoupleForWeek(
           { status: couple.status, eliminationWeek: couple.elimination_week },
           {
-            cutoffWeek: yourRosterWeek.week_number,
+            cutoffWeek: rosterCutoffWeek,
             finaleWeekNumber,
             weekNumber: yourRosterWeek.week_number,
-            rawWeeklyPoints: p?.week ?? 0,
+            rawWeeklyPoints: rosterWeekIsComing ? 0 : (p?.week ?? 0),
           }
         );
         return [{ ...names, coupleId: slot.coupleId, ...clamped }];
@@ -787,6 +809,7 @@ export default async function LeaguePicksPage({
                 categoryWeight={judgePointsInputs.categoryWeight}
                 lifelines={yourLifelines}
                 historyFrom={historyFrom}
+                notScoredYet={rosterWeekIsComing}
                 carousel={
                   yourRosterWeek ? (
                     <EpisodeCarousel
@@ -813,6 +836,7 @@ export default async function LeaguePicksPage({
                       weekId={yourRosterWeek.id}
                       entries={danceCardLeagueEntries}
                       historyFrom={historyFrom}
+                      notScoredYet={rosterWeekIsComing}
                     />
                   ) : undefined
                 }
