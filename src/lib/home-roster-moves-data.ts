@@ -141,9 +141,10 @@ export async function loadHomeRosterMoves(
       behind: false,
       peersHavePicks: false,
     });
-    if (state.kind === "catch-up" || weekSlots.length === 0) return null;
-    // No spots means every couple on the roster is still dancing.
+    if (state.kind === "catch-up") return null;
     return {
+      // A spot a trade emptied has no couple, so it never needs a Lifeline.
+      tradeOpenSpots: Math.max(0, league.roster_size - weekSlots.length),
       spots: (state.kind === "play" ? state.slots : []).map((slot) => ({
         former: slot.coupleId,
         pick: lifelinePicks.find((pick) => pick.slot_number === slot.slotNumber)?.couple_id ?? null,

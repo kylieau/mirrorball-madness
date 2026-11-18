@@ -47,9 +47,11 @@ export type RosterCouple = { couple: StackCouple; out: boolean };
 // couple went home.
 export type RosterMoves<Couple> = {
   // One entry per dead roster spot this week: the couple who left it and the
-  // Lifeline saved for it. No entries: every couple on the roster is dancing.
+  // Lifeline saved for it. No entries: every couple on the roster is dancing,
+  // bar tradeOpenSpots spots a trade emptied, which Lifeline doesn't cover.
   lifeline: {
     spots: { former: Couple; pick: Couple | null }[];
+    tradeOpenSpots: number;
     weekNumber: number;
     lockAt: string | null;
     locked: boolean;
