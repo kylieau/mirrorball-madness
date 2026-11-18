@@ -239,6 +239,12 @@ describe("buildModuleStack", () => {
         ).toEqual([]);
       });
 
+      it("adds no Lifeline line when every couple on the roster is dancing", () => {
+        const lifeline = { spots: [], weekNumber: 10, lockAt: IN_5H, locked: false };
+        expect(moves({ lifeline })).toEqual([]);
+        expect(lifelinePickDue({ ...NO_ROSTER_MOVES, lifeline })).toBe(false);
+      });
+
       it("puts a missing Lifeline above a saved one, with the lock on the first line only", () => {
         const spots = [c("Maura", "Mark"), null, null].map((pick) => ({ former: c("Alix", "Val"), pick }));
         expect(moves({ lifeline: { spots, weekNumber: 10, lockAt: IN_5H, locked: false } })).toEqual([

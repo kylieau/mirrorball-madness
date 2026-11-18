@@ -134,15 +134,17 @@ export async function loadHomeRosterMoves(
 
   const lifeline = ((): RosterMoves<string>["lifeline"] => {
     if (!lifelineWeek || !lifelinePicks) return null;
+    const weekSlots = slots.filter((slot) => slotActiveInWeek(slot.period, lifelineWeek.week_number));
     const state = lifelinePicksState({
-      slots: slots.filter((slot) => slotActiveInWeek(slot.period, lifelineWeek.week_number)),
+      slots: weekSlots,
       weekNumber: lifelineWeek.week_number,
       behind: false,
       peersHavePicks: false,
     });
-    if (state.kind !== "play") return null;
+    if (state.kind === "catch-up" || weekSlots.length === 0) return null;
+    // No spots means every couple on the roster is still dancing.
     return {
-      spots: state.slots.map((slot) => ({
+      spots: (state.kind === "play" ? state.slots : []).map((slot) => ({
         former: slot.coupleId,
         pick: lifelinePicks.find((pick) => pick.slot_number === slot.slotNumber)?.couple_id ?? null,
       })),

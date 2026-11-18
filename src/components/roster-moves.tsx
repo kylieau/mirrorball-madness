@@ -74,6 +74,9 @@ function LifelineStatusLines({ lifeline }: { lifeline: Moves["lifeline"] }) {
   if (!lifeline) return <p className={LINES}>Nothing to pick this week.</p>;
   const { spots, weekNumber, locked } = lifeline;
   const week = formatEpisodeCasual(weekNumber);
+  if (spots.length === 0) {
+    return <p className={LINES}>Every couple on your roster is still dancing, so there&rsquo;s no Lifeline to pick in {week}.</p>;
+  }
   const saved = spots.filter((spot) => spot.pick).length;
   const savedPart =
     saved === 0 ? (locked ? "None saved" : null) : saved < spots.length ? `${saved} of ${spots.length} saved` : "Saved";
@@ -178,7 +181,7 @@ function WaiverClaimsStatus({ waivers }: { waivers: Moves["waivers"] }) {
           {claims.length === 0 && openSpotCount > 0 && <HourglassIcon aria-hidden className={ICON} />}
           <span className="min-w-0">
             {statusLine}.
-            {(claims.length > 0 || openSpotCount > 0) && (
+            {(claims.length > 0 || openSpotsToFill(waivers) > 0) && (
               <>
                 {" "}
                 <span className="whitespace-nowrap">Winning claims start scoring in {formatEpisodeCasual(startWeek)}.</span>

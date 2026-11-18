@@ -47,7 +47,7 @@ export type RosterCouple = { couple: StackCouple; out: boolean };
 // couple went home.
 export type RosterMoves<Couple> = {
   // One entry per dead roster spot this week: the couple who left it and the
-  // Lifeline saved for it.
+  // Lifeline saved for it. No entries: every couple on the roster is dancing.
   lifeline: {
     spots: { former: Couple; pick: Couple | null }[];
     weekNumber: number;
