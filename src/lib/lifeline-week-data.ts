@@ -35,21 +35,24 @@ export async function loadLifelineWeek(supabase: SupabaseClient<Database>, base:
   const locked = !!lockAt && new Date() >= new Date(lockAt);
   const couplesById = new Map(base.flatCouples.map((couple) => [couple.id, couple]));
   const rosterSlots = base.rosterSlotPeriods
-    .filter((slot) => slot.managerId === myTeamId && slotActiveInWeek(slot, week.week_number))
+    .filter((slot) => slot.managerId === myTeamId)
     .flatMap((slot) => {
       const couple = couplesById.get(slot.coupleId);
       return couple
-        ? [{ slotNumber: slot.slotNumber, coupleId: slot.coupleId, status: couple.status, eliminationWeek: couple.elimination_week }]
+        ? [{ ...slot, status: couple.status, eliminationWeek: couple.elimination_week }]
         : [];
     });
   const peerPicks = (pickRows ?? []).filter((row) => row.manager_id !== myTeamId);
   const state = lifelinePicksState({
     slots: rosterSlots,
+    rosterSize: league.roster_size,
     weekNumber: week.week_number,
     behind: base.cutoff.pendingRevealEpisode != null,
     peersHavePicks: locked && peerPicks.length > 0,
   });
-  const heldCoupleIds = new Set(rosterSlots.map((slot) => slot.coupleId));
+  const heldCoupleIds = new Set(
+    rosterSlots.filter((slot) => slotActiveInWeek(slot, week.week_number)).map((slot) => slot.coupleId)
+  );
 
   return {
     week: { id: week.id, weekNumber: week.week_number, isFinale: week.week_number === base.finaleWeekNumber },
@@ -58,12 +61,11 @@ export async function loadLifelineWeek(supabase: SupabaseClient<Database>, base:
     // False when the saved picks couldn't be read, so nothing claims "none saved".
     picksRead: pickRows != null,
     state: state.kind,
-    // The viewer's dead roster spots, each with the Lifeline saved for it.
+    // The viewer's open roster spots, each with the Lifeline saved for it.
     slots:
       state.kind === "play"
-        ? state.slots.map((slot) => ({
-            slotNumber: slot.slotNumber,
-            formerCoupleId: slot.coupleId,
+        ? state.spots.map((slot) => ({
+            ...slot,
             pickCoupleId:
               (pickRows ?? []).find((row) => row.manager_id === myTeamId && row.slot_number === slot.slotNumber)
                 ?.couple_id ?? null,

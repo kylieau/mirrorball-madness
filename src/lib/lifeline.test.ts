@@ -65,6 +65,13 @@ describe("isDeadSlot", () => {
     expect(isDeadSlot(season, "league", "bo", 2, 4)).toBe(false);
     expect(isDeadSlot(season, "league", "bo", 1, 5)).toBe(false);
   });
+
+  it("is dead while nobody holds the spot, and never past the roster", () => {
+    const traded = { ...season, rosters: season.rosters.map((slot) => (slot.manager_id === "bo" && slot.slot_number === 1 ? { ...slot, end_week: 3 } : slot)) };
+    expect(isDeadSlot(traded, "league", "bo", 1, 3)).toBe(false);
+    expect(isDeadSlot(traded, "league", "bo", 1, 4)).toBe(true);
+    expect(isDeadSlot(traded, "league", "bo", 3, 4)).toBe(false);
+  });
 });
 
 describe("buildLifelinePayouts", () => {

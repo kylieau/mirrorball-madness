@@ -46,12 +46,11 @@ export type RosterCouple = { couple: StackCouple; out: boolean };
 // and all three are for a viewer who is behind, since an open spot says a
 // couple went home.
 export type RosterMoves<Couple> = {
-  // One entry per dead roster spot this week: the couple who left it and the
-  // Lifeline saved for it. No entries: every couple on the roster is dancing,
-  // bar tradeOpenSpots spots a trade emptied, which Lifeline doesn't cover.
+  // One entry per open roster spot this week: the couple who last held it
+  // (null if none ever has) and the Lifeline saved for it. No entries: every
+  // spot has a couple still dancing.
   lifeline: {
-    spots: { former: Couple; pick: Couple | null }[];
-    tradeOpenSpots: number;
+    spots: { former: Couple | null; pick: Couple | null }[];
     weekNumber: number;
     lockAt: string | null;
     locked: boolean;
@@ -87,7 +86,7 @@ export function mapRosterMoveCouples<A, B>(moves: RosterMoves<A>, rename: (coupl
   return {
     lifeline: moves.lifeline && {
       ...moves.lifeline,
-      spots: moves.lifeline.spots.map((spot) => ({ former: rename(spot.former), pick: spot.pick && rename(spot.pick) })),
+      spots: moves.lifeline.spots.map((spot) => ({ former: spot.former && rename(spot.former), pick: spot.pick && rename(spot.pick) })),
     },
     waivers: moves.waivers && {
       ...moves.waivers,

@@ -15,7 +15,7 @@ import type { CoupleNameParts } from "@/lib/couple-display";
 import { formatEpisodeCasual } from "@/lib/format-week";
 import { LIFELINE_RULES } from "@/lib/lifeline-picks";
 
-export type LifelineCardSlot = { slotNumber: number; formerCoupleId: string; pickCoupleId: string | null };
+export type LifelineCardSlot = { slotNumber: number; formerCoupleId: string | null; pickCoupleId: string | null };
 export type LifelineLeagueEntry = { managerId: string; displayName: string; coupleIds: string[] };
 
 const CHOOSE_COUPLE = "Choose a couple…";
@@ -112,7 +112,9 @@ export function LifelineCard({
 
   const pickLine = (slot: LifelineCardSlot, value: ReactNode) => (
     <div key={slot.slotNumber} className="flex items-start justify-between gap-3">
-      <span className="min-w-0 text-muted-foreground">In place of {coupleNameNode(parts(slot.formerCoupleId))}</span>
+      <span className="min-w-0 text-muted-foreground">
+        {slot.formerCoupleId ? <>In place of {coupleNameNode(parts(slot.formerCoupleId))}</> : "Open spot"}
+      </span>
       <span className="min-w-0 text-right font-medium">{value}</span>
     </div>
   );
@@ -127,7 +129,7 @@ export function LifelineCard({
           <CardDescription>
             {slots.length === 0
               ? "You have no open spot this week."
-              : `A stand-in for ${several ? "each roster spot" : "a roster spot"} whose couple went home. You earn half their Dance Card points ${
+              : `A stand-in for ${several ? "each open roster spot" : "an open roster spot"}, whether its couple went home or a trade emptied it. You earn half their Dance Card points ${
                   week.isFinale ? "in the Finale" : "this week, even if they go home"
                 }. Pick again each week.`}
           </CardDescription>
@@ -151,7 +153,9 @@ export function LifelineCard({
                   return (
                     <div key={slot.slotNumber} className="flex flex-col gap-2">
                       <Label htmlFor={id} className="leading-snug">
-                        <span>In Place of {coupleNameNode(parts(slot.formerCoupleId))}</span>
+                        <span>
+                          {slot.formerCoupleId ? <>In Place of {coupleNameNode(parts(slot.formerCoupleId))}</> : "Open Spot"}
+                        </span>
                       </Label>
                       <Select items={items} value={picks[slot.slotNumber] ?? ""} onValueChange={(v) => choose(slot.slotNumber, v ?? "")}>
                         <SelectTrigger id={id} className="w-full">

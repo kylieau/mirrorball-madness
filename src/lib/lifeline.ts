@@ -103,24 +103,29 @@ function lifelineValue(season: LifelineSeason, league: LeagueLifeline, coupleId:
   return { credit, survived: survivedWeek(season, coupleId, weekNumber), value: Math.max(0, LIFELINE_SHARE * credit) };
 }
 
-// A roster spot is dead for a week when the couple holding it that week went
-// home in an earlier one. Mirrors lifeline_slot_is_dead().
+// A roster spot is dead for a week when no couple in it is still dancing:
+// the one holding it went home in an earlier week, or nobody holds it (Kylie,
+// 2026-11-19: a trade emptied it). Mirrors lifeline_slot_is_dead().
 export function isDeadSlot(
-  season: Pick<LifelineSeason, "rosters" | "couples">,
+  season: Pick<LifelineSeason, "rosters" | "couples" | "leagues">,
   leagueId: string,
   managerId: string,
   slotNumber: number,
   weekNumber: number
 ): boolean {
-  return season.rosters.some((slot) => {
+  const rosterSize = season.leagues.find((league) => league.id === leagueId)?.roster_size ?? 0;
+  if (slotNumber < 1 || slotNumber > rosterSize) return false;
+  return !season.rosters.some((slot) => {
     if (slot.league_id !== leagueId || slot.manager_id !== managerId || slot.slot_number !== slotNumber) return false;
     if (slot.start_week > weekNumber || (slot.end_week != null && slot.end_week < weekNumber)) return false;
     const couple = season.couples.find((c) => c.id === slot.couple_id);
     return (
       !!couple &&
-      (couple.status === "eliminated" || couple.status === "withdrawn") &&
-      couple.elimination_week != null &&
-      couple.elimination_week < weekNumber
+      !(
+        (couple.status === "eliminated" || couple.status === "withdrawn") &&
+        couple.elimination_week != null &&
+        couple.elimination_week < weekNumber
+      )
     );
   });
 }
@@ -145,7 +150,8 @@ export function buildLifelinePayouts(season: LifelineSeason, picks: LifelinePick
 // The Equalizer: for every week a manager's spot was dead before Lifeline
 // started (from the Anchor Week), the average Lifeline that week, which is
 // the mean over the couples that danced of what a pick on each would have
-// paid. One amount per manager, rounded once.
+// paid. One amount per manager, rounded once. It walks the rows a couple
+// held, so a spot left empty counts only from Lifeline's first week on.
 export function buildLifelineEqualizer(season: LifelineSeason, leagueId: string, startsWeek: number): LifelineEqualizer[] {
   const league = leagueLifeline(season, leagueId);
   if (!league) return [];

@@ -72,16 +72,10 @@ const LINES = "flex flex-col gap-1 text-xs text-muted-foreground";
 function LifelineStatusLines({ lifeline }: { lifeline: Moves["lifeline"] }) {
   const formattedLockAt = useFormattedDeadline(lifeline?.lockAt);
   if (!lifeline) return <p className={LINES}>Nothing to pick this week.</p>;
-  const { spots, tradeOpenSpots, weekNumber, locked } = lifeline;
+  const { spots, weekNumber, locked } = lifeline;
   const week = formatEpisodeCasual(weekNumber);
   if (spots.length === 0) {
-    return (
-      <p className={LINES}>
-        {tradeOpenSpots > 0
-          ? `No Lifeline to pick in ${week}. Lifeline covers a spot whose couple went home, not one a trade emptied, which the waiver wire fills.`
-          : `Every couple on your roster is still dancing, so there’s no Lifeline to pick in ${week}.`}
-      </p>
-    );
+    return <p className={LINES}>Every couple on your roster is still dancing, so there’s no Lifeline to pick in {week}.</p>;
   }
   const saved = spots.filter((spot) => spot.pick).length;
   const savedPart =
@@ -108,7 +102,13 @@ function LifelineStatusLines({ lifeline }: { lifeline: Moves["lifeline"] }) {
                 ) : (
                   <span className={locked ? undefined : "font-semibold text-accent"}>No pick</span>
                 )}
-                , in place of <CoupleName {...spot.former} />
+                {spot.former ? (
+                  <>
+                    , in place of <CoupleName {...spot.former} />
+                  </>
+                ) : (
+                  ", for an open spot"
+                )}
               </span>
             </li>
           ))}

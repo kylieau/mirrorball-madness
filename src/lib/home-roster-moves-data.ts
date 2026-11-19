@@ -4,7 +4,6 @@ import { NO_ROSTER_MOVES, type RosterMoves } from "@/lib/league-triage";
 import { lifelinePicksState } from "@/lib/lifeline-picks";
 import { recastWire } from "@/lib/recast";
 import { partitionRecastSlots } from "@/lib/recast-framing";
-import { slotActiveInWeek } from "@/lib/roster-couple-points";
 import { isSpoilerSafeActive } from "@/lib/spoiler-safe-couple-status";
 import { offerExpiresAt } from "@/lib/trades";
 import { loadActiveSeasonId, loadAllCouples } from "@/lib/viewer-season-data";
@@ -134,20 +133,18 @@ export async function loadHomeRosterMoves(
 
   const lifeline = ((): RosterMoves<string>["lifeline"] => {
     if (!lifelineWeek || !lifelinePicks) return null;
-    const weekSlots = slots.filter((slot) => slotActiveInWeek(slot.period, lifelineWeek.week_number));
     const state = lifelinePicksState({
-      slots: weekSlots,
+      slots: slots.map((slot) => ({ ...slot, startWeek: slot.period.startWeek, endWeek: slot.period.endWeek })),
+      rosterSize: league.roster_size,
       weekNumber: lifelineWeek.week_number,
       behind: false,
       peersHavePicks: false,
     });
     if (state.kind === "catch-up") return null;
     return {
-      // A spot a trade emptied has no couple, so it never needs a Lifeline.
-      tradeOpenSpots: Math.max(0, league.roster_size - weekSlots.length),
-      spots: (state.kind === "play" ? state.slots : []).map((slot) => ({
-        former: slot.coupleId,
-        pick: lifelinePicks.find((pick) => pick.slot_number === slot.slotNumber)?.couple_id ?? null,
+      spots: (state.kind === "play" ? state.spots : []).map((spot) => ({
+        former: spot.formerCoupleId,
+        pick: lifelinePicks.find((pick) => pick.slot_number === spot.slotNumber)?.couple_id ?? null,
       })),
       weekNumber: lifelineWeek.week_number,
       lockAt: lifelineLockAt ?? null,

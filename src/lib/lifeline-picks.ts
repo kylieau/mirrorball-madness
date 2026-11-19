@@ -5,31 +5,52 @@ export type LifelineRosterSlot = {
   coupleId: string;
   status: string;
   eliminationWeek: number | null;
+  startWeek: number;
+  endWeek: number | null;
 };
 
-export type LifelinePicksState<S> = { kind: "none" } | { kind: "catch-up" } | { kind: "play"; slots: S[] };
+// A spot to fill, with the couple it stands in for: the one holding it that
+// went home, or for a spot nobody holds that week, the last one that did
+// (null if none ever has).
+export type LifelineSpot = { slotNumber: number; formerCoupleId: string | null };
 
-// What Picks shows for the week's Lifeline. `slots` is the viewer's roster as
-// it stands in that week. A viewer who is behind gets the same catch-up line
-// whether or not one of their spots is dead, so it gives nothing away; a
-// viewer with no dead spot still gets the card once peers' picks are public.
-export function lifelinePicksState<S extends LifelineRosterSlot>({
+export type LifelinePicksState = { kind: "none" } | { kind: "catch-up" } | { kind: "play"; spots: LifelineSpot[] };
+
+// What Picks shows for the week's Lifeline. `slots` is every period the
+// viewer's roster has had. A spot is open when no couple in it is still
+// dancing that week, whatever emptied it (Kylie, 2026-11-19): its couple went
+// home in an earlier week, or a trade took it and nothing has filled it.
+// Mirrors lifeline_slot_is_dead(). A viewer who is behind gets the same
+// catch-up line whether or not a spot is open, so it gives nothing away; a
+// viewer with none still gets the card once peers' picks are public.
+export function lifelinePicksState({
   slots,
+  rosterSize,
   weekNumber,
   behind,
   peersHavePicks,
 }: {
-  slots: S[];
+  slots: LifelineRosterSlot[];
+  rosterSize: number;
   weekNumber: number;
   behind: boolean;
   peersHavePicks: boolean;
-}): LifelinePicksState<S> {
+}): LifelinePicksState {
   if (slots.length === 0) return { kind: "none" };
   if (behind) return { kind: "catch-up" };
-  const dead = slots.filter(
-    (slot) => isOpenRosterStatus(slot.status) && slot.eliminationWeek != null && slot.eliminationWeek < weekNumber
-  );
-  return dead.length > 0 || peersHavePicks ? { kind: "play", slots: dead } : { kind: "none" };
+  const spots: LifelineSpot[] = [];
+  for (let slotNumber = 1; slotNumber <= rosterSize; slotNumber++) {
+    const periods = slots.filter((slot) => slot.slotNumber === slotNumber && slot.startWeek <= weekNumber);
+    const current = periods.find((slot) => slot.endWeek === null || slot.endWeek >= weekNumber);
+    if (current) {
+      const gone = isOpenRosterStatus(current.status) && current.eliminationWeek != null && current.eliminationWeek < weekNumber;
+      if (gone) spots.push({ slotNumber, formerCoupleId: current.coupleId });
+      continue;
+    }
+    const last = periods.reduce<LifelineRosterSlot | null>((latest, slot) => (!latest || slot.endWeek! > latest.endWeek! ? slot : latest), null);
+    spots.push({ slotNumber, formerCoupleId: last?.coupleId ?? null });
+  }
+  return spots.length > 0 || peersHavePicks ? { kind: "play", spots } : { kind: "none" };
 }
 
 export type LifelinePickChange = { slotNumber: number; coupleId: string | null };
@@ -44,7 +65,7 @@ export function lifelineSaveSteps(changes: LifelinePickChange[]): { clear: numbe
 }
 
 export const LIFELINE_RULES = [
-  "A Lifeline stands in for a roster spot whose couple has gone home. Each week, pick one couple still dancing that you don't hold, for each open spot.",
+  "A Lifeline stands in for an open roster spot: one whose couple has gone home, or one a trade left empty. Each week, pick one couple still dancing that you don't hold, for each open spot.",
   "It pays half of that couple's Dance Card points for the week, whatever happens to them: a couple who goes home that week still pays, and a couple with a bye pays nothing.",
   "Picks lock at the week's Lifeline lock. Until then only you can see yours; once the week locks, the league's Lifelines are listed here.",
   "A spot that gets a new couple, from the waiver wire or a trade, stops needing a Lifeline from the week they start scoring.",

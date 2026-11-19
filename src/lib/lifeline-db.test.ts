@@ -25,6 +25,7 @@ const LIVE_STACK = [
   "apply-draft-release-own-rows", "apply-whole-judge-marks", "apply-special-draft-release",
   "apply-contributor-special-setup", "apply-draft-lineup", "apply-retire-special-leftovers", "apply-episode-rounds",
   "apply-special-dance-label", "apply-dance-card-v2", "apply-dance-card-v3", "apply-lifeline",
+  "apply-lifeline-open-spots",
 ];
 let db: PGlite;
 
@@ -173,6 +174,17 @@ describe("Lifeline on a Dance Card v3 league", () => {
 
     await asUser(third);
     await expect(pick(week10, 1, a)).rejects.toThrow(/still has a couple dancing/);
+    // A spot a trade emptied takes a Lifeline too; one past the roster doesn't.
+    await asService();
+    await db.query("update public.roster_slots set end_week = 9 where league_id = $1 and manager_id = $2 and slot_number = 2", [league, third]);
+    await asUser(third);
+    await pick(week10, 2, d);
+    await expect(pick(week10, 3, a)).rejects.toThrow(/still has a couple dancing/);
+    await db.query("select public.clear_lifeline_pick($1, $2, 2)", [league, week10]);
+    await asService();
+    await db.query("update public.roster_slots set end_week = null where league_id = $1 and manager_id = $2 and slot_number = 2", [league, third]);
+    await asUser(third);
+    await expect(pick(week10, 2, d)).rejects.toThrow(/still has a couple dancing/);
     await asUser(outsider);
     await expect(pick(week10, 1, a)).rejects.toThrow(/not in this league/);
 
