@@ -26,6 +26,19 @@ three Lifeline leagues holds a couple in Week 11).
   allowed (Codex: bounded by the 10% cash cap, not an exploit; the veto can't
   stop it when every team is in the trade). Revisit if it shows up.
 
+## Picks and Couples Leaderboard changes — 2026-11-17/18
+
+Built and pushed (`f9f1f64`, `67f14bd`, `331e1bb`; CLAUDE.md describes them):
+Picks pages to the coming week's roster once it changes hands, the Couples
+Leaderboard is one row per couple (Kylie reversed the per-holder rows), an
+open spot only shows while the wire has a couple to claim, clearer Lifeline
+and waiver lines, no Safe tag on a week that hasn't aired
+(`docs/design/coming-week-roster/` A). Seen in a scratch league only.
+- Phone checks still owed: these, the roster-card Lifeline cards
+  (2026-11-20), the veto rows on Home and the Transactions card, the Trades
+  facts strip, the Waiver Order fold, the Remove and Leave dialogs, the pinned
+  title under the notch, Results' carousel swap and the league switcher.
+
 ## A couple that changed hands — 2026-11-13
 
 Built 2026-11-13 (`docs/design/roster-history/plan.md`, As built; CLAUDE.md
@@ -36,8 +49,9 @@ only, deployed with this push.
 - Visible change for a viewer who is behind: the leaderboard now hides a
   holding they haven't reached, where before it named the open period's
   holder (a trade showed before they had watched it).
-- Not seen live: a real trade or claim under this code. The first is the
-  Kylie league's trade executing Fri 2026-11-13 evening.
+- The Kylie league's trade executed live on Fri 2026-11-13 (its couple shows
+  as Traded, Weeks 1–9). The one-row-per-holder leaderboard was replaced by
+  one row per couple on 2026-11-17.
 - The Released and what-if rows carry no weeks label.
 
 ## Trades take effect when the veto window closes — 2026-11-12
@@ -101,6 +115,9 @@ Offered to Kylie, not answered and not built:
   `scripts/recompute-published-weeks.ts`).
 - `couplePath` in `src/lib/strong-play-ceilings.ts` still gives 4th place no
   Finale survival; re-solve the v3 rates with it for a future season, not S35.
+- Kylie decides whether to tell the v3 commissioners about the Finale
+  survival amendment (every finalist survives the Finale), before the Finale
+  on Tue Nov 24, 2026.
 
 ## Free agency after the waiver run — next season
 
@@ -829,6 +846,8 @@ Still out of scope: actually deleting `auth.users` / cascading league history. T
 
 Currently in-app only (`/notifications`, reusing the same "picks needed" logic as Today) — deliberately scoped that way for v1. Real delivery (email and/or push) is still an open question: no transactional email provider or push setup exists in this project yet. Revisit once there's a clearer sense of what actually needs to reach someone outside the app.
 
+**Paused question (Kylie, Fri Nov 13, 2026), not answered:** "any way to add notifications, even if not push: on Home or a signal on the avatar leading to a notification center?" Answer as an assessment with options (a badge on the avatar, a Home row, a read-marker table, since `supabase/schema.sql` has no notifications table), no build until she picks. The existing `/notifications` page is referenced from `src/components/account-settings-sheet.tsx` and `src/lib/league-summary.ts`.
+
 **`rankBadge` leak, done**: `computeLeagueSummary` used to compute a Home-style rank badge from *all* `weekly_manager_scores` (no `resolveSpoilerCutoff`). The Notifications page never rendered it, but the field was still returned — a latent Spoiler-Free leak if anyone re-wired the UI. The unused field, `getRankBadge` import, and the members/scores queries that existed only for it are gone. Home ranking stays in `league-home-summary.ts` and still respects the spoiler cutoff.
 
 The Add to Home Screen / enable-notifications *how-to* is a top-level Settings row (`/settings/add-to-home-screen`), not nested under Notifications and not on Home. It is UX guidance only — no FCM/APNs, no service worker, no subscribe button. iOS vs Android steps are adapted from LA Home Wins, not a first-visit modal.
@@ -882,6 +901,8 @@ Built (per-couple publish and undo, Finish Week, Home and every page reading a r
 - **Pushes and lock-screen alerts** don't exist yet; if they're ever added they must never fire on a reveal and must respect Spoiler-Free.
 
 ## Parked nits
+
+- Optional: upload the two handoff skills (`sync-handoff`, `resume-handoff`) to each claude.ai account Kylie uses.
 
 - Dead `'You are not a member of this league'` branch in `set_custom_draft_order` (`supabase/schema.sql`) — unreachable, never cleaned up.
 - League Settings' "✓ Settings saved" banner (`league-modules-form.tsx`) doesn't clear when you edit again.
