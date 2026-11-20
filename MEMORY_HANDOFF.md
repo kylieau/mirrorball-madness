@@ -13,7 +13,7 @@
 **Live state (S35, as last read Fri Nov 20, 2026):**
 - Week 10 (E11, Semi-Finals) is published. Week 11 (E12) is the Finale, the last scoring week, airing Tue Nov 24, 2026. The trade deadline and the last waiver run have passed.
 - Lifeline, Recast and Trades are on in the three West-lock leagues. Only Kylie's own team is short a couple for Week 11 (its spot emptied by a trade after Week 9), so its Week 11 Lifeline is the first one on a trade-emptied spot.
-- **Not yet run:** the after-E11 checks (`scripts/dance-card-v2.ts --verify`; `lifeline_payouts` for Week 10).
+- **After-E11 checks done Fri Nov 20, 2026 (read-only):** `scripts/dance-card-v2.ts --verify` matched in all four leagues; Week 10 had 12 Lifeline picks and 12 stored payouts, each equal to `buildLifelinePayouts` recomputed from `dance_card_snapshot`, none at zero.
 
 ## 2. Changes Made
 
@@ -52,11 +52,10 @@
 - **Before Tue Nov 24, 2026:** Kylie decides whether to tell the v3 commissioners about the Finale survival amendment (`BACKLOG.md`, Finale follow-ups).
 
 **Next steps:**
-1. **Now (read-only, overdue since Week 10 published):** `scripts/dance-card-v2.ts --verify`, and check Week 10 `lifeline_payouts` against the Week 10 picks.
-2. **After E12 publishes:** the same verify; confirm Kylie's league's Week 11 `lifeline_payouts` row for the trade-emptied spot paid above zero; check all three leagues' Lifeline payouts.
-3. **Phone checks** of the Nov 11 to Nov 20, 2026 UI (`BACKLOG.md`, Picks and Couples Leaderboard changes).
-4. **The paused notifications question** (`BACKLOG.md`, Notifications): an assessment with options, no build until she picks.
+1. **After E12 publishes (Tue Nov 24, 2026):** `scripts/dance-card-v2.ts --verify`; recompute Week 11 `lifeline_payouts` with `buildLifelinePayouts` over `lifelineSeason(dance_card_snapshot)` and compare with the stored rows (as done for Week 10; a tsx script needs the `.mts` extension for top-level await and must run from the project root); confirm Kylie's league's Week 11 payout for the trade-emptied spot is above zero.
+2. **Phone checks** of the Nov 11 to Nov 20, 2026 UI (`BACKLOG.md`, Picks and Couples Leaderboard changes).
+3. **The paused notifications question** (`BACKLOG.md`, Notifications): an assessment with options, no build until she picks.
 
 Deferred items are in `BACKLOG.md` (Lifeline on any open spot; Picks and Couples Leaderboard changes; Finale follow-ups; Notifications; Free agency next season; the adversarial audit).
 
-Next command: `NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`
+Next command: none pending until E12 publishes (Tue Nov 24, 2026); then `NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`.
