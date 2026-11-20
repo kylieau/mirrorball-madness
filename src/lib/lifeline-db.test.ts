@@ -25,7 +25,7 @@ const LIVE_STACK = [
   "apply-draft-release-own-rows", "apply-whole-judge-marks", "apply-special-draft-release",
   "apply-contributor-special-setup", "apply-draft-lineup", "apply-retire-special-leftovers", "apply-episode-rounds",
   "apply-special-dance-label", "apply-dance-card-v2", "apply-dance-card-v3", "apply-lifeline",
-  "apply-lifeline-open-spots",
+  "apply-lifeline-open-spots", "apply-lifeline-standings-payees",
 ];
 let db: PGlite;
 
@@ -257,5 +257,17 @@ describe("Lifeline on a Dance Card v3 league", () => {
 
     // The Dance Card version is pinned once Lifeline points are built on it.
     await expect(db.query("update public.scoring_settings set dance_card_version = 'v2' where league_id = $1", [league])).rejects.toThrow(/Lifeline points/);
+  });
+
+  it("keeps a Lifeline in standings for a team with no score row that week", async () => {
+    // A team that held no couple and picked nothing gets no score row.
+    await db.query("delete from public.weekly_manager_scores where league_id = $1 and manager_id = $2 and week_id = $3", [league, third, week10]);
+    await db.query(
+      `insert into public.lifeline_payouts(league_id, manager_id, week_id, slot_number, couple_id, credit, survived, points, weighted_points)
+       values ($1, $2, $3, 1, $4, 5, true, 2.5, 1.5)`, [league, third, week10, a]);
+    const row = (await db.query<{ roster: number; lifeline: number; total: number }>(
+      `select roster_points::float as roster, lifeline_points::float as lifeline, total_points::float as total
+       from public.weekly_manager_standings where league_id = $1 and manager_id = $2 and week_id = $3`, [league, third, week10])).rows;
+    expect(row).toEqual([{ roster: 0, lifeline: 1.5, total: 1.5 }]);
   });
 });

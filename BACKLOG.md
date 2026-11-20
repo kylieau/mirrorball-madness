@@ -11,13 +11,11 @@ spot is a dashed card on Your Fantasy Roster. Reviewed by the advisor and
 Codex; no live team was exposed to their findings for Week 11 (checked
 read-only 2026-11-20: no roster row without a couple, every manager in the
 three Lifeline leagues holds a couple in Week 11).
-- A Lifeline paid to a manager with no couple, no Curtain Call pick and no
-  Grand Finale points that week never reaches standings: score rows are only
-  made for those three (`computeWeeklyScores`, `src/lib/scoring.ts`), and the
-  `weekly_manager_standings` view starts from score rows. Give every Lifeline
-  payee a score row (publish and recompute), or have the view take payouts
-  on their own. Reachable by trading away a whole roster or joining after
-  the draft.
+- Fixed 2026-11-20 (`apply-lifeline-standings-payees.sql`): the standings
+  view now lists every team and week with a payout or adjustment, so a
+  Lifeline paid to a team with no score row counts. Still open: a trade with
+  points to such a team fails with `no_scored_week`, since
+  `run_league_trades` reads `weekly_manager_scores` directly.
 - Payout amounts are worked out in the app at publish; the SQL only checks
   every pick has a payout row. A publish from a build before `d04c6da` pays a
   trade-emptied spot 0.00 with no error. A rule version on the plan would

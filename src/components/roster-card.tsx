@@ -14,7 +14,7 @@ import { coupleHistoryHref } from "@/lib/couple-history-link";
 // total-points units.
 export type RosterLifeline = {
   slotNumber: number;
-  former: CoupleNameParts | null;
+  former: (CoupleNameParts & { coupleId: string }) | null;
   pick: (CoupleNameParts & { coupleId: string }) | null;
   points: number | null;
 };
@@ -154,6 +154,7 @@ export function RosterCard({
           <LifelineSpotCard
             key={line.slotNumber}
             line={line}
+            formerOnCard={couples.some((c) => !c.former && c.coupleId === line.former?.coupleId)}
             href={lifelineHref}
             historyFrom={historyFrom}
             notScoredYet={notScoredYet}
@@ -179,16 +180,20 @@ const TAG = "inline-block rounded-full px-2 py-0.5 text-[10px] font-bold";
 // from a couple the manager holds: the Lifeline in it, or what's still to do.
 function LifelineSpotCard({
   line,
+  formerOnCard,
   href,
   historyFrom,
   notScoredYet,
 }: {
   line: RosterLifeline;
+  // The couple that left the spot is still held this week (it went home),
+  // so its own card sits just above and naming it again is noise.
+  formerOnCard: boolean;
   href?: string;
   historyFrom: string;
   notScoredYet: boolean;
 }) {
-  const inPlaceOf = line.former && (
+  const inPlaceOf = line.former && !formerOnCard && (
     <p className="mb-1 text-xs text-muted-foreground">
       In place of <CoupleName celebrity={line.former.celebrity} pro={line.former.pro} />
     </p>
