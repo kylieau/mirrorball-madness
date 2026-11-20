@@ -56,6 +56,8 @@
 2. **Phone checks** of the Nov 11 to Nov 20, 2026 UI (`BACKLOG.md`, Picks and Couples Leaderboard changes).
 3. **The paused notifications question** (`BACKLOG.md`, Notifications): an assessment with options, no build until she picks.
 
+**After the Finale (Kylie, Fri Nov 20, 2026):** nothing new to build this season; all that's left is scoring E12 and the read-only checks in step 1. Steps 2 and 3 and the rest of `BACKLOG.md` are for next season.
+
 Deferred items are in `BACKLOG.md` (Lifeline on any open spot; Picks and Couples Leaderboard changes; Finale follow-ups; Notifications; Free agency next season; the adversarial audit).
 
 Next command: none pending until E12 publishes (Tue Nov 24, 2026); then `NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`.
