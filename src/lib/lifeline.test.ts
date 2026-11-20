@@ -124,6 +124,13 @@ describe("buildLifelineEqualizer", () => {
     expect(rows[0].points).toBeCloseTo(week3 + 2 * week4, 2);
   });
 
+  it("counts only periods a couple held, not a row with no couple", () => {
+    const cy = { league_id: "league", manager_id: "cy", slot_number: 1, couple_id: null, start_week: 1, end_week: null };
+    expect(buildLifelineEqualizer({ ...season, rosters: [...season.rosters, cy] }, "league", 5)).toEqual(
+      buildLifelineEqualizer(season, "league", 5)
+    );
+  });
+
   it("stops at the start week and skips a league without a ledger", () => {
     expect(buildLifelineEqualizer(season, "league", 4).map((row) => row.detail)).toEqual([
       { weeks: [3], slotWeeks: 1 },

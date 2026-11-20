@@ -20,7 +20,8 @@ export type LifelinePicksState = { kind: "none" } | { kind: "catch-up" } | { kin
 // viewer's roster has had. A spot is open when no couple in it is still
 // dancing that week, whatever emptied it (Kylie, 2026-11-19): its couple went
 // home in an earlier week, or a trade took it and nothing has filled it.
-// Mirrors lifeline_slot_is_dead(). A viewer who is behind gets the same
+// Mirrors lifeline_slot_is_dead(), so a manager who has never held a couple
+// (one who joined after the draft) has every spot open. A viewer who is behind gets the same
 // catch-up line whether or not a spot is open, so it gives nothing away; a
 // viewer with none still gets the card once peers' picks are public.
 export function lifelinePicksState({
@@ -36,7 +37,6 @@ export function lifelinePicksState({
   behind: boolean;
   peersHavePicks: boolean;
 }): LifelinePicksState {
-  if (slots.length === 0) return { kind: "none" };
   if (behind) return { kind: "catch-up" };
   const spots: LifelineSpot[] = [];
   for (let slotNumber = 1; slotNumber <= rosterSize; slotNumber++) {

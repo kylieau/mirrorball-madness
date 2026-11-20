@@ -165,7 +165,7 @@ export function buildLifelineEqualizer(season: LifelineSeason, leagueId: string,
   }
   const byManager = new Map<string, { value: number; weeks: Set<number>; slotWeeks: number }>();
   for (const slot of season.rosters) {
-    if (slot.league_id !== leagueId) continue;
+    if (slot.league_id !== leagueId || !slot.couple_id) continue;
     for (const [weekNumber, average] of averageByWeek) {
       if (slot.start_week > weekNumber || (slot.end_week != null && slot.end_week < weekNumber)) continue;
       if (!isDeadSlot(season, leagueId, slot.manager_id, slot.slot_number, weekNumber)) continue;

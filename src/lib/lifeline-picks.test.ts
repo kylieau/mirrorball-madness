@@ -35,7 +35,14 @@ describe("lifelinePicksState", () => {
   it("shows nothing for a full roster or a couple going home this week", () => {
     expect(state([dancing], { rosterSize: 1 })).toEqual({ kind: "none" });
     expect(state([dancing, { ...out, eliminationWeek: 6 }])).toEqual({ kind: "none" });
-    expect(state([])).toEqual({ kind: "none" });
+    // Someone who joined after the draft holds nothing, so every spot is open.
+    expect(state([])).toEqual({
+      kind: "play",
+      spots: [
+        { slotNumber: 1, formerCoupleId: null },
+        { slotNumber: 2, formerCoupleId: null },
+      ],
+    });
   });
 
   it("gives a viewer who is behind the same catch-up state with or without a dead spot", () => {
