@@ -5,7 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { RosterCard } from "@/components/roster-card";
+import { RosterCard, type RosterLifeline } from "@/components/roster-card";
 import { RosterMoves } from "@/components/roster-moves";
 import { DanceCardLeagueList, type DanceCardLeagueEntry } from "@/components/dance-card-league-list";
 import { CurtainCallCard } from "@/components/curtain-call-card";
@@ -19,6 +19,8 @@ import { DraftStatusCard } from "@/components/draft-status-card";
 import { RecastCatchUpCard } from "@/components/recast-catch-up-card";
 import { LifelineCatchUpCard } from "@/components/lifeline-card";
 import { loadLifelineWeek } from "@/lib/lifeline-week-data";
+import { lifelinePicksState } from "@/lib/lifeline-picks";
+import { rosterMoveTabHref } from "@/lib/roster-moves-pages";
 import { mapRosterMoveCouples } from "@/lib/league-triage";
 import { loadRosterMoveTabs } from "@/lib/roster-moves-data";
 import { LeaguePageShell } from "@/components/league-page-shell";
@@ -465,10 +467,55 @@ export default async function LeaguePicksPage({
   // Header total on Your Fantasy Roster: this paged week's Dance Card
   // points, not the season-cumulative total — matches the carousel it sits
   // above, same weighting as danceCardLeagueEntries' weekPoints below.
-  const yourLifelines = lifelinesFor(myTeamId);
   const yourRosterWeekTotalPoints = roundPoints(
-    yourRosterWeekRosterPoints * judgePointsInputs.categoryWeight + lifelineTotal(yourLifelines)
+    yourRosterWeekRosterPoints * judgePointsInputs.categoryWeight + lifelineTotal(lifelinesFor(myTeamId))
   );
+  // The viewer's open spots in the paged week, each a card on the roster:
+  // the coming week's from the Lifeline being picked, a scored week's from
+  // what each pick paid.
+  const yourLifelines: RosterLifeline[] = (() => {
+    if (!yourRosterWeek || !league.lifeline_enabled || yourRosterWeek.week_number < (league.lifeline_starts_week ?? Infinity)) {
+      return [];
+    }
+    const names = (coupleId: string) => ({
+      ...(allDisplayNames.get(coupleId) ?? { celebrity: "Unknown", pro: "Unknown" }),
+      coupleId,
+    });
+    if (rosterWeekIsComing) {
+      if (lifeline?.week.id !== yourRosterWeek.id) return [];
+      return lifeline.slots.map((slot) => ({
+        slotNumber: slot.slotNumber,
+        former: slot.formerCoupleId ? names(slot.formerCoupleId) : null,
+        pick: slot.pickCoupleId ? names(slot.pickCoupleId) : null,
+        points: null,
+      }));
+    }
+    const state = lifelinePicksState({
+      slots: rosterSlotPeriods
+        .filter((slot) => slot.managerId === myTeamId)
+        .flatMap((slot) => {
+          const couple = flatCouplesById.get(slot.coupleId);
+          return couple ? [{ ...slot, status: couple.status, eliminationWeek: couple.elimination_week }] : [];
+        }),
+      rosterSize: league.roster_size,
+      weekNumber: yourRosterWeek.week_number,
+      behind: false,
+      peersHavePicks: false,
+    });
+    const spots = state.kind === "play" ? state.spots : [];
+    const paid = (lifelinePayoutRows ?? []).filter((row) => row.manager_id === myTeamId);
+    const slotNumbers = [...new Set([...spots.map((spot) => spot.slotNumber), ...paid.map((row) => row.slot_number)])].sort((a, b) => a - b);
+    return slotNumbers.map((slotNumber) => {
+      const former = spots.find((spot) => spot.slotNumber === slotNumber)?.formerCoupleId;
+      const payout = paid.find((row) => row.slot_number === slotNumber);
+      return {
+        slotNumber,
+        former: former ? names(former) : null,
+        pick: payout ? names(payout.couple_id) : null,
+        points: payout ? Number(payout.weighted_points) : 0,
+      };
+    });
+  })();
   // Under Dance Card v2 nothing sits outside the couples' credits; under v3
   // survival and the Fantasy Bonus do, as under v1.
   const yourRosterWeekBonusPoints = yourRosterWeek && danceCardRule.version !== "v2"
@@ -808,6 +855,11 @@ export default async function LeaguePicksPage({
                 weekBonusPoints={yourRosterWeekBonusPoints}
                 categoryWeight={judgePointsInputs.categoryWeight}
                 lifelines={yourLifelines}
+                lifelineHref={
+                  rosterWeekIsComing && lifeline && !lifeline.locked
+                    ? rosterMoveTabHref(id, "lifeline", historyFrom)
+                    : undefined
+                }
                 historyFrom={historyFrom}
                 notScoredYet={rosterWeekIsComing}
                 carousel={

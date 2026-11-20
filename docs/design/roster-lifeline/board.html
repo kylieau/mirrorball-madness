@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Picks · a saved Lifeline on Your Fantasy Roster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../picks-roster-moves/mock.css" />
+<link rel="stylesheet" href="../roster-history/extra.css" />
+<style>
+.tag.ll { background: rgba(201,162,75,.18); color: var(--accent); }
+.couple.lifeline { border: 1px dashed var(--primary); }
+.couple .sub { display: block; font-size: 11px; color: var(--muted-fg); margin: 2px 0 4px; font-weight: 400; }
+.line .gold { color: var(--accent); font-weight: 600; }
+.line .n b { color: var(--foreground); font-weight: 600; }
+.state { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-fg); margin: 16px 0 6px; }
+</style>
+</head>
+<body>
+<h1 class="board-title">A saved Lifeline on Your Fantasy Roster</h1>
+<p class="board-sub">Mocks, not production UI. Couples are real; the league and points are made up. Picks opens on Week 11 before it airs. Jordan &amp; Ezra are still held; Alix &amp; Val were traded away after Week 9, so one spot is open, and Maura &amp; Mark are saved as its Lifeline. Today a scored week already ends with a "Lifeline · Maura &amp; Mark +2.42" line; the coming week shows nothing. Dashed outlines mark what's new.</p>
+<div class="board">
+<div class="col"><p class="cap">Today</p><p class="capsub">The coming week lists the couples and the one traded away. The Lifeline only shows on the Transactions card below, and on a scored week as a small line.</p>
+  <div class="phone" id="shot-today">
+    <div class="page">
+      <div><div class="h1">Picks</div><div class="rule"></div><div class="league">Sequin Syndicate</div></div>
+      <div class="section">🪩 Dance Card</div>
+      <div class="card">
+        <div>
+          <div class="card-title">Your Fantasy Roster</div>
+          <div class="card-desc">Not scored yet</div>
+          <div class="carousel"><span>‹</span><span><b>Week 11</b> — Finale</span><span>›</span></div>
+        </div>
+        <div class="stack">
+          <div class="couple"><div><div class="n">Jordan <span>&amp; Ezra</span></div></div><div class="p"><b>36.80</b>total</div></div>
+          <div class="couple former"><div><div class="n">Alix <span>&amp; Val</span><span class="since">Weeks 1–9 · now with Pat</span></div><span class="tag gone">Traded</span></div><div class="p"><b>18.40</b>total</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="col"><p class="cap">A · A Lifeline line</p><p class="capsub">The same small line a scored week already ends with, shown before the week airs too: "Pays half" until it's scored, then its points. With no pick saved before the lock, a gold "No pick yet" that opens Lifeline.</p>
+  <div class="phone" id="shot-a">
+    <div class="page">
+      <div><div class="h1">Picks</div><div class="rule"></div><div class="league">Sequin Syndicate</div></div>
+      <div class="section">🪩 Dance Card</div>
+      <div class="card">
+        <div>
+          <div class="card-title">Your Fantasy Roster</div>
+          <div class="card-desc">Not scored yet</div>
+          <div class="carousel"><span>‹</span><span><b>Week 11</b> — Finale</span><span>›</span></div>
+        </div>
+        <div class="stack">
+          <div class="couple"><div><div class="n">Jordan <span>&amp; Ezra</span></div></div><div class="p"><b>36.80</b>total</div></div>
+          <div class="couple former"><div><div class="n">Alix <span>&amp; Val</span><span class="since">Weeks 1–9 · now with Pat</span></div><span class="tag gone">Traded</span></div><div class="p"><b>18.40</b>total</div></div>
+          <div class="line mark"><span class="n">Lifeline · <b>Maura</b> &amp; Mark</span><span>Pays half</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="state">No pick saved yet</p>
+  <div class="phone" id="shot-a-none">
+    <div class="page">
+      <div><div class="h1">Picks</div><div class="rule"></div><div class="league">Sequin Syndicate</div></div>
+      <div class="section">🪩 Dance Card</div>
+      <div class="card">
+        <div>
+          <div class="card-title">Your Fantasy Roster</div>
+          <div class="card-desc">Not scored yet</div>
+          <div class="carousel"><span>‹</span><span><b>Week 11</b> — Finale</span><span>›</span></div>
+        </div>
+        <div class="stack">
+          <div class="couple"><div><div class="n">Jordan <span>&amp; Ezra</span></div></div><div class="p"><b>36.80</b>total</div></div>
+          <div class="couple former"><div><div class="n">Alix <span>&amp; Val</span><span class="since">Weeks 1–9 · now with Pat</span></div><span class="tag gone">Traded</span></div><div class="p"><b>18.40</b>total</div></div>
+          <div class="line mark"><span class="gold">Lifeline · No pick yet</span><span class="gold">Pick ›</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="col"><p class="cap">B · A Lifeline card</p><p class="capsub">The Lifeline gets a full card among the couples, with a dashed gold edge and a Lifeline tag, saying which spot it fills. A spot with no pick shows as an Open Spot card that opens Lifeline.</p>
+  <div class="phone" id="shot-b">
+    <div class="page">
+      <div><div class="h1">Picks</div><div class="rule"></div><div class="league">Sequin Syndicate</div></div>
+      <div class="section">🪩 Dance Card</div>
+      <div class="card">
+        <div>
+          <div class="card-title">Your Fantasy Roster</div>
+          <div class="card-desc">Not scored yet</div>
+          <div class="carousel"><span>‹</span><span><b>Week 11</b> — Finale</span><span>›</span></div>
+        </div>
+        <div class="stack">
+          <div class="couple lifeline mark"><div><div class="n">Maura <span>&amp; Mark</span></div><span class="sub">In place of Alix &amp; Val</span><span class="tag ll">Lifeline</span></div><div class="p"><b>½</b>their week</div></div>
+          <div class="couple"><div><div class="n">Jordan <span>&amp; Ezra</span></div></div><div class="p"><b>36.80</b>total</div></div>
+          <div class="couple former"><div><div class="n">Alix <span>&amp; Val</span><span class="since">Weeks 1–9 · now with Pat</span></div><span class="tag gone">Traded</span></div><div class="p"><b>18.40</b>total</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="state">No pick saved yet</p>
+  <div class="phone" id="shot-b-none">
+    <div class="page">
+      <div><div class="h1">Picks</div><div class="rule"></div><div class="league">Sequin Syndicate</div></div>
+      <div class="section">🪩 Dance Card</div>
+      <div class="card">
+        <div>
+          <div class="card-title">Your Fantasy Roster</div>
+          <div class="card-desc">Not scored yet</div>
+          <div class="carousel"><span>‹</span><span><b>Week 11</b> — Finale</span><span>›</span></div>
+        </div>
+        <div class="stack">
+          <div class="couple lifeline mark"><div><div class="n" style="color:var(--accent)">Open Spot</div><span class="sub">In place of Alix &amp; Val</span><span class="tag ll">No Lifeline yet</span></div><div class="p" style="color:var(--accent);font-weight:600">Pick ›</div></div>
+          <div class="couple"><div><div class="n">Jordan <span>&amp; Ezra</span></div></div><div class="p"><b>36.80</b>total</div></div>
+          <div class="couple former"><div><div class="n">Alix <span>&amp; Val</span><span class="since">Weeks 1–9 · now with Pat</span></div><span class="tag gone">Traded</span></div><div class="p"><b>18.40</b>total</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="col"><p class="cap">C · A card every week <span class="rec">Suggested</span></p><p class="capsub">As B, and a scored week shows the Lifeline as a card too, with its points (+2.42 this wk) in place of today's small line, so the spot always reads as part of the roster. Before the week airs it is exactly B, the No pick state included.</p>
+  <div class="phone" id="shot-c">
+    <div class="page">
+      <div><div class="h1">Picks</div><div class="rule"></div><div class="league">Sequin Syndicate</div></div>
+      <div class="section">🪩 Dance Card</div>
+      <div class="card">
+        <div>
+          <div class="card-title">Your Fantasy Roster</div>
+          <div class="card-desc"><b>11.62</b> pts this week</div>
+          <div class="carousel"><span>‹</span><span><b>Week 10</b></span><span>›</span></div>
+        </div>
+        <div class="stack">
+          <div class="couple"><div><div class="n">Jordan <span>&amp; Ezra</span></div></div><div class="p"><b>+9.20</b><b style="display:inline;font-size:12px">46.00</b> total</div></div>
+          <div class="couple lifeline mark"><div><div class="n">Maura <span>&amp; Mark</span></div><span class="sub">Lifeline · in place of Alix &amp; Val</span></div><div class="p"><b>+2.42</b>this wk</div></div>
+          <div class="couple former"><div><div class="n">Alix <span>&amp; Val</span><span class="since">Weeks 1–9 · now with Pat</span></div><span class="tag gone">Traded</span></div><div class="p"><b>18.40</b>total</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>
