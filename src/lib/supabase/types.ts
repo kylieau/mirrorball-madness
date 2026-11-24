@@ -519,6 +519,7 @@ export type Database = {
         Row: {
           couple_id: string
           created_at: string
+          dance_slot: number | null
           dance_style_id: string
           episode_id: string
           id: string
@@ -529,6 +530,7 @@ export type Database = {
         Insert: {
           couple_id: string
           created_at?: string
+          dance_slot?: number | null
           dance_style_id: string
           episode_id: string
           id?: string
@@ -539,6 +541,7 @@ export type Database = {
         Update: {
           couple_id?: string
           created_at?: string
+          dance_slot?: number | null
           dance_style_id?: string
           episode_id?: string
           id?: string
@@ -1675,6 +1678,39 @@ export type Database = {
           },
         ]
       }
+      league_departures: {
+        Row: {
+          league_id: string
+          left_at: string
+          user_id: string
+        }
+        Insert: {
+          league_id: string
+          left_at?: string
+          user_id: string
+        }
+        Update: {
+          league_id?: string
+          left_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_departures_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_departures_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       league_members: {
         Row: {
           co_manager_id: string | null
@@ -2209,44 +2245,6 @@ export type Database = {
         }
         Relationships: []
       }
-      roster_releases: {
-        Row: {
-          couple_id: string
-          id: string
-          league_id: string
-          manager_id: string
-          manager_name: string
-          released_at: string
-          week_number: number
-        }
-        Insert: {
-          couple_id: string
-          id?: string
-          league_id: string
-          manager_id: string
-          manager_name: string
-          released_at?: string
-          week_number: number
-        }
-        Update: {
-          couple_id?: string
-          id?: string
-          league_id?: string
-          manager_id?: string
-          manager_name?: string
-          released_at?: string
-          week_number?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "roster_releases_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       recast_cycles: {
         Row: {
           awards: number
@@ -2288,6 +2286,58 @@ export type Database = {
             columns: ["week_id"]
             isOneToOne: false
             referencedRelation: "competition_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roster_releases: {
+        Row: {
+          couple_id: string
+          id: string
+          league_id: string
+          manager_id: string
+          manager_name: string
+          released_at: string
+          week_number: number
+        }
+        Insert: {
+          couple_id: string
+          id?: string
+          league_id: string
+          manager_id: string
+          manager_name: string
+          released_at?: string
+          week_number: number
+        }
+        Update: {
+          couple_id?: string
+          id?: string
+          league_id?: string
+          manager_id?: string
+          manager_name?: string
+          released_at?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_releases_couple_id_fkey"
+            columns: ["couple_id"]
+            isOneToOne: false
+            referencedRelation: "couples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_releases_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roster_releases_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2986,29 +3036,7 @@ export type Database = {
           transfer_points: number | null
           week_id: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "weekly_manager_scores_league_id_fkey"
-            columns: ["league_id"]
-            isOneToOne: false
-            referencedRelation: "leagues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "weekly_manager_scores_manager_id_fkey"
-            columns: ["manager_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "weekly_manager_scores_week_id_fkey"
-            columns: ["week_id"]
-            isOneToOne: false
-            referencedRelation: "competition_weeks"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Functions: {
@@ -3431,6 +3459,7 @@ export type Database = {
         Returns: string
       }
       process_due_recasts: { Args: never; Returns: Json }
+      process_due_trades: { Args: never; Returns: Json }
       process_league_recast: {
         Args: {
           p_league_id: string
@@ -3477,10 +3506,10 @@ export type Database = {
       recast_order: {
         Args: { p_league_id: string }
         Returns: {
+          dance_card_total: number
           last_week_dance_card: number
           list_position: number
           manager_id: string
-          dance_card_total: number
         }[]
       }
       recast_pending_drops: {
@@ -3528,6 +3557,11 @@ export type Database = {
       refresh_round_points: {
         Args: { p_actor_id: string; p_round_id: string }
         Returns: undefined
+      }
+      release_effective_week: { Args: never; Returns: number }
+      release_team: {
+        Args: { p_league_id: string; p_user_id: string }
+        Returns: number
       }
       remove_co_manager: {
         Args: { p_league_id: string; p_team_user_id: string }

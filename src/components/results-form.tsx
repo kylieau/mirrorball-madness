@@ -48,6 +48,7 @@ import {
   ADD_SPECIAL_VALUE,
   NEW_SPECIAL_ID,
   coupleIdsForDraft,
+  placeDraftDances,
   teamPickValue,
 } from "@/lib/results-draft-input";
 import {
@@ -103,7 +104,7 @@ import {
   type EpisodeResultsStatus,
 } from "@/lib/results-status";
 import { useRelativeTimeAgo } from "@/lib/use-browser-time-zone";
-import type { DraftState } from "@/lib/results-draft";
+import type { DraftDanceState, DraftState } from "@/lib/results-draft";
 import { formatEpisodeCasual, formatEpisodeCasualWithTheme, formatEnterResultsOption } from "@/lib/format-week";
 import { resultsEntryCoupleIds, selectableCast } from "@/lib/episode-cast";
 import { judgesForScoreInputs, type ScoringJudge } from "@/lib/scoring-judges";
@@ -265,39 +266,28 @@ function buildRowsFromDraft(
     };
   }
 
-  for (const d of draft?.dances ?? []) {
-    const row = rows[d.coupleId] ?? emptyRow();
-    row.dances = [
-      ...row.dances,
-      {
-        key: d.id,
-        danceStyleId: d.danceStyleId,
-        songTitle: d.songTitle ?? "",
-        scores: Object.fromEntries(d.judgeScores.map((js) => [js.judgeId, String(js.score)])),
-      },
-    ];
-    rows[d.coupleId] = row;
-  }
-
-  // A couple's dance rows default to however many dances the episode expects,
-  // so entry is fill-in-the-blanks rather than a "+ Dance" click per row. A
-  // Did Not Dance couple gets none.
-  for (const coupleId of Object.keys(rows)) {
-    const row = rows[coupleId];
-    if (row.outcome === "bye") continue;
-    const fillCount = Math.max(expectedDanceCount - row.dances.length, row.dances.length === 0 ? 1 : 0);
-    if (fillCount <= 0) continue;
+  const savedByCouple = new Map<string, DraftDanceState[]>();
+  for (const d of draft?.dances ?? []) savedByCouple.set(d.coupleId, [...(savedByCouple.get(d.coupleId) ?? []), d]);
+  for (const coupleId of new Set([...Object.keys(rows), ...savedByCouple.keys()])) {
+    const row = rows[coupleId] ?? emptyRow();
+    const saved = savedByCouple.get(coupleId) ?? [];
+    // A couple's dance rows default to however many dances the episode
+    // expects, so entry is fill-in-the-blanks rather than a "+ Dance" click
+    // per row. A Did Not Dance couple gets none, but keeps any saved dance in
+    // its own slot so the next save doesn't move it.
+    const slots = row.outcome !== "bye" ? placeDraftDances(saved, expectedDanceCount) : saved.length > 0 ? placeDraftDances(saved, 0) : [];
     rows[coupleId] = {
       ...row,
-      dances: [
-        ...row.dances,
-        ...Array.from({ length: fillCount }, (_, i) => ({
-          key: `slot-${coupleId}-${row.dances.length + i}`,
-          danceStyleId: "",
-          songTitle: "",
-          scores: {},
-        })),
-      ],
+      dances: slots.map((d, i) =>
+        d
+          ? {
+              key: d.id,
+              danceStyleId: d.danceStyleId,
+              songTitle: d.songTitle ?? "",
+              scores: Object.fromEntries(d.judgeScores.map((js) => [js.judgeId, String(js.score)])),
+            }
+          : { key: `slot-${coupleId}-${i}`, danceStyleId: "", songTitle: "", scores: {} }
+      ),
     };
   }
 
@@ -678,8 +668,10 @@ export function ResultsForm({
         return {
           coupleId: c.id,
           dances: row.dances
+            .map((d, i) => ({ ...d, slot: i + 1 }))
             .filter((d) => d.danceStyleId)
             .map((d) => ({
+              slot: d.slot,
               danceStyleId: d.danceStyleId,
               songTitle: d.songTitle.trim() || null,
               judgeScores: Object.entries(d.scores)
@@ -816,6 +808,8 @@ export function ResultsForm({
       setRows((prev) => {
         const next = { ...prev };
         for (const [coupleId, serverRow] of Object.entries(serverRows)) {
+          // buildRowsFromDraft also returns every other couple with saved dances.
+          if (!skipped.has(coupleId)) continue;
           next[coupleId] = { ...(prev[coupleId] ?? emptyRow()), dances: serverRow.dances };
         }
         return next;
@@ -1902,8 +1896,12 @@ export function ResultsForm({
                 disabled={!d.danceStyleId}
                 onChange={(judgeId, value) => updateDance(c.id, d.key, { scores: { ...d.scores, [judgeId]: value } })}
               />
-              {/* A draft save skips a dance with no style, so marks typed first would be lost. */}
-              {!d.danceStyleId && <p className="text-xs text-muted-foreground">Pick a dance style to enter scores.</p>}
+              {/* A draft save skips a dance with no style, so marks or a song typed first would be lost. */}
+              {!d.danceStyleId && (
+                <p className="text-xs text-muted-foreground">
+                  {d.songTitle.trim() ? "Pick a dance style to save this dance." : "Pick a dance style to enter scores."}
+                </p>
+              )}
             </div>
           ))}
         </fieldset>
@@ -2189,7 +2187,14 @@ export function ResultsForm({
               items={episodeItems}
               disabled={savingDraft || revealBusy || publishing || releasing}
               value={selectedEpisodeId}
-              onValueChange={(v) => setSelectedEpisodeId(v ?? "")}
+              onValueChange={(v) => {
+                setSelectedEpisodeId(v ?? "");
+                // So a reload reopens this week, through the same ?episode= Scores links with.
+                const url = new URL(window.location.href);
+                if (v) url.searchParams.set("episode", v);
+                else url.searchParams.delete("episode");
+                window.history.replaceState(null, "", url);
+              }}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a Week" />

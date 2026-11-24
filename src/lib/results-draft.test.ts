@@ -10,7 +10,7 @@ const input: SaveDraftResultsInput = {
   updatedBy: "friend",
   inJeopardyCoupleIds: [],
   entries: [
-    { coupleId: "amber", dances: [{ danceStyleId: "s", songTitle: null, judgeScores: [{ judgeId: "j", score: 9 }] }], outcome: "safe", savedByJudges: false, hadImmunity: false, bonusPoints: 0, bonusNote: null },
+    { coupleId: "amber", dances: [{ slot: 1, danceStyleId: "s", songTitle: null, judgeScores: [{ judgeId: "j", score: 9 }] }], outcome: "safe", savedByJudges: false, hadImmunity: false, bonusPoints: 0, bonusNote: null },
     { coupleId: "julia", dances: [], outcome: "safe", savedByJudges: false, hadImmunity: false, bonusPoints: 0, bonusNote: null },
   ],
 };
@@ -44,7 +44,7 @@ describe("saveDraftResults", () => {
     const rpc = vi.fn();
     const admin = { rpc } as unknown as SupabaseClient<Database>;
     for (const score of [11, 0, 8.5]) {
-      const bad = { ...input, entries: [{ ...input.entries[0], dances: [{ danceStyleId: "s", songTitle: null, judgeScores: [{ judgeId: "j", score }] }] }] };
+      const bad = { ...input, entries: [{ ...input.entries[0], dances: [{ slot: 1, danceStyleId: "s", songTitle: null, judgeScores: [{ judgeId: "j", score }] }] }] };
       expect((await saveDraftResults(admin, bad)).error).toBe("Judge scores must be whole numbers from 1 to 10.");
     }
     expect(rpc).not.toHaveBeenCalled();

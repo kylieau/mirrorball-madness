@@ -2454,7 +2454,11 @@ create table draft_dance_scores (
   song_title text,
   total_score numeric not null default 0,
   scaled_score numeric not null default 0,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Which of the couple's own rounds this is (1 = Round 1), so a later
+  -- round saved before an earlier one reloads into its own slot. Null for a
+  -- copy of a live dance, which loads in saved order.
+  dance_slot smallint check (dance_slot between 1 and 12)
 );
 
 create table draft_judge_scores (
@@ -4848,8 +4852,8 @@ begin
           if (js->>'score')::numeric not between 0 and 10 then raise exception 'Judge scores must be between 0 and 10'; end if;
           total := total + (js->>'score')::numeric; count_scores := count_scores + 1;
         end loop;
-        insert into public.draft_dance_scores (episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score)
-        values (ep.id, couple, (dance->>'danceStyleId')::uuid, dance->>'songTitle', total, case when count_scores = 0 then 0 else total / count_scores * 3 end) returning id into draft_id;
+        insert into public.draft_dance_scores (episode_id, couple_id, dance_style_id, song_title, total_score, scaled_score, dance_slot)
+        values (ep.id, couple, (dance->>'danceStyleId')::uuid, dance->>'songTitle', total, case when count_scores = 0 then 0 else total / count_scores * 3 end, (dance->>'slot')::smallint) returning id into draft_id;
         insert into public.draft_judge_scores (draft_dance_score_id, judge_id, score)
         select draft_id, (j->>'judgeId')::uuid, (j->>'score')::numeric from jsonb_array_elements(dance->'judgeScores') j;
       end loop;

@@ -6,7 +6,7 @@ describe("viewer result payloads", () => {
   it("retains display metadata without serializing drafted scores, outcomes or songs", () => {
     const draft: DraftState = {
       hasDraft: true, updatedAt: null, guestJudgeName: "Secret guest", judgesSaveAvailable: false,
-      dances: [{ id: "dance", coupleId: "couple", danceStyleId: "style", songTitle: "Unreleased song", judgeScores: [{ judgeId: "judge", score: 9 }] }],
+      dances: [{ id: "dance", coupleId: "couple", slot: 1, danceStyleId: "style", songTitle: "Unreleased song", judgeScores: [{ judgeId: "judge", score: 9 }] }],
       entries: [{ coupleId: "couple", outcome: "eliminated", savedByJudges: false, hadImmunity: false, bonusPoints: 7, bonusNote: "Secret bonus" }],
       inJeopardyCoupleIds: ["couple"],
     };

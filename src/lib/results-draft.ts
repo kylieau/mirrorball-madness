@@ -7,6 +7,8 @@ import type { Json } from "./supabase/types";
 export type DraftJudgeScoreInput = { judgeId: string; score: number };
 
 export type DraftDanceInput = {
+  // Which of the couple's own rounds this dance is, 1 for Round 1.
+  slot: number;
   danceStyleId: string;
   songTitle: string | null;
   judgeScores: DraftJudgeScoreInput[];
@@ -35,6 +37,7 @@ export type SaveDraftResultsInput = {
 export type DraftDanceState = {
   id: string;
   coupleId: string;
+  slot: number | null;
   danceStyleId: string;
   songTitle: string | null;
   judgeScores: DraftJudgeScoreInput[];
@@ -112,7 +115,7 @@ export async function loadDraftForEpisode(
       admin.from("draft_episode_overrides").select("*").eq("episode_id", episodeId).maybeSingle(),
       admin
         .from("draft_dance_scores")
-        .select("id, couple_id, dance_style_id, song_title, draft_judge_scores(judge_id, score)")
+        .select("id, couple_id, dance_slot, dance_style_id, song_title, draft_judge_scores(judge_id, score)")
         .eq("episode_id", episodeId),
       admin.from("draft_episode_results").select("*").eq("episode_id", episodeId),
       admin.from("draft_episode_in_jeopardy_couples").select("couple_id").eq("episode_id", episodeId),
@@ -132,6 +135,7 @@ export async function loadDraftForEpisode(
     dances: (draftDances ?? []).map((d) => ({
       id: d.id,
       coupleId: d.couple_id,
+      slot: d.dance_slot,
       danceStyleId: d.dance_style_id,
       songTitle: d.song_title,
       judgeScores: (d.draft_judge_scores ?? []).map((js) => ({ judgeId: js.judge_id, score: js.score })),
