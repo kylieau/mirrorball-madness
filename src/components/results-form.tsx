@@ -639,13 +639,17 @@ export function ResultsForm({
   const scoredCouples = episodeCouples.filter((c) =>
     (rows[c.id] ?? emptyRow()).dances.some((d) => Object.values(d.scores).some((v) => v !== ""))
   );
-  // Once the whole episode is officially published, every couple in it is
+  // On a round's tab a couple is Published once that round's dance is, since
+  // each dance posts on its own; elsewhere, once any of their dances is. Once
+  // the whole episode is officially published, every couple in it is
   // published -- there's no "still drafting" distinction left to make.
-  const publishedCouples = published ? episodeCouples : episodeCouples.filter((c) => revealedCoupleIds.has(c.id));
-  const draftedCouples = published ? [] : episodeCouples.filter((c) => releasedCoupleIds.has(c.id) && !revealedCoupleIds.has(c.id));
+  const postedHere = (coupleId: string) =>
+    activeSlot != null && !showLeaderboard ? !!liveIdOf(coupleId, activeSlot + 1) : revealedCoupleIds.has(coupleId);
+  const publishedCouples = published ? episodeCouples : episodeCouples.filter((c) => postedHere(c.id));
+  const draftedCouples = published ? [] : episodeCouples.filter((c) => releasedCoupleIds.has(c.id) && !postedHere(c.id));
   const inProgressCouples = published
     ? []
-    : episodeCouples.filter((c) => !releasedCoupleIds.has(c.id) && !revealedCoupleIds.has(c.id));
+    : episodeCouples.filter((c) => !releasedCoupleIds.has(c.id) && !postedHere(c.id));
   const eliminatedCount = episodeCouples.filter((c) => (rows[c.id] ?? emptyRow()).outcome === "eliminated").length;
   const requiredEliminations = selectedWeek?.is_double_elimination_week ? 2 : 1;
 
@@ -1999,9 +2003,7 @@ export function ResultsForm({
         {!published && (
           <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
             <div className="flex flex-wrap items-center gap-2">
-              {coupleHasPosted ? (
-                <Badge>Posted</Badge>
-              ) : (
+              {coupleHasPosted ? null : (
                 <>
                   {releasedCoupleIds.has(c.id) ? (
                     <>
