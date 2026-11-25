@@ -33,8 +33,8 @@ three Lifeline leagues holds a couple in Week 11).
   every pick has a payout row. A publish from a build before `d04c6da` pays a
   trade-emptied spot 0.00 with no error. A rule version on the plan would
   refuse it.
-- After E11: read Kylie's league's Week 11 `lifeline_payouts` and confirm the
-  trade-emptied spot's pick paid above zero.
+- Done 2026-11-25 (read-only): Kylie's league's Week 11 pick on the
+  trade-emptied spot paid 8.68 (credit 8.68 × 0.5 × weight 2).
 - Selling a couple for points, then taking a Lifeline on the empty spot, is
   allowed (Codex: bounded by the 10% cash cap, not an exploit; the veto can't
   stop it when every team is in the trade). Revisit if it shows up.
@@ -229,9 +229,11 @@ after. Still unchecked:
   managers, every picked couple still dancing). So the lock (Tue
   2026-11-17) and the settlement inside E11's publish are the first live
   runs of those paths; `apply_lifeline_settlement` refuses a plan without
-  payouts, and the night is rehearsed in the PGlite tests. After E11
-  publishes, check `lifeline_payouts` against the picks and
-  `scripts/dance-card-v2.ts --verify`.
+  payouts, and the night is rehearsed in the PGlite tests. Checked
+  2026-11-25 after the Finale published (read-only): all 21 stored
+  `lifeline_payouts` match `buildLifelinePayouts` recomputed over the live
+  `dance_card_snapshot`, and `scripts/dance-card-v2.ts --verify` matches in
+  all four S35 leagues.
 - The Home card says "Ends in 1d" for a 48-hour offer (largest unit, floored).
 
 Known limits, none fixed:

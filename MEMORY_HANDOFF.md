@@ -25,7 +25,7 @@
 
 All of these were used live on Finale night.
 
-**Live state (S35):** Week 11 (E12, the Finale, aired Tue Nov 24, 2026) is published; production's Results shows it to signed-out visitors, and guests only ever see published weeks. The season is over, with nothing new to build for S35. Whether the after-Finale verification (step 1 below) ran has not been confirmed.
+**Live state (S35):** Week 11 (E12, the Finale, aired Tue Nov 24, 2026) is published; production's Results shows it to signed-out visitors, and guests only ever see published weeks. The season is over, with nothing new to build for S35. The after-Finale verification ran read-only on Wed Nov 25, 2026 and passed: `dance-card-v2.ts --verify` matches in all four leagues, all 21 stored Lifeline payouts match a recompute, and the trade-emptied spot in Kylie's league paid 8.68.
 
 ## 2. Changes Made
 
@@ -75,11 +75,7 @@ All of these were used live on Finale night.
 
 No hard dates remain this season.
 
-1. **After-Finale verification (read-only), if not yet run:**
-   - Run `scripts/dance-card-v2.ts --verify`.
-   - Recompute Week 11 `lifeline_payouts` with `buildLifelinePayouts` over `lifelineSeason(dance_card_snapshot)` and compare with the stored rows. A tsx script needs the `.mts` extension for top-level await.
-   - Confirm that Kylie's league's Week 11 payout for the trade-emptied spot is above zero.
-2. **Phone checks:** the season wrap's signed-in screens, plus the Nov 11 to Nov 20, 2026 UI. Both are listed in `BACKLOG.md`.
-3. **Next season:** the rest of `BACKLOG.md` (Finale follow-ups, Notifications, Free agency, the adversarial audit).
+1. **Phone checks:** the season wrap's signed-in screens (live since the Finale's West feed ended), plus the Nov 11 to Nov 20, 2026 UI. Both are listed in `BACKLOG.md`.
+2. **Next season:** the rest of `BACKLOG.md` (Finale follow-ups, Notifications, Free agency, the adversarial audit).
 
-Next command: `NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`
+The after-Finale verification is done (Wed Nov 25, 2026). Nothing is waiting on a command; the next step is Kylie's phone check.
