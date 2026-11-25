@@ -26,6 +26,8 @@ const LIVE_STACK = [
 ];
 const roundsSql = readFileSync("supabase/apply-episode-rounds.sql", "utf8");
 const heatGuardSql = readFileSync("supabase/apply-immune-heat-guard.sql", "utf8");
+// Applied live after the heat guard; the reorder file needs dance_slot.
+const LATER_SQL = ["apply-draft-dance-slots", "apply-episode-rounds-reorder"].map((f) => readFileSync(`supabase/${f}.sql`, "utf8"));
 
 async function freshDb() {
   const instance = new PGlite();
@@ -174,6 +176,7 @@ describe("apply-episode-rounds.sql", () => {
     await db.exec(roundsSql); // Dashboard reruns must be safe.
     await db.exec(heatGuardSql);
     await db.exec(heatGuardSql);
+    for (const sql of LATER_SQL) await db.exec(sql);
   }, 60_000);
   afterAll(async () => db?.close());
 
@@ -210,9 +213,11 @@ describe("apply-episode-rounds.sql", () => {
     ]);
   });
 
-  it("keeps the plan admin only and Round 1 fixed", async () => {
+  it("keeps the plan admin only, with at least one round of the couples' own dances", async () => {
     await expect(saveRounds(e11, [{ kind: "own", roundType: "Individual Dance" }], friend)).rejects.toThrow(/Only a site admin/);
-    await expect(saveRounds(e11, [{ kind: "special", roundType: "Dance-Off", scoring: "fixed_bonus" }])).rejects.toThrow(/Round 1 is always/);
+    await expect(saveRounds(e11, [{ kind: "special", roundType: "Dance-Off", scoring: "fixed_bonus" }])).rejects.toThrow(/at least one round where every couple dances their own/);
+    await saveRounds(e11, [{ kind: "special", roundType: "Dance-Off", scoring: "fixed_bonus", unitCount: 1 }, { kind: "own", roundType: "Freestyle" }]);
+    expect((await rounds(e11)).map((r) => r.round_type)).toEqual(["Dance-Off", "Freestyle"]);
     await expect(saveRounds(e11, [{ kind: "own", roundType: "Individual Dance" }, { kind: "special", roundType: "Trio" }])).rejects.toThrow(/Pick how Trio is scored/);
   });
 

@@ -5,6 +5,7 @@ import {
   exceptionStatus,
   heatName,
   individualRoundDraft,
+  moveRoundDraft,
   newRoundDraft,
   nightException,
   ownSlotIndex,
@@ -116,8 +117,18 @@ describe("drafts and payload", () => {
         heats: [{ heatNumber: 1, coupleIds: ["amber", "ezra"] }, { heatNumber: 2, coupleIds: [] }], exceptions: [] },
       { id: null, kind: "special", roundType: "Team Dance", scoring: "team_marks", bonusPoints: null, unitCount: 2, exceptions: [] },
     ]);
-    expect(validateRounds([off])).toBe("Round 1 is always the Individual Dance.");
+    expect(validateRounds([off])).toBe("Keep at least one round where every couple dances their own.");
+    expect(validateRounds([off, individualRoundDraft()])).toBeNull();
     expect(validateRounds([individualRoundDraft(), { ...off, bonusPoints: 2.25 }])).toMatch(/steps of 0.5/);
+  });
+
+  it("moves a round up or down, Round 1 included, and not past either end", () => {
+    const keys = (drafts: { key: string }[]) => drafts.map((d) => d.key);
+    const drafts = [individualRoundDraft("a"), individualRoundDraft("b"), individualRoundDraft("c")];
+    expect(keys(moveRoundDraft(drafts, "a", 1))).toEqual(["b", "a", "c"]);
+    expect(keys(moveRoundDraft(drafts, "c", -1))).toEqual(["a", "c", "b"]);
+    expect(moveRoundDraft(drafts, "a", -1)).toBe(drafts);
+    expect(moveRoundDraft(drafts, "c", 1)).toBe(drafts);
   });
 
   it("reads a saved round back, and marks or clears a couple on the draft", () => {

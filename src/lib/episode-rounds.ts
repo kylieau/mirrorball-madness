@@ -1,9 +1,10 @@
 import { oxfordJoin, type SpecialDance, type SpecialDanceScoringMode } from "./team-dances";
 
 // An episode's planned rounds (episode_rounds, supabase/apply-episode-rounds.sql).
-// Round 1 is always the couples' own Individual Dance. "own" rounds are one
-// more dance per couple (the draft rows map to them in order, as
-// expected_dance_count did); "special" rounds hold heats or teams as special
+// A new episode starts with the couples' own Individual Dance, which can be
+// renamed, moved or removed like any round. "own" rounds are one dance per
+// couple (a draft dance's dance_slot is its round's place among them);
+// "special" rounds hold heats or teams as special
 // dances; "none" rounds only decide an elimination and never score.
 export type RoundKind = "own" | "special" | "none";
 export type RoundScoring = "marks" | "couple_marks" | "fixed_bonus" | "ranked_points" | "team_marks" | "none";
@@ -90,14 +91,14 @@ export function unitNoun(round: Pick<EpisodeRound, "roundType" | "scoring">, plu
   return plural ? "Groups" : "Group";
 }
 
-// Which of a couple's own dances a round is: 0 for Round 1, 1 for the next
-// own round, and so on. -1 for a special or elimination round.
+// Which of a couple's own dances a round is: 0 for the first own round, 1
+// for the next, and so on. -1 for a special or elimination round.
 export function ownSlotIndex(rounds: EpisodeRound[], roundId: string): number {
   const own = rounds.filter((r) => r.kind === "own").sort((a, b) => a.position - b.position);
   return own.findIndex((r) => r.id === roundId);
 }
 
-// "Individual" for Round 1, else the round's own name.
+// "Individual" for the Individual Dance, else the round's own name.
 export function roundShortName(round: Pick<EpisodeRound, "roundType">): string {
   return round.roundType === INDIVIDUAL_DANCE ? "Individual" : round.roundType;
 }
@@ -299,6 +300,16 @@ export function individualRoundDraft(key = "round-1"): RoundDraft {
   return { key, id: null, kind: "own", roundType: INDIVIDUAL_DANCE, scoring: "marks", bonusPoints: null, unitCount: 0, units: null, exceptions: [] };
 }
 
+// The plan with one round moved up (-1) or down (1); unchanged at either end.
+export function moveRoundDraft(drafts: RoundDraft[], key: string, step: -1 | 1): RoundDraft[] {
+  const from = drafts.findIndex((d) => d.key === key);
+  const to = from + step;
+  if (from < 0 || to < 0 || to >= drafts.length) return drafts;
+  const next = [...drafts];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}
+
 // A round's heats resized: extra heats are dropped, new ones start empty.
 export function resizeUnits(draft: RoundDraft, unitCount: number): RoundDraft {
   const count = Math.min(Math.max(unitCount, 1), MAX_UNITS);
@@ -311,7 +322,7 @@ export function resizeUnits(draft: RoundDraft, unitCount: number): RoundDraft {
 
 // Problems Save would hit, said before the round trip. The RPC still checks.
 export function validateRounds(drafts: RoundDraft[]): string | null {
-  if (drafts.length === 0 || drafts[0].kind !== "own" || drafts[0].roundType !== INDIVIDUAL_DANCE) return "Round 1 is always the Individual Dance.";
+  if (!drafts.some((d) => d.kind === "own")) return "Keep at least one round where every couple dances their own.";
   if (drafts.length > MAX_ROUNDS) return `An episode can have up to ${MAX_ROUNDS} rounds.`;
   for (const [i, d] of drafts.entries()) {
     const type = d.roundType.trim();

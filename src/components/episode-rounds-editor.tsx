@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { LockIcon, MinusIcon, PlusIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, MinusIcon, PlusIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   heatName,
   MAX_ROUNDS,
   MAX_UNITS,
+  moveRoundDraft,
   newRoundDraft,
   OWN_ROUND_OPTIONS,
   pairingChecks,
@@ -52,9 +53,9 @@ function parseBonus(raw: string): { value: number | null; invalid: boolean } {
   return { value, invalid: Number.isNaN(value) || Math.abs(value) > 100 || value * 2 !== Math.trunc(value * 2) };
 }
 
-// Edit Episode → Dance Rounds For This Episode. Round 1 (the Individual
-// Dance) is always on; rounds are added from a picker that also takes a typed
-// name. Nothing here saves on its own: the sheet's Save sends the plan.
+// Edit Episode → Dance Rounds For This Episode. A new episode starts with the
+// Individual Dance; any round can be renamed, moved or removed, and rounds are
+// added from a picker that also takes a typed name. Nothing here saves on its own: the sheet's Save sends the plan.
 export function EpisodeRoundsEditor({
   drafts,
   onChange,
@@ -117,12 +118,14 @@ export function EpisodeRoundsEditor({
           key={draft.key}
           draft={draft}
           position={index + 1}
+          last={index === drafts.length - 1}
           couples={couples}
           nameOf={nameOf}
           published={published}
           removing={removing === draft.key}
           marking={marking === draft.key}
           onPatch={(change) => patch(draft.key, change)}
+          onMove={(step) => onChange(moveRoundDraft(drafts, draft.key, step))}
           onAskRemove={() => setRemoving(draft.key)}
           onCancelRemove={() => setRemoving(null)}
           onRemove={() => {
@@ -184,12 +187,14 @@ export function EpisodeRoundsEditor({
 function RoundCard({
   draft,
   position,
+  last,
   couples,
   nameOf,
   published,
   removing,
   marking,
   onPatch,
+  onMove,
   onAskRemove,
   onCancelRemove,
   onRemove,
@@ -198,12 +203,14 @@ function RoundCard({
 }: {
   draft: RoundDraft;
   position: number;
+  last: boolean;
   couples: Couple[];
   nameOf: (id: string) => string;
   published: boolean;
   removing: boolean;
   marking: boolean;
   onPatch: (change: (d: RoundDraft) => RoundDraft) => void;
+  onMove: (step: -1 | 1) => void;
   onAskRemove: () => void;
   onCancelRemove: () => void;
   onRemove: () => void;
@@ -211,7 +218,6 @@ function RoundCard({
   onException: (coupleId: string, exception: { kind: ExceptionKind; note: string | null; bonusPoints: number | null } | null) => void;
 }) {
   const id = useId();
-  const locked = position === 1;
   const special = draft.kind === "special";
   const noun = unitNoun(draft);
   const singular = unitNoun(draft, false).toLowerCase();
@@ -232,16 +238,17 @@ function RoundCard({
           <span className="font-heading text-base font-semibold">{draft.roundType || "New Round"}</span>
           <Badge variant="secondary">{KIND_BADGE[draft.kind]}</Badge>
         </p>
-        {locked ? (
-          <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-            <LockIcon aria-hidden className="size-3.5" />
-            Always On
-          </span>
-        ) : (
+        <div className="flex shrink-0 items-center">
+          <Button type="button" size="icon" variant="ghost" aria-label={`Move Round ${position} up`} disabled={position === 1} onClick={() => onMove(-1)}>
+            <ChevronUpIcon className="size-4" />
+          </Button>
+          <Button type="button" size="icon" variant="ghost" aria-label={`Move Round ${position} down`} disabled={last} onClick={() => onMove(1)}>
+            <ChevronDownIcon className="size-4" />
+          </Button>
           <Button type="button" size="icon" variant="ghost" className="text-danger-text" aria-label={`Remove Round ${position}`} onClick={onAskRemove}>
             <Trash2Icon className="size-4" />
           </Button>
-        )}
+        </div>
       </div>
 
       {removing && (
@@ -252,6 +259,7 @@ function RoundCard({
             {draft.exceptions.length > 0 ? " Its exceptions go with it." : ""}
           </p>
           {special && <p className="text-xs text-muted-foreground">A {singular} that already has scores stops the save; clear it on Enter Results first.</p>}
+          {draft.kind === "own" && <p className="text-xs text-muted-foreground">A dance already saved in this round stops the save; clear it on Enter Results first.</p>}
           <div className="flex gap-2">
             <Button type="button" variant="destructive" onClick={onRemove}>
               Remove Round
@@ -263,16 +271,12 @@ function RoundCard({
         </div>
       )}
 
-      {locked ? (
-        <p className="text-xs text-muted-foreground">Every couple dances their own. Style and song are typed on Enter Results, and save as you type.</p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={`${id}-name`}>Round Name</Label>
-          <Input id={`${id}-name`} value={draft.roundType} maxLength={40} onChange={(e) => onPatch((d) => ({ ...d, roundType: e.target.value }))} />
-          {draft.kind === "own" && <p className="text-xs text-muted-foreground">Adds a dance to every couple on Enter Results. Style and song are typed there.</p>}
-          {draft.kind === "none" && <p className="text-xs text-muted-foreground">Decides the elimination only. Nothing is scored.</p>}
-        </div>
-      )}
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`${id}-name`}>Round Name</Label>
+        <Input id={`${id}-name`} value={draft.roundType} maxLength={40} onChange={(e) => onPatch((d) => ({ ...d, roundType: e.target.value }))} />
+        {draft.kind === "own" && <p className="text-xs text-muted-foreground">Adds a dance to every couple on Enter Results. Style and song are typed there.</p>}
+        {draft.kind === "none" && <p className="text-xs text-muted-foreground">Decides the elimination only. Nothing is scored.</p>}
+      </div>
 
       {special && (
         <>

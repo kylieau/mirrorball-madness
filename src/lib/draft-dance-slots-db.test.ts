@@ -76,6 +76,16 @@ async function save(couple: string, dances: Dance[]) {
   ])).rows[0].data;
 }
 
+async function plan(rounds: { id?: string; kind: string; roundType: string; scoring?: string; unitCount?: number }[]) {
+  return (await db.query<{ ids: string[] }>("select public.save_episode_rounds($1, $2, $3) as ids", [episode, admin, JSON.stringify(rounds)])).rows[0].ids;
+}
+
+async function plannedRounds() {
+  const own = (await db.query<{ count: number }>("select expected_dance_count as count from public.episodes where id = $1", [episode])).rows[0].count;
+  const types = (await db.query<{ round_type: string }>("select round_type from public.episode_rounds where episode_id = $1 order by position", [episode])).rows;
+  return { own, types: types.map((r) => r.round_type) };
+}
+
 async function slots(couple: string) {
   return (await db.query<{ slot: number | null; song: string }>(
     "select dance_slot as slot, song_title as song from public.draft_dance_scores where episode_id = $1 and couple_id = $2 order by song_title",
@@ -89,6 +99,8 @@ describe("draft dance slots SQL", () => {
     // Rerunning the file must be safe.
     await db.exec(readFileSync("supabase/apply-draft-dance-slots.sql", "utf8"));
     await db.exec(readFileSync("supabase/apply-draft-dance-slots.sql", "utf8"));
+    await db.exec(readFileSync("supabase/apply-episode-rounds-reorder.sql", "utf8"));
+    await db.exec(readFileSync("supabase/apply-episode-rounds-reorder.sql", "utf8"));
   }, 60000);
   afterAll(async () => {
     await db?.close();
@@ -119,6 +131,50 @@ describe("draft dance slots SQL", () => {
     expect(await save(amber, [{ slot: 1, style: freestyle, song: "Like a Prayer", marks: [9, 9, 9] }])).toEqual({ acknowledged: [amber], skippedPosted: [] });
     expect(await save(amber, [{ slot: 3, style: freestyle, song: "Like a Prayer", marks: [9, 8, 9] }])).toEqual({ acknowledged: [], skippedPosted: [amber] });
     expect(await slots(amber)).toEqual([{ slot: 3, song: "Like a Prayer" }]);
+  });
+
+  it("moves saved dances with their rounds when Round 1 is removed or the rounds are reordered", async () => {
+    const [, instantRound, freestyleRound] = await plan([
+      { kind: "own", roundType: "Individual Dance" }, { kind: "own", roundType: "Instant Dance" }, { kind: "own", roundType: "Freestyle" },
+    ]);
+    await save(amber, [{ slot: 2, style: rumba, song: "Instant" }, { slot: 3, style: freestyle, song: "Like a Prayer" }]);
+    await save(maura, [{ slot: 3, style: freestyle, song: "Flowers" }]);
+
+    const stamp = async () => (await db.query<{ at: string }>("select updated_at::text as at from public.draft_episode_overrides where episode_id = $1", [episode])).rows[0].at;
+    await db.exec(`update public.draft_episode_overrides set updated_at = now() - interval '1 hour' where episode_id = '${episode}'`);
+    const before = await stamp();
+    await plan([{ id: instantRound, kind: "own", roundType: "Instant Dance" }, { id: freestyleRound, kind: "own", roundType: "Freestyle" }]);
+    expect(await plannedRounds()).toEqual({ own: 2, types: ["Instant Dance", "Freestyle"] });
+    expect(await stamp()).not.toBe(before);
+    expect(await slots(amber)).toEqual([{ slot: 1, song: "Instant" }, { slot: 2, song: "Like a Prayer" }]);
+    expect(await slots(maura)).toEqual([{ slot: 2, song: "Flowers" }]);
+
+    await plan([{ id: freestyleRound, kind: "own", roundType: "Freestyle" }, { id: instantRound, kind: "own", roundType: "Instant Dance" }]);
+    expect(await slots(amber)).toEqual([{ slot: 2, song: "Instant" }, { slot: 1, song: "Like a Prayer" }]);
+    expect(await slots(maura)).toEqual([{ slot: 1, song: "Flowers" }]);
+  });
+
+  it("refuses to drop a round with saved dances, or to move rounds over a dance with no slot", async () => {
+    const [individualRound, freestyleRound] = await plan([{ kind: "own", roundType: "Individual Dance" }, { kind: "own", roundType: "Freestyle" }]);
+    await save(amber, [{ slot: 1, style: rumba, song: "A" }]);
+    await expect(plan([{ id: freestyleRound, kind: "own", roundType: "Freestyle" }])).rejects.toThrow(/Individual Dance has saved dances/);
+    await expect(plan([{ id: individualRound, kind: "special", roundType: "Individual Dance", scoring: "fixed_bonus", unitCount: 1 }, { id: freestyleRound, kind: "own", roundType: "Freestyle" }]))
+      .rejects.toThrow(/Individual Dance has saved dances/);
+    expect(await plannedRounds()).toEqual({ own: 2, types: ["Individual Dance", "Freestyle"] });
+
+    await save(amber, [{ style: rumba, song: "A" }]);
+    await expect(plan([{ id: freestyleRound, kind: "own", roundType: "Freestyle" }, { id: individualRound, kind: "own", roundType: "Individual Dance" }]))
+      .rejects.toThrow(/saved before rounds were tracked/);
+    await plan([{ id: individualRound, kind: "own", roundType: "Individual Dance" }, { id: freestyleRound, kind: "own", roundType: "Freestyle" }, { kind: "own", roundType: "Encore" }]);
+    expect(await plannedRounds()).toEqual({ own: 3, types: ["Individual Dance", "Freestyle", "Encore"] });
+  });
+
+  it("leaves a published week's own rounds where they are", async () => {
+    const [individualRound, freestyleRound] = await plan([{ kind: "own", roundType: "Individual Dance" }, { kind: "own", roundType: "Freestyle" }]);
+    await db.exec(`update public.episodes set results_published_at = now() where id = '${episode}'`);
+    await expect(plan([{ id: freestyleRound, kind: "own", roundType: "Freestyle" }, { id: individualRound, kind: "own", roundType: "Individual Dance" }]))
+      .rejects.toThrow(/published week's own rounds/);
+    await expect(plan([{ id: freestyleRound, kind: "own", roundType: "Freestyle" }])).rejects.toThrow(/published week's own rounds/);
   });
 
   it("publishes a night whose drafts carry slots", async () => {
