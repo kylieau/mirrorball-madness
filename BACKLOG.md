@@ -4,7 +4,7 @@ Things explicitly deferred during development, not tracked anywhere else. Not a 
 
 ## Season wrap — 2026-11-25
 
-Built and pushed (`8d1119e`; CLAUDE.md, Season wrap; mock in
+Built and pushed (`8d1119e`; docs/architecture/fan-pages.md, Season wrap; mock in
 `docs/design/season-wrap/`). Seen signed out only: Results' Final Placements
 and Season at a Glance on production, the Home wrap banner on the dev server.
 - Phone checks still owed, signed in: Home's final league cards (and Manage
@@ -27,7 +27,7 @@ stays open until that league drafts.
 
 ## Lifeline on any open spot — 2026-11-20
 
-Built 2026-11-19/20 (CLAUDE.md describes it): Lifeline covers a spot with no
+Built 2026-11-19/20 (docs/architecture/roster-moves.md describes it): Lifeline covers a spot with no
 couple dancing, a trade-emptied one included (`apply-lifeline-open-spots.sql`,
 applied live by Kylie and checked with a scratch-league pick), and each open
 spot is a dashed card on Your Fantasy Roster. Reviewed by the advisor and
@@ -51,7 +51,7 @@ three Lifeline leagues holds a couple in Week 11).
 
 ## Picks and Couples Leaderboard changes — 2026-11-17/18
 
-Built and pushed (`f9f1f64`, `67f14bd`, `331e1bb`; CLAUDE.md describes them):
+Built and pushed (`f9f1f64`, `67f14bd`, `331e1bb`; docs/architecture/ describes them):
 Picks pages to the coming week's roster once it changes hands, the Couples
 Leaderboard is one row per couple (Kylie reversed the per-holder rows), an
 open spot only shows while the wire has a couple to claim, clearer Lifeline
@@ -64,7 +64,7 @@ and waiver lines, no Safe tag on a week that hasn't aired
 
 ## A couple that changed hands — 2026-11-13
 
-Built 2026-11-13 (`docs/design/roster-history/plan.md`, As built; CLAUDE.md
+Built 2026-11-13 (`docs/design/roster-history/plan.md`, As built; docs/architecture/dance-card.md
 describes it): the Couples Leaderboard has one row per holder, Picks keeps
 former couples as dimmed cards, holdings are clamped to the viewer's cutoff.
 Reviewed by the advisor and Codex (plan and code; no P1 in the code). App
@@ -79,7 +79,7 @@ only, deployed with this push.
 
 ## Trades take effect when the veto window closes — 2026-11-12
 
-Built 2026-11-12 (`docs/design/trade-execution/plan.md`; CLAUDE.md describes
+Built 2026-11-12 (`docs/design/trade-execution/plan.md`; docs/architecture/roster-moves.md describes
 it). Kylie applied `supabase/apply-trade-execution.sql` live after the Week
 9 waiver run on 2026-11-12 (the cron job is unchanged); the app deploys with
 the next push. The one accepted offer at the time executes on the first
@@ -103,7 +103,7 @@ tick after its window closes, Fri 2026-11-13 about 7:30 PM PT, for Week 10.
 
 ## Curtain Call podium and Home card moves — 2026-11-11
 
-Pushed 2026-11-11 (`CLAUDE.md` describes each): Curtain Call's Finale podium,
+Pushed 2026-11-11 (`docs/architecture/` describes each): Curtain Call's Finale podium,
 the own-dances-first order, the Dance Card weight line on Picks and the roster
 moves lines on the Home league card. `supabase/apply-curtain-call-podium.sql`
 was applied live by Kylie and read back (columns, both RPCs; regenerated types
@@ -156,7 +156,7 @@ the wire until the next run.
 ## Remove a manager after the draft — 2026-11-12
 
 Built 2026-11-12 (`docs/design/remove-manager/plan.md`, As built;
-CLAUDE.md describes it). Pushed as `06f4b02` and
+docs/architecture/roster-moves.md describes it). Pushed as `06f4b02` and
 `supabase/apply-remove-manager.sql` applied live by Kylie on 2026-11-12
 (`roster_releases` and `league_departures` read back present and empty). Her
 apply predates the file's service-role grant on `release_effective_week`,
@@ -357,7 +357,7 @@ Decisions for Kylie:
 
 ## Long special-dance names — inventory 2026-11-05
 
-Rule A chosen 2026-11-06 (see CLAUDE.md Special Dances "Naming"); the app
+Rule A chosen 2026-11-06 (see docs/architecture/results-entry.md, Special Dances "Naming"); the app
 side is done: fan Results, couple history, Home, member cards, Night
 Summary, both special-dance pickers (render-checked on E09 and E10 at 360px,
 writes blocked), and SQL error messages (`apply-special-dance-label.sql`,
@@ -417,7 +417,7 @@ Immunity`. The builders: `night-dance-lines.ts` `styleLabel`,
 
 ## Couple history — 2026-11-05
 
-Built: `/couples/[id]` (see CLAUDE.md "Couple history"), linked from Results
+Built: `/couples/[id]` (see docs/architecture/fan-pages.md, "Couple history"), linked from Results
 cards, Couples Leaderboard rows and Your Fantasy Roster. Browser-checked at
 390/360px in a scratch league with writes blocked: caught up, Spoiler-Free
 watched through Week 6 (Julia & Ezra read Still Dancing, Weeks 7–8 held
@@ -909,7 +909,7 @@ Shipped: per-manager Score History that expands in place under each leaderboard 
 
 ## Home curtain banner follow-ups
 
-Shipped: new state machine, West overlays, relative "Airs", `episodes.duration_minutes`. See CLAUDE.md. Still worth deciding or checking:
+Shipped: new state machine, West overlays, relative "Airs", `episodes.duration_minutes`. See docs/architecture/fan-pages.md. Still worth deciding or checking:
 
 - **Multi-night lock wording**: Curtain Call locks per week (first night minus lock hours), so Night 2 reads "Picks open · Picks locked · Airs Night 2" rather than plain "Picks open". Flip it if that reads wrong.
 - **Locked-state gap**: the lock transition happens outside the per-minute window when the lock is more than 6 hours before air, so it updates on the daily tick or next page load.
