@@ -38,7 +38,7 @@ export function statusLabel(couple: GrandFinaleCouple): string {
     case "winner":
       return "Won the season";
     case "runner_up":
-      return "Runner-up";
+      return "Runner-Up";
     case "third_place":
       return "Third Place";
     case "eliminated":

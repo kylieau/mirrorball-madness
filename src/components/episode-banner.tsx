@@ -74,14 +74,14 @@ function statusCopy(state: EpisodeBannerState, timeLabel: string, champions: Sea
               <>
                 🪩 Mirrorball Champions
                 {(champions.runnerUp || champions.third) && (
+                  // One line each: real names don't fit side by side at phone width.
                   <span className="mt-0.5 block text-xs text-foreground/80">
                     {[champions.runnerUp && `2nd ${champions.runnerUp}`, champions.third && `3rd ${champions.third}`]
                       .filter(Boolean)
                       .map((line, i) => (
-                        <Fragment key={i}>
-                          {i > 0 && " · "}
-                          <span className="whitespace-nowrap">{line}</span>
-                        </Fragment>
+                        <span key={i} className="block">
+                          {line}
+                        </span>
                       ))}
                   </span>
                 )}
@@ -110,10 +110,11 @@ function SeasonTrack({ weeksDone, currentWeek, marker, futureDots, trophy }: Sea
           <span className="relative flex-none">
             <span
               className={cn(
-                "grid size-4 flex-none place-items-center rounded-full border-[1.5px] text-[8.5px] font-semibold",
+                // Eleven weeks and the trophy only fit a 360px phone at 14px.
+                "grid size-3.5 flex-none place-items-center rounded-full border-[1.5px] text-[8.5px] font-semibold min-[380px]:size-4",
                 dot.kind === "done" && "border-primary bg-primary text-primary-foreground",
                 dot.kind === "current" &&
-                  "size-[22px] border-[#fff3c8] bg-primary text-[11px] text-primary-foreground shadow-[0_0_0_3px_rgba(230,197,111,0.22),0_0_14px_rgba(255,220,130,0.6)]",
+                  "size-[22px] border-[#fff3c8] min-[380px]:size-[22px] bg-primary text-[11px] text-primary-foreground shadow-[0_0_0_3px_rgba(230,197,111,0.22),0_0_14px_rgba(255,220,130,0.6)]",
                 dot.kind === "future" && "border-primary/40 bg-black/30"
               )}
             >

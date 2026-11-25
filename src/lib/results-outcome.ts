@@ -8,7 +8,7 @@ export function fanOutcomeBadge(outcome: string, finalPlace?: number | null): { 
   if (outcome === "eliminated") return { label: "Eliminated", className: "bg-muted text-muted-foreground" };
   if (outcome === "withdrawn") return { label: "Withdrew", className: "bg-muted text-muted-foreground" };
   if (outcome === "winner") return { label: "Winner", className: "bg-primary/15 text-accent" };
-  if (outcome === "runner_up") return { label: "Runner-up", className: "bg-primary/15 text-accent" };
+  if (outcome === "runner_up") return { label: "Runner-Up", className: "bg-primary/15 text-accent" };
   if (outcome === "third_place") return { label: "Third Place", className: "bg-primary/15 text-accent" };
   if (outcome === "bye") return { label: "DND", className: "bg-muted text-muted-foreground" };
   return { label: "Safe", className: "bg-emerald/20 text-emerald-text" };

@@ -176,7 +176,7 @@ const STATUS_LABELS: Record<StatusValue, string> = {
   withdrawn: "Withdrawn",
   bye: "Did Not Dance",
   winner: "Winner",
-  runner_up: "Runner-up",
+  runner_up: "Runner-Up",
   third_place: "Third Place",
   fourth_place: "4th Place",
   fifth_place: "5th Place",
@@ -2595,7 +2595,7 @@ export function ResultsForm({
                   {c.status === "winner"
                     ? "Won the season"
                     : c.status === "runner_up"
-                      ? "Runner-up"
+                      ? "Runner-Up"
                       : c.status === "third_place"
                         ? "Third Place"
                         : formatEpisodeCasual(c.elimination_week!)}
