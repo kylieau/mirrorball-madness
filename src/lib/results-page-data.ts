@@ -70,6 +70,8 @@ export type ResultsPageData = {
   // with their latest post time (drives Posted rows and the undo window). A
   // team's row for a couple never makes them posted.
   revealedByEpisode: Record<string, Record<string, string>>;
+  // When each posted own dance of an unpublished week went live, by its live row id.
+  postedAtByDanceId: Record<string, string>;
   // "special" once supabase/apply-special-dances.sql is applied, "entity"
   // with only supabase/apply-team-dance-entity.sql, else "none" (no special
   // dances, no team_id selected).
@@ -229,6 +231,7 @@ export async function loadResultsPageData(
     (episodes ?? []).filter((e) => !e.results_published_at).map((e) => e.id)
   );
   const revealedByEpisode: Record<string, Record<string, string>> = {};
+  const postedAtByDanceId: Record<string, string> = {};
   const teamLiveByTeam: ResultsPageData["teamLiveByTeam"] = {};
   for (const row of liveRows) {
     if (row.team_id) {
@@ -238,6 +241,7 @@ export async function loadResultsPageData(
       continue;
     }
     if (!unpublishedEpisodeIds.has(row.episode_id)) continue;
+    postedAtByDanceId[row.id] = row.created_at;
     const byCouple = (revealedByEpisode[row.episode_id] ??= {});
     if (!byCouple[row.couple_id] || row.created_at > byCouple[row.couple_id]) byCouple[row.couple_id] = row.created_at;
   }
@@ -303,6 +307,7 @@ export async function loadResultsPageData(
     episodeResults: episodeResults ?? [],
     draftsByEpisode,
     revealedByEpisode,
+    postedAtByDanceId,
     teamsMode: teams.mode,
     teamsByEpisode: teams.teamsByEpisode,
     teamMarksByTeam: teams.marksByTeam,

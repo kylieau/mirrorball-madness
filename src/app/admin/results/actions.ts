@@ -19,7 +19,7 @@ import {
   type SeasonSettingsInput,
 } from "@/lib/results-draft";
 import { publishEpisodeAtomically } from "@/lib/episode-publication";
-import { revealCouple, revealTeam, undoReveal, undoTeamReveal } from "@/lib/results-reveal";
+import { revealDance, revealTeam, undoDanceReveal, undoTeamReveal } from "@/lib/results-reveal";
 import { insertScoringJudge, renameScoringJudge, setJudgeArchived } from "@/lib/admin-people";
 import {
   deleteSpecialDance,
@@ -257,26 +257,28 @@ export async function publishEpisodeResults(episodeId: string): Promise<{ error:
   return result;
 }
 
-export async function revealCoupleScores(input: {
+export async function revealDanceScores(input: {
   episodeId: string;
   coupleId: string;
+  slot: number;
 }): Promise<{ error: string | null }> {
   const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
-  const result = await revealCouple(createAdminClient(), input, access.userId);
+  const result = await revealDance(createAdminClient(), input, access.userId);
   if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }
 
-export async function undoCoupleReveal(input: {
+export async function undoDanceScoresReveal(input: {
   episodeId: string;
   coupleId: string;
+  slot: number;
 }): Promise<{ error: string | null }> {
   const access = await requireAdminAccess();
   if (access.error) return { error: access.error };
 
-  const result = await undoReveal(createAdminClient(), input, access.userId);
+  const result = await undoDanceReveal(createAdminClient(), input, access.userId);
   if (!result.error) revalidatePath("/admin/results", "layout");
   return result;
 }

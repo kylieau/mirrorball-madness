@@ -79,6 +79,27 @@ export function buildRevealPlan(snapshot: PublicationSnapshot, episodeId: string
   return { planVersion: PLAN_VERSION, weeklyScores: revealWeeklyScores(snapshot, week, episodeId, before.map(scoringOnly), after) };
 }
 
+// Posting or un-posting one of a couple's own dances: the draft dance in that
+// round slot, which links to the live row its post wrote. The couple's other
+// posted dances and any team row for them stay, as commit_dance_reveal leaves
+// them.
+export function buildDanceRevealPlan(snapshot: PublicationSnapshot, episodeId: string, coupleId: string, slot: number, undo: boolean) {
+  const { week, before } = weekLiveDances(snapshot, episodeId);
+  const dance = snapshot.draftDances.find((row) => row.episode_id === episodeId && row.couple_id === coupleId && row.dance_slot === slot);
+  if (!dance) throw new Error("No saved dance in that round for this couple. Refresh and try again.");
+  if (!week) return { planVersion: PLAN_VERSION, weeklyScores: [] };
+  const liveId = dance.live_dance_score_id;
+  const after: ScoringDance[] = before.filter((row) => !undo || row.id !== liveId).map(scoringOnly);
+  if (undo && !liveId) throw new Error("That dance isn't posted");
+  if (!undo) {
+    if (liveId) throw new Error("That dance is already posted");
+    const scores = snapshot.draftJudges.filter((row) => row.draft_dance_score_id === dance.id).map((row) => Number(row.score));
+    if (!scores.length || scores.some((score) => !Number.isFinite(score) || score < 0 || score > 10)) throw new Error("Complete this dance's judge scores before posting");
+    after.push({ episode_id: episodeId, couple_id: coupleId, total_score: scores.reduce((sum, score) => sum + score, 0), scaled_score: scaledJudgesScore(scores), max_score: null });
+  }
+  return { planVersion: PLAN_VERSION, weeklyScores: revealWeeklyScores(snapshot, week, episodeId, before.map(scoringOnly), after) };
+}
+
 // Posting a special dance replaces its rows for every eligible member (a
 // re-post rewrites a re-scored one in place); un-posting removes them. Dance
 // Card is recomputed for the whole week from what is live, so a couple whose
@@ -93,13 +114,13 @@ export function buildTeamRevealPlan(snapshot: PublicationSnapshot, episodeId: st
   return { planVersion: PLAN_VERSION, weeklyScores: revealWeeklyScores(snapshot, week, episodeId, before.map(scoringOnly), after) };
 }
 
-export async function changeEpisodeReveal(admin: SupabaseClient<Database>, input: { episodeId: string; coupleId: string }, actorId: string, undo: boolean) {
+export async function changeDanceReveal(admin: SupabaseClient<Database>, input: { episodeId: string; coupleId: string; slot: number }, actorId: string, undo: boolean) {
   const { data, error } = await admin.rpc("episode_publication_snapshot", { p_episode_id: input.episodeId });
   if (error) return { error: error.message };
   try {
-    const plan = buildRevealPlan(data as unknown as PublicationSnapshot, input.episodeId, input.coupleId, undo);
-    const result = await admin.rpc("commit_episode_reveal", {
-      p_episode_id: input.episodeId, p_couple_id: input.coupleId, p_actor_id: actorId,
+    const plan = buildDanceRevealPlan(data as unknown as PublicationSnapshot, input.episodeId, input.coupleId, input.slot, undo);
+    const result = await admin.rpc("commit_dance_reveal", {
+      p_episode_id: input.episodeId, p_couple_id: input.coupleId, p_slot: input.slot, p_actor_id: actorId,
       p_snapshot: data, p_plan: plan as unknown as Json, p_undo: undo,
     });
     return { error: result.error?.message ?? null };

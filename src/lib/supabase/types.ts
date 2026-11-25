@@ -523,6 +523,7 @@ export type Database = {
           dance_style_id: string
           episode_id: string
           id: string
+          live_dance_score_id: string | null
           scaled_score: number
           song_title: string | null
           total_score: number
@@ -534,6 +535,7 @@ export type Database = {
           dance_style_id: string
           episode_id: string
           id?: string
+          live_dance_score_id?: string | null
           scaled_score?: number
           song_title?: string | null
           total_score?: number
@@ -545,6 +547,7 @@ export type Database = {
           dance_style_id?: string
           episode_id?: string
           id?: string
+          live_dance_score_id?: string | null
           scaled_score?: number
           song_title?: string | null
           total_score?: number
@@ -569,6 +572,13 @@ export type Database = {
             columns: ["episode_id"]
             isOneToOne: false
             referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_dance_scores_live_dance_score_id_fkey"
+            columns: ["live_dance_score_id"]
+            isOneToOne: false
+            referencedRelation: "dance_scores"
             referencedColumns: ["id"]
           },
         ]
@@ -3153,6 +3163,18 @@ export type Database = {
       }
       close_grand_finale_late: {
         Args: { p_league_id: string; p_manager_id: string }
+        Returns: undefined
+      }
+      commit_dance_reveal: {
+        Args: {
+          p_actor_id: string
+          p_couple_id: string
+          p_episode_id: string
+          p_plan: Json
+          p_slot: number
+          p_snapshot: Json
+          p_undo: boolean
+        }
         Returns: undefined
       }
       commit_episode_publication: {

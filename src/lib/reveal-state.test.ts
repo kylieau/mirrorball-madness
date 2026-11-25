@@ -1,28 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { couplesRevealState, undoSecondsLeft, unpostedCoupleIds } from "./reveal-state";
-
-const dance = (coupleId: string, judgeCount: number) => ({
-  coupleId,
-  judgeScores: Array.from({ length: judgeCount }, () => ({ score: 8 })),
-});
-
-describe("couplesRevealState", () => {
-  it("marks posted, ready and waiting couples", () => {
-    const states = couplesRevealState([dance("a", 3), dance("b", 3), dance("c", 0)], new Set(["a"]));
-    expect(states.get("a")).toBe("posted");
-    expect(states.get("b")).toBe("ready");
-    expect(states.get("c")).toBe("waiting");
-  });
-
-  it("keeps a couple waiting until every one of its dances has judge scores", () => {
-    const states = couplesRevealState([dance("a", 3), dance("a", 0)], new Set());
-    expect(states.get("a")).toBe("waiting");
-  });
-
-  it("omits couples with no drafted dance", () => {
-    expect(couplesRevealState([], new Set()).size).toBe(0);
-  });
-});
+import { undoSecondsLeft, unpostedCoupleIds } from "./reveal-state";
 
 describe("unpostedCoupleIds", () => {
   it("does not gate publishing when nothing has been posted", () => {

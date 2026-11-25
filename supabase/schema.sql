@@ -2458,8 +2458,13 @@ create table draft_dance_scores (
   -- Which of the couple's own rounds this is (1 = Round 1), so a later
   -- round saved before an earlier one reloads into its own slot. Null for a
   -- copy of a live dance, which loads in saved order.
-  dance_slot smallint check (dance_slot between 1 and 12)
+  dance_slot smallint check (dance_slot between 1 and 12),
+  -- The live dance_scores row this dance's post wrote, so each dance posts
+  -- and un-posts on its own (apply-per-dance-publish.sql).
+  live_dance_score_id uuid references dance_scores(id) on delete set null
 );
+create unique index draft_dance_scores_live_dance_score_id_key
+  on draft_dance_scores (live_dance_score_id) where live_dance_score_id is not null;
 
 create table draft_judge_scores (
   id uuid primary key default gen_random_uuid(),

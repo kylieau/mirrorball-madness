@@ -4,8 +4,8 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { useRouter } from "next/navigation";
 import {
   saveEpisodeDraft,
-  revealCoupleScores,
-  undoCoupleReveal,
+  revealDanceScores,
+  undoDanceScoresReveal,
   publishEpisodeResults,
   releaseDraftCoupleAction,
   startEpisodeCorrection,
@@ -93,7 +93,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DraftSaveQueue } from "@/lib/draft-save-queue";
-import { couplesRevealState, undoSecondsLeft } from "@/lib/reveal-state";
+import { undoSecondsLeft } from "@/lib/reveal-state";
 import { isValidMark } from "@/lib/judge-marks";
 import { buildPeopleDisplayNames, formatCoupleName, type CoupleNameParts } from "@/lib/couple-display";
 import { CoupleName, coupleNameNode } from "@/components/couple-name";
@@ -306,6 +306,7 @@ export function ResultsForm({
   weeks,
   draftsByEpisode,
   revealedByEpisode,
+  postedAtByDanceId,
   releasedCoupleIdsByEpisode,
   releasedTeamIdsByEpisode,
   forceSelectEpisodeId,
@@ -335,6 +336,7 @@ export function ResultsForm({
   weeks: CompetitionWeek[];
   draftsByEpisode: Record<string, DraftState>;
   revealedByEpisode: Record<string, Record<string, string>>;
+  postedAtByDanceId: Record<string, string>;
   releasedCoupleIdsByEpisode: Record<string, string[]>;
   releasedTeamIdsByEpisode: Record<string, string[]>;
   // From /admin/results/enter?episode= (Scores' "Continue in Enter Results"),
@@ -617,17 +619,22 @@ export function ResultsForm({
     ? deriveResultsStatus({ results_published_at: selectedEpisode.results_published_at }, hasDraft, revealedCoupleIds.size > 0)
     : null;
 
-  // Super admins publish a couple at a time; everyone else only saves drafts.
+  // Super admins publish a dance at a time; everyone else only saves drafts.
   const publishPerCouple = canPublish && !!selectedEpisode && !published;
-  const revealStates = couplesRevealState(
-    episodeCouples.flatMap((c) =>
-      (rows[c.id] ?? emptyRow()).dances
-        .filter((d) => d.danceStyleId)
-        .map((d) => ({ coupleId: c.id, judgeScores: Object.values(d.scores).filter((v) => v !== "").map((v) => ({ score: Number(v) })) }))
-    ),
-    revealedCoupleIds
+  const danceScored = (d: RowDance) => Object.values(d.scores).some((v) => v !== "") && judgesForDance(d).every((j) => (d.scores[j.id] ?? "") !== "");
+  // Which dances are posted comes from page data by couple and round slot, not
+  // from rows: a post doesn't rehydrate rows, and saves give unposted drafts
+  // new ids.
+  const liveIdBySlot = new Map(
+    (published ? [] : (draftsByEpisode[selectedEpisode?.id ?? ""]?.dances ?? [])).flatMap((d) =>
+      d.liveId && d.slot != null ? [[`${d.coupleId}:${d.slot}`, d.liveId] as const] : []
+    )
   );
-  const unpostedCount = revealStates.size - episodeCouples.filter((c) => revealStates.get(c.id) === "posted").length;
+  const liveIdOf = (coupleId: string, slot: number) => liveIdBySlot.get(`${coupleId}:${slot}`) ?? null;
+  const unpostedCount = episodeCouples.reduce(
+    (count, c) => count + (rows[c.id] ?? emptyRow()).dances.filter((d, i) => d.danceStyleId && !liveIdOf(c.id, i + 1)).length,
+    0
+  );
 
   const scoredCouples = episodeCouples.filter((c) =>
     (rows[c.id] ?? emptyRow()).dances.some((d) => Object.values(d.scores).some((v) => v !== ""))
@@ -989,7 +996,7 @@ export function ResultsForm({
     setByCoupleSelectedId(ADD_SPECIAL_VALUE);
   }
 
-  async function handlePublishCouple(coupleId: string) {
+  async function handlePublishDance(coupleId: string, slot: number) {
     try {
       if (!selectedEpisode) return;
       setError(null);
@@ -1000,7 +1007,7 @@ export function ResultsForm({
         setRevealBusy(false);
         return;
       }
-      const result = await revealCoupleScores({ episodeId: selectedEpisode.id, coupleId });
+      const result = await revealDanceScores({ episodeId: selectedEpisode.id, coupleId, slot });
       if (result.error) {
         setError(result.error);
       } else {
@@ -1014,12 +1021,12 @@ export function ResultsForm({
     }
   }
 
-  async function handleUndoReveal(coupleId: string) {
+  async function handleUndoDance(coupleId: string, slot: number) {
     try {
       if (!selectedEpisode) return;
       setError(null);
       setRevealBusy(true);
-      const result = await undoCoupleReveal({ episodeId: selectedEpisode.id, coupleId });
+      const result = await undoDanceScoresReveal({ episodeId: selectedEpisode.id, coupleId, slot });
       if (result.error) {
         setError(result.error);
       } else {
@@ -1824,22 +1831,40 @@ export function ResultsForm({
   const openPickerTeams = pickerTeams.filter((v) => !v.dance.postedAt);
   const postedPickerTeams = pickerTeams.filter((v) => v.dance.postedAt);
 
+  function renderDancePublish(coupleId: string, d: RowDance, slot: number) {
+    const liveId = liveIdOf(coupleId, slot);
+    if (liveId) {
+      const postedAt = postedAtByDanceId[liveId];
+      const undoLeft = nowMs !== null && postedAt ? undoSecondsLeft(postedAt, nowMs) : 0;
+      return (
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge>Published</Badge>
+          <Button size="sm" variant="ghost" className="text-danger-text" disabled={revealBusy} onClick={() => void handleUndoDance(coupleId, slot)}>
+            {undoLeft > 0 ? `Undo · ${undoLeft}s` : "Un-Post"}
+          </Button>
+        </div>
+      );
+    }
+    const scored = danceScored(d);
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" disabled={!scored || savingDraft || revealBusy} onClick={() => void handlePublishDance(coupleId, slot)}>
+          {revealBusy ? "Publishing…" : "Publish"}
+        </Button>
+        {!scored && <p className="text-xs text-muted-foreground">Enter every judge&apos;s score to publish this dance.</p>}
+      </div>
+    );
+  }
+
   function renderDanceEntry(c: Couple, rank?: number, slot: number | null = showLeaderboard ? null : activeSlot) {
     const row = rows[c.id] ?? emptyRow();
     const coupleExceptions = exceptions.filter((x) => x.coupleId === c.id);
-    const revealState = publishPerCouple ? revealStates.get(c.id) : undefined;
     // Once officially published, every couple's draft is already fully
     // editable underneath (see the correction-seed effect) -- this just
     // narrows which one the UI lets you touch, read-only by default.
     const correctionLocked = published && (!canPublish || !unlockedForCorrectionCoupleIds.has(c.id));
-    const locked = published ? correctionLocked : revealState === "posted";
-    const postedAtIso = revealedAtByCouple[c.id];
-    const undoLeft = nowMs !== null && postedAtIso ? undoSecondsLeft(postedAtIso, nowMs) : 0;
-    const publishBlocker = row.dances.filter((d) => d.danceStyleId).length === 0
-      ? "Pick a dance style to publish."
-      : revealState === "waiting"
-        ? "Enter every dance's judge scores to publish."
-        : null;
+    const locked = published && correctionLocked;
+    const coupleHasPosted = revealedCoupleIds.has(c.id);
     return (
       <div key={c.id} className="rounded-xl border border-border p-2.5">
         <p className="text-sm font-semibold">
@@ -1857,6 +1882,7 @@ export function ResultsForm({
           )}
           {row.dances.map((d, i) => slot != null && i !== slot ? null : (
             <div key={d.key} className="flex flex-col gap-1.5 rounded-lg bg-muted/50 p-1.5">
+              <fieldset disabled={!!liveIdOf(c.id, i + 1)} className="flex min-w-0 flex-col gap-1.5">
               <div className="flex flex-wrap items-end gap-1.5">
                 <Select
                   items={danceStyleItems}
@@ -1902,6 +1928,8 @@ export function ResultsForm({
                   {d.songTitle.trim() ? "Pick a dance style to save this dance." : "Pick a dance style to enter scores."}
                 </p>
               )}
+              </fieldset>
+              {publishPerCouple && d.danceStyleId && renderDancePublish(c.id, d, i + 1)}
             </div>
           ))}
         </fieldset>
@@ -1971,18 +1999,8 @@ export function ResultsForm({
         {!published && (
           <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
             <div className="flex flex-wrap items-center gap-2">
-              {locked ? (
-                <>
-                  <Badge>Posted</Badge>
-                  <Button
-                    variant="ghost"
-                    className="text-danger-text"
-                    disabled={revealBusy}
-                    onClick={() => void handleUndoReveal(c.id)}
-                  >
-                    {undoLeft > 0 ? `Undo · ${undoLeft}s` : "Un-Post"}
-                  </Button>
-                </>
+              {coupleHasPosted ? (
+                <Badge>Posted</Badge>
               ) : (
                 <>
                   {releasedCoupleIds.has(c.id) ? (
@@ -2006,22 +2024,14 @@ export function ResultsForm({
                       {releasing ? "Saving…" : "Save as Draft Score"}
                     </Button>
                   )}
-                  {publishPerCouple && (
-                    <Button
-                      disabled={!!publishBlocker || savingDraft || revealBusy}
-                      onClick={() => void handlePublishCouple(c.id)}
-                    >
-                      {revealBusy ? "Publishing…" : "Publish"}
-                    </Button>
-                  )}
                 </>
               )}
             </div>
-            {!locked && (
-              <p className="text-[11px] text-muted-foreground">
-                Draft stays on this couple until you publish. In progress → Drafted → Published.
-              </p>
-            )}
+            <p className="text-[11px] text-muted-foreground">
+              {coupleHasPosted
+                ? "Publish each dance as it airs. A posted dance locks; Un-Post it to edit."
+                : "Draft stays on this couple until you publish. In progress → Drafted → Published."}
+            </p>
           </div>
         )}
 
@@ -2485,7 +2495,7 @@ export function ResultsForm({
                       show called down who stayed. That list is what Curtain Call uses — it is not taken from the
                       scores.
                       {publishPerCouple && revealedCoupleIds.size > 0 && unpostedCount > 0
-                        ? ` ${unpostedCount} ${unpostedCount === 1 ? "couple is" : "couples are"} still to publish.`
+                        ? ` ${unpostedCount} ${unpostedCount === 1 ? "dance is" : "dances are"} still to publish.`
                         : ""}
                     </CardDescription>
                   </CardHeader>

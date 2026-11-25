@@ -38,6 +38,8 @@ export type DraftDanceState = {
   id: string;
   coupleId: string;
   slot: number | null;
+  // The live dance_scores row this dance's post wrote, null until posted.
+  liveId: string | null;
   danceStyleId: string;
   songTitle: string | null;
   judgeScores: DraftJudgeScoreInput[];
@@ -115,7 +117,7 @@ export async function loadDraftForEpisode(
       admin.from("draft_episode_overrides").select("*").eq("episode_id", episodeId).maybeSingle(),
       admin
         .from("draft_dance_scores")
-        .select("id, couple_id, dance_slot, dance_style_id, song_title, draft_judge_scores(judge_id, score)")
+        .select("id, couple_id, dance_slot, live_dance_score_id, dance_style_id, song_title, draft_judge_scores(judge_id, score)")
         .eq("episode_id", episodeId),
       admin.from("draft_episode_results").select("*").eq("episode_id", episodeId),
       admin.from("draft_episode_in_jeopardy_couples").select("couple_id").eq("episode_id", episodeId),
@@ -136,6 +138,7 @@ export async function loadDraftForEpisode(
       id: d.id,
       coupleId: d.couple_id,
       slot: d.dance_slot,
+      liveId: d.live_dance_score_id,
       danceStyleId: d.dance_style_id,
       songTitle: d.song_title,
       judgeScores: (d.draft_judge_scores ?? []).map((js) => ({ judgeId: js.judge_id, score: js.score })),
