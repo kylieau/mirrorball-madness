@@ -15,6 +15,16 @@ and Season at a Glance on production, the Home wrap banner on the dev server.
 - Next season: the wrap ends once another season is active; check the banner
   and cards switch back when S36 is set up.
 
+## League creation window — next season (Kylie, 2026-11-25)
+
+Nobody can create a league unless a site admin has opened a creation window
+for the active season; with no active season it is always closed. The admin
+opens it before the premiere and closes it (around Week 2). Today
+`create_league` ties a new league to whatever season is active, so a league
+made between seasons belongs to the finished one. Mock the Create a League
+states first. Open question: whether joining follows the same window or
+stays open until that league drafts.
+
 ## Lifeline on any open spot — 2026-11-20
 
 Built 2026-11-19/20 (CLAUDE.md describes it): Lifeline covers a spot with no
