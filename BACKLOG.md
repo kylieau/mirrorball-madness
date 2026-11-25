@@ -22,8 +22,8 @@ private to Kylie). Codex read the repo; only the Reset Draft and Grand Finale
 items were spot-checked, and none has been rehearsed in a two-season test.
 - P1, act now: Reset Draft (League Settings, any drafted league) deletes the
   league's scores, rosters, draft picks, claims and departures for every
-  season; Lifeline payouts and adjustments survive. Commissioners asked not
-  to use it before S36; needs a season-scoped guard.
+  season; Lifeline payouts and adjustments survive. Ask commissioners not to
+  use it before S36; needs a season-scoped guard.
 - P1: no redraft path that keeps history (`draft_status` stays completed
   across seasons; Reset Draft is the only way back).
 - P1: roster rows are matched by week number with no season filter (league
