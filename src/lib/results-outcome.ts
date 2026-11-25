@@ -1,7 +1,10 @@
 // Fan Results badges. In Jeopardy is a second, additive pill shown alongside
 // Safe, never in place of it — an elimination, withdrawal, bye, or podium
-// finish keeps its own label regardless of a stale mark on the row.
-export function fanOutcomeBadge(outcome: string): { label: string; className: string } {
+// finish keeps its own label regardless of a stale mark on the row. A Finale
+// finalist placed 4th or 5th is stored as Eliminated with a place, but never
+// went home, so it reads as its place.
+export function fanOutcomeBadge(outcome: string, finalPlace?: number | null): { label: string; className: string } {
+  if (outcome === "eliminated" && finalPlace) return { label: `${finalPlace}th Place`, className: "bg-primary/15 text-accent" };
   if (outcome === "eliminated") return { label: "Eliminated", className: "bg-muted text-muted-foreground" };
   if (outcome === "withdrawn") return { label: "Withdrew", className: "bg-muted text-muted-foreground" };
   if (outcome === "winner") return { label: "Winner", className: "bg-primary/15 text-accent" };

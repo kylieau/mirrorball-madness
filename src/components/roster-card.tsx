@@ -38,6 +38,8 @@ const TAG_INFO: Record<RosterWeeklyTag, { label: string; className: string }> = 
   eliminated: { label: "Eliminated", className: "bg-muted text-muted-foreground" },
   traded: { label: "Traded", className: "bg-muted text-muted-foreground" },
   dropped: { label: "Dropped", className: "bg-muted text-muted-foreground" },
+  fourth_place: { label: "4th Place", className: "bg-primary/15 text-accent" },
+  fifth_place: { label: "5th Place", className: "bg-primary/15 text-accent" },
 };
 
 export function RosterCard({

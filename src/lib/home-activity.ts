@@ -35,6 +35,9 @@ export type ActivityWeek = {
   // home has results to hold back during the West feed.
   resultsIn?: boolean;
   eliminated: ActivityCouple[];
+  // The Finale's finishers: the podium and Finish Week's 4th and 5th, who
+  // never went home.
+  finished?: (ActivityCouple & { place: number })[];
   scores: ActivityScore[];
   rankMoves?: ActivityRankMove[];
   transactions?: ActivityTransaction[];
@@ -83,6 +86,20 @@ export type ActivityLine = { key: string; segments: ActivitySegment[]; weekLabel
 // "results are in" line until that window ends, and so do that week's
 // overtakes (published points carry survival and Curtain Call) and roster
 // moves, while posted scores still show.
+const FINISH_PLACE: Partial<Record<string, number>> = { winner: 1, runner_up: 2, third_place: 3 };
+
+// One result row into its week: a Finale finisher gets a place line, anyone
+// else Eliminated goes home.
+export function addActivityOutcome(
+  week: ActivityWeek,
+  row: { couple_id: string; outcome: string; final_place?: number | null },
+  name: string
+) {
+  const place = FINISH_PLACE[row.outcome] ?? (row.outcome === "eliminated" ? row.final_place : null);
+  if (place) (week.finished ??= []).push({ coupleId: row.couple_id, name, place });
+  else if (row.outcome === "eliminated") week.eliminated.push({ coupleId: row.couple_id, name });
+}
+
 export function buildRecentActivity({
   weeks,
   westWeek,
@@ -96,7 +113,7 @@ export function buildRecentActivity({
 
   for (const week of [...weeks].sort((a, b) => b.weekNumber - a.weekNumber)) {
     const weekLabel = formatEpisodeCasual(week.weekNumber);
-    if (week.weekNumber === westWeek && (week.resultsIn || week.eliminated.length > 0)) {
+    if (week.weekNumber === westWeek && (week.resultsIn || week.eliminated.length > 0 || (week.finished?.length ?? 0) > 0)) {
       lines.push({ key: `w${week.weekNumber}-hidden`, segments: [{ text: `${weekLabel} results are in` }], weekLabel: null });
     } else {
       (week.transactions ?? []).forEach((transaction, i) =>
@@ -106,6 +123,13 @@ export function buildRecentActivity({
       // came after the night's scores.
       (week.rankMoves ?? []).forEach((move, i) =>
         lines.push({ key: `w${week.weekNumber}-rank-${i}`, segments: rankMoveSegments(move), weekLabel })
+      );
+      [...(week.finished ?? [])].sort((a, b) => a.place - b.place).forEach(({ coupleId, name, place }) =>
+        lines.push({
+          key: `w${week.weekNumber}-place-${place}-${coupleId}`,
+          segments: [{ text: name, kind: "couple", coupleId }, { text: place === 1 ? " won the Mirrorball Trophy" : ` finished ${ordinal(place)}` }],
+          weekLabel,
+        })
       );
       week.eliminated.forEach(({ coupleId, name }, i) =>
         lines.push({ key: `w${week.weekNumber}-elim-${i}`, segments: [{ text: name, kind: "couple", coupleId }, { text: " eliminated" }], weekLabel })

@@ -7,7 +7,10 @@ export type EpisodeBannerState =
   | { kind: "results_soon"; weekNumber: number }
   | { kind: "results_in"; weekNumber: number }
   | { kind: "west_soon"; weekNumber: number; westStartIso: string }
-  | { kind: "west_watching"; weekNumber: number };
+  | { kind: "west_watching"; weekNumber: number }
+  // The week marked Finale is published: the season's resting state until the
+  // next season is scheduled (no 7-day hold).
+  | { kind: "season_wrap"; weekNumber: number };
 
 // Matches the episodes.duration_minutes column default.
 export const DEFAULT_EPISODE_DURATION_MINUTES = 120;
@@ -165,6 +168,8 @@ export type SeasonTrackModel = {
   // "now" while that week is on air or awaiting results, "next" while it is still to come.
   marker: "now" | "next";
   futureDots: number;
+  // The season is over: a trophy ends the track.
+  trophy?: boolean;
 };
 
 // Without a week marked Finale the season's length is unknown, so the track
@@ -184,6 +189,10 @@ function futureDots(weeks: BannerWeek[], lastShownWeek: number, weeksDone: numbe
 // weeks are checked. Once that week is fully published (Results in) it is
 // checked too, and the circle moves on to the next week.
 export function seasonTrack(weeks: BannerWeek[], state: EpisodeBannerState): SeasonTrackModel {
+  if (state.kind === "season_wrap") {
+    const weeksDone = weeks.filter((week) => week.weekNumber <= state.weekNumber && isComplete(week)).length;
+    return { weeksDone, currentWeek: null, marker: "next", futureDots: 0, trophy: true };
+  }
   if (state.kind !== "results_in") {
     const weeksDone = weeks.filter((week) => week.weekNumber < state.weekNumber && isComplete(week)).length;
     return {
@@ -226,6 +235,7 @@ export function computeEpisodeBannerState(
   const heldFor = (holdMs: number) => !!publishedAt && now.getTime() < publishedAt.getTime() + holdMs;
 
   if (liveIndex === -1) {
+    if (lastCompleted?.isFinale) return { kind: "season_wrap", weekNumber: lastCompleted.weekNumber };
     return lastCompleted && heldFor(FINAL_RESULTS_HOLD_MS)
       ? { kind: "results_in", weekNumber: lastCompleted.weekNumber }
       : null;

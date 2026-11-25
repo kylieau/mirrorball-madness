@@ -12,6 +12,7 @@ import {
 } from "@/lib/episode-banner";
 import { formatAirsAt } from "@/lib/format-airs";
 import { formatEpisodeCasual } from "@/lib/format-week";
+import type { SeasonChampions } from "@/lib/season-wrap";
 
 // Longer titles step down in size; the curtain grows when text wraps.
 const SHORT_TITLE_MAX = 12;
@@ -25,7 +26,7 @@ const LETS_DANCE = "💃Let's Dance🕺";
 
 // Chip = where the broadcast is, title = what the league can do, sub = what
 // changes next. Times are viewer-local, so the labels arrive after mount.
-function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
+function statusCopy(state: EpisodeBannerState, timeLabel: string, champions: SeasonChampions | null): BannerCopy {
   // The sub wraps on phones; the time stays in one piece so the zone is never
   // stranded on its own line, and the dot stays on the first line.
   const at = (prefix: string) =>
@@ -63,10 +64,36 @@ function statusCopy(state: EpisodeBannerState, timeLabel: string): BannerCopy {
       return { chip: "Curtain Closed", title: "Results Soon", sub: "Tallying the scores", live: false };
     case "results_in":
       return { chip: "That's a Wrap", title: "Scores Are In", sub: "See where everyone landed", live: false };
+    case "season_wrap":
+      // A viewer who hasn't watched the Finale gets the wrap without names.
+      return champions
+        ? {
+            chip: "That's a Wrap",
+            title: champions.winner,
+            sub: (
+              <>
+                🪩 Mirrorball Champions
+                {(champions.runnerUp || champions.third) && (
+                  <span className="mt-0.5 block text-xs text-foreground/80">
+                    {[champions.runnerUp && `2nd ${champions.runnerUp}`, champions.third && `3rd ${champions.third}`]
+                      .filter(Boolean)
+                      .map((line, i) => (
+                        <Fragment key={i}>
+                          {i > 0 && " · "}
+                          <span className="whitespace-nowrap">{line}</span>
+                        </Fragment>
+                      ))}
+                  </span>
+                )}
+              </>
+            ),
+            live: false,
+          }
+        : { chip: "That's a Wrap", title: "Season Complete", sub: "Mark the Finale watched to see who won", live: false };
   }
 }
 
-function SeasonTrack({ weeksDone, currentWeek, marker, futureDots }: SeasonTrackModel) {
+function SeasonTrack({ weeksDone, currentWeek, marker, futureDots, trophy }: SeasonTrackModel) {
   const dots = [
     ...Array.from({ length: weeksDone }, () => ({ kind: "done" as const, label: "✓" })),
     ...(currentWeek === null ? [] : [{ kind: "current" as const, label: String(currentWeek) }]),
@@ -102,11 +129,12 @@ function SeasonTrack({ weeksDone, currentWeek, marker, futureDots }: SeasonTrack
             className={cn(
               "h-0.5 min-w-[3px] flex-1",
               i < weeksDone ? "bg-primary" : "bg-primary/30",
-              i === dots.length - 1 && "bg-linear-to-r from-primary/30 to-transparent"
+              i === dots.length - 1 && !trophy && "bg-linear-to-r from-primary/30 to-transparent"
             )}
           />
         </Fragment>
       ))}
+      {trophy && <span className="flex-none text-sm leading-none">🏆</span>}
     </div>
   );
 }
@@ -114,9 +142,12 @@ function SeasonTrack({ weeksDone, currentWeek, marker, futureDots }: SeasonTrack
 export function EpisodeBanner({
   input,
   initialState,
+  champions = null,
 }: {
   input: EpisodeBannerInput;
   initialState: EpisodeBannerState | null;
+  // The season wrap's podium, null for a viewer who hasn't watched the Finale.
+  champions?: SeasonChampions | null;
 }) {
   // The state moves with the clock, so it is re-derived here rather than only
   // at render time on the server. The first paint uses the server's state to
@@ -146,7 +177,7 @@ export function EpisodeBanner({
   if (!state) return null;
 
   const track = seasonTrack(input.weeks, state);
-  const { chip, title, sub, live } = statusCopy(state, timeLabel);
+  const { chip, title, sub, live } = statusCopy(state, timeLabel, champions);
   const weekLabel = formatEpisodeCasual(state.weekNumber);
 
   return (

@@ -56,6 +56,8 @@ export type CoupleHistoryWeek = {
   theme: string | null;
   mode: "results" | "scores";
   outcome: string | null;
+  // 4 or 5 for a Finale finalist (still stored as Eliminated).
+  finalPlace: number | null;
   inJeopardy: boolean;
   nights: CoupleHistoryNight[];
 };
@@ -82,7 +84,7 @@ export function buildCoupleHistory(input: {
   // legacy or bonus-only night) comes from the whole episode, as in scoring.
   episodeDances: DanceScore[];
   marks: { danceId: string; judge: string; score: number }[];
-  outcomes: { episode_id: string; couple_id: string; outcome: string }[];
+  outcomes: { episode_id: string; couple_id: string; outcome: string; final_place?: number | null }[];
   inJeopardyEpisodeIds: ReadonlySet<string>;
   teamDanceEpisodes: ReadonlySet<string>;
   labels: ReadonlyMap<string, SpecialDanceLabelInput>;
@@ -140,6 +142,7 @@ export function buildCoupleHistory(input: {
       theme: week.theme,
       mode: week.mode,
       outcome: merged?.outcome ?? null,
+      finalPlace: merged?.final_place ?? null,
       inJeopardy: results && week.episodeIds.some((id) => input.inJeopardyEpisodeIds.has(id)),
       nights,
     });

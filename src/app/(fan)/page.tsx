@@ -1,3 +1,4 @@
+import { finaleStillAiring } from "@/lib/season-wrap";
 import { redirect } from "next/navigation";
 import { cn } from "cn";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
@@ -8,7 +9,8 @@ import { loadHomeLeagueData } from "@/lib/home-league-data";
 import { getAccountSettingsData } from "@/lib/account-settings-data";
 import { computeEpisodeBannerState, toBannerWeeks, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
-import { activityScore, buildRecentActivity, type ActivityDanceRow, type ActivityWeek } from "@/lib/home-activity";
+import { loadSeasonChampions } from "@/lib/season-wrap-data";
+import { activityScore, addActivityOutcome, buildRecentActivity, type ActivityDanceRow, type ActivityWeek } from "@/lib/home-activity";
 import { homeTransactions } from "@/lib/home-transactions";
 import { danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
 import { SpoilerFreeStrip } from "@/components/spoiler-free-strip";
@@ -105,7 +107,7 @@ export default async function Home() {
             .in("episode_id", visibleEpisodeIds)
         : Promise.resolve({ data: [] }),
       visibleEpisodeIds.length > 0
-        ? supabase.from("episode_results").select("episode_id, couple_id, outcome").in("episode_id", visibleEpisodeIds)
+        ? supabase.from("episode_results").select("episode_id, couple_id, outcome, final_place").in("episode_id", visibleEpisodeIds)
         : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
       loadSpecialDanceLabels(supabase, [...visibleEpisodeIds, ...draftEpisodeIds], teamsMode),
       loadAllCouples(supabase),
@@ -184,7 +186,7 @@ export default async function Home() {
       const parts = displayNames.get(r.couple_id);
       const week = activityWeeks.get(weekNumberByEpisodeId.get(r.episode_id) ?? -1);
       if (week) week.resultsIn = true;
-      if (r.outcome === "eliminated" && parts && week) week.eliminated.push({ coupleId: r.couple_id, name: formatCoupleName(parts) });
+      if (parts && week) addActivityOutcome(week, r, formatCoupleName(parts));
     }
     const liveDanceScores = excludeReleasedCoupleRows(danceScores, draftNight?.releasedCoupleIdsByEpisode ?? {});
     for (const d of liveDanceScores) {
@@ -241,6 +243,11 @@ export default async function Home() {
   const draftVisible = homeStripChoice(!!draftNight, !!spoilerFreeStrip) === "draft";
 
   const moduleInputs = await moduleInputsPending;
+  // Loaded whatever the banner's state, so a page left open past the West
+  // feed's end still names the champions when it turns to the wrap. Non-null
+  // once this viewer has watched the Finale, which also turns every league
+  // card to its final result.
+  const champions = await loadSeasonChampions(supabase, activeSeasonId, cutoff.effectiveLatestEpisode?.week_number ?? null, finaleWeekNumber);
   const leagues: LeagueTriage[] = summaries.map((s, i) => ({
     id: s.id,
     name: s.name,
@@ -252,6 +259,8 @@ export default async function Home() {
     weeksBehind,
     from: "/",
     modules: moduleInputs.get(s.id)!,
+    // A league that never scored has no final result to show.
+    final: champions && !finaleStillAiring(groupedWeeks) && s.topStandings.some((t) => t.points > 0) ? { topStandings: s.topStandings } : null,
   }));
 
   const episodeBannerInput: EpisodeBannerInput = {
@@ -286,7 +295,7 @@ export default async function Home() {
     <HomeDashboard
       leagues={leagues}
       recentActivity={recentActivity}
-      episodeBanner={{ input: episodeBannerInput, initialState: episodeBannerState }}
+      episodeBanner={{ input: episodeBannerInput, initialState: episodeBannerState, champions }}
     />
   );
 

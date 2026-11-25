@@ -1,3 +1,4 @@
+import type { SeasonChampions } from "@/lib/season-wrap";
 import Link from "next/link";
 import { cn } from "cn";
 import { Card } from "@/components/ui/card";
@@ -19,7 +20,7 @@ export function HomeDashboard({
 }: {
   leagues: LeagueTriage[];
   recentActivity: ActivityLine[];
-  episodeBanner: { input: EpisodeBannerInput; initialState: EpisodeBannerState | null };
+  episodeBanner: { input: EpisodeBannerInput; initialState: EpisodeBannerState | null; champions?: SeasonChampions | null };
   guest?: boolean;
 }) {
   const shownLeagues = [...leagues].sort((a, b) => Number(b.picksDue) - Number(a.picksDue));

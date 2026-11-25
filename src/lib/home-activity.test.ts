@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activityScore, buildRecentActivity, type ActivityLine, type ActivityWeek } from "./home-activity";
+import { activityScore, addActivityOutcome, buildRecentActivity, type ActivityLine, type ActivityWeek } from "./home-activity";
 
 const plain = (line: ActivityLine) => line.segments.map((seg) => seg.text).join("");
 
@@ -226,5 +226,17 @@ describe("activityScore", () => {
     expect(immune).toMatchObject({ danceStyle: "Dance-Off Immunity", immunity: true });
     const lines = buildRecentActivity({ weeks: [week(9, { scores: [immune] })], westWeek: null, extraLines: [] });
     expect(lines.map(plain)).toEqual(["Harry earned +3 with Dance-Off Immunity"]);
+  });
+});
+
+describe("the Finale's finishers", () => {
+  it("names the winner and each place, and never calls 4th or 5th eliminated", () => {
+    const week: ActivityWeek = { weekNumber: 11, eliminated: [], scores: [] };
+    addActivityOutcome(week, { couple_id: "m", outcome: "eliminated", final_place: 5 }, "Maura & Mark");
+    addActivityOutcome(week, { couple_id: "e", outcome: "winner" }, "Ezra & Daniella");
+    addActivityOutcome(week, { couple_id: "t", outcome: "eliminated", final_place: 4 }, "Tatyana & Jan");
+    addActivityOutcome(week, { couple_id: "h", outcome: "eliminated" }, "Harry & Jenna");
+    const text = buildRecentActivity({ weeks: [week], westWeek: null, extraLines: [] }).map((l) => l.segments.map((s) => s.text).join(""));
+    expect(text).toEqual(["Ezra & Daniella won the Mirrorball Trophy", "Tatyana & Jan finished 4th", "Maura & Mark finished 5th", "Harry & Jenna eliminated"]);
   });
 });

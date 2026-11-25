@@ -4,7 +4,7 @@ import { buildCoupleDisplayNames } from "@/lib/couple-display";
 import { nextPredictedElimination } from "@/lib/grand-finale-pins";
 import type { LeagueHomeSummary } from "@/lib/league-home-summary";
 import { danceCardRosterNames, mapRosterMoveCouples, type ModuleStackInput } from "@/lib/league-triage";
-import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
+import { isPlacedFinalist, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { loadAllCouples } from "@/lib/viewer-season-data";
 
 const OUT_STATUSES = new Set(["eliminated", "withdrawn"]);
@@ -88,13 +88,14 @@ export async function loadModuleStackInputs(
                 id: c.id,
                 celebrityName: c.celebrity?.name ?? "Unknown",
                 proName: c.pro?.name ?? "Unknown",
-                out: OUT_STATUSES.has(
-                  spoilerSafeCoupleStatus(
+                out: (() => {
+                  const status = spoilerSafeCoupleStatus(
                     { status: c.status, eliminationWeek: c.elimination_week },
                     context.spoilerCutoffWeek,
                     context.finaleWeekNumber
-                  )
-                ),
+                  );
+                  return OUT_STATUSES.has(status) && !isPlacedFinalist(status, c.final_place);
+                })(),
               }))
             ),
             moves: {

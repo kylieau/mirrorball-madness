@@ -3,6 +3,8 @@ export type PinnableCouple = {
   celebrity_name: string;
   status: string;
   elimination_week: number | null;
+  // 4 or 5 for a Finale finalist (still Eliminated), which ranks it exactly.
+  final_place?: number | null;
 };
 
 // A couple's fate no longer being "next up to predict" includes not just

@@ -7,6 +7,7 @@ import type { LeaguePageBase } from "@/lib/league-page-data";
 
 export function LeaguePageShell({
   tab,
+  title,
   base,
   error,
   message,
@@ -14,6 +15,7 @@ export function LeaguePageShell({
   children,
 }: {
   tab: LeagueTab;
+  title?: string;
   base: LeaguePageBase;
   error?: string;
   message?: string;
@@ -25,6 +27,7 @@ export function LeaguePageShell({
     <div className="flex flex-col px-4">
       <LeagueHeader
         tab={tab}
+        title={title}
         leagueId={league.id}
         inviteCode={league.invite_code}
         canEdit={base.isCommissioner}

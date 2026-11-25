@@ -5,6 +5,7 @@ describe("fanOutcomeBadge", () => {
   it("labels a plain outcome regardless of any In Jeopardy mark", () => {
     expect(fanOutcomeBadge("safe").label).toBe("Safe");
     expect(fanOutcomeBadge("eliminated").label).toBe("Eliminated");
+    expect(fanOutcomeBadge("eliminated", 5).label).toBe("5th Place");
     expect(fanOutcomeBadge("bye").label).toBe("DND");
     expect(fanOutcomeBadge("withdrawn").label).toBe("Withdrew");
     expect(fanOutcomeBadge("winner").label).toBe("Winner");

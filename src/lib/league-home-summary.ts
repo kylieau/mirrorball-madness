@@ -43,6 +43,8 @@ export type LeagueHomeSummary = {
   rosterMoves: RosterMoves<string>;
   recentJoins: { name: string; joinedAt: string }[];
   managerNames: Record<string, string>;
+  // The league's top three, best first, for the season wrap's final card.
+  topStandings: { managerId: string; name: string; points: number; isYou: boolean }[];
   // The viewer's own team reads as "You" / "you".
   rankMoves: { weekNumber: number; mover: string; passed: string[]; place: number }[];
 };
@@ -274,6 +276,10 @@ export async function computeLeagueHomeSummary(
       .filter((m) => !isOwnMembership(m, userId) && new Date(m.joined_at).getTime() >= joinCutoffMs)
       .map((m) => ({ name: m.profiles?.display_name ?? "Someone", joinedAt: m.joined_at })),
     managerNames: Object.fromEntries(managerName),
+    topStandings: [...standings]
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 3)
+      .map((s) => ({ managerId: s.managerId, name: managerName.get(s.managerId) ?? "Someone", points: s.points, isYou: s.managerId === myTeamId })),
     rankMoves,
   };
 }

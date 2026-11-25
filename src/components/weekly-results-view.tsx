@@ -8,6 +8,7 @@ import { formatEpisodeCasual } from "@/lib/format-week";
 import { mergeCoupleOutcomes } from "@/lib/competition-week";
 import { coupleDanceLines, type SpecialDanceLabelInput } from "@/lib/night-dance-lines";
 import { fanOutcomeBadge, showInJeopardyBadge, IN_JEOPARDY_BADGE } from "@/lib/results-outcome";
+import { finalPlacements } from "@/lib/season-wrap";
 import { coupleHistoryHref } from "@/lib/couple-history-link";
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -28,6 +29,8 @@ type EpisodeResult = {
   episode_id: string;
   couple_id: string;
   outcome: string;
+  // 4 or 5 for a Finale finalist (still stored as Eliminated).
+  final_place?: number | null;
 };
 type Episode = {
   id: string;
@@ -56,6 +59,7 @@ export function WeeklyResultsView({
   teamDanceEpisodeIds,
   specialDanceLabels,
   historyFrom,
+  seasonGlance,
 }: {
   episodes: Episode[];
   episodeResults: EpisodeResult[];
@@ -78,6 +82,9 @@ export function WeeklyResultsView({
   pendingReveal?: { weekNumber: number; theme: string | null } | null;
   // Union of commissioner In Jeopardy ticks for the episodes on screen.
   inJeopardyCoupleIds?: string[];
+  // The Finale's results page only: who went home each week before it,
+  // newest first (seasonEliminationOrder).
+  seasonGlance?: { weekNumber: number; coupleIds: string[] }[];
   // A week still being revealed: list each posted couple by its judges' score,
   // with no outcome badges or eliminations.
   scoresOnly?: boolean;
@@ -151,7 +158,7 @@ export function WeeklyResultsView({
   }
 
   const outcomeRows = scoresOnly
-    ? [...danceScoresByCouple.keys()].map((couple_id) => ({ episode_id: episodes[0].id, couple_id, outcome: "safe" }))
+    ? [...danceScoresByCouple.keys()].map((couple_id): EpisodeResult => ({ episode_id: episodes[0].id, couple_id, outcome: "safe" }))
     : episodeResults.filter((r) => episodeIds.has(r.episode_id));
   const outcomes = mergeCoupleOutcomes(outcomeRows)
     .map((r) => {
@@ -177,12 +184,69 @@ export function WeeklyResultsView({
     })
     .sort((a, b) => b.total - a.total);
 
-  const eliminated = outcomes.filter((r) => r.outcome === "eliminated");
+  const placements = finalPlacements(outcomes);
+  const eliminated = placements.length > 0 ? [] : outcomes.filter((r) => r.outcome === "eliminated");
+  const coupleLabel = (coupleId: string) => {
+    const parts = coupleParts(coupleId);
+    return parts ? `${parts.celebrity} & ${parts.pro}` : "Unknown";
+  };
   const managerScores = [...(scoresByEpisode?.[episode.id] ?? [])].sort((a, b) => b.totalPoints - a.totalPoints);
 
   return (
     <div>
       {pendingCard && <div className="mb-4">{pendingCard}</div>}
+
+      {placements.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-primary/40 bg-linear-to-br from-curtain to-curtain-light px-4 py-4">
+          <p className="text-center text-xs text-accent">Final Placements</p>
+          <ol className="mt-2 flex flex-col gap-1.5">
+            {placements.map(({ coupleId, place }) => (
+              <li key={coupleId}>
+                <Link
+                  href={coupleHistoryHref(coupleId, historyFrom)}
+                  className={cn(
+                    "flex items-center justify-between gap-3 rounded-xl border px-3 py-2 hover:border-primary/60",
+                    place === 1 ? "border-primary bg-primary/10" : "border-border"
+                  )}
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="w-5 font-rank text-base font-bold">{place}</span>
+                    <span className={cn("font-heading", place === 1 ? "text-lg font-semibold" : "text-base")}>{coupleLabel(coupleId)}</span>
+                  </span>
+                  {place === 1 && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">Champions</span>}
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {seasonGlance && seasonGlance.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-border bg-card px-4 py-3">
+          <p className="font-heading text-base font-semibold">Season at a Glance</p>
+          <ul className="mt-1.5 flex flex-col">
+            {seasonGlance.map((week) => (
+              <li key={week.weekNumber} className="flex items-baseline justify-between gap-3 py-1 text-sm">
+                <span className="shrink-0 text-muted-foreground">{formatEpisodeCasual(week.weekNumber)}</span>
+                <span className="text-right">
+                  {week.coupleIds.length === 0 ? (
+                    <span className="text-muted-foreground">No elimination</span>
+                  ) : (
+                    week.coupleIds.map((id, i) => (
+                      <span key={id}>
+                        {i > 0 && ", "}
+                        <Link href={coupleHistoryHref(id, historyFrom)} className="font-medium hover:text-accent">
+                          {coupleLabel(id)}
+                        </Link>
+                      </span>
+                    ))
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {eliminated.length > 0 && (
         <div className="mb-4 rounded-2xl border border-primary/40 bg-linear-to-br from-curtain to-curtain-light px-5 py-4 text-center">
@@ -205,7 +269,7 @@ export function WeeklyResultsView({
       </div>
       <div className="flex flex-col gap-2.5">
         {outcomes.map((r) => {
-          const tag = fanOutcomeBadge(r.outcome);
+          const tag = fanOutcomeBadge(r.outcome, r.final_place);
           const inJeopardyBadge = showInJeopardyBadge(r.outcome, inJeopardy.has(r.couple_id));
           return (
             <Link
@@ -213,7 +277,7 @@ export function WeeklyResultsView({
               href={coupleHistoryHref(r.couple_id, historyFrom)}
               className={cn(
                 "flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3.5 py-3 transition-colors hover:border-primary/60 active:bg-muted/40",
-                r.outcome === "eliminated" && "opacity-60"
+                r.outcome === "eliminated" && !r.final_place && "opacity-60"
               )}
             >
               <div>

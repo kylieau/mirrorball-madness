@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { BOTTOM_NAV_CLEARANCE, FanBottomNav } from "@/components/bottom-nav";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
+import { seasonEliminationOrder } from "@/lib/season-wrap";
 import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
 import { PageHeader } from "@/components/page-header";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
@@ -24,7 +25,7 @@ export async function GuestResults({
   supabase: SupabaseClient<Database>;
   weekParam?: string;
 }) {
-  const [{ groupedWeeks, completedWeeks }, { data: danceStyles }, allCouples] = await Promise.all([
+  const [{ seasonId, groupedWeeks, completedWeeks }, { data: danceStyles }, allCouples] = await Promise.all([
     loadGuestSeason(supabase),
     supabase.from("dance_styles").select("id, name").order("name"),
     loadAllCouples(supabase),
@@ -55,8 +56,8 @@ export async function GuestResults({
           .in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] }),
     showResults && selectedEpisodeIds.length > 0
-      ? supabase.from("episode_results").select("episode_id, couple_id, outcome").in("episode_id", selectedEpisodeIds)
-      : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
+      ? supabase.from("episode_results").select("episode_id, couple_id, outcome, final_place").in("episode_id", selectedEpisodeIds)
+      : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string; final_place: number | null }[] }),
     showResults && selectedEpisodeIds.length > 0
       ? supabase.from("episode_in_jeopardy_couples").select("couple_id").in("episode_id", selectedEpisodeIds)
       : Promise.resolve({ data: [] as { couple_id: string }[] }),
@@ -109,6 +110,11 @@ export async function GuestResults({
               coupleDisplayNames={coupleDisplayNames}
               pendingReveal={null}
               historyFrom={selectedWeek ? thisWeekHref(selectedWeek.id) : "/this-week"}
+              seasonGlance={
+                selectedMode === "results" && selectedWeek?.is_finale
+                  ? seasonEliminationOrder(allCouples.filter((c) => c.season_id === seasonId), selectedWeek.week_number)
+                  : undefined
+              }
             />
           )}
         </div>

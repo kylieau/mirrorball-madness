@@ -14,6 +14,7 @@ export function CurtainCallCard({
   episode,
   weeks,
   rosterWeekId,
+  seasonHref,
   invite,
   children,
 }: {
@@ -21,6 +22,8 @@ export function CurtainCallCard({
   episode: { id: string; weekNumber: number; theme: string | null; nightsLabel?: string | null } | null;
   weeks: { id: string; weekNumber: number; theme: string | null }[];
   rosterWeekId?: string | null;
+  // Once the season is over, the last week's › goes to the Season page.
+  seasonHref?: string | null;
   // Shown under the title only while this week's picks are open.
   invite?: ReactNode;
   children?: ReactNode;
@@ -39,7 +42,7 @@ export function CurtainCallCard({
             theme={episode.theme}
             nightsLabel={episode.nightsLabel}
             prevHref={neighbors.prev ? pastPicksHref(leagueId, neighbors.prev.id, rosterWeekId) : null}
-            nextHref={neighbors.next ? pastPicksHref(leagueId, neighbors.next.id, rosterWeekId) : null}
+            nextHref={neighbors.next ? pastPicksHref(leagueId, neighbors.next.id, rosterWeekId) : (seasonHref ?? null)}
           />
         ) : (
           <CardDescription>No upcoming week scheduled yet.</CardDescription>

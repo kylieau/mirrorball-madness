@@ -32,10 +32,15 @@ import { clampRosterCoupleForWeek, formerCoupleNote, weeklyBonusPoints } from "@
 import { partitionRecastSlots } from "@/lib/recast-framing";
 import { scoringModule, type ScoringModuleKey } from "@/lib/scoring-modules";
 import { EpisodeCarousel } from "@/components/episode-carousel";
-import { adjacentThisWeekWeeks, rosterWeekHref } from "@/lib/this-week-carousel";
+import { adjacentThisWeekWeeks, pastPicksHref, rosterWeekHref } from "@/lib/this-week-carousel";
 import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { clampSlotsToWeek, formerSlotsForWeek, judgePointsThroughWeek, slotActiveInWeek } from "@/lib/roster-couple-points";
-import { roundPoints } from "@/lib/format-points";
+import { formatPoints, roundPoints } from "@/lib/format-points";
+import { formatEpisodeCasual } from "@/lib/format-week";
+import { ordinal } from "@/lib/ordinal";
+import { bestWeek, eliminationPicksCalled, finaleStillAiring, gradedBracket, placeByPoints } from "@/lib/season-wrap";
+import { loadSeasonRecapInputs } from "@/lib/season-wrap-data";
+import { SeasonRecap } from "@/components/season-recap";
 import { formatManagerName } from "@/lib/manager-display";
 import {
   buildCurtainCallWeeks,
@@ -108,6 +113,56 @@ export default async function LeaguePicksPage({
     teamsMode,
     danceCardRule,
   } = base;
+
+  // Once this viewer has watched the Finale (clamped statuses name a winner),
+  // Picks opens on the Season page, the Curtain Call carousel's last page.
+  const seasonOver =
+    seasonCouplesSpoilerSafe.some((c) => c.status === "winner") &&
+    standings.some((s) => s.totalPoints > 0) &&
+    !finaleStillAiring(groupedWeeks);
+  const finaleWeekId = completedEpisodes.find((e) => e.is_finale)?.id ?? null;
+  if (seasonOver && (weekParam === "season" || (!weekParam && !rosterWeekParam))) {
+    const recap = await loadSeasonRecapInputs(supabase, { leagueId: id, managerId: myTeamId, weeks: groupedWeeks });
+    const weekNumberById = new Map(groupedWeeks.map((w) => [w.id, w.week_number]));
+    const best = bestWeek(
+      scoreRows.flatMap((row) => {
+        const weekNumber = weekNumberById.get(row.week_id);
+        return row.manager_id === myTeamId && scoredIds.has(row.week_id) && weekNumber != null ? [{ weekNumber, points: row.total_points }] : [];
+      })
+    );
+    const called = eliminationPicksCalled(recap.homePicks, recap.eliminatedByWeek);
+    const danceCardTotal = (managerId: string) =>
+      (base.rosterPointsByManager.get(managerId) ?? 0) * (scoringSettings?.judges_score_category_weight ?? 1) +
+      (base.storedDanceCardPointsByManager.get(managerId) ?? 0);
+    const danceCardRank = placeByPoints(danceCardTotal(myTeamId), standings.map((s) => danceCardTotal(s.managerId)));
+    const placeByStatus: Record<string, number> = { winner: 1, runner_up: 2, third_place: 3 };
+    const finishers = seasonCouplesSpoilerSafe
+      .flatMap((c) => {
+        const place = placeByStatus[c.status] ?? (c.status === "eliminated" ? c.final_place : null);
+        return place ? [{ coupleId: c.id, place }] : [];
+      })
+      .sort((a, b) => a.place - b.place);
+    const predictedPlace = new Map(recap.bracket.map((b) => [b.coupleId, seasonCouples.length - b.position + 1]));
+    const coupleName = (coupleId: string) => {
+      const parts = allDisplayNames.get(coupleId);
+      return parts ? `${parts.celebrity} & ${parts.pro}` : "Unknown";
+    };
+    return (
+      <LeaguePageShell tab="picks" base={base} error={error} message={message} justCreated={justCreated}>
+        <SeasonRecap
+          finaleHref={finaleWeekId ? pastPicksHref(id, finaleWeekId) : null}
+          finaleWeekNumber={finaleWeekNumber}
+          stats={[
+            { value: `${ordinal(placeByPoints(base.pointsByManager.get(myTeamId) ?? 0, standings.map((s) => s.totalPoints)))} of ${standings.length}`, label: `Final standing · ${formatPoints(base.pointsByManager.get(myTeamId) ?? 0)} pts` },
+            ...(best ? [{ value: formatEpisodeCasual(best.weekNumber), label: `Your best week · ${formatPoints(best.points)} pts` }] : []),
+            ...(curtainCallOn && called.weeks > 0 ? [{ value: `${called.called} of ${called.weeks}`, label: "Weeks your Home pick went home" }] : []),
+            ...(danceCardOn ? [{ value: formatPoints(danceCardTotal(myTeamId)), label: `Dance Card · ${ordinal(danceCardRank)} in the league` }] : []),
+          ]}
+          bracket={grandFinaleOn && recap.bracket.length > 0 ? gradedBracket(finishers, predictedPlace).map((row) => ({ ...row, name: coupleName(row.coupleId) })) : []}
+        />
+      </LeaguePageShell>
+    );
+  }
 
   const curtainCallWeekId = upcomingEpisode && curtainCallOn ? upcomingEpisode.id : null;
 
@@ -337,7 +392,7 @@ export default async function LeaguePicksPage({
     rosterMovesPending,
   ]);
   const recastCycle = recastCycleRows?.[0];
-  const rosterMoves = rosterMoveTabs.tabs.length > 0 && !cutoff.pendingRevealEpisode && (
+  const rosterMoves = !seasonOver && rosterMoveTabs.tabs.length > 0 && !cutoff.pendingRevealEpisode && (
     <RosterMoves
       leagueId={id}
       tabs={rosterMoveTabs.tabs}
@@ -526,7 +581,7 @@ export default async function LeaguePicksPage({
           const couple = flatCouplesById.get(slot.coupleId);
           if (!couple) return 0;
           return clampRosterCoupleForWeek(
-            { status: couple.status, eliminationWeek: couple.elimination_week },
+            { status: couple.status, eliminationWeek: couple.elimination_week, finalPlace: couple.final_place },
             {
               cutoffWeek: rosterCutoffWeek,
               finaleWeekNumber,
@@ -545,7 +600,7 @@ export default async function LeaguePicksPage({
     const points = yourRosterPoints?.get(slot.coupleId);
     const names = allDisplayNames.get(slot.coupleId) ?? { celebrity: couple.celebrity_name, pro: couple.pro_name };
     const clamped = clampRosterCoupleForWeek(
-      { status: couple.status, eliminationWeek: couple.elimination_week },
+      { status: couple.status, eliminationWeek: couple.elimination_week, finalPlace: couple.final_place },
       {
         cutoffWeek: yourRosterWeek ? rosterCutoffWeek : null,
         finaleWeekNumber,
@@ -583,6 +638,7 @@ export default async function LeaguePicksPage({
         next: next ? { source: next.source } : null,
         holderNow: holderNow ? { name: nameByManager[holderNow.managerId] ?? "Unknown" } : null,
         status: spoilerSafeCoupleStatus({ status: couple.status, eliminationWeek: couple.elimination_week }, rosterCutoffWeek, finaleWeekNumber),
+        finalPlace: couple.final_place,
       });
       const names = allDisplayNames.get(coupleId) ?? { celebrity: couple.celebrity_name, pro: couple.pro_name };
       return [{ ...names, coupleId, tag, weeklyPoints: 0, totalPoints: points.get(coupleId)?.total ?? 0, inJeopardy: false, former: { weeks, note } }];
@@ -619,7 +675,7 @@ export default async function LeaguePicksPage({
         const p = points.get(slot.coupleId);
         const names = allDisplayNames.get(slot.coupleId) ?? { celebrity: couple.celebrity_name, pro: couple.pro_name };
         const clamped = clampRosterCoupleForWeek(
-          { status: couple.status, eliminationWeek: couple.elimination_week },
+          { status: couple.status, eliminationWeek: couple.elimination_week, finalPlace: couple.final_place },
           {
             cutoffWeek: rosterCutoffWeek,
             finaleWeekNumber,
@@ -757,6 +813,7 @@ export default async function LeaguePicksPage({
             <CurtainCallCard
               leagueId={id}
               rosterWeekId={rosterWeekParam}
+              seasonHref={seasonOver ? `/leagues/${id}/picks?week=season` : null}
               episode={
                 curtainCallEpisode
                   ? {

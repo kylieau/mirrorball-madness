@@ -1,6 +1,9 @@
+import { finaleStillAiring } from "@/lib/season-wrap";
+import { isPlacedFinalist } from "@/lib/spoiler-safe-couple-status";
 import { createClient } from "@/lib/supabase/server";
 import { StandingsTable } from "@/components/standings-table";
 import { CouplesLeaderboard } from "@/components/couples-leaderboard";
+import { FinalStandings } from "@/components/final-standings";
 import { LeaguePageShell } from "@/components/league-page-shell";
 import { loadLeaguePageBase } from "@/lib/league-page-data";
 import { getStandingMessage } from "@/lib/standings-message";
@@ -202,7 +205,7 @@ export default async function LeagueStandingsPage({
             ownerName: standing.ownerId ? (ownerName ?? "Released") : null,
             holdingLabel: ownerName ? standing.ownerLabel : null,
             isViewer: standing.ownerId === myTeamId,
-            eliminated: couple.status === "eliminated" || couple.status === "withdrawn",
+            eliminated: (couple.status === "eliminated" && !isPlacedFinalist(couple.status, couple.final_place)) || couple.status === "withdrawn",
           };
         })
         .sort(
@@ -211,8 +214,23 @@ export default async function LeagueStandingsPage({
         )
       : null;
 
+  // Clamped statuses name a winner only once this viewer has watched the
+  // Finale; a league that never scored has no final standings to show.
+  const seasonOver =
+    seasonCouplesSpoilerSafe.some((c) => c.status === "winner") &&
+    standings.some((s) => s.totalPoints > 0) &&
+    !finaleStillAiring(base.groupedWeeks);
+
   return (
-    <LeaguePageShell tab="standings" base={base} error={error} message={message} justCreated={justCreated}>
+    <LeaguePageShell
+      tab="standings"
+      title={seasonOver ? "Final Standings" : undefined}
+      base={base}
+      error={error}
+      message={message}
+      justCreated={justCreated}
+    >
+      {seasonOver && <FinalStandings standings={standings} viewerId={myTeamId} moduleTotals={moduleTotalsByManager} />}
       <StandingsTable
         leagueId={id}
         standings={standingsWithChange}

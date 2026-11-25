@@ -197,6 +197,14 @@ describe("computeEpisodeBannerState", () => {
       });
       expect(computeEpisodeBannerState(input([final]), at("2026-12-03T12:00:00Z"))).toBeNull();
     });
+
+    it("wraps the season once the week marked Finale is in, with no hold, after the West feed", () => {
+      const finale: BannerWeek = { ...final, isFinale: true };
+      expect(computeEpisodeBannerState(input([finale]), at("2026-11-25T04:30:00Z"))).toEqual({ kind: "west_watching", weekNumber: 9 });
+      expect(computeEpisodeBannerState(input([finale]), at("2026-11-25T07:00:00Z"))).toEqual({ kind: "season_wrap", weekNumber: 9 });
+      expect(computeEpisodeBannerState(input([finale]), at("2027-02-01T12:00:00Z"))).toEqual({ kind: "season_wrap", weekNumber: 9 });
+      expect(seasonTrack([finale], { kind: "season_wrap", weekNumber: 9 })).toEqual({ weeksDone: 1, currentWeek: null, marker: "next", futureDots: 0, trophy: true });
+    });
   });
 });
 

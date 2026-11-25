@@ -32,3 +32,11 @@ export function isSpoilerSafeActive(
 ): boolean {
   return spoilerSafeCoupleStatus(couple, cutoffWeek, finaleWeekNumber) === "active";
 }
+
+// A Finale finalist placed 4th or 5th is stored as Eliminated with a place so
+// scoring can rank it, but never went home: display sites check this before
+// striking, fading or tagging a couple Eliminated. Pass the spoiler-safe
+// status, so a viewer who hasn't watched the Finale sees neither.
+export function isPlacedFinalist(status: string, finalPlace: number | null | undefined): boolean {
+  return status === "eliminated" && !!finalPlace;
+}

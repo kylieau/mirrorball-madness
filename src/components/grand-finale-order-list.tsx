@@ -42,6 +42,7 @@ export function statusLabel(couple: GrandFinaleCouple): string {
     case "third_place":
       return "Third Place";
     case "eliminated":
+      if (couple.final_place) return `${couple.final_place}th Place`;
       return `${formatEpisodeCasualAbbreviated(couple.elimination_week!)} Elim`;
     case "withdrawn":
       return `${formatEpisodeCasualAbbreviated(couple.elimination_week!)} Withdrew`;

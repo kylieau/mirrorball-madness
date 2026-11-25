@@ -10,7 +10,8 @@ import { fanOutcomeBadge, IN_JEOPARDY_BADGE, showInJeopardyBadge } from "@/lib/r
 
 const BADGE = "inline-block rounded-full px-2 py-0.5 text-[10px] font-bold";
 
-function statusBadge(status: string, eliminationWeek: number | null): { label: string; className: string } {
+function statusBadge(status: string, eliminationWeek: number | null, finalPlace: number | null): { label: string; className: string } {
+  if (finalPlace) return fanOutcomeBadge(status, finalPlace);
   const week = eliminationWeek !== null ? ` · ${formatEpisodeCasual(eliminationWeek)}` : "";
   if (status === "eliminated") return { label: `Eliminated${week}`, className: "bg-muted text-muted-foreground" };
   if (status === "withdrawn") return { label: `Withdrew${week}`, className: "bg-muted text-muted-foreground" };
@@ -54,7 +55,7 @@ function DanceRow({ dance }: { dance: CoupleHistoryDance }) {
 }
 
 function WeekCard({ week, notes }: { week: CoupleHistoryWeek; notes: string[] }) {
-  const outcome = week.outcome ? fanOutcomeBadge(week.outcome) : null;
+  const outcome = week.outcome ? fanOutcomeBadge(week.outcome, week.finalPlace) : null;
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card">
       <div className="flex items-center gap-1.5 bg-muted/50 px-3 py-2">
@@ -147,7 +148,7 @@ function LeaguesCard({ rows }: { rows: CoupleLeagueRow[] }) {
 
 export function CoupleHistoryView({ page }: { page: CoupleHistoryPage }) {
   const { history, unwatched } = page;
-  const status = statusBadge(page.status, page.eliminationWeek);
+  const status = statusBadge(page.status, page.eliminationWeek, page.finalPlace);
   const weekCount = history.weeks.length;
   const jeopardy = history.jeopardyWeeks;
   return (

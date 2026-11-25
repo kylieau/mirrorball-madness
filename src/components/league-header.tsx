@@ -14,6 +14,7 @@ export type LeagueTab = "picks" | "standings";
 
 export function LeagueHeader({
   tab,
+  title: titleOverride,
   leagueId,
   canEdit,
   inviteCode,
@@ -27,6 +28,8 @@ export function LeagueHeader({
   draftScoresStrip,
 }: {
   tab: LeagueTab;
+  // Final Standings once the season is over.
+  title?: string;
   leagueId: string;
   canEdit: boolean;
   inviteCode: string;
@@ -41,7 +44,7 @@ export function LeagueHeader({
   // Unlocked drafts: the amber strip replaces the Spoiler-Free one, as on Home.
   draftScoresStrip: boolean;
 }) {
-  const title = tab === "standings" ? "Standings" : "Picks";
+  const title = titleOverride ?? (tab === "standings" ? "Standings" : "Picks");
   const currentPath = `/leagues/${leagueId}/${tab}`;
   const leagueSettingsHref = `/leagues/${leagueId}/settings?from=${encodeURIComponent(currentPath)}`;
 

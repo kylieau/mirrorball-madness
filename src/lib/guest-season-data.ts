@@ -8,8 +8,8 @@ import { loadActiveSeasonId, loadSeasonSchedule } from "@/lib/viewer-season-data
 // to published episodes, so a live reveal never reaches them.
 export async function loadGuestSeason(supabase: SupabaseClient<Database>) {
   const seasonId = await loadActiveSeasonId(supabase);
-  if (!seasonId) return { groupedWeeks: [], completedWeeks: [] };
+  if (!seasonId) return { seasonId: null, groupedWeeks: [], completedWeeks: [] };
   const { weekRows, episodeRows } = await loadSeasonSchedule(supabase, seasonId);
   const groupedWeeks = groupEpisodesByWeek(weekRows, episodeRows);
-  return { groupedWeeks, completedWeeks: groupedWeeks.filter((week) => week.status === "completed") };
+  return { seasonId, groupedWeeks, completedWeeks: groupedWeeks.filter((week) => week.status === "completed") };
 }

@@ -7,6 +7,9 @@ import { LeagueStatusPill } from "@/components/league-status-pill";
 import { coupleHistoryHref } from "@/lib/couple-history-link";
 import { formatCountdown } from "@/lib/format-countdown";
 import { formatPoints } from "@/lib/format-points";
+import { ordinal } from "@/lib/ordinal";
+import { placeByPoints } from "@/lib/season-wrap";
+import { YouPill } from "@/components/you-pill";
 import { scoringModule } from "@/lib/scoring-modules";
 import {
   buildModuleStack,
@@ -31,12 +34,16 @@ export type LeagueTriage = {
   // The page the card sits on, which League Settings and couple pages link back to.
   from?: string;
   modules: ModuleStackInput;
+  // Set once the viewer has watched the Finale: the card shows the league's
+  // final result instead of this week's picks.
+  final?: { topStandings: { managerId: string; name: string; points: number; isYou: boolean }[] } | null;
 };
 
 const GOLD_OUTLINE =
   "border-primary/60 bg-transparent text-accent hover:bg-primary/10 hover:text-accent dark:border-primary/60 dark:bg-transparent dark:hover:bg-primary/10";
 
 export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
+  if (league.final) return <FinalLeagueCard league={league} top={league.final.topStandings} />;
   const stack = buildModuleStack(league.modules);
   const action = picksAction(league.picksDue, league.modules);
   const picksLabel = picksButtonLabel(action);
@@ -174,6 +181,64 @@ export function LeagueTriageCard({ league }: { league: LeagueTriage }) {
             render={<Link href={`/leagues/${league.id}/settings?from=${encodeURIComponent(from)}`} />}
           >
             <SettingsIcon aria-hidden />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// The season wrap: the viewer's final place, a crown for the champion, the
+// league's top three, and the way to the final standings and the recap.
+function FinalLeagueCard({ league, top }: { league: LeagueTriage; top: NonNullable<LeagueTriage["final"]>["topStandings"] }) {
+  // Tied totals share a place; past the top three only the summary's rank is known.
+  const topPoints = top.map((row) => row.points);
+  const place = top.some((row) => row.isYou) || topPoints.some((p) => p <= league.totalPoints)
+    ? placeByPoints(league.totalPoints, topPoints)
+    : league.rank;
+  const champion = place === 1;
+  const winners = top.filter((row) => row.points === topPoints[0]).map((row) => row.name);
+  return (
+    <Card className={cn("ring-primary/40", champion && "ring-primary")}>
+      <CardContent className="flex flex-col gap-3">
+        <div>
+          <div className="flex items-start justify-between gap-3">
+            <p className="min-w-0 truncate font-heading text-base font-semibold">{league.name}</p>
+            <span
+              className={cn(
+                "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold",
+                champion ? "bg-primary text-primary-foreground" : "bg-foreground/10 text-foreground"
+              )}
+            >
+              {champion ? "👑 Champion" : ordinal(place)}
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Final · {ordinal(place)} of {league.totalMembers} ·{" "}
+            <span className="font-heading font-semibold">{formatPoints(league.totalPoints)}</span> pts
+            {!champion && winners.length > 0 && <> · {winners.join(" and ")} won</>}
+          </p>
+        </div>
+        {top.length > 0 && (
+          <ol className="flex flex-col gap-1 border-y border-border py-2 text-sm">
+            {top.map((row) => (
+              <li key={row.managerId} className="flex items-baseline justify-between gap-2">
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className="w-4 shrink-0 font-rank text-muted-foreground">{placeByPoints(row.points, topPoints)}</span>
+                  <span className={cn("truncate", row.isYou && "font-semibold")}>{row.name}</span>
+                  {row.isYou && <YouPill />}
+                </span>
+                <span className="shrink-0 font-heading">{formatPoints(row.points)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+        <div className="flex gap-2">
+          <Button size="lg" className="flex-1" nativeButton={false} render={<Link href={`/leagues/${league.id}/standings`} />}>
+            Final Standings
+          </Button>
+          <Button size="lg" variant="outline" className={cn("flex-1", GOLD_OUTLINE)} nativeButton={false} render={<Link href={`/leagues/${league.id}/picks?week=season`} />}>
+            Season Recap
           </Button>
         </div>
       </CardContent>

@@ -1,3 +1,5 @@
+import { finaleStillAiring } from "@/lib/season-wrap";
+import { loadSeasonChampions } from "@/lib/season-wrap-data";
 import Link from "next/link";
 import { cn } from "cn";
 import { redirect } from "next/navigation";
@@ -34,7 +36,7 @@ export default async function LeaguesPage({
   ]);
 
   const rows = (memberships ?? []).filter((m) => m.leagues);
-  const { summaries, weeksBehind, liveWeekNumber, cutoff, activeSeasonId, finaleWeekNumber } = await loadHomeLeagueData(
+  const { summaries, weeksBehind, liveWeekNumber, cutoff, activeSeasonId, finaleWeekNumber, groupedWeeks } = await loadHomeLeagueData(
     supabase,
     user.id,
     accountSettingsData.spoilerFreeMode,
@@ -45,6 +47,7 @@ export default async function LeaguesPage({
           spoilerCutoffWeek: cutoff.effectiveLatestEpisode?.week_number ?? null,
           finaleWeekNumber,
         }) : new Map<string, ModuleStackInput>();
+  const champions = await loadSeasonChampions(supabase, activeSeasonId, cutoff.effectiveLatestEpisode?.week_number ?? null, finaleWeekNumber);
   const leagues: LeagueTriage[] = summaries
     .map((s, i) => ({
       id: s.id,
@@ -56,6 +59,7 @@ export default async function LeaguesPage({
       picksDue: s.picksDue,
       weeksBehind,
       modules: moduleInputs.get(s.id)!,
+      final: champions && !finaleStillAiring(groupedWeeks) && s.topStandings.some((t) => t.points > 0) ? { topStandings: s.topStandings } : null,
     }))
     .sort((a, b) => Number(b.picksDue) - Number(a.picksDue));
 

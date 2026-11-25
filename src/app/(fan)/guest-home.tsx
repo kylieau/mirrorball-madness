@@ -6,16 +6,17 @@ import { HomeDashboard } from "@/components/home-dashboard";
 import { PageHeader } from "@/components/page-header";
 import { computeEpisodeBannerState, toBannerWeeks, type EpisodeBannerInput } from "@/lib/episode-banner";
 import { buildCoupleDisplayNames, formatCoupleName } from "@/lib/couple-display";
-import { activityScore, buildRecentActivity, type ActivityDanceRow, type ActivityWeek } from "@/lib/home-activity";
+import { activityScore, addActivityOutcome, buildRecentActivity, type ActivityDanceRow, type ActivityWeek } from "@/lib/home-activity";
 import { danceScoreColumns, loadSpecialDanceLabels } from "@/lib/episode-teams";
 import { loadGuestSeason } from "@/lib/guest-season-data";
+import { loadSeasonChampions } from "@/lib/season-wrap-data";
 import { loadAllCouples, loadTeamsMode } from "@/lib/viewer-season-data";
 
 // Signed-out Home: the season's banner and published results, with a sign-in
 // card where Your Leagues would be. Guests have no spoiler marks and never
 // opted into live scores, so only officially published weeks show.
 export async function GuestHome({ supabase }: { supabase: SupabaseClient<Database> }) {
-  const { groupedWeeks, completedWeeks } = await loadGuestSeason(supabase);
+  const { seasonId, groupedWeeks, completedWeeks } = await loadGuestSeason(supabase);
   const episodeIds = completedWeeks.flatMap((week) => week.episodes.map((episode) => episode.id));
   const weekNumberByEpisodeId = new Map(
     completedWeeks.flatMap((week) => week.episodes.map((episode) => [episode.id, week.week_number] as const))
@@ -28,7 +29,7 @@ export async function GuestHome({ supabase }: { supabase: SupabaseClient<Databas
     // team_id and max_score are selected only once their migrations are applied.
     const teamsMode = await loadTeamsMode(supabase);
     const [{ data: episodeResults }, { data: danceScoreRows }, specialDanceLabels, couples] = await Promise.all([
-      supabase.from("episode_results").select("episode_id, couple_id, outcome").in("episode_id", episodeIds),
+      supabase.from("episode_results").select("episode_id, couple_id, outcome, final_place").in("episode_id", episodeIds),
       supabase
         .from("dance_scores")
         .select(danceScoreColumns(teamsMode, "episode_id, couple_id, total_score, created_at, dance_styles(name)", { teamId: true }))
@@ -44,7 +45,7 @@ export async function GuestHome({ supabase }: { supabase: SupabaseClient<Databas
       const parts = displayNames.get(r.couple_id);
       const week = activityWeeks.get(weekNumberByEpisodeId.get(r.episode_id) ?? -1);
       if (week) week.resultsIn = true;
-      if (r.outcome === "eliminated" && parts && week) week.eliminated.push({ coupleId: r.couple_id, name: formatCoupleName(parts) });
+      if (parts && week) addActivityOutcome(week, r, formatCoupleName(parts));
     }
     for (const d of danceScores) {
       const parts = displayNames.get(d.couple_id);
@@ -61,6 +62,13 @@ export async function GuestHome({ supabase }: { supabase: SupabaseClient<Databas
     curtainCallLockAtIso: null,
   };
   const episodeBannerState = computeEpisodeBannerState(episodeBannerInput);
+  // Guests see every published week, the Finale included.
+  const champions = await loadSeasonChampions(
+    supabase,
+    seasonId,
+    completedWeeks.reduce<number | null>((latest, week) => Math.max(latest ?? 0, week.week_number), null),
+    groupedWeeks.find((week) => week.is_finale)?.week_number ?? null
+  );
   const westWindow = episodeBannerState?.kind === "west_soon" || episodeBannerState?.kind === "west_watching";
   const recentActivity = buildRecentActivity({
     weeks: [...activityWeeks.values()],
@@ -76,7 +84,7 @@ export async function GuestHome({ supabase }: { supabase: SupabaseClient<Databas
           guest
           leagues={[]}
           recentActivity={recentActivity}
-          episodeBanner={{ input: episodeBannerInput, initialState: episodeBannerState }}
+          episodeBanner={{ input: episodeBannerInput, initialState: episodeBannerState, champions }}
         />
       </div>
       <FanBottomNav active="home" leagueId={null} />

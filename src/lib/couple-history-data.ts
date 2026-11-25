@@ -15,7 +15,7 @@ import { teamDanceEpisodeIds } from "@/lib/night-dance-lines";
 import { loadRevealingWeek } from "@/lib/revealing-week-data";
 import { clampSlotsToWeek } from "@/lib/roster-couple-points";
 import { resolveSpoilerCutoff } from "@/lib/spoiler-cutoff";
-import { spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
+import { isPlacedFinalist, spoilerSafeCoupleStatus } from "@/lib/spoiler-safe-couple-status";
 import { loadActiveSeasonId, loadAllCouples, loadTeamsMode, loadViewerMemberships, loadViewerSeason } from "@/lib/viewer-season-data";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,6 +26,8 @@ export type CoupleHistoryPage = {
   // Clamped to what the viewer has watched (spoilerSafeCoupleStatus).
   status: string;
   eliminationWeek: number | null;
+  // 4 or 5 once a watched Finale placed the couple there.
+  finalPlace: number | null;
   history: CoupleHistory;
   // Completed weeks a Spoiler-Free viewer hasn't marked watched.
   unwatched: { from: number; to: number } | null;
@@ -298,8 +300,8 @@ export async function loadCoupleHistory(
           .in("episode_id", episodeIds)
       : Promise.resolve({ data: [] }),
     resultEpisodeIds.length > 0
-      ? supabase.from("episode_results").select("episode_id, couple_id, outcome").eq("couple_id", coupleId).in("episode_id", resultEpisodeIds)
-      : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
+      ? supabase.from("episode_results").select("episode_id, couple_id, outcome, final_place").eq("couple_id", coupleId).in("episode_id", resultEpisodeIds)
+      : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string; final_place: number | null }[] }),
     resultEpisodeIds.length > 0
       ? supabase.from("episode_in_jeopardy_couples").select("episode_id").eq("couple_id", coupleId).in("episode_id", resultEpisodeIds)
       : Promise.resolve({ data: [] as { episode_id: string }[] }),
@@ -353,6 +355,7 @@ export async function loadCoupleHistory(
     pro: couple.pro?.name ?? "Unknown",
     status,
     eliminationWeek: status === couple.status ? couple.elimination_week : null,
+    finalPlace: isPlacedFinalist(status, couple.final_place) ? couple.final_place : null,
     history,
     unwatched,
     live,

@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Season wrap · Home, Results, Picks and Standings after the Finale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Libre+Caslon+Text:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../picks-roster-moves/mock.css" />
+<style>
+.new { outline: 1px dashed var(--primary); outline-offset: 3px; }
+.curtain { border-radius: 16px; padding: 16px; background: radial-gradient(120% 90% at 50% 0%, #4a2552 0%, #2a1730 70%); box-shadow: 0 0 0 1px var(--border); text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.chip { display: inline-flex; gap: 6px; align-items: center; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: rgba(201,162,75,.18); color: var(--accent); }
+.trophy { font-size: 34px; line-height: 1; }
+.champ { font-family: var(--heading); font-size: 22px; font-weight: 600; }
+.champ span { font-weight: 500; color: var(--muted-fg); }
+.sub { font-size: 12.5px; color: var(--muted-fg); }
+.podium3 { display: flex; gap: 8px; justify-content: center; font-size: 12px; color: var(--muted-fg); flex-wrap: wrap; }
+.podium3 b { color: var(--foreground); }
+.track { display: flex; gap: 6px; justify-content: center; align-items: center; margin-top: 4px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); opacity: .85; }
+.dot.trophy-dot { width: auto; height: auto; background: none; font-size: 14px; opacity: 1; }
+.lcard { background: var(--card); border-radius: 14px; box-shadow: 0 0 0 1px var(--hair); padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.lcard.gold { box-shadow: 0 0 0 1px var(--primary); }
+.lhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.lname { font-family: var(--heading); font-size: 16px; font-weight: 600; }
+.rank { font-size: 13px; color: var(--muted-fg); }
+.rank b { color: var(--foreground); font-family: var(--heading); }
+.crown { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 700; background: var(--primary); color: var(--primary-fg); }
+.crown.silver { background: rgba(242,232,216,.14); color: var(--foreground); }
+.mini { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.mini .r { display: flex; justify-content: space-between; }
+.mini .r .n { display: flex; gap: 8px; }
+.mini .r .pl { font-family: "Libre Caslon Text", serif; color: var(--muted-fg); width: 14px; }
+.mini .r .pts { font-family: var(--heading); }
+.mini .me .n span:last-child { font-weight: 600; }
+.you { font-size: 10px; font-weight: 700; border-radius: 999px; padding: 1px 6px; background: rgba(201,162,75,.22); color: var(--accent); margin-left: 4px; }
+.btns { display: flex; gap: 8px; }
+.btn { flex: 1; text-align: center; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; border: 1px solid var(--border); }
+.btn.pri { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.sum { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat { border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+.stat b { display: block; font-family: var(--heading); font-size: 20px; }
+.stat span { font-size: 11.5px; color: var(--muted-fg); }
+.podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 6px; align-items: end; text-align: center; }
+.step { border-radius: 12px 12px 4px 4px; background: var(--muted); padding: 10px 6px 8px; display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.step.first { background: linear-gradient(180deg, rgba(201,162,75,.35), rgba(201,162,75,.12)); padding-top: 16px; }
+.step .p { font-family: "Libre Caslon Text", serif; font-size: 20px; font-weight: 700; }
+.step .who { font-size: 12.5px; font-weight: 600; }
+.step .pts { font-family: var(--heading); font-size: 13px; color: var(--muted-fg); }
+.lb { display: flex; flex-direction: column; }
+.lb .r { display: flex; justify-content: space-between; padding: 8px 2px; border-top: 1px solid var(--hair); font-size: 13.5px; }
+.lb .r .n { display: flex; gap: 10px; }
+.lb .r .pl { font-family: "Libre Caslon Text", serif; color: var(--muted-fg); width: 16px; }
+.lb .r .pts { font-family: var(--heading); }
+.awards { display: flex; flex-direction: column; gap: 6px; }
+.award { display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; font-size: 13px; }
+.award small { display: block; font-size: 11px; color: var(--muted-fg); }
+.award .pts { font-family: var(--heading); }
+.place { display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); border-radius: 12px; padding: 9px 12px; font-size: 13.5px; }
+.place.w { box-shadow: 0 0 0 1px var(--primary); border-color: transparent; }
+.place .l { display: flex; gap: 10px; align-items: center; }
+.place .pl { font-family: "Libre Caslon Text", serif; font-weight: 700; width: 22px; }
+.tagp { font-size: 10px; font-weight: 700; border-radius: 999px; padding: 2px 8px; }
+.tagp.gold { background: var(--primary); color: var(--primary-fg); }
+.tagp.m { background: var(--muted); color: var(--muted-fg); }
+.order { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
+.order .r { display: flex; justify-content: space-between; color: var(--muted-fg); padding: 3px 0; }
+.order .r b { color: var(--foreground); font-weight: 600; }
+.grade { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.grade .r { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--hair); }
+.grade .r .act { font-family: "Libre Caslon Text", serif; font-weight: 700; }
+.grade .r .you2 { font-size: 11.5px; color: var(--muted-fg); text-align: right; }
+.ok { color: var(--emerald-text); }
+.closed { border: 1px dashed var(--border); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; color: var(--muted-fg); }
+.tabs { display: flex; justify-content: space-around; border-top: 1px solid var(--hair); padding: 10px 0 14px; font-size: 11px; color: var(--muted-fg); }
+.tabs .on { color: var(--accent); font-weight: 600; }
+.feed { font-size: 12.5px; display: flex; flex-direction: column; gap: 6px; }
+.feed .wk { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-fg); }
+</style>
+</head>
+<body>
+<h1 class="board-title">Season wrap: every tab after the Finale</h1>
+<p class="board-sub">Mocks, not production UI. Real Season 35 data: Ezra &amp; Daniella won, Amber &amp; Pasha were runners-up, Connor &amp; Rylee third, Tatyana &amp; Jan 4th, Maura &amp; Mark 5th; league totals are each league's standings after the Finale was published, and the bracket is Kylie's real one. Season stats (picks called, best week, module leaders) and the roster card on the Week 11 page are made up. Kylie's Finale picks are real too. Today nothing changes when the season ends: the banner says That's a Wrap for 7 days then disappears, league cards keep their "Locked" lines, Picks keeps paging weeks and Transactions says there's no run to come. Dashed outlines mark what's new.</p>
+
+<div class="board">
+
+<div class="col" id="shot-home-a">
+<p class="cap">Home · A · The champions, then your final places <span class="rec">Recommended</span></p>
+<p class="capsub">The curtain becomes the season's wrap and stays until the next season is scheduled (not 7 days). Each league card turns into its final result: your place, a crown when you won, the top three, and Final Standings. No Picks Due, no lock lines.</p>
+<div class="phone"><div class="topbar"><span class="wordmark"><span class="orb"></span>Mirrorball Madness</span><span class="avatar">KA</span></div>
+<div class="page">
+  <div><div class="h1">Home</div><div class="rule"></div></div>
+  <div class="curtain new">
+    <span class="chip">Season 35 · That's a Wrap</span>
+    <div class="trophy">🪩</div>
+    <div class="champ">Ezra <span>&amp; Daniella</span></div>
+    <div class="sub">Mirrorball Champions</div>
+    <div class="podium3"><span>2nd <b>Amber &amp; Pasha</b></span><span>·</span><span>3rd <b>Connor &amp; Rylee</b></span></div>
+    <div class="track"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot trophy-dot">🏆</span></div>
+  </div>
+  <div class="section">Your Leagues · Final</div>
+  <div class="lcard gold new">
+    <div class="lhead"><span class="lname">#supportSWEKylie</span><span class="crown">👑 Champion</span></div>
+    <div class="rank"><b>1st</b> of 7 · <b>880.20</b> pts</div>
+    <div class="mini">
+      <div class="r me"><span class="n"><span class="pl">1</span><span>Kylie Au<span class="you">You</span></span></span><span class="pts">880.20</span></div>
+      <div class="r"><span class="n"><span class="pl">2</span><span>JSAK</span></span><span class="pts">731.52</span></div>
+      <div class="r"><span class="n"><span class="pl">3</span><span>Colin</span></span><span class="pts">679.48</span></div>
+    </div>
+    <div class="btns"><span class="btn pri">Final Standings</span><span class="btn">Season Recap</span></div>
+  </div>
+  <div class="lcard new">
+    <div class="lhead"><span class="lname">Carrie Ann's Biggest Fans</span><span class="crown silver">3rd</span></div>
+    <div class="rank"><b>3rd</b> of 6 · <b>1,064.44</b> pts · Guillermo fan club won</div>
+    <div class="btns"><span class="btn pri">Final Standings</span><span class="btn">Season Recap</span></div>
+  </div>
+  <div class="fade">+ matt with the stars (1st) · Pen &amp; Paso (1st)</div>
+</div>
+<div class="tabs"><span class="on">Home</span><span>Results</span><span>Picks</span><span>Standings</span></div>
+</div>
+</div>
+
+<div class="col" id="shot-home-b">
+<p class="cap">Home · B · Your season first</p>
+<p class="capsub">A personal summary leads: how many leagues you won, with a trophy per league, then the show's champions as a slim strip. League cards are compact rows. Warmer for the person, less about the show.</p>
+<div class="phone"><div class="topbar"><span class="wordmark"><span class="orb"></span>Mirrorball Madness</span><span class="avatar">KA</span></div>
+<div class="page">
+  <div><div class="h1">Home</div><div class="rule"></div></div>
+  <div class="lcard gold new">
+    <span class="chip" style="align-self:flex-start">Your Season 35</span>
+    <div class="champ" style="text-align:left">You won 3 of 4 leagues</div>
+    <div class="mini">
+      <div class="r"><span class="n"><span>👑</span><span>#supportSWEKylie</span></span><span class="pts">1st of 7</span></div>
+      <div class="r"><span class="n"><span>👑</span><span>matt with the stars</span></span><span class="pts">1st of 6</span></div>
+      <div class="r"><span class="n"><span>👑</span><span>Pen &amp; Paso (Doble)</span></span><span class="pts">1st of 6</span></div>
+      <div class="r"><span class="n"><span>🥉</span><span>Carrie Ann's Biggest Fans</span></span><span class="pts">3rd of 6</span></div>
+    </div>
+    <div class="btns"><span class="btn pri">See Final Standings</span></div>
+  </div>
+  <div class="closed new" style="display:flex;justify-content:space-between;align-items:center"><span>🪩 <b style="color:var(--foreground)">Ezra &amp; Daniella</b> won Season 35</span><span>Results ›</span></div>
+  <div class="section">Recent Activity</div>
+  <div class="feed">
+    <span class="wk">Week 11 · Finale</span>
+    <span>🏆 <b>Ezra &amp; Daniella</b> won the Mirrorball</span>
+    <span>Amber &amp; Pasha 2nd · Connor &amp; Rylee 3rd · Tatyana &amp; Jan 4th · Maura &amp; Mark 5th</span>
+    <span>You won #supportSWEKylie, matt with the stars and Pen &amp; Paso</span>
+  </div>
+</div>
+<div class="tabs"><span class="on">Home</span><span>Results</span><span>Picks</span><span>Standings</span></div>
+</div>
+</div>
+
+<div class="col" id="shot-standings">
+<p class="cap">Standings · Final</p>
+<p class="capsub">Titled Final Standings with a podium for the top three managers, the rest below, and one line per module naming who led it. Score History and the Couples Leaderboard stay as they are, with the champion couple marked.</p>
+<div class="phone"><div class="topbar"><span class="wordmark"><span class="orb"></span>Mirrorball Madness</span><span class="avatar">KA</span></div>
+<div class="page">
+  <div><div class="h1">Final Standings</div><div class="rule"></div><div class="league">#supportSWEKylie · Season 35</div></div>
+  <div class="podium new">
+    <div class="step"><span class="p">2</span><span class="who">JSAK</span><span class="pts">731.52</span></div>
+    <div class="step first"><span>👑</span><span class="p">1</span><span class="who">Kylie Au<span class="you">You</span></span><span class="pts">880.20</span></div>
+    <div class="step"><span class="p">3</span><span class="who">Colin</span><span class="pts">679.48</span></div>
+  </div>
+  <div class="lb">
+    <div class="r"><span class="n"><span class="pl">4</span><span>Kellie Au</span></span><span class="pts">677.11</span></div>
+    <div class="r"><span class="n"><span class="pl">5</span><span>Lauren Au</span></span><span class="pts">609.98</span></div>
+    <div class="r"><span class="n"><span class="pl">6</span><span>Wlee13</span></span><span class="pts">588.96</span></div>
+    <div class="r"><span class="n"><span class="pl">7</span><span>Jonathan Au</span></span><span class="pts">188.44</span></div>
+  </div>
+  <div class="section">Module Leaders</div>
+  <div class="awards new">
+    <div class="award"><span>Curtain Call<small>Most picks called</small></span><span>JSAK · <span class="pts">212.40</span></span></div>
+    <div class="award"><span>Dance Card<small>Best roster</small></span><span>Kylie Au · <span class="pts">318.75</span></span></div>
+    <div class="award"><span>Grand Finale<small>Best bracket</small></span><span>Colin · <span class="pts">241.10</span></span></div>
+  </div>
+</div>
+<div class="tabs"><span>Home</span><span>Results</span><span>Picks</span><span class="on">Standings</span></div>
+</div>
+</div>
+
+</div>
+<div class="board" style="padding-top:0">
+
+<div class="col" id="shot-results">
+<p class="cap">Results · The Finale and the season</p>
+<p class="capsub">The Finale opens on its final placements, 1st to 5th, instead of the usual couple cards, which stay below. Under them, Season 35 at a Glance: the whole elimination order, each week a line.</p>
+<div class="phone"><div class="topbar"><span class="wordmark"><span class="orb"></span>Mirrorball Madness</span><span class="avatar">KA</span></div>
+<div class="page">
+  <div><div class="h1">Results</div><div class="rule"></div><div class="league">Week 11 — Finale</div></div>
+  <div class="card new">
+    <div class="card-title">Final Placements</div>
+    <div class="place w"><span class="l"><span class="pl">1</span><b>Ezra</b> &amp; Daniella</span><span class="tagp gold">🪩 Champions</span></div>
+    <div class="place"><span class="l"><span class="pl">2</span><b>Amber</b> &amp; Pasha</span><span class="tagp m">Runner-Up</span></div>
+    <div class="place"><span class="l"><span class="pl">3</span><b>Connor</b> &amp; Rylee</span><span class="tagp m">Third</span></div>
+    <div class="place"><span class="l"><span class="pl">4</span><b>Tatyana</b> &amp; Jan</span><span class="tagp m">4th</span></div>
+    <div class="place"><span class="l"><span class="pl">5</span><b>Maura</b> &amp; Mark</span><span class="tagp m">5th</span></div>
+  </div>
+  <div class="card new">
+    <div class="card-title">Season 35 at a Glance</div>
+    <div class="order">
+      <div class="r"><span>Week 10</span><b>Harry &amp; Jenna</b></div>
+      <div class="r"><span>Week 9</span><b>Jenna &amp; Val</b></div>
+      <div class="r"><span>Week 8</span><b>Julia &amp; Ezra</b></div>
+      <div class="r"><span>Week 7</span><b>Jackson &amp; Emma, Tyler &amp; Sharna</b></div>
+      <div class="r"><span>Week 6</span><span>No elimination</span></div>
+      <div class="r"><span>Week 5</span><b>Guillermo &amp; Witney</b></div>
+      <div class="r"><span>…</span><span>Weeks 1–4</span></div>
+    </div>
+  </div>
+</div>
+<div class="tabs"><span>Home</span><span class="on">Results</span><span>Picks</span><span>Standings</span></div>
+</div>
+</div>
+
+<div class="col" id="shot-picks-w11">
+<p class="cap">Picks · Week 11 · Finale, as any week</p>
+<p class="capsub">The Finale keeps its normal page in the carousel: your podium and High picks graded against the real result, Your Fantasy Roster with Tatyana &amp; Jan as 4th Place (not struck through), League at a Glance. The carousel goes one page further.</p>
+<div class="phone"><div class="topbar"><span class="wordmark"><span class="orb"></span>Mirrorball Madness</span><span class="avatar">KA</span></div>
+<div class="page">
+  <div><div class="h1">Picks</div><div class="rule"></div><div class="league">#supportSWEKylie</div></div>
+  <div class="card">
+    <div class="card-title">Curtain Call</div>
+    <div class="carousel"><span>‹</span><b>Week 11 · Finale</b><span>›</span></div>
+    <div class="grade">
+      <div class="r"><span class="act">Win</span><span><b>Amber</b> &amp; Pasha</span><span class="you2">Finished 2nd · Off 1</span></div>
+      <div class="r"><span class="act">2nd</span><span><b>Ezra</b> &amp; Daniella</span><span class="you2">Won · Off 1</span></div>
+      <div class="r"><span class="act">3rd</span><span><b>Connor</b> &amp; Rylee</span><span class="you2 ok">Exact ✓</span></div>
+      <div class="r"><span class="act">High</span><span><b>Amber</b> &amp; Pasha</span><span class="you2 ok">Tied for 90 ✓</span></div>
+    </div>
+    <div class="rank">Week 11 · <b>+8.63</b> Curtain Call</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Your Fantasy Roster</div>
+    <div class="stack">
+      <div class="couple new"><span class="n"><b>Tatyana</b> <span>&amp; Jan</span><br /><span class="tag" style="background:rgba(242,232,216,.12);color:var(--foreground)">4th Place</span></span><span class="p">Week 11<b>+24.60</b></span></div>
+      <div class="couple out"><span class="n"><b>Jenna</b> <span>&amp; Val</span><br /><span class="tag elim">Eliminated</span></span><span class="p">Weeks 1–9<b>+0.00</b></span></div>
+    </div>
+  </div>
+</div>
+<div class="tabs"><span>Home</span><span>Results</span><span class="on">Picks</span><span>Standings</span></div>
+</div>
+</div>
+
+<div class="col" id="shot-picks">
+<p class="cap">Picks · Season 35, the carousel's last page</p>
+<p class="capsub">One page after the Finale, and where Picks opens once the season is over: a few stats, then your bracket graded against the real top five. ‹ goes back to Week 11. Transactions goes away.</p>
+<div class="phone"><div class="topbar"><span class="wordmark"><span class="orb"></span>Mirrorball Madness</span><span class="avatar">KA</span></div>
+<div class="page">
+  <div><div class="h1">Picks</div><div class="rule"></div><div class="league">#supportSWEKylie</div></div>
+  <div class="card new">
+    <div class="carousel"><span>‹ Week 11</span><b>Season 35</b><span style="opacity:.3">›</span></div>
+    <div class="closed">Picks are closed for Season 35. Here's how yours went.</div>
+    <div class="sum">
+      <div class="stat"><b>7 of 11</b><span>Weeks your Home pick went home</span></div>
+      <div class="stat"><b>Week 6</b><span>Your best week · 112.40 pts</span></div>
+      <div class="stat"><b>318.75</b><span>Dance Card · 1st in the league</span></div>
+      <div class="stat"><b>8.63</b><span>Finale podium and High</span></div>
+    </div>
+  </div>
+  <div class="card new">
+    <div class="card-title">Your Season Bracket, Graded</div>
+    <div class="grade">
+      <div class="r"><span class="act">1st</span><span><b>Ezra</b> &amp; Daniella</span><span class="you2">You had 3rd · Off 2</span></div>
+      <div class="r"><span class="act">2nd</span><span><b>Amber</b> &amp; Pasha</span><span class="you2">You had 5th · Off 3</span></div>
+      <div class="r"><span class="act">3rd</span><span><b>Connor</b> &amp; Rylee</span><span class="you2">You had 8th · Off 5</span></div>
+      <div class="r"><span class="act">4th</span><span><b>Tatyana</b> &amp; Jan</span><span class="you2">You had 13th · Off 9</span></div>
+      <div class="r"><span class="act">5th</span><span><b>Maura</b> &amp; Mark</span><span class="you2">You had 2nd · Off 3</span></div>
+    </div>
+  </div>
+</div>
+<div class="tabs"><span>Home</span><span>Results</span><span class="on">Picks</span><span>Standings</span></div>
+</div>
+</div>
+
+</div>
+<div class="board" style="padding-top:0">
+
+<div class="col" style="width:420px">
+<p class="cap">Finalists, never Eliminated</p>
+<p class="capsub" style="min-height:0">4th and 5th are stored as Eliminated with a place, so scoring treats them as finalists; every fan label should too.</p>
+<div class="awards" style="width:390px">
+  <div class="award"><span>Results card<small>Today: Eliminated</small></span><span class="tagp m">4th Place</span></div>
+  <div class="award"><span>Home Recent Activity<small>Today: "Maura &amp; Mark were eliminated"</small></span><span style="font-size:12px">Maura &amp; Mark finished 5th</span></div>
+  <div class="award"><span>Your Fantasy Roster, Home card<small>Today: struck through, Eliminated</small></span><span class="tagp m">5th Place</span></div>
+  <div class="award"><span>Couples Leaderboard, couple page<small>Today: faded, Eliminated</small></span><span style="font-size:12px">Full colour · 4th Place</span></div>
+  <div class="award"><span>Season at a Glance<small>Weeks 1–10 only</small></span><span style="font-size:12px">Finalists sit in Final Placements</span></div>
+</div>
+</div>
+
+<div class="col" style="width:420px">
+<p class="cap">How long it lasts</p>
+<p class="capsub" style="min-height:0">The wrap is the season's resting state, not a 7-day banner.</p>
+<div class="awards" style="width:390px">
+  <div class="award"><span>Finale published<small>Every tab switches to its wrap</small></span><span>Now</span></div>
+  <div class="award"><span>Off-season<small>Wrap stays; leagues read Final</small></span><span>Until next season</span></div>
+  <div class="award"><span>Next season scheduled<small>A new season becomes active and Home goes back to week by week</small></span><span>Premiere</span></div>
+</div>
+<p class="note" style="margin-top:12px;max-width:390px;font-size:12px;color:var(--muted-fg)">A Spoiler-Free viewer who hasn't marked the Finale watched sees none of this: the wrap waits behind their Mark Watched, like every other result.</p>
+</div>
+
+</div>
+</body>
+</html>

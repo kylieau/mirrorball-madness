@@ -11,6 +11,7 @@ import { toBannerWeeks } from "@/lib/episode-banner";
 import { LiveScoresPrompt } from "@/components/live-scores-prompt";
 import { loadDraftScoreContext } from "@/lib/draft-scores-data";
 import { WeeklyResultsView } from "@/components/weekly-results-view";
+import { seasonEliminationOrder } from "@/lib/season-wrap";
 import { EpisodeCarousel, ThisWeekThemePeek } from "@/components/episode-carousel";
 import { FanPageChrome } from "@/components/top-bar";
 import { buildCoupleDisplayNames } from "@/lib/couple-display";
@@ -156,9 +157,9 @@ export default async function ThisWeekPage({
     showResults && selectedEpisodeIds.length > 0
       ? supabase
           .from("episode_results")
-          .select("episode_id, couple_id, outcome")
+          .select("episode_id, couple_id, outcome, final_place")
           .in("episode_id", selectedEpisodeIds)
-      : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string }[] }),
+      : Promise.resolve({ data: [] as { episode_id: string; couple_id: string; outcome: string; final_place: number | null }[] }),
     showResults && selectedEpisodeIds.length > 0
       ? supabase
           .from("episode_in_jeopardy_couples")
@@ -356,6 +357,11 @@ export default async function ThisWeekPage({
           teamDanceEpisodeIds={[...teamDanceEpisodeIds(episodeRoundTypes ?? [])]}
           specialDanceLabels={specialDanceLabels}
           historyFrom={selectedWeek ? thisWeekHref(selectedWeek.id) : "/this-week"}
+          seasonGlance={
+            selectedMode === "results" && selectedWeek?.is_finale
+              ? seasonEliminationOrder(allCouples.filter((c) => c.season_id === season.seasonId), selectedWeek.week_number)
+              : undefined
+          }
         />
       )}
     </div>
