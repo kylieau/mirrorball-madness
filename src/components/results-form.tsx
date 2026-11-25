@@ -22,6 +22,7 @@ import {
   undoTeamScores,
 } from "@/app/admin/results/actions";
 import { CirclePauseIcon, PlusIcon } from "lucide-react";
+import { cn } from "cn";
 import { JudgeScoreRow } from "@/components/judge-score-row";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImmuneBonusField, RoundExceptionPanel, type ExceptionChoice } from "@/components/round-exception-panel";
@@ -76,9 +77,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -111,36 +110,34 @@ import { judgesForScoreInputs, type ScoringJudge } from "@/lib/scoring-judges";
 import { collapseToNights, MARK_MAX, scaledJudgesScore } from "@/lib/scoring";
 import { formatPoints } from "@/lib/format-points";
 
-// A special dance in a picker menu. Menu rows don't wrap and size to their
-// text by default (SelectItem), so a long name or member list would run
-// under the check mark: the row may shrink, the name wraps, Posted keeps the
-// right, and the member line ends in "…". The Dance Type is plain text, since
-// a badge turns unreadable on the highlighted row.
-const SPECIAL_PICKER_ITEM = "*:min-w-0";
+// Each row on a round's tab says where that round's dance stands, since each
+// dance posts on its own.
+type EntryStatus = "inProgress" | "ready" | "drafted" | "published";
+const STATUS_LABEL: Record<EntryStatus, string> = {
+  inProgress: "In progress",
+  ready: "Ready to Publish",
+  drafted: "Drafted",
+  published: "Published",
+};
+const STATUS_TONE: Record<EntryStatus, string> = {
+  inProgress: "bg-muted text-muted-foreground",
+  ready: "bg-primary/15 text-accent",
+  drafted: "bg-amber-500/10 text-amber-text",
+  published: "bg-emerald/10 text-emerald-text",
+};
 
-function specialPickerLabel({ name, badge, members, posted }: { name: string; badge: string | null; members: string; posted: boolean }) {
-  const detail = [badge, members].filter(Boolean).join(" · ");
+function StatusPill({ status }: { status: EntryStatus }) {
   return (
-    <span className="flex min-w-0 flex-1 flex-col whitespace-normal">
-      <span className="flex items-baseline gap-2">
-        <strong className="min-w-0 flex-1">{name}</strong>
-        {posted && <span className="shrink-0 text-xs text-muted-foreground">Posted</span>}
-      </span>
-      {detail && <span className="truncate text-xs text-muted-foreground">{detail}</span>}
+    <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap", STATUS_TONE[status])}>
+      <span aria-hidden className="size-1.5 rounded-full bg-current" />
+      {STATUS_LABEL[status]}
     </span>
   );
 }
 
-// The closed picker is one 32px line, so it gets the name and members on one
-// line, ending in "…".
-function specialPickerTrigger({ name, members }: { name: string; members: string }) {
-  return (
-    <span className="flex min-w-0 items-center gap-1.5">
-      <strong className="min-w-0 truncate">{name}</strong>
-      {members && <span className="min-w-0 shrink-[4] truncate text-muted-foreground">· {members}</span>}
-    </span>
-  );
-}
+// A row opened then tapped shut stays shut rather than falling back to the
+// first row still to publish.
+const CLOSED_ENTRY = "closed";
 
 
 type Couple = { id: string; celebrity_name: string; pro_name: string };
@@ -443,11 +440,10 @@ export function ResultsForm({
   const [error, setError] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState(false);
   const [seedingCorrection, setSeedingCorrection] = useState(false);
-  const [coupleViewMode, setCoupleViewMode] = useState<"inProgress" | "drafted" | "published">("inProgress");
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  // The open row on the Couples & Scores card: a couple, a special dance
+  // (team:<id>), a planned heat (heat:<n>), Add Special Dance, or none.
   const [byCoupleSelectedId, setByCoupleSelectedId] = useState("");
-  const [draftedSelectedId, setDraftedSelectedId] = useState("");
-  const [publishedSelectedId, setPublishedSelectedId] = useState("");
   // Published couples default to locked/read-only in a correction (every
   // couple in a published episode is already fully editable in the draft
   // underneath -- this just narrows which one the UI lets you touch at a
@@ -567,13 +563,11 @@ export function ResultsForm({
       previousEpisodeId.current = selectedEpisode.id;
       setJustPublished(false);
       setByCoupleSelectedId("");
-      setDraftedSelectedId("");
       setSelectedRoundId(null);
       setExceptionFor(null);
       setBandCoupleId(null);
       setShowLeaderboard(false);
       setUnlockedForCorrectionCoupleIds(new Set());
-      setCoupleViewMode(selectedEpisode.results_published_at != null ? "published" : "inProgress");
       setPostedSkipNotice([]);
       draftSaveQueue.current.reset();
     }
@@ -639,17 +633,6 @@ export function ResultsForm({
   const scoredCouples = episodeCouples.filter((c) =>
     (rows[c.id] ?? emptyRow()).dances.some((d) => Object.values(d.scores).some((v) => v !== ""))
   );
-  // On a round's tab a couple is Published once that round's dance is, since
-  // each dance posts on its own; elsewhere, once any of their dances is. Once
-  // the whole episode is officially published, every couple in it is
-  // published -- there's no "still drafting" distinction left to make.
-  const postedHere = (coupleId: string) =>
-    activeSlot != null && !showLeaderboard ? !!liveIdOf(coupleId, activeSlot + 1) : revealedCoupleIds.has(coupleId);
-  const publishedCouples = published ? episodeCouples : episodeCouples.filter((c) => postedHere(c.id));
-  const draftedCouples = published ? [] : episodeCouples.filter((c) => releasedCoupleIds.has(c.id) && !postedHere(c.id));
-  const inProgressCouples = published
-    ? []
-    : episodeCouples.filter((c) => !releasedCoupleIds.has(c.id) && !postedHere(c.id));
   const eliminatedCount = episodeCouples.filter((c) => (rows[c.id] ?? emptyRow()).outcome === "eliminated").length;
   const requiredEliminations = selectedWeek?.is_double_elimination_week ? 2 : 1;
 
@@ -871,8 +854,7 @@ export function ResultsForm({
       if (!result.error && result.result?.id) {
         setDraftSpecial(null);
         const value = teamPickValue(result.result.id);
-        if (published) setPublishedSelectedId(value);
-        else setByCoupleSelectedId(value);
+        setByCoupleSelectedId(value);
         router.refresh();
       }
       return { error: result.error, id: result.result?.id };
@@ -885,7 +867,7 @@ export function ResultsForm({
     if (!selectedEpisode) return { error: "Select a week first." };
     if (teamId === NEW_SPECIAL_ID) {
       setDraftSpecial(null);
-      setByCoupleSelectedId(inProgressCouples[0]?.id ?? "");
+      setByCoupleSelectedId("");
       return { error: null };
     }
     try {
@@ -996,7 +978,6 @@ export function ResultsForm({
     const draft = blankSpecialDance(selectedEpisode.id, freestyleStyleId);
     setDraftSpecial(draft);
     setShowLeaderboard(false);
-    setCoupleViewMode("inProgress");
     setByCoupleSelectedId(ADD_SPECIAL_VALUE);
   }
 
@@ -1011,6 +992,7 @@ export function ResultsForm({
         setRevealBusy(false);
         return;
       }
+      setByCoupleSelectedId(coupleId);
       const result = await revealDanceScores({ episodeId: selectedEpisode.id, coupleId, slot });
       if (result.error) {
         setError(result.error);
@@ -1457,82 +1439,117 @@ export function ResultsForm({
   function firstName(coupleId: string) {
     return coupleParts(namedCouple(coupleId) ?? { id: coupleId, celebrity_name: "?", pro_name: "?" }).celebrity;
   }
-  function renderCouplePicker(list: Couple[], selectedId: string, onSelect: (id: string) => void, teams: PickerTeam[] = [], opts: { allowAdd?: boolean } = {}) {
+  // Where a couple stands on the open round: its dance in that slot, or every
+  // dance of theirs when the episode has no rounds.
+  function coupleStatus(c: Couple): EntryStatus {
+    if (published) return "published";
+    const dances = (rows[c.id] ?? emptyRow()).dances
+      .map((d, i) => ({ d, slot: i + 1 }))
+      .filter(({ d, slot }) => d.danceStyleId && (activeSlot == null || slot === activeSlot + 1));
+    if (dances.length > 0 && dances.every(({ slot }) => liveIdOf(c.id, slot))) return "published";
+    if (releasedCoupleIds.has(c.id)) return "drafted";
+    if (dances.length > 0 && dances.every(({ d }) => danceScored(d))) return "ready";
+    return "inProgress";
+  }
+
+  function specialStatus(dance: SpecialDance | null): EntryStatus {
+    if (published || dance?.postedAt) return "published";
+    return dance && releasedTeamIds.has(dance.id) ? "drafted" : "inProgress";
+  }
+
+  // "Cha Cha · Tears" for the open round's dance (every dance of theirs with
+  // no rounds), and its total once a mark is in.
+  function coupleRowDetail(c: Couple): { detail: string; total: number | null } {
+    const dances = (rows[c.id] ?? emptyRow()).dances.filter((d, i) => d.danceStyleId && (activeSlot == null || i === activeSlot));
+    if (dances.length === 0) return { detail: "No dance yet", total: null };
+    const detail = dances
+      .map((d) => [danceStyles.find((ds) => ds.id === d.danceStyleId)?.name, d.songTitle.trim()].filter(Boolean).join(" · "))
+      .join(" + ");
+    const marked = dances.some((d) => Object.values(d.scores).some((v) => v !== ""));
+    return { detail, total: marked ? dances.reduce((sum, d) => sum + danceTotal(d), 0) : null };
+  }
+
+  // One row per entry, opened in place one at a time: the open row, else the
+  // first one still to publish. Rows keep their order as statuses change.
+  function renderEntryRows(
+    entries: { value: string; status: EntryStatus; name: ReactNode; detail: string; total?: number | null; render: () => ReactNode }[],
+    fallback: string | null
+  ) {
+    const open = entries.some((e) => e.value === byCoupleSelectedId)
+      ? byCoupleSelectedId
+      : byCoupleSelectedId === CLOSED_ENTRY
+        ? null
+        : (fallback ?? entries.find((e) => e.status !== "published")?.value ?? null);
+    return (
+      <div className="flex flex-col gap-1.5">
+        {entries.map((e) => {
+          const isOpen = e.value === open;
+          return (
+            <div key={e.value} className={cn("rounded-xl border", isOpen ? "border-primary" : "border-border")}>
+              <button
+                type="button"
+                aria-expanded={isOpen}
+                className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                onClick={() => {
+                  setDraftSpecial(null);
+                  setByCoupleSelectedId(isOpen ? CLOSED_ENTRY : e.value);
+                }}
+              >
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-sm">{e.name}</span>
+                  {e.detail && <span className="truncate text-xs text-muted-foreground">{e.detail}</span>}
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  {e.total != null && <span className="font-heading text-base font-semibold">{e.total}</span>}
+                  <StatusPill status={e.status} />
+                </span>
+              </button>
+              {isOpen && <div className="px-2 pb-2">{e.render()}</div>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderCoupleRows(list: Couple[], teams: PickerTeam[], opts: { allowAdd?: boolean } = {}) {
     const allowAdd = Boolean(opts.allowAdd && special && canSetupSpecials);
-    const listedTeams = [...teams.filter((t) => t.dance.id !== NEW_SPECIAL_ID)].sort((a, b) => {
-      const byName = (a.dance.name || "").localeCompare(b.dance.name || "", undefined, { sensitivity: "base" });
-      return byName !== 0 ? byName : teams.indexOf(a) - teams.indexOf(b);
-    });
-    const selectedTeam = selectedId === ADD_SPECIAL_VALUE
-      ? teams.find((v) => v.dance.id === NEW_SPECIAL_ID)
-      : selectedId.startsWith("team:")
-        ? teams.find((v) => teamPickValue(v.dance.id) === selectedId)
-        : undefined;
-    const current = selectedTeam ? null : (list.find((c) => c.id === selectedId) ?? list[0] ?? null);
-    const value = selectedId === ADD_SPECIAL_VALUE
-      ? ADD_SPECIAL_VALUE
-      : selectedTeam
-        ? teamPickValue(selectedTeam.dance.id)
-        : (current?.id ?? (allowAdd ? ADD_SPECIAL_VALUE : teamPickValue(listedTeams[0]?.dance.id ?? "")));
-    const teamNames = (item: PickerTeam) => ({
-      name: item.dance.name ? specialDanceShortName(item.dance) : "New Special Dance",
-      members: oxfordJoin(item.dance.memberCoupleIds.map(firstName)),
-    });
-    const teamLabel = (item: PickerTeam) =>
-      specialPickerLabel({ ...teamNames(item), badge: specialDanceTypeBadge(item.dance), posted: !!item.dance.postedAt });
-    const items: Record<string, ReactNode> = {
-      ...Object.fromEntries(listedTeams.map((v) => [teamPickValue(v.dance.id), specialPickerTrigger(teamNames(v))])),
-      ...Object.fromEntries(list.map((c) => [c.id, coupleNameNode(coupleParts(c))])),
-    };
-    if (allowAdd) items[ADD_SPECIAL_VALUE] = "+ Add Special Dance";
+    const listedTeams = teams
+      .filter((t) => t.dance.id !== NEW_SPECIAL_ID)
+      .sort((a, b) => (a.dance.name || "").localeCompare(b.dance.name || "", undefined, { sensitivity: "base" }));
+    const adding = byCoupleSelectedId === ADD_SPECIAL_VALUE ? teams.find((t) => t.dance.id === NEW_SPECIAL_ID) : undefined;
+    if (list.length === 0 && listedTeams.length === 0 && !allowAdd) {
+      return <p className="text-sm text-muted-foreground">No couples to check for this episode.</p>;
+    }
     return (
       <>
-        <Select
-          items={items}
-          value={value}
-          onValueChange={(v) => {
-            if (!v) return;
-            if (v === ADD_SPECIAL_VALUE) {
-              startAddSpecialDance();
-              return;
-            }
-            onSelect(v);
-          }}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {list.length > 0 && (
-              <SelectGroup>
-                <SelectLabel>Couples · {list.length}</SelectLabel>
-                {list.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {coupleNameNode(coupleParts(c))}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
+        {renderEntryRows(
+          [
+            ...list.map((c) => ({
+              value: c.id,
+              status: coupleStatus(c),
+              name: coupleNameNode(coupleParts(c)),
+              ...coupleRowDetail(c),
+              render: () => renderDanceEntry(c, undefined, undefined, true),
+            })),
+            ...listedTeams.map((t) => ({
+              value: teamPickValue(t.dance.id),
+              status: specialStatus(t.dance),
+              name: <strong>{t.dance.name ? specialDanceShortName(t.dance) : "New Special Dance"}</strong>,
+              detail: [specialDanceTypeBadge(t.dance), oxfordJoin(t.dance.memberCoupleIds.map(firstName))].filter(Boolean).join(" · "),
+              render: t.render,
+            })),
+          ],
+          adding ? ADD_SPECIAL_VALUE : null
+        )}
+        {adding
+          ? adding.render()
+          : allowAdd && (
+              <Button variant="outline" className="self-start border-dashed" onClick={startAddSpecialDance}>
+                <PlusIcon className="size-4" />
+                Add Special Dance
+              </Button>
             )}
-            {(listedTeams.length > 0 || allowAdd) && (
-              <SelectGroup>
-                <SelectLabel>Special Dances · {listedTeams.length}</SelectLabel>
-                {listedTeams.map((v) => (
-                  <SelectItem key={v.dance.id} value={teamPickValue(v.dance.id)} className={SPECIAL_PICKER_ITEM}>
-                    {teamLabel(v)}
-                  </SelectItem>
-                ))}
-                {allowAdd && <SelectItem value={ADD_SPECIAL_VALUE}>+ Add Special Dance</SelectItem>}
-              </SelectGroup>
-            )}
-          </SelectContent>
-        </Select>
-        {selectedTeam
-          ? selectedTeam.render()
-          : current
-            ? renderDanceEntry(current)
-            : teams[0]
-              ? teams[0].render()
-              : null}
       </>
     );
   }
@@ -1545,14 +1562,7 @@ export function ResultsForm({
     const dance = persistedTeams.find((t) => t.id === teamId);
     // A planned heat lives on its round's tab.
     if (dance?.roundId) setSelectedRoundId(dance.roundId);
-    const postedDance = dance?.postedAt != null;
-    if (published || postedDance) {
-      setCoupleViewMode("published");
-      setPublishedSelectedId(value);
-    } else {
-      setCoupleViewMode("inProgress");
-      setByCoupleSelectedId(value);
-    }
+    setByCoupleSelectedId(value);
   }
 
   function specialParticipants(): { id: string; celebrity: string; pro: string; status: string; eliminationWeek: number | null }[] {
@@ -1696,90 +1706,66 @@ export function ResultsForm({
   }
 
   // A special round's heats or teams (placeholders for any not set up yet)
-  // and its immunity bonus, filtered by the In progress / Drafted / Published
-  // chips like couples are.
+  // and its immunity bonus, one row each with its status.
   function renderRoundPicker(round: EpisodeRound) {
     const units = roundUnits(round, persistedTeams);
     const immunity = roundImmunity(round, persistedTeams);
-    const listed = (dance: SpecialDance | null) =>
-      coupleViewMode === "published"
-        ? dance != null && (published || dance.postedAt != null)
-        : coupleViewMode === "drafted"
-          ? dance != null && !published && dance.postedAt == null && releasedTeamIds.has(dance.id)
-          : !published && (dance == null || dance.postedAt == null);
-    const entries = [
-      ...units.filter((u) => listed(u.dance)).map((u) => ({ value: u.dance ? teamPickValue(u.dance.id) : `heat:${u.heatNumber}`, unit: u, dance: u.dance })),
-      ...(immunity && listed(immunity) ? [{ value: teamPickValue(immunity.id), unit: null, dance: immunity }] : []),
-    ];
-    const selectedId = coupleViewMode === "drafted" ? draftedSelectedId : coupleViewMode === "published" ? publishedSelectedId : byCoupleSelectedId;
-    const setSelected = coupleViewMode === "drafted" ? setDraftedSelectedId : coupleViewMode === "published" ? setPublishedSelectedId : setByCoupleSelectedId;
     const draftOpen = draftSpecial && draftSpecial.roundId === round.id ? draftSpecial : null;
-    const value = draftOpen
-      ? `heat:${draftOpen.heatNumber}`
-      : entries.some((e) => e.value === selectedId)
-        ? selectedId
-        : (entries[0]?.value ?? "");
-    const current = entries.find((e) => e.value === value);
-    const entryNames = (entry: (typeof entries)[number]) => ({
-      name: entry.dance ? specialDanceShortName(entry.dance) : (entry.unit?.name ?? ""),
-      members: entry.dance ? oxfordJoin(entry.dance.memberCoupleIds.map(firstName)) : "Not set up yet",
-    });
-    // The round's tab already names its kind, so no Dance Type here.
-    const label = (entry: (typeof entries)[number]) => specialPickerLabel({ ...entryNames(entry), badge: null, posted: !!entry.dance?.postedAt });
-    if (entries.length === 0) {
-      return (
-        <p className="text-sm text-muted-foreground">
-          {coupleViewMode === "inProgress" ? (published ? "This episode is published — see Published." : `Every ${unitNoun(round, false).toLowerCase()} is posted.`) : `Nothing here yet.`}
-        </p>
-      );
-    }
     const draftView = draftOpen ? teamEntityViews.find((v) => v.dance.id === NEW_SPECIAL_ID) : undefined;
-    const currentView = current?.dance ? teamEntityViews.find((v) => v.dance.id === current.dance!.id) : undefined;
+    const viewOf = (dance: SpecialDance) => teamEntityViews.find((v) => v.dance.id === dance.id);
+    const members = (dance: SpecialDance | null) => (dance ? oxfordJoin(dance.memberCoupleIds.map(firstName)) : "Not set up yet");
+    const placeholder = (heatNumber: number, name: string) => (
+      <div className="flex flex-col gap-2 rounded-xl border border-dashed border-primary/50 p-3">
+        <p className="text-sm">
+          <strong>{name}</strong> <span className="text-muted-foreground">isn&apos;t set up yet.</span>
+        </p>
+        {canSetupSpecials ? (
+          <Button variant="outline" className="self-start" onClick={() => startPlannedUnit(round, heatNumber)}>
+            Set Up {name}
+          </Button>
+        ) : (
+          <p className="text-xs text-muted-foreground">A site admin sets it up once it airs.</p>
+        )}
+      </div>
+    );
     return (
       <>
-        <Select
-          items={Object.fromEntries(entries.map((e) => [e.value, specialPickerTrigger(entryNames(e))]))}
-          value={value}
-          onValueChange={(v) => {
-            if (!v) return;
-            setDraftSpecial(null);
-            setSelected(v);
-          }}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectLabel>
-                {round.unitCount} {round.unitCount === 1 ? unitNoun(round, false) : unitNoun(round)}
-              </SelectLabel>
-              {entries.map((e) => (
-                <SelectItem key={e.value} value={e.value} className={SPECIAL_PICKER_ITEM}>
-                  {label(e)}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        {draftView ? (
-          renderTeamEntityEntry(draftView)
-        ) : currentView ? (
-          renderTeamEntityEntry(currentView)
-        ) : current?.unit ? (
-          <div className="flex flex-col gap-2 rounded-xl border border-dashed border-primary/50 p-3">
-            <p className="text-sm">
-              <strong>{current.unit.name}</strong> <span className="text-muted-foreground">isn&apos;t set up yet.</span>
-            </p>
-            {canSetupSpecials ? (
-              <Button variant="outline" className="self-start" onClick={() => startPlannedUnit(round, current.unit!.heatNumber)}>
-                Set Up {current.unit.name}
-              </Button>
-            ) : (
-              <p className="text-xs text-muted-foreground">A site admin sets it up once it airs.</p>
-            )}
-          </div>
-        ) : null}
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {round.unitCount} {round.unitCount === 1 ? unitNoun(round, false) : unitNoun(round)}
+        </p>
+        {renderEntryRows(
+          [
+            ...units.map((u) => {
+              const value = u.dance ? teamPickValue(u.dance.id) : `heat:${u.heatNumber}`;
+              const view = u.dance ? viewOf(u.dance) : undefined;
+              return {
+                value,
+                status: specialStatus(u.dance),
+                name: <strong>{u.dance ? specialDanceShortName(u.dance) : u.name}</strong>,
+                detail: members(u.dance),
+                render: () =>
+                  draftOpen?.heatNumber === u.heatNumber && draftView
+                    ? renderTeamEntityEntry(draftView)
+                    : view
+                      ? renderTeamEntityEntry(view)
+                      : placeholder(u.heatNumber, u.name),
+              };
+            }),
+            ...(immunity
+              ? [{
+                  value: teamPickValue(immunity.id),
+                  status: specialStatus(immunity),
+                  name: <strong>{specialDanceShortName(immunity)}</strong>,
+                  detail: members(immunity),
+                  render: () => {
+                    const view = viewOf(immunity);
+                    return view ? renderTeamEntityEntry(view) : null;
+                  },
+                }]
+              : []),
+          ],
+          draftOpen ? `heat:${draftOpen.heatNumber}` : null
+        )}
       </>
     );
   }
@@ -1832,8 +1818,6 @@ export function ResultsForm({
   }
 
   const pickerTeams: PickerTeam[] = teamEntityViews.map((view) => ({ dance: view.dance, view, render: () => renderTeamEntityEntry(view) }));
-  const openPickerTeams = pickerTeams.filter((v) => !v.dance.postedAt);
-  const postedPickerTeams = pickerTeams.filter((v) => v.dance.postedAt);
 
   function renderDancePublish(coupleId: string, d: RowDance, slot: number) {
     const liveId = liveIdOf(coupleId, slot);
@@ -1860,7 +1844,9 @@ export function ResultsForm({
     );
   }
 
-  function renderDanceEntry(c: Couple, rank?: number, slot: number | null = showLeaderboard ? null : activeSlot) {
+  // inRow: inside its row on the Couples & Scores card, which already names
+  // the couple and frames it.
+  function renderDanceEntry(c: Couple, rank?: number, slot: number | null = showLeaderboard ? null : activeSlot, inRow = false) {
     const row = rows[c.id] ?? emptyRow();
     const coupleExceptions = exceptions.filter((x) => x.coupleId === c.id);
     // Once officially published, every couple's draft is already fully
@@ -1870,13 +1856,15 @@ export function ResultsForm({
     const locked = published && correctionLocked;
     const coupleHasPosted = revealedCoupleIds.has(c.id);
     return (
-      <div key={c.id} className="rounded-xl border border-border p-2.5">
-        <p className="text-sm font-semibold">
-          {rank != null && <span className="text-muted-foreground">#{rank}</span>} <CoupleName {...coupleParts(c)} />
-          {rank != null && (
-            <span className="ml-1.5 text-muted-foreground">· {nightPreview(row, c.id) ?? `${coupleTotal(row)} pts`}</span>
-          )}
-        </p>
+      <div key={c.id} className={inRow ? undefined : "rounded-xl border border-border p-2.5"}>
+        {!inRow && (
+          <p className="text-sm font-semibold">
+            {rank != null && <span className="text-muted-foreground">#{rank}</span>} <CoupleName {...coupleParts(c)} />
+            {rank != null && (
+              <span className="ml-1.5 text-muted-foreground">· {nightPreview(row, c.id) ?? `${coupleTotal(row)} pts`}</span>
+            )}
+          </p>
+        )}
 
         <fieldset disabled={locked || revealBusy || publishing || releasing} className="mt-1.5 flex min-w-0 flex-col gap-1.5">
           {slot != null && activeRound && (
@@ -2276,15 +2264,16 @@ export function ResultsForm({
                   <button
                     type="button"
                     className="text-sm font-semibold text-accent"
-                    onClick={() => setShowLeaderboard(true)}
+                    onClick={() => setShowLeaderboard((on) => !on)}
                   >
-                    Leaderboard →
+                    {showLeaderboard ? "← Couples" : "Leaderboard →"}
                   </button>
                 </div>
               </div>
               {activeRound && (
-                // Rounds are where you are in the night (tabs); the chips below
-                // filter that round. No round reads active over the Leaderboard.
+                // Rounds are where you are in the night (tabs); each row below
+                // says where its dance in that round stands. No round reads
+                // active over the Leaderboard.
                 <Tabs
                   value={showLeaderboard ? "" : activeRound.id}
                   onValueChange={(value) => {
@@ -2311,38 +2300,6 @@ export function ResultsForm({
                   </div>
                 </Tabs>
               )}
-              <div className="flex gap-2 pt-1">
-                <Button
-                  size="sm"
-                  variant={!showLeaderboard && coupleViewMode === "inProgress" ? "default" : "outline"}
-                  onClick={() => {
-                    setShowLeaderboard(false);
-                    setCoupleViewMode("inProgress");
-                  }}
-                >
-                  In progress
-                </Button>
-                <Button
-                  size="sm"
-                  variant={!showLeaderboard && coupleViewMode === "drafted" ? "default" : "outline"}
-                  onClick={() => {
-                    setShowLeaderboard(false);
-                    setCoupleViewMode("drafted");
-                  }}
-                >
-                  Drafted
-                </Button>
-                <Button
-                  size="sm"
-                  variant={!showLeaderboard && coupleViewMode === "published" ? "default" : "outline"}
-                  onClick={() => {
-                    setShowLeaderboard(false);
-                    setCoupleViewMode("published");
-                  }}
-                >
-                  Published
-                </Button>
-              </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {showLeaderboard ? (
@@ -2443,40 +2400,11 @@ export function ResultsForm({
                   {renderRoundPicker(activeRound)}
                   {renderNotInRound(activeRound)}
                 </>
-              ) : coupleViewMode === "drafted" ? (
-                draftedCouples.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {published ? "This episode is published — see Published." : "No couples drafted yet."}
-                  </p>
-                ) : (
-                  renderCouplePicker(draftedCouples.filter((c) => !outOfActiveRound.has(c.id)), draftedSelectedId, setDraftedSelectedId)
-                )
-              ) : coupleViewMode === "published" ? (
-                publishedCouples.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No couples published yet.</p>
-                ) : (
-                  renderCouplePicker(
-                    publishedCouples.filter((c) => !outOfActiveRound.has(c.id)),
-                    publishedSelectedId,
-                    setPublishedSelectedId,
-                    (published ? pickerTeams : postedPickerTeams).filter((t) => !activeRound || (!t.dance.roundId && activeRound.position === 1))
-                  )
-                )
-              ) : inProgressCouples.length === 0 && (published || (openPickerTeams.length === 0 && !(special && canSetupSpecials))) ? (
-                <p className="text-sm text-muted-foreground">
-                  {episodeCouples.length === 0
-                    ? "No couples to check for this episode."
-                    : published
-                      ? "This episode is published — see Published."
-                      : "Every couple's scores are drafted or published."}
-                </p>
               ) : (
                 <>
-                  {renderCouplePicker(
-                    inProgressCouples.filter((c) => !outOfActiveRound.has(c.id)),
-                    byCoupleSelectedId,
-                    setByCoupleSelectedId,
-                    published ? [] : openPickerTeams.filter((t) => !activeRound || (!t.dance.roundId && activeRound.position === 1)),
+                  {renderCoupleRows(
+                    episodeCouples.filter((c) => !outOfActiveRound.has(c.id)),
+                    pickerTeams.filter((t) => !activeRound || (!t.dance.roundId && activeRound.position === 1)),
                     { allowAdd: !published && (!activeRound || activeRound.position === 1) }
                   )}
                   {activeRound && renderNotInRound(activeRound)}

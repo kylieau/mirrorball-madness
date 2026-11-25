@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Enter Results · a status on each couple, per round</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../picks-roster-moves/mock.css" />
+<style>
+.tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--border); }
+.tab { padding-bottom: 8px; }
+.tab small { display: block; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-fg); }
+.tab span { font-size: 15px; color: var(--muted-fg); }
+.tab.on { border-bottom: 2px solid var(--primary); }
+.tab.on span { color: var(--accent); }
+.chips { display: flex; gap: 8px; }
+.chip { border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 13px; }
+.chip.on { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.select { border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.select .chev { color: var(--muted-fg); }
+.menu { border-radius: 10px; background: #2f2032; box-shadow: 0 8px 24px rgba(0,0,0,.4), 0 0 0 1px var(--hair); padding: 4px; }
+.menu .lbl { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-fg); padding: 6px 10px 4px; }
+.menu .it { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 14px; }
+.menu .it.sel { background: rgba(201,162,75,.14); }
+.st { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.st.prog { background: var(--muted); color: var(--muted-fg); }
+.st.ready { background: rgba(201,162,75,.18); color: var(--accent); }
+.st.draft { background: rgba(214,160,90,.16); color: #e0b37a; }
+.st.pub { background: rgba(76,122,90,.22); color: var(--emerald-text); }
+.dance { background: var(--muted); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.dance .head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 600; color: var(--muted-fg); }
+.row { display: flex; gap: 6px; }
+.field { border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font-size: 12px; background: var(--background); }
+.field.grow { flex: 1; }
+.marks { display: flex; gap: 6px; align-items: flex-end; font-size: 11px; color: var(--muted-fg); }
+.marks .j { text-align: center; }
+.marks .box { width: 38px; height: 30px; border: 1px solid var(--border); border-radius: 6px; display: grid; place-items: center; color: var(--foreground); font-size: 13px; background: var(--background); margin-top: 2px; }
+.marks .tot { margin-left: auto; text-align: right; color: var(--foreground); font-family: var(--heading); font-size: 15px; }
+.btns { display: flex; gap: 8px; align-items: center; }
+.btn { border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
+.btn.pri { background: var(--primary); color: var(--primary-fg); }
+.btn.ghost { color: #e58f8f; }
+.btn.out { border: 1px solid var(--border); }
+.btn.dim { opacity: .45; }
+.note { font-size: 11px; color: var(--muted-fg); }
+.cname { font-size: 14px; font-weight: 600; }
+.cname span { font-weight: 400; }
+.locked { opacity: .55; }
+.new { outline: 1px dashed var(--primary); outline-offset: 3px; border-radius: 10px; }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.lrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 12px; padding: 9px 12px; }
+.lrow .sub { display: block; font-size: 11px; color: var(--muted-fg); font-weight: 400; margin-top: 1px; }
+.lrow .rt { display: flex; align-items: center; gap: 8px; }
+.lrow .score { font-family: var(--heading); font-size: 15px; }
+.lrow.open { border-color: var(--primary); flex-direction: column; align-items: stretch; gap: 10px; }
+.lrow.open .top { display: flex; justify-content: space-between; align-items: center; }
+.bad { color: #e58f8f; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1 class="board-title">Enter Results: a status on each couple, per round</h1>
+<p class="board-sub">Mocks, not production UI. Couples, dances and songs are E12's real Instant Dance round as of tonight (Tatyana's 9s are made up): Amber's Cha Cha is published, Tatyana's Jive is fully marked but not posted, Connor and Maura have a style and song but no marks, and Ezra has nothing yet. Each dance posts on its own, so a couple can be Published in Round 1 and In progress in Round 2; the status always means <b>this round's dance</b>. Dashed outlines mark what's new.</p>
+<div class="board">
+
+<div class="col" id="shot-today">
+<p class="cap">Today</p>
+<p class="capsub">Three chips sort couples by a status for the whole couple. Once every Round 1 was posted, In progress was empty on the Instant Dance tab and the dropdown showed a raw <b>team:</b>.</p>
+<div class="phone"><div class="page" style="padding-top:16px">
+<div class="card">
+  <div class="card-title" style="display:flex;justify-content:space-between">Couples &amp; Scores <span style="font-family:var(--sans);font-size:14px;color:var(--accent);font-weight:600">Leaderboard →</span></div>
+  <div class="tabs"><div class="tab"><small>Round 1</small><span>Judges Choice</span></div><div class="tab on"><small>Round 2</small><span>Instant Dance</span></div><div class="tab"><small>Round 3</small><span>Freestyle</span></div></div>
+  <div class="chips"><span class="chip on">In progress</span><span class="chip">Drafted</span><span class="chip">Published</span></div>
+  <div class="select"><span class="bad">team:</span><span class="chev">⌄</span></div>
+</div>
+<div class="card"><div class="card-title">Finish Week</div><div class="card-desc" style="font-size:13px">… 8 dances are still to publish.</div></div>
+</div></div>
+</div>
+
+<div class="col" id="shot-a">
+<p class="cap">A · One dropdown with statuses <span class="rec">Smaller change</span></p>
+<p class="capsub">No chips. The round's dropdown lists every couple dancing it with that round's status on the right, so you can see who's left without opening anyone. The card shows the same status on the dance, beside Publish.</p>
+<div class="phone"><div class="page" style="padding-top:16px">
+<div class="card">
+  <div class="card-title" style="display:flex;justify-content:space-between">Couples &amp; Scores <span style="font-family:var(--sans);font-size:14px;color:var(--accent);font-weight:600">Leaderboard →</span></div>
+  <div class="tabs"><div class="tab"><small>Round 1</small><span>Judges Choice</span></div><div class="tab on"><small>Round 2</small><span>Instant Dance</span></div><div class="tab"><small>Round 3</small><span>Freestyle</span></div></div>
+  <div class="select new"><span class="cname"><b>Tatyana</b> <span>&amp; Jan</span></span><span style="display:flex;gap:8px;align-items:center"><span class="st ready">Ready to Publish</span><span class="chev">⌄</span></span></div>
+  <div class="menu new">
+    <div class="lbl">Couples · 5 · 1 published</div>
+    <div class="it"><span class="cname"><b>Amber</b> <span>&amp; Pasha</span></span><span class="st pub">Published</span></div>
+    <div class="it"><span class="cname"><b>Connor</b> <span>&amp; Rylee</span></span><span class="st prog">In progress</span></div>
+    <div class="it"><span class="cname"><b>Ezra</b> <span>&amp; Daniella</span></span><span class="st prog">In progress</span></div>
+    <div class="it"><span class="cname"><b>Maura</b> <span>&amp; Mark</span></span><span class="st prog">In progress</span></div>
+    <div class="it sel"><span class="cname"><b>Tatyana</b> <span>&amp; Jan</span></span><span class="st ready">Ready to Publish</span></div>
+  </div>
+  <div class="dance">
+    <div class="head"><span>Round 2 · Instant Dance</span><span class="st ready new">Ready to Publish</span></div>
+    <div class="row"><span class="field" style="width:110px">Jive</span><span class="field grow">Land of 1,000 Dances</span></div>
+    <div class="marks"><div class="j">Carrie Ann<div class="box">9</div></div><div class="j">Derek<div class="box">9</div></div><div class="j">Bruno<div class="box">9</div></div><div class="tot">27<span style="font-size:11px;color:var(--muted-fg);font-family:var(--sans)">/30</span></div></div>
+    <div class="btns"><span class="btn pri">Publish</span><span class="btn out">Save as Draft Score</span></div>
+  </div>
+</div>
+</div></div>
+</div>
+
+<div class="col" id="shot-b">
+<p class="cap">B · Every couple on the tab, open one to edit</p>
+<p class="capsub">No chips and no dropdown. The round lists all its couples as rows with their dance, total and status; tapping one opens its entry in place (one at a time). Best for a live night: who's posted and who's next is always on screen. Ezra, with no dance yet, sits last.</p>
+<div class="phone"><div class="page" style="padding-top:16px">
+<div class="card">
+  <div class="card-title" style="display:flex;justify-content:space-between">Couples &amp; Scores <span style="font-family:var(--sans);font-size:14px;color:var(--accent);font-weight:600">Leaderboard →</span></div>
+  <div class="tabs"><div class="tab"><small>Round 1</small><span>Judges Choice</span></div><div class="tab on"><small>Round 2</small><span>Instant Dance</span></div><div class="tab"><small>Round 3</small><span>Freestyle</span></div></div>
+  <div class="list new">
+    <div class="lrow"><span class="cname"><b>Amber</b> <span>&amp; Pasha</span><span class="sub">Cha Cha · Tears</span></span><span class="rt"><span class="score">30</span><span class="st pub">Published</span></span></div>
+    <div class="lrow open">
+      <div class="top"><span class="cname"><b>Tatyana</b> <span>&amp; Jan</span></span><span class="st ready">Ready to Publish</span></div>
+      <div class="dance">
+        <div class="row"><span class="field" style="width:110px">Jive</span><span class="field grow">Land of 1,000 Dances</span></div>
+        <div class="marks"><div class="j">Carrie Ann<div class="box">9</div></div><div class="j">Derek<div class="box">9</div></div><div class="j">Bruno<div class="box">9</div></div><div class="tot">27<span style="font-size:11px;color:var(--muted-fg);font-family:var(--sans)">/30</span></div></div>
+        <div class="btns"><span class="btn pri">Publish</span><span class="btn out">Save as Draft Score</span></div>
+      </div>
+    </div>
+    <div class="lrow"><span class="cname"><b>Connor</b> <span>&amp; Rylee</span><span class="sub">Cha Cha · Buttons</span></span><span class="rt"><span class="st prog">In progress</span></span></div>
+    <div class="lrow"><span class="cname"><b>Maura</b> <span>&amp; Mark</span><span class="sub">Quickstep · Tutti F</span></span><span class="rt"><span class="st prog">In progress</span></span></div>
+    <div class="lrow"><span class="cname"><b>Ezra</b> <span>&amp; Daniella</span><span class="sub">No dance yet</span></span><span class="rt"><span class="st prog">In progress</span></span></div>
+  </div>
+</div>
+</div></div>
+</div>
+
+</div>
+<div class="board" style="padding-top:0">
+<div class="col" id="shot-posted" style="width:390px">
+<p class="cap">Both · a published dance on its card</p>
+<p class="capsub">Amber's Instant Dance once posted: the dance locks and the status takes Publish's place, with Undo for 30 seconds, then Un-Post. Her Freestyle on the next tab is its own card with its own status.</p>
+<div class="phone"><div class="page" style="padding-top:16px"><div class="card">
+  <div class="dance">
+    <div class="head"><span>Round 2 · Instant Dance</span><span class="st pub">Published</span></div>
+    <div class="locked"><div class="row"><span class="field" style="width:110px">Cha Cha</span><span class="field grow">Tears</span></div></div>
+    <div class="marks locked"><div class="j">Carrie Ann<div class="box">10</div></div><div class="j">Derek<div class="box">10</div></div><div class="j">Bruno<div class="box">10</div></div><div class="tot">30<span style="font-size:11px;color:var(--muted-fg);font-family:var(--sans)">/30</span></div></div>
+    <div class="btns"><span class="btn ghost">Undo · 24s</span></div>
+  </div>
+</div></div></div>
+</div>
+<div class="col" style="width:520px">
+<p class="cap">The statuses</p>
+<p class="capsub" style="min-height:0">Always for this round's dance, never the whole couple.</p>
+<div class="list" style="width:390px">
+  <div class="lrow"><span>No style or marks yet, or some marks missing</span><span class="st prog">In progress</span></div>
+  <div class="lrow"><span>Every judge has marked it</span><span class="st ready">Ready to Publish</span></div>
+  <div class="lrow"><span>Released with Save as Draft Score (contributors)</span><span class="st draft">Drafted</span></div>
+  <div class="lrow"><span>Posted live to fans</span><span class="st pub">Published</span></div>
+</div>
+<p class="note" style="margin-top:12px;max-width:390px">Special-round tabs (dance-offs, team dances) list their heats the same way, each with its own status. Finish Week's "8 dances are still to publish" and the Leaderboard link stay as they are.</p>
+</div>
+</div>
+</body>
+</html>
