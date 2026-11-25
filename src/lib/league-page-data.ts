@@ -235,6 +235,7 @@ export async function loadLeaguePageBase(supabase: SupabaseClient<Database>, id:
     status: c.status,
     season_id: c.season_id,
     elimination_week: c.elimination_week,
+    final_place: c.final_place,
     celebrity_name: c.celebrity?.name ?? "Unknown",
     pro_name: c.pro?.name ?? "Unknown",
   }));

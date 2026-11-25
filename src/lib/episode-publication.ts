@@ -87,7 +87,7 @@ export type LifelineInputs = {
 };
 export type PublicationPlan = {
   planVersion: number;
-  coupleUpdates: Pick<Row<"couples">, "id" | "status" | "elimination_week">[];
+  coupleUpdates: Pick<Row<"couples">, "id" | "status" | "elimination_week" | "final_place">[];
   futureEpisodeIds: string[];
   weeklyScores: WeeklyScoreRow[];
   laterDanceCard: LaterDanceCardRow[];
@@ -360,18 +360,20 @@ export function buildPublicationPlan(
         elimination_week: ["eliminated", "withdrawn"].includes(entry.outcome)
           ? week.week_number
           : null,
+        final_place: entry.outcome === "eliminated" ? (entry.final_place ?? null) : null,
       };
     if (previouslyResolved.has(c.id) && !nowResolved.has(c.id) && !siblingResolved.has(c.id))
-      return { ...c, status: "active", elimination_week: null };
+      return { ...c, status: "active", elimination_week: null, final_place: null };
     return c;
   });
   const coupleUpdates = couples
     .filter(
       (c, i) =>
         c.status !== snapshot.couples[i].status ||
-        c.elimination_week !== snapshot.couples[i].elimination_week
+        c.elimination_week !== snapshot.couples[i].elimination_week ||
+        (c.final_place ?? null) !== (snapshot.couples[i].final_place ?? null)
     )
-    .map(({ id, status, elimination_week }) => ({ id, status, elimination_week }));
+    .map(({ id, status, elimination_week, final_place }) => ({ id, status, elimination_week, final_place: final_place ?? null }));
   const futureEpisodeIds = !week
     ? []
     : snapshot.episodes

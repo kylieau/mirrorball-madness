@@ -7,7 +7,7 @@ describe("viewer result payloads", () => {
     const draft: DraftState = {
       hasDraft: true, updatedAt: null, guestJudgeName: "Secret guest", judgesSaveAvailable: false,
       dances: [{ id: "dance", coupleId: "couple", slot: 1, liveId: null, danceStyleId: "style", songTitle: "Unreleased song", judgeScores: [{ judgeId: "judge", score: 9 }] }],
-      entries: [{ coupleId: "couple", outcome: "eliminated", savedByJudges: false, hadImmunity: false, bonusPoints: 7, bonusNote: "Secret bonus" }],
+      entries: [{ coupleId: "couple", outcome: "eliminated", savedByJudges: false, hadImmunity: false, bonusPoints: 7, bonusNote: "Secret bonus", finalPlace: null }],
       inJeopardyCoupleIds: ["couple"],
     };
     expect(summarizeDrafts({ episode: draft })).toEqual({ episode: { hasDraft: true, entryCount: 1, draftedCoupleIds: ["couple"] } });

@@ -229,7 +229,7 @@ export function matchTopScorerPick({
 
 export function matchPodiumPicks(
   podium: PodiumPick,
-  episodeOutcomes: { coupleId: string; outcome: string }[],
+  episodeOutcomes: { coupleId: string; outcome: string; finalPlacement?: number | null }[],
   exactPayout: number
 ): PodiumMatch[] {
   const places = podiumPlaceByCouple(episodeOutcomes);
@@ -261,7 +261,7 @@ export function buildPastPicksComparison({
   // The manager's podium pick, given only for the Finale week.
   finalePodium?: PodiumPick;
   predictedTopScorerCoupleId: string | null;
-  episodeOutcomes: { coupleId: string; outcome: string }[];
+  episodeOutcomes: { coupleId: string; outcome: string; finalPlacement?: number | null }[];
   danceScores: RawDanceScore[];
   predictionPoints: number | null;
   inJeopardyCoupleIds?: Iterable<string>;

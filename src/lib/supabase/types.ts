@@ -321,6 +321,7 @@ export type Database = {
           celebrity_id: string
           created_at: string
           elimination_week: number | null
+          final_place: number | null
           id: string
           pro_id: string
           season_id: string
@@ -330,6 +331,7 @@ export type Database = {
           celebrity_id: string
           created_at?: string
           elimination_week?: number | null
+          final_place?: number | null
           id?: string
           pro_id: string
           season_id: string
@@ -339,6 +341,7 @@ export type Database = {
           celebrity_id?: string
           created_at?: string
           elimination_week?: number | null
+          final_place?: number | null
           id?: string
           pro_id?: string
           season_id?: string
@@ -667,6 +670,7 @@ export type Database = {
           bonus_points: number
           couple_id: string
           episode_id: string
+          final_place: number | null
           had_immunity: boolean
           id: string
           outcome: string
@@ -679,6 +683,7 @@ export type Database = {
           bonus_points?: number
           couple_id: string
           episode_id: string
+          final_place?: number | null
           had_immunity?: boolean
           id?: string
           outcome: string
@@ -691,6 +696,7 @@ export type Database = {
           bonus_points?: number
           couple_id?: string
           episode_id?: string
+          final_place?: number | null
           had_immunity?: boolean
           id?: string
           outcome?: string
@@ -990,6 +996,7 @@ export type Database = {
           bonus_points: number
           couple_id: string
           episode_id: string
+          final_place: number | null
           had_immunity: boolean
           id: string
           outcome: string
@@ -1002,6 +1009,7 @@ export type Database = {
           bonus_points?: number
           couple_id: string
           episode_id: string
+          final_place?: number | null
           had_immunity?: boolean
           id?: string
           outcome: string
@@ -1014,6 +1022,7 @@ export type Database = {
           bonus_points?: number
           couple_id?: string
           episode_id?: string
+          final_place?: number | null
           had_immunity?: boolean
           id?: string
           outcome?: string

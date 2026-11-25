@@ -1184,6 +1184,16 @@ describe("eliminationPositionRanges", () => {
     expect(ranges.get("b")).toEqual({ start: 2, end: 2 });
     expect([ranges.get("w")?.start, ranges.get("r")?.start, ranges.get("t")?.start]).toEqual([5, 4, 3]);
   });
+
+  it("gives Finale finalists marked 4th and 5th their own spots, and leaves an unmarked pair sharing", () => {
+    const finale = [c("a", "eliminated", 1), c("w", "winner", null), c("r", "runner_up", null), c("t", "third_place", null)];
+    const placed = eliminationPositionRanges([...finale, { ...c("f4", "eliminated", 6), final_place: 4 }, { ...c("f5", "eliminated", 6), final_place: 5 }]);
+    expect([placed.get("f4"), placed.get("f5")]).toEqual([{ start: 3, end: 3 }, { start: 2, end: 2 }]);
+    const shared = eliminationPositionRanges([...finale, c("f4", "eliminated", 6), c("f5", "eliminated", 6)]);
+    expect([shared.get("f4"), shared.get("f5")]).toEqual([{ start: 2, end: 3 }, { start: 2, end: 3 }]);
+    // A spoiler-clamped status hides the place.
+    expect(eliminationPositionRanges([...finale, { ...c("f5", "active", null), final_place: 5 }]).has("f5")).toBe(false);
+  });
 });
 
 describe("finalPlacementFromRange", () => {
@@ -1356,6 +1366,10 @@ describe("Curtain Call's Finale podium", () => {
     ]);
     expect(podiumPlaceByCouple([outcome("fifth", "eliminated"), outcome("first", "safe")]).size).toBe(0);
     expect(podiumPlaceByCouple([...finale, outcome("fourth", "withdrawn")]).has("fourth")).toBe(false);
+    // Finish Week's 5th place; a blank place stays 4th.
+    const placed = podiumPlaceByCouple([...finale, { coupleId: "fifth", outcome: "eliminated", finalPlacement: 5 }]);
+    expect([placed.get("fourth"), placed.get("fifth")]).toEqual([4, 5]);
+    expect(resolvePodiumGuess("fifth", 3, placed, 20)).toEqual({ placesOff: 2, points: 0 });
   });
 
   it("pays each place the elimination payout, whatever the In Jeopardy setting", () => {

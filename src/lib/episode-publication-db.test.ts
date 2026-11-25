@@ -186,7 +186,7 @@ describe("atomic episode publication in PostgreSQL", () => {
     const data = await snapshot();
     const plan = buildPublicationPlan(data, episode);
     expect(plan.futureEpisodeIds).toEqual([future]);
-    expect(plan.coupleUpdates).toEqual([{ id: couple, status: "eliminated", elimination_week: 1 }]);
+    expect(plan.coupleUpdates).toEqual([{ id: couple, status: "eliminated", elimination_week: 1, final_place: null }]);
     await commit(data);
     expect((await snapshot()).couples[0].status).toBe("eliminated");
     expect((await db.query("select * from public.episode_participants")).rows).toEqual([]);
@@ -232,7 +232,7 @@ describe("atomic episode publication in PostgreSQL", () => {
       insert into public.episode_results(episode_id, couple_id, outcome) values ('${episode}', '${couple}', 'eliminated');`);
     let data = await snapshot();
     expect(buildPublicationPlan(data, episode).coupleUpdates).toEqual([
-      { id: couple, status: "active", elimination_week: null },
+      { id: couple, status: "active", elimination_week: null, final_place: null },
     ]);
     await db.exec(`insert into public.episodes(id, season_id, week_id, episode_number, airs_at) values ('${sibling}', '${season}', '${week}', 2, now());
       insert into public.episode_results(episode_id, couple_id, outcome) values ('${sibling}', '${couple}', 'eliminated');`);

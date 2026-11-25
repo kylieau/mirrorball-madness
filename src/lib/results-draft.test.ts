@@ -10,8 +10,8 @@ const input: SaveDraftResultsInput = {
   updatedBy: "friend",
   inJeopardyCoupleIds: [],
   entries: [
-    { coupleId: "amber", dances: [{ slot: 1, danceStyleId: "s", songTitle: null, judgeScores: [{ judgeId: "j", score: 9 }] }], outcome: "safe", savedByJudges: false, hadImmunity: false, bonusPoints: 0, bonusNote: null },
-    { coupleId: "julia", dances: [], outcome: "safe", savedByJudges: false, hadImmunity: false, bonusPoints: 0, bonusNote: null },
+    { coupleId: "amber", dances: [{ slot: 1, danceStyleId: "s", songTitle: null, judgeScores: [{ judgeId: "j", score: 9 }] }], outcome: "safe", savedByJudges: false, hadImmunity: false, bonusPoints: 0, bonusNote: null, finalPlace: null },
+    { coupleId: "julia", dances: [], outcome: "safe", savedByJudges: false, hadImmunity: false, bonusPoints: 0, bonusNote: null, finalPlace: null },
   ],
 };
 

@@ -148,7 +148,7 @@ export async function loadScoreHistory(
       .from("dance_scores")
       .select(danceScoreColumns(teamsMode, "episode_id, couple_id, total_score, scaled_score", { teamId: true }))
       .in("episode_id", episodeIds),
-    supabase.from("episode_results").select("episode_id, couple_id, outcome, bonus_points").in("episode_id", episodeIds),
+    supabase.from("episode_results").select("episode_id, couple_id, outcome, bonus_points, final_place").in("episode_id", episodeIds),
     supabase.from("episode_in_jeopardy_couples").select("episode_id, couple_id").in("episode_id", episodeIds),
     supabase
       .from("lifeline_payouts")
@@ -226,7 +226,7 @@ export async function loadScoreHistory(
       tierPayStyle: settings.bonus_picks_tier_pay_style as TierPayStyle,
       pointsPerCorrect: settings.bonus_picks_points_per_correct,
     },
-    couples: couples.map((c) => ({ id: c.id, status: c.status, elimination_week: c.elimination_week })),
+    couples: couples.map((c) => ({ id: c.id, status: c.status, elimination_week: c.elimination_week, final_place: c.final_place })),
     coupleNames,
     weeks,
     rosterSlots: (slots ?? [])

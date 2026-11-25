@@ -80,7 +80,7 @@ export const loadAllCouples = cache(async (supabase: Client) => {
   const { data } = await supabase
     .from("couples")
     .select(
-      "id, status, season_id, elimination_week, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
+      "id, status, season_id, elimination_week, final_place, celebrity:people!couples_celebrity_id_fkey(name), pro:people!couples_pro_id_fkey(name)"
     );
   return data ?? [];
 });

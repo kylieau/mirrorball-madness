@@ -228,8 +228,8 @@ export default async function LeaguePicksPage({
           .eq("league_id", id)
           .eq("week_id", recapEpisode.id),
         recapEpisodeIds.length > 0
-          ? supabase.from("episode_results").select("couple_id, outcome").in("episode_id", recapEpisodeIds)
-          : Promise.resolve({ data: [] as { couple_id: string; outcome: string }[] }),
+          ? supabase.from("episode_results").select("couple_id, outcome, final_place").in("episode_id", recapEpisodeIds)
+          : Promise.resolve({ data: [] as { couple_id: string; outcome: string; final_place: number | null }[] }),
         recapEpisodeIds.length > 0
           ? supabase.from("dance_scores").select("couple_id, total_score").in("episode_id", recapEpisodeIds)
           : Promise.resolve({ data: [] as { couple_id: string; total_score: number }[] }),
@@ -695,7 +695,7 @@ export default async function LeaguePicksPage({
       seasonCouples.map((c) => ({ eliminationWeek: c.elimination_week })),
       recapEpisode.week_number
     );
-    const episodeOutcomes = (pastResults ?? []).map((r) => ({ coupleId: r.couple_id, outcome: r.outcome }));
+    const episodeOutcomes = (pastResults ?? []).map((r) => ({ coupleId: r.couple_id, outcome: r.outcome, finalPlacement: r.final_place }));
     const danceScores = (pastDanceScores ?? []).map((s) => ({ coupleId: s.couple_id, totalScore: Number(s.total_score) }));
     const inJeopardyCoupleIds = (pastJeopardy ?? []).map((row) => row.couple_id);
     const eliminationExactPayout = curtainCallPayout(

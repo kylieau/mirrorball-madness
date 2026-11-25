@@ -368,6 +368,8 @@ create table couples (
   -- that week (see computeWeeklyScores). "bye" (sat out, still competing)
   -- never becomes a couples.status value at all — the couple stays 'active'.
   status text not null default 'active' check (status in ('active', 'eliminated', 'withdrawn', 'winner', 'runner_up', 'third_place')),
+  -- 4 or 5 for a Finale finalist left Eliminated (apply-finale-places.sql).
+  final_place smallint check (final_place in (4, 5)),
   elimination_week int,
   created_at timestamptz not null default now(),
   unique (season_id, celebrity_id, pro_id)
@@ -584,6 +586,7 @@ create table episode_results (
   episode_id uuid not null references episodes(id) on delete cascade,
   couple_id uuid not null references couples(id),
   outcome text not null check (outcome in ('safe', 'eliminated', 'withdrawn', 'bye', 'winner', 'runner_up', 'third_place')),
+  final_place smallint check (final_place in (4, 5)),
   was_bottom_two boolean not null default false,
   was_bottom_three boolean not null default false,
   saved_by_judges boolean not null default false,
@@ -2504,6 +2507,7 @@ create table draft_episode_results (
   episode_id uuid not null references episodes(id) on delete cascade,
   couple_id uuid not null references couples(id),
   outcome text not null check (outcome in ('safe', 'eliminated', 'withdrawn', 'bye', 'winner', 'runner_up', 'third_place')),
+  final_place smallint check (final_place in (4, 5)),
   was_bottom_two boolean not null default false,
   was_bottom_three boolean not null default false,
   saved_by_judges boolean not null default false,

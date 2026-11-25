@@ -166,7 +166,9 @@ type CompetitionWeek = {
 };
 type Outcome = "safe" | "eliminated" | "withdrawn" | "bye" | "winner" | "runner_up" | "third_place";
 
-type StatusValue = Outcome;
+// The Finale's 4th and 5th places are Eliminated plus a place.
+type StatusValue = Outcome | "fourth_place" | "fifth_place";
+const FINALE_PLACE: Partial<Record<StatusValue, number>> = { fourth_place: 4, fifth_place: 5 };
 
 const STATUS_LABELS: Record<StatusValue, string> = {
   safe: "Safe",
@@ -176,11 +178,13 @@ const STATUS_LABELS: Record<StatusValue, string> = {
   winner: "Winner",
   runner_up: "Runner-up",
   third_place: "Third Place",
+  fourth_place: "4th Place",
+  fifth_place: "5th Place",
 };
 
 function statusOptions(isFinale: boolean): StatusValue[] {
   const base: StatusValue[] = ["safe", "eliminated", "withdrawn", "bye"];
-  return isFinale ? [...base, "winner", "runner_up", "third_place"] : base;
+  return isFinale ? [...base, "winner", "runner_up", "third_place", "fourth_place", "fifth_place"] : base;
 }
 
 type RowDance = {
@@ -197,6 +201,7 @@ type CoupleRow = {
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string;
+  finalPlace: number | null;
   dances: RowDance[];
 };
 
@@ -208,6 +213,7 @@ function emptyRow(): CoupleRow {
     hadImmunity: false,
     bonusPoints: 0,
     bonusNote: "",
+    finalPlace: null,
     dances: [],
   };
 }
@@ -259,6 +265,7 @@ function buildRowsFromDraft(
       hadImmunity: entry.hadImmunity,
       bonusPoints: entry.bonusPoints,
       bonusNote: entry.bonusNote ?? "",
+      finalPlace: entry.finalPlace,
       dances: rows[entry.coupleId]?.dances ?? [],
     };
   }
@@ -677,6 +684,7 @@ export function ResultsForm({
           hadImmunity: row.hadImmunity,
           bonusPoints: row.bonusPoints,
           bonusNote: row.bonusNote.trim() || null,
+          finalPlace: row.outcome === "eliminated" ? row.finalPlace : null,
         };
       }),
       inJeopardyCoupleIds: dirtyCouples
@@ -1220,9 +1228,12 @@ export function ResultsForm({
   }
 
   function setStatus(coupleId: string, value: StatusValue) {
+    const finalPlace = FINALE_PLACE[value] ?? null;
+    const outcome: Outcome = finalPlace ? "eliminated" : (value as Outcome);
     updateRow(coupleId, {
-      outcome: value,
-      ...(value === "eliminated" ? { inJeopardy: false } : {}),
+      outcome,
+      finalPlace,
+      ...(outcome === "eliminated" ? { inJeopardy: false } : {}),
     });
   }
 
@@ -2068,7 +2079,7 @@ export function ResultsForm({
         <td className="px-1 py-1">
           <Select
             items={STATUS_LABELS}
-            value={row.outcome}
+            value={row.outcome === "eliminated" && row.finalPlace === 4 ? "fourth_place" : row.outcome === "eliminated" && row.finalPlace === 5 ? "fifth_place" : row.outcome}
             onValueChange={(v) => setStatus(c.id, (v as StatusValue) ?? "safe")}
           >
             <SelectTrigger className="h-7 w-28 text-xs">

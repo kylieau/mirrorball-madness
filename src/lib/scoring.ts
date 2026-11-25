@@ -397,15 +397,16 @@ const PODIUM_PLACE_BY_OUTCOME: Partial<Record<string, number>> = {
   eliminated: 4,
 };
 
-// Where each finalist finished, once a winner is named. The show places only
-// three couples, so every other finalist counts as fourth; a couple that
-// withdrew has no place. The last row per couple decides, as in the engine.
-export function podiumPlaceByCouple(outcomes: { coupleId: string; outcome: string }[]): Map<string, number> {
-  const outcomeByCouple = new Map(outcomes.map((o) => [o.coupleId, o.outcome]));
+// Where each finalist finished, once a winner is named. The show places
+// three couples; another finalist is fourth unless Finish Week gave them 5th
+// (finalPlacement); a couple that withdrew has no place. The last row per
+// couple decides, as in the engine.
+export function podiumPlaceByCouple(outcomes: { coupleId: string; outcome: string; finalPlacement?: number | null }[]): Map<string, number> {
+  const byCouple = new Map(outcomes.map((o) => [o.coupleId, o]));
   const places = new Map<string, number>();
-  if (![...outcomeByCouple.values()].includes("winner")) return places;
-  for (const [coupleId, outcome] of outcomeByCouple) {
-    const place = PODIUM_PLACE_BY_OUTCOME[outcome];
+  if (![...byCouple.values()].some((o) => o.outcome === "winner")) return places;
+  for (const [coupleId, o] of byCouple) {
+    const place = o.outcome === "eliminated" && o.finalPlacement === 5 ? 5 : PODIUM_PLACE_BY_OUTCOME[o.outcome];
     if (place) places.set(coupleId, place);
   }
   return places;
@@ -732,10 +733,11 @@ function grandFinalePointsAt(
 // eliminated the same week share the range of positions that week occupied
 // (a double elimination is 2 positions wide), so a week with no elimination
 // takes none and a double doesn't shift every later couple by one. Podium
-// couples get their fixed top spots. Pass spoiler-clamped statuses and only
-// revealed outcomes resolve.
+// couples get their fixed top spots, and so does a Finale finalist given 4th
+// or 5th place (final_place, still Eliminated). Pass spoiler-clamped
+// statuses and only revealed outcomes resolve.
 export function eliminationPositionRanges(
-  couples: { id: string; status: string; elimination_week: number | null }[]
+  couples: { id: string; status: string; elimination_week: number | null; final_place?: number | null }[]
 ): Map<string, { start: number; end: number }> {
   const total = couples.length;
   const ranges = new Map<string, { start: number; end: number }>();
@@ -752,6 +754,9 @@ export function eliminationPositionRanges(
     const ids = outByWeek.get(week)!;
     for (const id of ids) ranges.set(id, { start: before + 1, end: before + ids.length });
     before += ids.length;
+  }
+  for (const c of couples) {
+    if (c.status === "eliminated" && c.final_place) ranges.set(c.id, { start: total - c.final_place + 1, end: total - c.final_place + 1 });
   }
   return ranges;
 }

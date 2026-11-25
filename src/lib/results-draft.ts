@@ -22,6 +22,9 @@ export type DraftEntryInput = {
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string | null;
+  // 4 or 5 for an Eliminated finalist in the Finale week; the SQL keeps it
+  // only there.
+  finalPlace: number | null;
 };
 
 export type SaveDraftResultsInput = {
@@ -52,6 +55,7 @@ export type DraftEntryState = {
   hadImmunity: boolean;
   bonusPoints: number;
   bonusNote: string | null;
+  finalPlace: number | null;
 };
 
 
@@ -150,6 +154,7 @@ export async function loadDraftForEpisode(
       hadImmunity: r.had_immunity,
       bonusPoints: r.bonus_points,
       bonusNote: r.bonus_note,
+      finalPlace: r.final_place,
     })),
     inJeopardyCoupleIds: (jeopardy ?? []).map((row) => row.couple_id),
   };

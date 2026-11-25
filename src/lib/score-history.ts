@@ -53,7 +53,7 @@ export type HistoryWeekData = {
   danceScores: DanceScore[];
   // Every episode's result rows for the week, in episode order: like the
   // scoring engine, the last row per couple decides survival and bonus.
-  outcomes: { coupleId: string; outcome: Outcome; bonusPoints: number }[];
+  outcomes: { coupleId: string; outcome: Outcome; bonusPoints: number; finalPlacement?: number | null }[];
   inJeopardyCoupleIds: string[];
 };
 
@@ -64,7 +64,7 @@ type EpisodeRows<T> = ({ episode_id: string } & T)[];
 export function weekResults(
   episodeIds: string[],
   danceRows: EpisodeRows<{ couple_id: string; total_score: number; scaled_score: number; max_score: number | null; team_id?: string | null }>,
-  outcomeRows: EpisodeRows<{ couple_id: string; outcome: string; bonus_points: number }>
+  outcomeRows: EpisodeRows<{ couple_id: string; outcome: string; bonus_points: number; final_place?: number | null }>
 ): Pick<HistoryWeekData, "danceScores" | "outcomes"> {
   const inWeek = new Set(episodeIds);
   const episodeOrder = new Map(episodeIds.map((id, index) => [id, index]));
@@ -86,6 +86,7 @@ export function weekResults(
         coupleId: row.couple_id,
         outcome: row.outcome as Outcome,
         bonusPoints: Number(row.bonus_points),
+        finalPlacement: row.final_place ?? null,
       })),
   };
 }
