@@ -11,10 +11,8 @@ import {
   predictedRounds,
   reconcileCustomOrder,
   roundForPick,
-  pickFromQueue,
   partitionPresence,
   reconcileOrder,
-  pickRandomEligible,
   secondsRemainingOnClock,
 } from "./draft";
 
@@ -43,37 +41,6 @@ describe("eligibleRemaining", () => {
 
   it("returns an empty list when everyone is taken", () => {
     expect(eligibleRemaining([{ id: "a" }], new Set(["a"]))).toEqual([]);
-  });
-});
-
-describe("pickRandomEligible", () => {
-  it("returns null when nothing is left", () => {
-    expect(pickRandomEligible([])).toBeNull();
-  });
-
-  it("returns the only remaining item", () => {
-    expect(pickRandomEligible(["only"], () => 0.42)).toEqual("only");
-  });
-
-  it("picks uniformly from eligible remaining using the injected rng", () => {
-    const eligible = ["a", "b", "c", "d"];
-    expect(pickRandomEligible(eligible, () => 0)).toBe("a");
-    expect(pickRandomEligible(eligible, () => 0.25)).toBe("b");
-    expect(pickRandomEligible(eligible, () => 0.5)).toBe("c");
-    expect(pickRandomEligible(eligible, () => 0.75)).toBe("d");
-  });
-
-  it("does not prefer any skill ordering — input order is the only structure", () => {
-    const ranked = ["best", "mid", "worst"];
-    expect(pickRandomEligible(ranked, () => 0.9)).toBe("worst");
-    expect(pickRandomEligible(ranked, () => 0)).toBe("best");
-  });
-
-  it("treats rng values outside [0, 1) as the first slot", () => {
-    const eligible = ["a", "b"];
-    expect(pickRandomEligible(eligible, () => 1)).toBe("a");
-    expect(pickRandomEligible(eligible, () => -0.3)).toBe("a");
-    expect(pickRandomEligible(eligible, () => Number.NaN)).toBe("a");
   });
 });
 
@@ -183,17 +150,6 @@ describe("reconcileOrder", () => {
 
   it("drops leavers and appends joiners", () => {
     expect(reconcileOrder(["c", "a", "b"], ["a", "b", "d"])).toEqual(["a", "b", "d"]);
-  });
-});
-
-describe("pickFromQueue", () => {
-  it("takes the highest-ranked couple that is still eligible", () => {
-    expect(pickFromQueue(["a", "b", "c"], new Set(["b", "c"]))).toBe("b");
-  });
-
-  it("returns null when the queue is empty or exhausted", () => {
-    expect(pickFromQueue([], new Set(["a"]))).toBeNull();
-    expect(pickFromQueue(["a"], new Set(["b"]))).toBeNull();
   });
 });
 

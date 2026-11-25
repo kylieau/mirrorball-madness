@@ -48,21 +48,6 @@ export function formerCoupleNote({
   return { tag: "dropped", weeks, note: now };
 }
 
-// Mirrors how a couple's raw judges' score becomes "points" everywhere else
-// in the app: judges_score_multiplier is applied before a score is ever
-// stored (see computeWeeklyScores in scoring.ts), and judges_score_category_
-// weight is applied at display time rather than baked into storage, so a
-// commissioner can reweight categories without rescoring history. This
-// couple's weekly figure isn't read from a stored total, so both factors
-// are applied here in one step.
-export function computeCoupleWeeklyPoints(
-  totalScore: number,
-  judgesScoreMultiplier: number,
-  categoryWeight: number
-): number {
-  return roundPoints(totalScore * judgesScoreMultiplier * categoryWeight);
-}
-
 // Survival, finale placement and per-couple bonus points aren't part of any
 // couple's judges' line, so they're what's left of the week's weighted roster
 // total after the couples' judges' points are taken out. Reading it as a

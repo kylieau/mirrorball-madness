@@ -23,21 +23,6 @@ export function getPickAssignment(
   return { round, draftPosition };
 }
 
-// Uniform choice among eligible remaining couples — same rule as
-// make_auto_draft_pick (`order by random()`). No ADP, rankings, or
-// team-needs. `rng` must return a number in [0, 1) (Math.random's range);
-// inject a stub in tests.
-export function pickRandomEligible<T>(
-  eligible: readonly T[],
-  rng: () => number = Math.random
-): T | null {
-  if (eligible.length === 0) return null;
-  const raw = rng();
-  const unit = Number.isFinite(raw) ? raw : 0;
-  const bounded = unit >= 1 ? 0 : unit < 0 ? 0 : unit;
-  return eligible[Math.floor(bounded * eligible.length)] ?? null;
-}
-
 export function eligibleRemaining<T extends { id: string }>(
   all: readonly T[],
   draftedIds: ReadonlySet<string>
@@ -107,16 +92,6 @@ export function reconcileOrder(
   const kept = order.filter((id) => current.has(id));
   const known = new Set(kept);
   return [...kept, ...memberIds.filter((id) => !known.has(id))];
-}
-
-// Mirrors make_auto_draft_pick's queue rule: the highest-ranked queued couple
-// that is still eligible, else null (caller falls back to random). Display /
-// test only — the server is the authority.
-export function pickFromQueue(
-  queue: readonly string[],
-  eligibleIds: ReadonlySet<string>
-): string | null {
-  return queue.find((id) => eligibleIds.has(id)) ?? null;
 }
 
 export function moveQueueEntry<T>(queue: readonly T[], index: number, direction: -1 | 1): T[] {

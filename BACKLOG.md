@@ -20,9 +20,9 @@ and Season at a Glance on production, the Home wrap banner on the dev server.
 Nobody can create a league unless a site admin has opened a creation window
 for the active season; with no active season it is always closed. The admin
 opens it before the premiere and closes it (around Week 2). Today
-`create_league` ties a new league to whatever season is active, so a league
-made between seasons belongs to the finished one. Mock the Create a League
-states first. Open question: whether joining follows the same window or
+`create_league` stores no season and checks none, so a league can be made
+between seasons; its draft then fails with "Not enough couples for every
+member to get at least one". Mock the Create a League states first. Open question: whether joining follows the same window or
 stays open until that league drafts.
 
 ## Lifeline on any open spot — 2026-11-20
@@ -932,7 +932,6 @@ Built (per-couple publish and undo, Finish Week, Home and every page reading a r
 - Dead `'You are not a member of this league'` branch in `set_custom_draft_order` (`supabase/schema.sql`) — unreachable, never cleaned up.
 - League Settings' "✓ Settings saved" banner (`league-modules-form.tsx`) doesn't clear when you edit again.
 - Guest judges (Schedule): `episodes.guest_judge_name` and its draft-save passthrough are dead and could be dropped; guest names match exactly (a double space makes a second judge); a failed episode save can leave a new archived guest row with no booking.
-- `computeCoupleWeeklyPoints` (`src/lib/roster-weekly-points.ts`) is only used by its own test.
 - `supabase/queries/prefill-s35-e06-dances.sql` is an uncommitted one-off (already run 2026-10-13); delete it rather than commit it.
 - A human click-through of the custom-draft lobby UI was never done. Raise when next season's drafts start.
 

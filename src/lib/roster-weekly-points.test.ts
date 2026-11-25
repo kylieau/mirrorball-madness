@@ -1,24 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   clampRosterCoupleForWeek,
-  computeCoupleWeeklyPoints,
   deriveCoupleWeeklyTag,
   weeklyBonusPoints,
- formerCoupleNote, holdingWeeksLabel } from "./roster-weekly-points";
-
-describe("computeCoupleWeeklyPoints", () => {
-  it("applies the judges' score multiplier and the category weight, to two decimals", () => {
-    expect(computeCoupleWeeklyPoints(24, 1, 1)).toBe(24);
-    expect(computeCoupleWeeklyPoints(24, 1.5, 1)).toBe(36);
-    expect(computeCoupleWeeklyPoints(24, 1, 1.5)).toBe(36);
-    expect(computeCoupleWeeklyPoints(23, 1.1, 1)).toBe(25.3);
-    expect(computeCoupleWeeklyPoints(23, 1.111, 1)).toBe(25.55); // 25.553 rounds to 25.55
-  });
-
-  it("handles a zero score", () => {
-    expect(computeCoupleWeeklyPoints(0, 1, 1)).toBe(0);
-  });
-});
+  formerCoupleNote,
+  holdingWeeksLabel,
+} from "./roster-weekly-points";
 
 describe("deriveCoupleWeeklyTag", () => {
   it("tags eliminated and withdrawn couples as eliminated", () => {

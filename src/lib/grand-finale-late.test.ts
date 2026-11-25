@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   allowLateButtonLabel,
   eligibleGrandFinalePredictions,
-  formatLateFactor,
   formatLateMultiplier,
   lateEntryBanner,
   lateEntryLabel,
@@ -11,31 +10,12 @@ import {
   lateScoreHistoryHelper,
   lateUnlockWarning,
   managerInitials,
-  parseLateFactor,
   parseLatePercent,
   percentToLateFactor,
   resolvedCoupleCount,
   scaleGrandFinaleLateFactors,
   updateLateButtonLabel,
 } from "./grand-finale-late";
-
-describe("parseLateFactor", () => {
-  it("accepts 0 through 1 with up to two decimals", () => {
-    expect(parseLateFactor("1")).toBe(1);
-    expect(parseLateFactor("1.0")).toBe(1);
-    expect(parseLateFactor("0")).toBe(0);
-    expect(parseLateFactor("0.50")).toBe(0.5);
-    expect(parseLateFactor(" 0.25 ")).toBe(0.25);
-  });
-
-  it("rejects values outside 0 to 1 and extra precision", () => {
-    expect(parseLateFactor("")).toBeNull();
-    expect(parseLateFactor("1.01")).toBeNull();
-    expect(parseLateFactor("-0.1")).toBeNull();
-    expect(parseLateFactor("0.555")).toBeNull();
-    expect(parseLateFactor(".5")).toBeNull();
-  });
-});
 
 describe("percent and late factor", () => {
   it("accepts a whole percent from 0 to 100", () => {
@@ -60,7 +40,6 @@ describe("percent and late factor", () => {
     expect(formatLateMultiplier(1)).toBe("1.0");
     expect(formatLateMultiplier(0.5)).toBe("0.5");
     expect(formatLateMultiplier(0.25)).toBe("0.25");
-    expect(formatLateFactor(0.5)).toBe("0.50");
   });
 });
 

@@ -164,12 +164,6 @@ export function teamMarksTotal(marks: TeamMark[]): number {
   return marks.reduce((sum, m) => sum + m.score, 0);
 }
 
-export function sameTeamMarks(a: TeamMark[] | null, b: TeamMark[] | null): boolean {
-  if (!a || !b || a.length !== b.length) return false;
-  const byJudge = new Map(a.map((m) => [m.judgeId, m.score]));
-  return b.every((m) => byJudge.get(m.judgeId) === m.score);
-}
-
 type ScoringInput = {
   marks: TeamMark[];
   coupleMarks?: CoupleMarks;

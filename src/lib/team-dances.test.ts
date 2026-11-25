@@ -11,7 +11,6 @@ import {
   parseSpecialPoints,
   parseTeamMarks,
   recentSuggestions,
-  sameTeamMarks,
   specialDanceComplete,
   specialDanceProgress,
   specialDanceSummary,
@@ -117,15 +116,6 @@ describe("specialDanceComplete and specialDanceProgress", () => {
     expect(specialDanceProgress(danceOff, input)).toMatchObject({ done: 1, total: 2, label: "1 of 2 points" });
     expect(specialDanceComplete(danceOff, { ...input, scores: [scores[0], { coupleId: "b", points: 0, result: "Loser" }] })).toBe(true);
     expect(specialDanceComplete(danceOff, { ...input, eligibleCoupleIds: [] })).toBe(false);
-  });
-});
-
-describe("sameTeamMarks", () => {
-  it("compares by judge, not by order", () => {
-    const a = judges.map((judgeId) => ({ judgeId, score: 9 }));
-    expect(sameTeamMarks(a, [...a].reverse())).toBe(true);
-    expect(sameTeamMarks(a, a.map((m) => (m.judgeId === "derek" ? { ...m, score: 8 } : m)))).toBe(false);
-    expect(sameTeamMarks(a, null)).toBe(false);
   });
 });
 

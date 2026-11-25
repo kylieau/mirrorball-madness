@@ -1,18 +1,9 @@
 import { roundPoints } from "./format-points";
 import { RESOLVING_OUTCOMES, type Outcome } from "./scoring";
 
-// 1 is full weight. A commissioner may set anything from 0 through 1, to two
-// decimals, matching numeric(3,2) on grand_finale_late_unlocks.
-const LATE_FACTOR_PATTERN = /^\d+(\.\d{1,2})?$/;
+// late_factor: 1 is full weight, anything from 0 through 1 to two decimals,
+// matching numeric(3,2) on grand_finale_late_unlocks.
 const LATE_PERCENT_PATTERN = /^\d{1,3}$/;
-
-export function parseLateFactor(raw: string): number | null {
-  const trimmed = raw.trim();
-  if (!LATE_FACTOR_PATTERN.test(trimmed)) return null;
-  const value = roundPoints(Number(trimmed));
-  if (value < 0 || value > 1) return null;
-  return value;
-}
 
 // The sheet speaks in whole percents. The RPC and scoring still store late_factor as 0–1.
 export function parseLatePercent(raw: string): number | null {
@@ -29,10 +20,6 @@ export function percentToLateFactor(percent: number): number {
 
 export function latePercent(factor: number): number {
   return Math.round(factor * 100);
-}
-
-export function formatLateFactor(factor: number): string {
-  return factor.toFixed(2);
 }
 
 // 1 → "1.0", 0.5 → "0.5", 0.25 → "0.25". Score History uses this multiplier.
