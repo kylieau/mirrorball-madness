@@ -1,23 +1,41 @@
-# Session Handoff — Fri Nov 20, 2026 PT (`main` at `ffe3b66`, pushed and deployed)
+# Session Handoff — Wed Nov 25, 2026 PT (`main` at `8d1119e`, pushed and deployed)
 
 ## 1. Current State
 
-**In focus: Lifeline on any open spot, pushed, live and verified. Nothing is uncommitted from this work.**
-- **The rule** (`d04c6da`, Kylie, Thu Nov 19, 2026): a roster spot is open for a week when no couple in it is still dancing, whether its couple went home or a trade emptied it. `supabase/apply-lifeline-open-spots.sql` was applied live by Kylie. Checked with a throwaway scratch league against the live project: a pick on a trade-emptied spot saved, a full spot and a spot past the roster size were refused.
-- **The roster card** (`b9c4577`, `ffe3b66`; Kylie picked option C, `docs/design/roster-lifeline/`): each open spot is a dashed card on Your Fantasy Roster: the Lifeline with `½ their week` before scoring, its points after, or an Open Spot card with `Pick ›`. "In place of" is left off when the couple that went home is still held that week. Seen in a scratch league in Chromium only, not on a phone.
-- **Codex review fixes** (`db25317`, `ffe3b66`): a manager with no couple gets every spot; the Equalizer counts only periods a couple held; `supabase/apply-lifeline-standings-payees.sql` (applied live by Kylie) makes `weekly_manager_standings` list every team and week with a score row, payout or adjustment. Verified live: all 225 view rows identical before and after.
-- Reviewed by the advisor (a duplicate subagent was stopped) and Codex; tests (1062), `npx eslint src` and `npm run build` pass. **Kylie confirmed `ffe3b66` is the live deployment** (Fri Nov 20, 2026).
+**In focus: the season wrap (`8d1119e`), pushed and live. Nothing is uncommitted from this work.**
+- After the Finale, every fan tab switches to the season's end. **Home** (option A): the champions banner and a final result on each league card. **Results**: Final Placements and Season at a Glance on the Finale's week. **Standings**: Final Standings with a podium and Module Leaders. **Picks**: a Season Recap page after Week 11 (`?week=season`), with Transactions hidden. 4th and 5th place read as finalists, never as Eliminated, everywhere. `CLAUDE.md` (Season wrap) has the details; the mock is in `docs/design/season-wrap/`.
+- **Checks run:**
+  - 1091 tests, `tsc`, eslint and build all pass.
+  - Codex and the advisor reviewed the change and their findings are fixed.
+  - Vercel's commit status reads success.
+  - Both production domains serve Final Placements and Season at a Glance to signed-out visitors.
+  - The Home wrap banner was seen signed out at 390px on the dev server, with the clock pinned.
+- **Not checked:** Home's final league cards, Final Standings and the Picks Season Recap, because they need a sign-in. Kylie was asked to look at them on her phone.
+- Home's champions banner, the final league cards and Picks' recap only appear after the Finale's West feed ends (10 PM PT, Tue Nov 24, 2026).
 
-**Earlier this session, also pushed:** `f9f1f64` (Picks shows the coming week's roster once it changes hands), `67f14bd` (one row per couple on the Couples Leaderboard; open spots only with a couple to claim), `331e1bb` (clearer Lifeline and waiver lines; no Safe tag before a week airs), `fcece8a`.
+**Earlier this session, all pushed, with SQL applied live by Kylie before each deploy:**
 
-**Live state (S35, as last read Fri Nov 20, 2026):**
-- Week 10 (E11, Semi-Finals) is published. Week 11 (E12) is the Finale, the last scoring week, airing Tue Nov 24, 2026. The trade deadline and the last waiver run have passed.
-- Lifeline, Recast and Trades are on in the three West-lock leagues. Only Kylie's own team is short a couple for Week 11 (its spot emptied by a trade after Week 9), so its Week 11 Lifeline is the first one on a trade-emptied spot.
-- **After-E11 checks done Fri Nov 20, 2026 (read-only):** `scripts/dance-card-v2.ts --verify` matched in all four leagues; Week 10 had 12 Lifeline picks and 12 stored payouts, each equal to `buildLifelinePayouts` recomputed from `dance_card_snapshot`, none at zero.
+| Commit | Change | SQL |
+|---|---|---|
+| `69d7a7b` | Per-round draft slots | `apply-draft-dance-slots.sql` |
+| `946db9b` | Remove and reorder any round, Round 1 included | `apply-episode-rounds-reorder.sql` |
+| `e3df720` | Publish one dance at a time | `apply-per-dance-publish.sql` |
+| `232045c`, `38ea3bd`, `12afe55` | A status row per round in place of the In progress / Drafted / Published chips (mock B) | none |
+| `2158f8c` | Finale 4th / 5th Place (`final_place`) | `apply-finale-places.sql` |
+
+All of these were used live on Finale night.
+
+**Live state (S35):** Week 11 (E12, the Finale, aired Tue Nov 24, 2026) is published; production's Results shows it to signed-out visitors, and guests only ever see published weeks. The season is over, with nothing new to build for S35. Whether the after-Finale verification (step 1 below) ran has not been confirmed.
 
 ## 2. Changes Made
 
-**This session, all pushed:** `supabase/apply-lifeline-open-spots.sql` and `supabase/apply-lifeline-standings-payees.sql` (new), `src/lib/lifeline.ts`, `lifeline-picks.ts`, `lifeline-week-data.ts`, `home-roster-moves-data.ts`, `league-triage.ts` and their tests, `lifeline-db.test.ts`, `src/components/{roster-card,roster-moves,lifeline-card,lifeline-settings}.tsx`, `src/app/leagues/[id]/picks/page.tsx`, the Nov 17/18 commits' files, `docs/design/coming-week-roster/` and `docs/design/roster-lifeline/` (new), `CLAUDE.md`, `BACKLOG.md`, this file.
+**This session, all pushed:**
+- **SQL:** the four SQL files above and `supabase/schema.sql`.
+- **Enter Results:** `results-form.tsx`, `results-draft-input.ts`, `reveal-state.ts`, the episode-rounds files, and the Finish Week and publication-plan files.
+- **Season wrap (new):** `src/lib/season-wrap.ts`, `season-wrap-data.ts`, `src/components/final-standings.tsx` and `season-recap.tsx`.
+- **Season wrap (changed):** `episode-banner.ts` / `.tsx`, `league-triage-card.tsx`, `league-home-summary.ts`, `weekly-results-view.tsx`, and the Home, Manage Leagues, Results, Picks and Standings pages.
+- **4th / 5th display sites:** `spoiler-safe-couple-status.ts`, `results-outcome.ts`, `home-activity.ts`, `roster-weekly-points.ts`, `roster-card.tsx`, `couple-history*.ts` and `grand-finale-*`.
+- **Tests, docs and this file:** their tests, `docs/design/season-wrap/`, `CLAUDE.md`, `BACKLOG.md` and this file.
 
 **Not ours, uncommitted. Leave unstaged:**
 - `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile.codex`, `.devcontainer/devcontainer-lock.json`
@@ -28,36 +46,40 @@
 ## 3. Key Decisions
 
 **Workflow rules:**
-- A push to `main` needs Kylie's yes in that turn; invoking `/sync-handoff` is that yes for the handoff commit only. Commit only when asked. Stage by name, never `git add -A`.
-- Before a push she wants the advisor and Codex to have reviewed the change; say plainly when one wasn't available. The `/advisor` tool (Opus) sees the whole conversation, so don't also spawn a cold Opus subagent for the same review. If Codex replies that it is waiting for a go-ahead, send it one (SendMessage); if it dies on a rate limit, run `node /home/node/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs task --fresh "…"` directly.
-- No live SQL apply by the agent; Kylie applies SQL from a pasted fenced block. Live DB writes need her yes; verify read-only. `lifeline_slot_is_dead` is revoked from the service role too, so check it through a throwaway account's `set_lifeline_pick`.
-- The repo is public: never commit league standings or member names. No secrets in code.
-- For a UI placement change: a mock first (lettered options, she picks), then review before the push.
-- Don't run prettier. Never `pkill -f` (stop the dev server by PID from `ss -ltnp`). Never build while the dev server runs.
-- Scratch league: `scripts/qa-screenshots/seed.mjs up|down`; scratch-only direct writes are fine; tear down when done. Ad-hoc scripts run from the project root via `node --env-file=.env.local --input-type=module - args < file.mjs` with `NODE_OPTIONS=--experimental-websocket`; don't chain setup steps with `&&` after a `grep -v` that may print nothing.
-- No turning Recast, Trades or Lifeline on in a live league for her. In-app Recast copy says "waiver".
+- **Pushing and committing:** a push to `main` needs Kylie's yes in that turn. Invoking `/sync-handoff` is that yes for the handoff commit only. Commit only when asked. Stage by name, never `git add -A`.
+- **Reviews before a push:** she wants the advisor and Codex to have reviewed the change; say plainly when one wasn't available. The `/advisor` tool sees the whole conversation, so don't also spawn a cold Opus subagent for the same review. If Codex replies that it is waiting for a go-ahead, send it one (SendMessage). If it dies on a rate limit, run `node /home/node/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs task --fresh "…"` directly.
+- **Live database:** don't touch the Supabase DB directly (preview and prod share it) and don't change published weeks. Kylie applies SQL from a pasted fenced block, and the app deploys only after its SQL. Live DB writes need her yes; verify read-only, and when a check needs a write, ask her to run read-only queries instead.
+- **Public repo:** never commit league standings or member names. No secrets in code.
+- **UI placement changes:** a mock first (lettered options, she picks), then review before the push. If a deploy fails, roll back by redeploying the previous good commit.
+- **Dev server and formatting:** don't run prettier. Never `pkill -f`; stop the dev server by its PID from `ss -ltnp`. Never build while the dev server runs.
+- **Scratch league:** `scripts/qa-screenshots/seed.mjs up|down`. Direct writes to the scratch league are fine; tear it down when done.
+- **Ad-hoc scripts:** run from the project root via `node --env-file=.env.local --input-type=module - args < file.mjs` with `NODE_OPTIONS=--experimental-websocket`.
+- **League features:** don't turn Recast, Trades or Lifeline on in a live league for her. In-app Recast copy says "waiver".
 
-**Product decisions Kylie settled (details in `CLAUDE.md`):**
-- **Lifeline covers any open spot** (Thu Nov 19, 2026), whatever emptied it. Selling a couple for points and then taking a Lifeline is allowed (Codex: limited by the 10% trade cash cap). The Equalizer stays as stored.
-- **Roster card** shows each open spot as a card (option C, Fri Nov 20, 2026); no Safe tag on a week that hasn't aired (option A, Wed Nov 18, 2026).
-- **Couples Leaderboard is one row per couple** (Tue Nov 17, 2026, reversing the per-holder rows of Fri Nov 13).
-- **Trades** clear when the 24-hour veto window closes; **removing a manager** releases the roster at the first unaired week; **waiver order** is reverse Dance Card standings, one run per week, no second run this season.
-- **Grand Finale distance** counts weeks, the Finale split between its places. **Dance Card v3:** every finalist survives the Finale; rates frozen for S35. **Lifeline** pays half the couple's credit whatever its outcome. **"Open spot"** is the one name for an empty roster spot.
-- **Notifications:** in-app `/notifications` only; no push or service worker.
+**Product decisions Kylie settled this session (details in `CLAUDE.md`):**
+- **Rounds:** Round 1 is on by default but can be removed and reordered like any round (Tue Nov 24, 2026).
+- **Publishing:** Kylie can always publish, with no time lock, one dance at a time (Tue Nov 24, 2026).
+- **Round status:** a status marker on each couple's card, one per round, replaces the In progress / Drafted / Published chips (mock B, Tue Nov 24, 2026).
+- **4th and 5th Place** only in the week marked Finale. The couple stays Eliminated for scoring and eligibility, but reads as a finalist, never Eliminated, on every fan surface. Entering the places before or after the rest of the results makes no difference.
+- **Season wrap:** Home option A. Picks keeps Week 11 as a normal page and adds a final Season Recap page. Tied totals share a place.
+
+**Still in force from earlier sessions:**
+- Lifeline covers any open spot.
+- Couples Leaderboard: one row per couple.
+- Trades clear when the veto window closes.
+- Grand Finale distance counts weeks.
+- Dance Card v3: every finalist survives the Finale.
+- Notifications: in-app `/notifications` only.
 
 ## 4. Backlog & Next Steps
 
-**Hard dates (PT):**
-- **Tue Nov 24, 2026:** the Finale (Week 11, E12). Kylie should save her Lifeline for the trade-emptied spot before the Week 11 lock.
-- **Before Tue Nov 24, 2026:** Kylie decides whether to tell the v3 commissioners about the Finale survival amendment (`BACKLOG.md`, Finale follow-ups).
+No hard dates remain this season.
 
-**Next steps:**
-1. **After E12 publishes (Tue Nov 24, 2026):** `scripts/dance-card-v2.ts --verify`; recompute Week 11 `lifeline_payouts` with `buildLifelinePayouts` over `lifelineSeason(dance_card_snapshot)` and compare with the stored rows (as done for Week 10; a tsx script needs the `.mts` extension for top-level await and must run from the project root); confirm Kylie's league's Week 11 payout for the trade-emptied spot is above zero.
-2. **Phone checks** of the Nov 11 to Nov 20, 2026 UI (`BACKLOG.md`, Picks and Couples Leaderboard changes).
-3. **The paused notifications question** (`BACKLOG.md`, Notifications): an assessment with options, no build until she picks.
+1. **After-Finale verification (read-only), if not yet run:**
+   - Run `scripts/dance-card-v2.ts --verify`.
+   - Recompute Week 11 `lifeline_payouts` with `buildLifelinePayouts` over `lifelineSeason(dance_card_snapshot)` and compare with the stored rows. A tsx script needs the `.mts` extension for top-level await.
+   - Confirm that Kylie's league's Week 11 payout for the trade-emptied spot is above zero.
+2. **Phone checks:** the season wrap's signed-in screens, plus the Nov 11 to Nov 20, 2026 UI. Both are listed in `BACKLOG.md`.
+3. **Next season:** the rest of `BACKLOG.md` (Finale follow-ups, Notifications, Free agency, the adversarial audit).
 
-**After the Finale (Kylie, Fri Nov 20, 2026):** nothing new to build this season; all that's left is scoring E12 and the read-only checks in step 1. Steps 2 and 3 and the rest of `BACKLOG.md` are for next season.
-
-Deferred items are in `BACKLOG.md` (Lifeline on any open spot; Picks and Couples Leaderboard changes; Finale follow-ups; Notifications; Free agency next season; the adversarial audit).
-
-Next command: none pending until E12 publishes (Tue Nov 24, 2026); then `NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`.
+Next command: `NODE_OPTIONS=--experimental-websocket npx tsx --env-file=.env.local scripts/dance-card-v2.ts --verify`

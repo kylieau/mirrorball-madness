@@ -2,6 +2,19 @@
 
 Things explicitly deferred during development, not tracked anywhere else. Not a full feature roadmap — just the "don't forget this" list.
 
+## Season wrap — 2026-11-25
+
+Built and pushed (`8d1119e`; CLAUDE.md, Season wrap; mock in
+`docs/design/season-wrap/`). Seen signed out only: Results' Final Placements
+and Season at a Glance on production, the Home wrap banner on the dev server.
+- Phone checks still owed, signed in: Home's final league cards (and Manage
+  Leagues), Final Standings, the Picks Season Recap.
+- Differs from the mock: the Picks page is labelled "Season Recap", not
+  "Season 35" (the season's name isn't loaded there), and the Couples
+  Leaderboard doesn't mark the champion couple.
+- Next season: the wrap ends once another season is active; check the banner
+  and cards switch back when S36 is set up.
+
 ## Lifeline on any open spot — 2026-11-20
 
 Built 2026-11-19/20 (CLAUDE.md describes it): Lifeline covers a spot with no
@@ -104,10 +117,10 @@ Still open:
 
 ## Finale follow-ups — 2026-11-11
 
+Built 2026-11-24 (`2158f8c`, `apply-finale-places.sql`, applied live):
+Finish Week's 4th Place / 5th Place in the Finale week (`final_place`).
+
 Offered to Kylie, not answered and not built:
-- Real 4th Place / 5th Place outcomes (needs SQL). Today both are entered as
-  Eliminated in the Finale week and share spots, so Grand Finale, Curtain Call
-  and Dance Card can't tell them apart.
 - A Finish Week guard for a season with no week ticked Finale (the engine
   falls back to the last scheduled week).
 - An automatic rescore when the Finale tick is set or moved after weeks are
@@ -115,9 +128,9 @@ Offered to Kylie, not answered and not built:
   `scripts/recompute-published-weeks.ts`).
 - `couplePath` in `src/lib/strong-play-ceilings.ts` still gives 4th place no
   Finale survival; re-solve the v3 rates with it for a future season, not S35.
-- Kylie decides whether to tell the v3 commissioners about the Finale
-  survival amendment (every finalist survives the Finale), before the Finale
-  on Tue Nov 24, 2026.
+- Unconfirmed: whether Kylie told the v3 commissioners about the Finale
+  survival amendment (every finalist survives the Finale) before the Finale
+  aired on Tue Nov 24, 2026.
 
 ## Free agency after the waiver run — next season
 
