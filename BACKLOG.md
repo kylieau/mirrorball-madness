@@ -15,6 +15,40 @@ and Season at a Glance on production, the Home wrap banner on the dev server.
 - Next season: the wrap ends once another season is active; check the banner
   and cards switch back when S36 is set up.
 
+## Season 36 rollover — 2026-11-25
+
+From the end-of-season review (https://claude.ai/artifact/6EWniZyAB3bQ881wsJMXxh,
+private to Kylie). Codex read the repo; only the Reset Draft and Grand Finale
+items were spot-checked, and none has been rehearsed in a two-season test.
+- P1, act now: Reset Draft (League Settings, any drafted league) deletes the
+  league's scores, rosters, draft picks, claims and departures for every
+  season; Lifeline payouts and adjustments survive. Commissioners asked not
+  to use it before S36; needs a season-scoped guard.
+- P1: no redraft path that keeps history (`draft_status` stays completed
+  across seasons; Reset Draft is the only way back).
+- P1: roster rows are matched by week number with no season filter (league
+  pages, `lifeline_slot_is_dead`); departed S35 managers stay barred.
+- P1: `grand_finale_predictions` is unique per league and manager, not per
+  season (reminders, resubmits deleting S35's bracket, old late factors).
+- P1: Anchor Week (`judges_score_starts_week`) carries over; so do Lifeline's
+  start week, its guards and the one-Equalizer-per-manager rule.
+- P2: Home's Recent Activity attaches claims and trades by week number (S35
+  moves could replay in S36); the Recast page picks the latest run by max week
+  number across seasons. App-only fixes.
+- P2: autopilot, draft order, queues, custom order and Dance Card version
+  carry over unreviewed.
+- P2: build a complete schema baseline (live `pg_dump --schema-only` with
+  ACLs, checked against the PGlite full stack), then one shared test setup,
+  then retire the fallbacks for SQL that is live (`detectTeamsMode`,
+  `LEGACY_TEAM_PANEL_SIZE`, the standings table fallback, the whole-couple
+  reveal `commit_episode_reveal` / `buildRevealPlan`, now test-only).
+- P3: ESLint reads the gitignored `.codex-private/`; the QA seed can't draft
+  between seasons; Finale leaderboard ties could follow final place; a lost
+  dance-off shows "+0" in gold on the couple page; confirm-dialog titles mix
+  Title Case and sentence case.
+- Checked fine: no S35 totals bleed into another season's standings; the
+  season wrap switches back once S36 is active.
+
 ## League creation window — next season (Kylie, 2026-11-25)
 
 Nobody can create a league unless a site admin has opened a creation window

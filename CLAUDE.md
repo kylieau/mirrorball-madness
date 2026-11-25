@@ -28,7 +28,7 @@ Fantasy sports app for Dancing with the Stars. Next.js 15 (App Router), TypeScri
 
 - **Deploy order.** The app is never deployed before the SQL it depends on: several loaders select columns an `apply-*.sql` file adds (`dance_slot`, `live_dance_score_id`, the podium columns on `predictions`). Every file named in these docs is applied live.
 - **Replaying SQL.** `schema.sql` lacks every function added since late October; a fresh project needs `schema.sql` plus the `apply-*.sql` files in the order they went live. Later files redefine earlier functions, so alphabetical order is wrong (the PGlite tests' `LIVE_STACK` lists are the best record of the order). `supabase/apply-strong-play-ceilings.sql` predates the night-scaling rule — never rerun it.
-- **Reset Draft deletes every season.** `reset_draft` clears the league's `weekly_manager_scores`, rosters, picks, claims and departures with no season filter, and League Settings offers it on any drafted league. Lifeline payouts and adjustments survive it.
+- **Reset Draft deletes every season.** `reset_draft` clears the league's `weekly_manager_scores`, rosters, draft picks, claims and departures with no season filter, and League Settings offers it on any drafted league. Lifeline payouts and adjustments survive it.
 - **Published weeks.** Changing scoring logic only reaches a published week when it is republished or `scripts/recompute-published-weeks.ts` runs; never change a published week without Kylie's yes.
 
 ## Architecture & Conventions
@@ -60,6 +60,7 @@ Each feature's full behaviour lives in `docs/architecture/`; read the relevant f
 - Recast/waiver couple status must go through `spoilerSafeCoupleStatus`/`resolveSpoilerCutoff`/`isSpoilerSafeActive` — never key copy or eligibility off raw `eliminated`/`withdrawn`.
 - **The Finale has about 4–5 couples** who receive placements rather than going home one by one, and doubles are only known once a week airs, so never assume one elimination per week; Grand Finale positions use shared ranges (`eliminationPositionRanges`). See Curtain Call and Grand Finale.
 - **Invite preview**: `/join/[code]` names the league before sign-in through `league_invite_preview` (name, team count, draft running), granted to `anon` (`supabase/apply-league-invite-preview.sql`). An unknown code says so before anyone signs up.
+- **Guest browsing**: `anon` reads only the season tables, and restrictive anon-only policies limit scores, outcomes and In Jeopardy to published episodes (`supabase/apply-guest-browsing.sql`); a new table guests can see needs the same. See Fan Pages.
 - Account deletion is request-and-review: `request_account_deletion` stamps `profiles.deletion_requested_at`; nothing auto-deletes `auth.users` or cascades a league wipe.
 
 ## Environment Gotchas
@@ -83,6 +84,7 @@ Each feature's full behaviour lives in `docs/architecture/`; read the relevant f
 - **Use the `cn` helper** (from the `cn` package, tailwind-merge-compatible) instead of raw `clsx` — a later conflicting class always wins, so it's safe to override a generated component's default classes via `className`.
 - **Date/time hydration safety**: absolute date/time formatting (viewer's local timezone) must be computed client-side after mount (`useEffect`, empty deps), never during initial render — the server has no meaningful browser timezone. Relative durations (a countdown) have no such ambiguity and are safe to compute in a Server Component.
 - **Module order is Curtain Call → Dance Card → Grand Finale everywhere** it's listed (Your Picks sections, Standings, Settings, create-league dialog). Defined once in `SCORING_MODULES` (`src/lib/scoring-modules.ts`) — derive any new module list from it.
+- **Points are always formatted**: fantasy points are rounded to two decimals when computed (`roundPoints`) and shown through `formatPoints` / `formatSignedPoints` (`12.00`); never interpolate a points value into copy unformatted. Raw judge scores stay plain integers. See Scoring.
 - **Capitalization**: anything that names a thing (page/card/section titles, buttons, badges, field/setting labels, dropdown options, nav items) is Title Case. Full phrases and sentences (descriptions, helper text, status/empty messages) stay sentence case. Hidden `aria-label`s are left alone.
 - **League at a Glance on Picks** (Dance Card, Curtain Call, Grand Finale) sits behind one shared collapsed-by-default hop, `LeagueGlanceHop` (`src/components/league-glance-hop.tsx`), that expands the peer list in place — never a sheet. Curtain Call and Grand Finale only render it after lock.
 - **App frame**: the whole app is one phone-width column (`--frame-width`, 30rem, set in `globals.css`) centered on a darker `--desk` backdrop, with a shadow from 520px up; the root layout owns it, so pages don't set their own max width. The page itself still scrolls. Anything `fixed` (tab bars, the Enter Results Publish bar, bottom sheets) caps itself at `max-w-(--frame-width)` so it stays inside the column. **Fan/admin tab bars** stay `fixed` to the viewport bottom on every width. Shared chrome is `BottomNav`/`FanBottomNav` (`src/components/bottom-nav.tsx`).
@@ -103,6 +105,9 @@ Deliberate omissions and naming calls. Code can't record an absence, so these co
 - **"Bracket"** in Your Season Bracket is deliberate: a full outcome prediction submitted up front and locked, like a March Madness bracket, even though it's one order rather than matchups.
 - **Home curtain banner**, **Home Recent Activity** and the **Spoiler-Free strip / live-air prompt**: settled designs, described in full in Fan Pages. Don't re-propose a picks-deadline line or thin Make Picks ticket on Home.
 - **Manager-earned points are set in the Fraunces serif** (`font-heading`); general points talk (settings values, "up to N pts" potential, explainer copy) is not. `font-rank` (Libre Caslon) is only for leaderboard placement numbers. The viewer marker is the shared `YouPill`.
+- **Couples Leaderboard** is one row per couple over its whole season, whoever held it (Kylie, 2026-11-17), and never shows Curtain Call or Grand Finale points. See Dance Card.
+- **Roster per-couple points are judges' points only**; survival and placement bonuses stay manager-level. See Dance Card.
+- **League Settings scoring** opens each module straight onto its weight field: no Scoring Mix accordion and no separate "Scoring by module" summary. See Scoring.
 - **Manager order on shared roster cards** is `orderManagersForRosters`: viewer first, then alphabetical, until anyone has scored — then standings order.
 - **Standings' roster card has no week carousel**; flipping weeks lives on Your Fantasy Roster only.
 - **Gear on the hybrid card only.** Home and Manage Leagues put an icon-only gear on the right of each card's CTA row (League Settings). The league switcher has no per-league gear; `league-header.tsx`'s first-run nudges still link into settings.
