@@ -1446,15 +1446,18 @@ export function ResultsForm({
     const dances = (rows[c.id] ?? emptyRow()).dances
       .map((d, i) => ({ d, slot: i + 1 }))
       .filter(({ d, slot }) => d.danceStyleId && (activeSlot == null || slot === activeSlot + 1));
-    if (dances.length > 0 && dances.every(({ slot }) => liveIdOf(c.id, slot))) return "published";
+    if (dances.length === 0) return "inProgress";
+    if (dances.every(({ slot }) => liveIdOf(c.id, slot))) return "published";
     if (releasedCoupleIds.has(c.id)) return "drafted";
-    if (dances.length > 0 && dances.every(({ d }) => danceScored(d))) return "ready";
+    if (dances.every(({ d }) => danceScored(d))) return "ready";
     return "inProgress";
   }
 
   function specialStatus(dance: SpecialDance | null): EntryStatus {
     if (published || dance?.postedAt) return "published";
-    return dance && releasedTeamIds.has(dance.id) ? "drafted" : "inProgress";
+    if (!dance || dance.memberCoupleIds.length === 0) return "inProgress";
+    if (releasedTeamIds.has(dance.id)) return "drafted";
+    return unscoredTeams.some((v) => v.dance.id === dance.id) ? "inProgress" : "ready";
   }
 
   // "Cha Cha · Tears" for the open round's dance (every dance of theirs with
