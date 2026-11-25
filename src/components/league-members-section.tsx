@@ -173,7 +173,7 @@ function InviteCoManagerButton({ leagueId, member }: { leagueId: string; member:
       <DialogTrigger render={<Button variant="outline" size="sm" />}>Invite a Co-Manager</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Invite a co-manager</DialogTitle>
+          <DialogTitle>Invite a Co-Manager</DialogTitle>
           <DialogDescription>
             Share this link with whoever&apos;ll run this team with you — full parity, same
             roster, same picks, same standings. Invitations expire after seven days.
