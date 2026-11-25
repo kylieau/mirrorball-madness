@@ -63,7 +63,7 @@
 @layer base {
   /*
    * Mirrorball Madness's one and only theme: dark curtain + gold mirrorball
-   * accent, per design/mockups.html. There's no light/dark toggle, so this
+   * accent, per docs/design/early-mockups.html. There's no light/dark toggle, so this
    * lives directly in :root rather than behind a .dark class.
    */
   :root {

@@ -26,7 +26,7 @@ Fantasy sports app for Dancing with the Stars. Next.js 15 (App Router), TypeScri
 
 ## Audit remediation release status — 2026-10-22
 
-Released 2026-10-22 per `docs/audit-release-runbook.md`: private backup taken,
+Released 2026-10-22 per `docs/audits/audit-release-runbook.md`: private backup taken,
 the four `apply-audit-*.sql` scripts dry-run in one rolled-back transaction and
 then applied live, the app deployed from `main` (`997de1a`), and types regenerated
 from the live project. Production was verified with throwaway accounts (League

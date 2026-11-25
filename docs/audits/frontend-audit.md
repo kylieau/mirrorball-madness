@@ -1,6 +1,6 @@
 # Frontend code quality audit — 2026-10-17
 
-A read-only review of the client components, the hooks under `src/lib/use-*`, and the pages, server actions and loaders that feed them. It looked for state bugs, spoiler leaks across the server/client boundary, live-night failure modes, hydration safety and dead code. Nothing in the app was changed. It ran in two passes, a first pass and a gap pass, and both skipped anything `docs/ux-audit.md` already covers. Items that extend a ux-audit finding say so. Every finding below was re-checked by at least one independent verifier, and their corrections are folded into the text.
+A read-only review of the client components, the hooks under `src/lib/use-*`, and the pages, server actions and loaders that feed them. It looked for state bugs, spoiler leaks across the server/client boundary, live-night failure modes, hydration safety and dead code. Nothing in the app was changed. It ran in two passes, a first pass and a gap pass, and both skipped anything `docs/audits/ux-audit.md` already covers. Items that extend a ux-audit finding say so. Every finding below was re-checked by at least one independent verifier, and their corrections are folded into the text.
 
 **How it was checked**
 - **First pass, static read:**
@@ -70,9 +70,9 @@ A read-only review of the client components, the hooks under `src/lib/use-*`, an
   - `pending-account-deletions`, `add-to-home-screen-notice`, `scoring-module-panel` and `other-leagues-picker`;
   - `dance-card-league-list` and `curtain-call-league-list` beyond their spoiler comments.
 - **The Recast spoiler findings (FE-11, FE-27) are latent.** No live league has Recast on, so they couldn't be shown with live data. They rest on the code and the schema.
-- **Not re-audited:** server-side spoiler gating in RPCs and RLS, apart from the `waiver_claims` and `roster_slots` policies. `docs/security-audit.md` covers that ground.
+- **Not re-audited:** server-side spoiler gating in RPCs and RLS, apart from the `waiver_claims` and `roster_slots` policies. `docs/audits/security-audit.md` covers that ground.
 - **Checked but not reported:**
-  - **Co-manager invite code readable by league members.** The settings page comment at L113-116 says any member can read `co_manager_invite_code` through RLS. It wasn't probed here because `join_as_co_manager`'s member guard is backend scope. It is reported as SEC-2 in `docs/security-audit.md`.
+  - **Co-manager invite code readable by league members.** The settings page comment at L113-116 says any member can read `co_manager_invite_code` through RLS. It wasn't probed here because `join_as_co_manager`'s member guard is backend scope. It is reported as SEC-2 in `docs/audits/security-audit.md`.
   - **Duplicate pending Recast claims.** These are possible because `submit_waiver_claim` has no duplicate-pending guard. Not reported: it is latent, and it is by design for the multi-bid methods.
   - **The Live Scores sheet's `spoilerFree` state is seeded only once.** This is the same pattern as FE-15 and adds nothing new.
 
@@ -86,7 +86,7 @@ Severity:
 ## Findings
 
 **FE-1 · Scores › By Couple shows Spoiler-Free viewers when each couple went home, through the number of locked rows** — High
-- **Where:** [all-results-view.tsx:500](../src/components/all-results-view.tsx#L500-L511) (the locked placeholder row); also [all-results-view.tsx:451](../src/components/all-results-view.tsx#L451) (the history is built from `episode_results`), [all-results-view.tsx:507](../src/components/all-results-view.tsx#L507), [results/page.tsx:72](../src/app/admin/results/page.tsx#L72) and [results/page.tsx:81](../src/app/admin/results/page.tsx#L81) (rows passed through without filtering).
+- **Where:** [all-results-view.tsx:500](../../src/components/all-results-view.tsx#L500-L511) (the locked placeholder row); also [all-results-view.tsx:451](../../src/components/all-results-view.tsx#L451) (the history is built from `episode_results`), [all-results-view.tsx:507](../../src/components/all-results-view.tsx#L507), [results/page.tsx:72](../../src/app/admin/results/page.tsx#L72) and [results/page.tsx:81](../../src/app/admin/results/page.tsx#L81) (rows passed through without filtering).
 - **What's wrong:**
   - In the By Couple view, each couple's history is built from its `episode_results` rows.
   - A week the viewer hasn't watched isn't dropped. It renders as a "Week N | 🔒 Locked" row, so the lock hides only the outcome text.
@@ -104,13 +104,13 @@ Severity:
   - Better still, filter `episodeResults`, `danceScores` and `judgeScores` down to the allowed weeks server-side in `admin/results/page.tsx`, before they reach the client component. That also keeps the outcomes out of the RSC payload, which ships them today. This pairs with FE-2's fix for drafts.
   - The server-side filter must keep exhibition rows (no `week_id`) and draft or unpublished rows, which the current lock check already exempts.
 - **Evidence:**
-  - Read [all-results-view.tsx:356](../src/components/all-results-view.tsx#L356-L359) and L447-536.
+  - Read [all-results-view.tsx:356](../../src/components/all-results-view.tsx#L356-L359) and L447-536.
   - A scratch SSR test rendered `AllResultsView` with `view='couple'`, `spoilerFreeMode=true` and empty `allowedWeekIds`, with couple Alpha eliminated in week 2 and Bravo and Charlie running through week 3. It passes: the markup never says "eliminated", but Alpha has 2 "🔒 Locked" rows and Bravo and Charlie have 3.
   - A read-only query joining `episode_results` to episodes, competition weeks and couples for the active season confirmed that each eliminated couple's last row is its elimination week.
   - **3/3 upheld.** One of the three verifiers would rate this Medium: it needs a viewer at least 2 weeks behind, and the path is Settings › Scores rather than a primary fan tab. The verifiers corrected "every elimination except the most recent week's" to the range above, and corrected the couple counts.
 
 **FE-2 · Unreleased draft scores, drafted eliminations and In Jeopardy ticks reach every signed-in user through the Scores and Schedule pages** — Medium
-- **Where:** [results/page.tsx:73](../src/app/admin/results/page.tsx#L73); also [schedule/page.tsx:35](../src/app/admin/schedule/page.tsx#L35), [results-page-data.ts:180](../src/lib/results-page-data.ts#L180-L183), [results-screen.tsx:157](../src/components/results-screen.tsx#L157), [schedule-manager.tsx:200](../src/components/schedule-manager.tsx#L200) (prop type; used at [:439](../src/components/schedule-manager.tsx#L439) and [:454](../src/components/schedule-manager.tsx#L454)), [all-results-view.tsx:216](../src/components/all-results-view.tsx#L216).
+- **Where:** [results/page.tsx:73](../../src/app/admin/results/page.tsx#L73); also [schedule/page.tsx:35](../../src/app/admin/schedule/page.tsx#L35), [results-page-data.ts:180](../../src/lib/results-page-data.ts#L180-L183), [results-screen.tsx:157](../../src/components/results-screen.tsx#L157), [schedule-manager.tsx:200](../../src/components/schedule-manager.tsx#L200) (prop type; used at [:439](../../src/components/schedule-manager.tsx#L439) and [:454](../../src/components/schedule-manager.tsx#L454)), [all-results-view.tsx:216](../../src/components/all-results-view.tsx#L216).
 - **What's wrong:**
   - `loadResultsPageData` uses the service-role client to read every episode's full draft: draft dances with per-judge scores, draft entries with outcome, Judges' Save and bonus, `inJeopardyCoupleIds`, and custom moments.
   - `/admin/results` (Scores, the View tier, open to any signed-in user) passes the whole `draftsByEpisode` to `ResultsScreen`, which is a `"use client"` component. `/admin/schedule`, also open to any signed-in user, passes it to `ScheduleManager` (`"use client"`).
@@ -119,7 +119,7 @@ Severity:
     - `AllResultsView` reads `hasDraft` and `entries.length` (L216, 259, 373).
     - `ScheduleManager` reads `hasDraft` and the draft dance couple ids.
 - **Why it matters:**
-  - On a live night, any signed-in user can open the RSC payload of either page (both are linked for everyone in the Settings sheet, [results-nav.tsx:40](../src/components/results-nav.tsx#L40)).
+  - On a live night, any signed-in user can open the RSC payload of either page (both are linked for everyone in the Settings sheet, [results-nav.tsx:40](../../src/components/results-nav.tsx#L40)).
   - From the first autosave they can read unreleased draft judge scores and songs. `draft_couple_releases` is supposed to gate these, and this path skips it.
   - Drafted eliminations and In Jeopardy can exist only once Finish Week opens, after every couple is posted. That is a short window near the end of the East broadcast.
   - A Spoiler-Free viewer's browser receives all of it too, even though the page never shows it.
@@ -127,7 +127,7 @@ Severity:
 - **Why Medium, not High:**
   - Nothing is rendered; it takes devtools to read it.
   - Drafts hold only what East TV is airing at the time.
-  - This isn't a bypass of a hard boundary. Anyone can call `create_league`, become a commissioner and so reach the Propose tier, where Enter Results shows every draft by design ([enter/page.tsx:36](../src/app/admin/results/enter/page.tsx#L36-L42)).
+  - This isn't a bypass of a hard boundary. Anyone can call `create_league`, become a commissioner and so reach the Propose tier, where Enter Results shows every draft by design ([enter/page.tsx:36](../../src/app/admin/results/enter/page.tsx#L36-L42)).
   - Nothing unpublished is exposed today: E7–E12 have 0 draft rows, and the current drafts are correction drafts of published weeks (58 draft dances, 66 draft results, 0 releases) that match the live tables.
   - The first pass also claimed West-lock Curtain Call picks could be gamed. The verifiers dropped that: West-lock leagues already pick after the East elimination airs, by design.
 - **Fix:**
@@ -137,15 +137,15 @@ Severity:
   - Keep the full `DraftState` only on `/admin/results/enter`, which already redirects viewers without Propose access before loading.
   - Both pages render the same as before and the View tier stays, so this doesn't conflict with the "Results entry has three access tiers" decision.
   - Whether "commissioner of any self-created league" should reach Enter Results at all belongs to that settled decision and to the season-wide Draft Scores decision. It is not reported here.
-  - **This is the same exposure as SEC-3 in `docs/security-audit.md`**, which rates it High. One fix closes both.
+  - **This is the same exposure as SEC-3 in `docs/audits/security-audit.md`**, which rates it High. One fix closes both.
 - **Evidence:**
-  - Read `results-page-data.ts:180-183` (`loadDraftForEpisode` with the admin client for every episode), `DraftState` at [results-draft.ts:52](../src/lib/results-draft.ts#L52-L61), and `results-screen.tsx` (`"use client"`, takes `draftsByEpisode` at L108 and passes it on at L157).
+  - Read `results-page-data.ts:180-183` (`loadDraftForEpisode` with the admin client for every episode), `DraftState` at [results-draft.ts:52](../../src/lib/results-draft.ts#L52-L61), and `results-screen.tsx` (`"use client"`, takes `draftsByEpisode` at L108 and passes it on at L157).
   - Read-only `information_schema.role_table_grants`: `authenticated` and `anon` have no `SELECT` on `draft_dance_scores`, `draft_episode_results`, `draft_judge_scores`, `draft_episode_in_jeopardy_couples`, `draft_episode_overrides` or `draft_episode_custom_moments`.
-  - The live tables (`dance_scores`, `episode_results`, `judge_scores`, In Jeopardy) are readable by everyone through RLS (`using (true)`, [schema.sql:2532](../supabase/schema.sql#L2532-L2545), [:2635](../supabase/schema.sql#L2635-L2638)), so drafts are the only new exposure.
+  - The live tables (`dance_scores`, `episode_results`, `judge_scores`, In Jeopardy) are readable by everyone through RLS (`using (true)`, [schema.sql:2532](../../supabase/schema.sql#L2532-L2545), [:2635](../../supabase/schema.sql#L2635-L2638)), so drafts are the only new exposure.
   - **3/3 upheld, rated down from High to Medium** for the reasons above.
 
 **FE-3 · After results go live, the Curtain Call box shows last week's picks as "Picks saved" for the new week** — Medium
-- **Where:** [pick-em-box.tsx:115](../src/components/pick-em-box.tsx#L115-L133); also [picks/page.tsx:597](../src/app/leagues/%5Bid%5D/picks/page.tsx#L597) (rendered with no `key`), [league-page-data.ts:87](../src/lib/league-page-data.ts#L87-L97) (`upcomingEpisode`).
+- **Where:** [pick-em-box.tsx:115](../../src/components/pick-em-box.tsx#L115-L133); also [picks/page.tsx:597](../../src/app/leagues/%5Bid%5D/picks/page.tsx#L597) (rendered with no `key`), [league-page-data.ts:87](../../src/lib/league-page-data.ts#L87-L97) (`upcomingEpisode`).
 - **What's wrong:**
   - `PickEmBox` copies `eliminatedId`, `eliminatedId2`, `topScorerId` and `editing` from props into `useState` once and never re-syncs them.
   - The Picks page renders it at a fixed position in the tree with no `key`.
@@ -163,10 +163,10 @@ Severity:
   - A scratch happy-dom test rendered `PickEmBox` for week 5 with a saved pick, then re-rendered the same root with week 6, `existingPrediction` null and couple c1 removed from `activeCouples`. It passes:
     - before: "✓Picks saved…Eliminated Alix & Val Top Scorer Bree & Sasha";
     - after: "✓Picks saved…Eliminated Unknown & Unknown Top Scorer Bree & Sasha".
-  - **1/1 upheld.** The verifier added the `?week=` precondition. It also noted that [grand-finale-box.tsx:84](../src/components/grand-finale-box.tsx#L84) seeds state the same way. Grand Finale has no week, so it doesn't advance like this; treat it as a lower-impact related case, e.g. a refresh after the deadline or a late unlock.
+  - **1/1 upheld.** The verifier added the `?week=` precondition. It also noted that [grand-finale-box.tsx:84](../../src/components/grand-finale-box.tsx#L84) seeds state the same way. Grand Finale has no week, so it doesn't advance like this; treat it as a lower-impact related case, e.g. a refresh after the deadline or a late unlock.
 
 **FE-4 · Curtain Call's Cancel shows unsaved choices as "Picks saved"** — Medium
-- **Where:** [pick-em-box.tsx:291](../src/components/pick-em-box.tsx#L291-L295); also [pick-em-box.tsx:190](../src/components/pick-em-box.tsx#L190) (`hasSavedPick`), [pick-em-box.tsx:299](../src/components/pick-em-box.tsx#L299-L330) (read-only branch), [pick-em-box.tsx:162](../src/components/pick-em-box.tsx#L162-L170) (`fillFrom`).
+- **Where:** [pick-em-box.tsx:291](../../src/components/pick-em-box.tsx#L291-L295); also [pick-em-box.tsx:190](../../src/components/pick-em-box.tsx#L190) (`hasSavedPick`), [pick-em-box.tsx:299](../../src/components/pick-em-box.tsx#L299-L330) (read-only branch), [pick-em-box.tsx:162](../../src/components/pick-em-box.tsx#L162-L170) (`fillFrom`).
 - **What's wrong:**
   - `hasSavedPick` is computed from the local dropdown state, not from `existingPrediction`.
   - With no saved prediction, choosing any couple makes Cancel appear. Cancel only calls `setEditing(false)` and doesn't restore the saved values. The read-only branch then shows "✓ Picks saved" with the unsaved choices.
@@ -181,7 +181,7 @@ Severity:
 - **Evidence:** read `pick-em-box.tsx:115-133`, 190 and 288-306. It wasn't exercised in a DOM test, because simulating Base UI `Select` wasn't attempted, but the logic is direct. **1/1 upheld.** The verifier added the `fillFrom` trigger.
 
 **FE-5 · Back-to-back autopilot managers each wait out the full pick clock, because the auto-pick effect doesn't re-run** — Medium
-- **Where:** [use-auto-draft-pick.ts:48](../src/lib/use-auto-draft-pick.ts#L48); also [draft-room.tsx:317](../src/components/draft-room.tsx#L317), [draft-status-card.tsx:51](../src/components/draft-status-card.tsx#L51), [schema.sql:2062](../supabase/schema.sql#L2062-L2161) (`make_auto_draft_pick`, one pick per call).
+- **Where:** [use-auto-draft-pick.ts:48](../../src/lib/use-auto-draft-pick.ts#L48); also [draft-room.tsx:317](../../src/components/draft-room.tsx#L317), [draft-status-card.tsx:51](../../src/components/draft-status-card.tsx#L51), [schema.sql:2062](../../supabase/schema.sql#L2062-L2161) (`make_auto_draft_pick`, one pick per call).
 - **What's wrong:**
   - The effect's deps are `[leagueId, draftStatus, clockExpired, onTheClockAutopilot]`.
   - Suppose an autopilot pick lands and the next manager is also on autopilot. None of the deps change: the turn clock resets, so `clockExpired` stays false, and `onTheClockAutopilot` stays true. So no new `make_auto_draft_pick` call is made.
@@ -202,7 +202,7 @@ Severity:
   - **1/1 upheld.** The verifier added the multi-tab and double-run refinements by tracing the code, not by re-running the test.
 
 **FE-6 · The draft card on Picks never updates: the turn goes stale, "Auto-picking…" sticks, and "your turn" never appears** — Medium
-- **Where:** [draft-status-card.tsx:44](../src/components/draft-status-card.tsx#L44); also [picks/page.tsx:649](../src/app/leagues/%5Bid%5D/picks/page.tsx#L649-L661), [league-page-shell.tsx:50](../src/components/league-page-shell.tsx#L50).
+- **Where:** [draft-status-card.tsx:44](../../src/components/draft-status-card.tsx#L44); also [picks/page.tsx:649](../../src/app/leagues/%5Bid%5D/picks/page.tsx#L649-L661), [league-page-shell.tsx:50](../../src/components/league-page-shell.tsx#L50).
 - **What's wrong:**
   - `DraftStatusCard` on Picks gets `pickCount`, `onTheClockName`, `isMyTurn`, `currentTurnStartedAt` and `onTheClockAutopilot` as server props, computed once at render (`picks/page.tsx:473-491`).
   - It has no realtime subscription and no refresh. `RevealAutoRefresh` only runs on episode nights or during a reveal. Only the 1s clock ticks.
@@ -216,13 +216,13 @@ Severity:
 - **Evidence:** read `draft-status-card.tsx:36-56` and 92-117 (no subscription), `picks/page.tsx:473-491` and `league-page-shell.tsx:50`. **1/1 upheld.** The verifier clarified that the stale auto-pick fires once per trigger change, not once per tick, and added the missing `revalidatePath`.
 
 **FE-7 · An open, stale League Settings form overwrites the Judges' Score Multiplier that `start_draft` seeded, and marks it customized** — Medium
-- **Where:** [league-modules-form.tsx:240](../src/components/league-modules-form.tsx#L240); also [league-modules-form.tsx:483](../src/components/league-modules-form.tsx#L483) (sent on save), [schema.sql:1573](../supabase/schema.sql#L1573-L1592) (customized flag), [schema.sql:1879](../supabase/schema.sql#L1879-L1894) (`start_draft` seeding).
+- **Where:** [league-modules-form.tsx:240](../../src/components/league-modules-form.tsx#L240); also [league-modules-form.tsx:483](../../src/components/league-modules-form.tsx#L483) (sent on save), [schema.sql:1573](../../supabase/schema.sql#L1573-L1592) (customized flag), [schema.sql:1879](../../supabase/schema.sql#L1879-L1894) (`start_draft` seeding).
 - **What's wrong:**
   - Every field is initialized once from props with `useState`, never re-synced (the file imports only `useState`).
   - `handleSave` sends every field back, `judgesScoreMultiplier` included.
   - Suppose the draft starts while this form stays open in another tab, or a co-commissioner starts it. The next Save or Save & Exit sends the pre-draft value.
   - `update_scoring_categories` accepts that value while `draft_status` is `in_progress`. Because it differs from both the current value and the roster-size calibration, the RPC sets `judges_score_multiplier_customized = true`, so the multiplier is never re-seeded. The draft-complete lock then freezes it.
-  - Same-tab navigation back to Settings after starting the draft is safe, because the draft action's `revalidatePath(..., "layout")` clears the router cache ([draft/actions.ts:78](../src/app/leagues/%5Bid%5D/draft/actions.ts#L78)).
+  - Same-tab navigation back to Settings after starting the draft is safe, because the draft action's `revalidatePath(..., "layout")` clears the router cache ([draft/actions.ts:78](../../src/app/leagues/%5Bid%5D/draft/actions.ts#L78)).
   - A stale save after the draft completes errors out rather than corrupting the value. The window is from `start_draft` until the draft completes.
 - **Why it matters:**
   - This season's data has exactly that gap. The default seeded at league creation is 0.1421 (roster 3), but every live league drafted at roster size 2, which calibrates to 0.2449.
@@ -240,13 +240,13 @@ Severity:
   - **1/1 upheld.** The verifier narrowed the trigger to a form that stays mounted and noted the window ends at draft completion. The draft-complete lock is near `schema.sql:1554`.
 
 **FE-8 · A rejected server action (dropped connection, redeploy) leaves buttons stuck pending, and in the draft room it blocks picking** — Medium
-- **Where:** [draft-room.tsx:473](../src/components/draft-room.tsx#L473-L485); also:
-  - [use-auto-draft-pick.ts:39](../src/lib/use-auto-draft-pick.ts#L39-L44)
-  - [use-debounced-save.ts:20](../src/lib/use-debounced-save.ts#L20-L22)
-  - [live-scores-prompt.tsx:55](../src/components/live-scores-prompt.tsx#L55-L66)
-  - [spoiler-free-strip.tsx:121](../src/components/spoiler-free-strip.tsx#L121-L133)
-  - [pick-em-box.tsx:172](../src/components/pick-em-box.tsx#L172-L188)
-  - [grand-finale-box.tsx:152](../src/components/grand-finale-box.tsx#L152-L165)
+- **Where:** [draft-room.tsx:473](../../src/components/draft-room.tsx#L473-L485); also:
+  - [use-auto-draft-pick.ts:39](../../src/lib/use-auto-draft-pick.ts#L39-L44)
+  - [use-debounced-save.ts:20](../../src/lib/use-debounced-save.ts#L20-L22)
+  - [live-scores-prompt.tsx:55](../../src/components/live-scores-prompt.tsx#L55-L66)
+  - [spoiler-free-strip.tsx:121](../../src/components/spoiler-free-strip.tsx#L121-L133)
+  - [pick-em-box.tsx:172](../../src/components/pick-em-box.tsx#L172-L188)
+  - [grand-finale-box.tsx:152](../../src/components/grand-finale-box.tsx#L152-L165)
 - **What's wrong:**
   - Client handlers do `setPending(true); await action(); setPending(false)` with no `try/finally` or `catch`.
   - Supabase errors already come back as `{ error }`. The rejection comes from Next's client transport: a fetch `TypeError` on a dropped connection, or `UnrecognizedActionError` after a redeploy.
@@ -266,15 +266,15 @@ Severity:
   - **1/1 upheld.** Not covered by ux-audit A2, which deals only with pending states on the auth forms.
 
 **FE-9 · Point previews on Picks ignore the league's category weight (and the viewer's late factor), and live leagues use weights from 2 to 8** — Medium
-- **Where:** [pick-em-box.tsx:203](../src/components/pick-em-box.tsx#L203-L215); also:
-  - [grand-finale-order-list.tsx:98](../src/components/grand-finale-order-list.tsx#L98) and [:119](../src/components/grand-finale-order-list.tsx#L119) (`PointsTag`)
-  - [picks/page.tsx:190](../src/app/leagues/%5Bid%5D/picks/page.tsx#L190-L200) (Grand Finale scoring object) and [:541](../src/app/leagues/%5Bid%5D/picks/page.tsx#L541)
-  - [grand-finale-box.tsx:211](../src/components/grand-finale-box.tsx#L211)
-  - [weekly-score-rows.ts:218](../src/lib/weekly-score-rows.ts#L218-L222)
+- **Where:** [pick-em-box.tsx:203](../../src/components/pick-em-box.tsx#L203-L215); also:
+  - [grand-finale-order-list.tsx:98](../../src/components/grand-finale-order-list.tsx#L98) and [:119](../../src/components/grand-finale-order-list.tsx#L119) (`PointsTag`)
+  - [picks/page.tsx:190](../../src/app/leagues/%5Bid%5D/picks/page.tsx#L190-L200) (Grand Finale scoring object) and [:541](../../src/app/leagues/%5Bid%5D/picks/page.tsx#L541)
+  - [grand-finale-box.tsx:211](../../src/components/grand-finale-box.tsx#L211)
+  - [weekly-score-rows.ts:218](../../src/lib/weekly-score-rows.ts#L218-L222)
 - **What's wrong:**
   - Curtain Call's "Correct elimination: X pts" preview calls `curtainCallPayout` without `eliminations_category_weight`.
-  - Grand Finale's "+X pts" and "up to X pts" tags use `grandFinalePredictionPoints` and `grandFinaleBestCasePoints` with a scoring object built without `bonus_picks_category_weight`. The engine applies that weight at [scoring.ts:381](../src/lib/scoring.ts#L381).
-  - The viewer's own `late_factor` isn't applied to their own bracket either. It is applied in [weekly-score-rows.ts:143](../src/lib/weekly-score-rows.ts#L143-L182). Peers' late factors do reach League at a Glance (`lateFactorByManager`).
+  - Grand Finale's "+X pts" and "up to X pts" tags use `grandFinalePredictionPoints` and `grandFinaleBestCasePoints` with a scoring object built without `bonus_picks_category_weight`. The engine applies that weight at [scoring.ts:381](../../src/lib/scoring.ts#L381).
+  - The viewer's own `late_factor` isn't applied to their own bracket either. It is applied in [weekly-score-rows.ts:143](../../src/lib/weekly-score-rows.ts#L143-L182). Peers' late factors do reach League at a Glance (`lateFactorByManager`).
   - The engine multiplies by those weights when it totals points. Meanwhile the Dance Card numbers on the same page are weighted (`picks/page.tsx` L317, L343, L433).
 - **Why it matters:**
   - Live leagues use Curtain Call weights of 2 and 3, Grand Finale weights of 2 and 5, and one league uses a Dance Card weight of 8.
@@ -289,7 +289,7 @@ Severity:
   - **1/1 upheld.** The verifier pinned where the engine applies the weight and the late factor.
 
 **FE-10 · Scores › By Week leaves a split week unlocked while its second night is drafting, so Spoiler-Free viewers see night 1's results** — Medium
-- **Where:** [all-results-view.tsx:370](../src/components/all-results-view.tsx#L370); also [all-results-view.tsx:350](../src/components/all-results-view.tsx#L350-L353) (`groupStatus`), [all-results-view.tsx:279](../src/components/all-results-view.tsx#L279) (published branch), [all-results-view.tsx:219](../src/components/all-results-view.tsx#L219).
+- **Where:** [all-results-view.tsx:370](../../src/components/all-results-view.tsx#L370); also [all-results-view.tsx:350](../../src/components/all-results-view.tsx#L350-L353) (`groupStatus`), [all-results-view.tsx:279](../../src/components/all-results-view.tsx#L279) (published branch), [all-results-view.tsx:219](../../src/components/all-results-view.tsx#L219).
 - **What's wrong:**
   - A week is locked only when `spoilerFreeMode && status === 'published'` and the week isn't allowed.
   - `groupStatus` returns `'draft'` if any night in the week has a draft. So a two-night week whose night 1 is published and whose night 2 has a draft row reads `'draft'`, and is never locked.
@@ -307,7 +307,7 @@ Severity:
   - **1/1 upheld.** The verifier added the draft-row precondition and the fact that only one split week exists.
 
 **FE-11 · The Recast page lists every manager's claims with no spoiler cutoff (latent: no live league uses Recast)** — Medium
-- **Where:** [waivers/page.tsx:205](../src/app/leagues/%5Bid%5D/waivers/page.tsx#L205); also [waivers/page.tsx:120](../src/app/leagues/%5Bid%5D/waivers/page.tsx#L119-L123) (claims read), [waivers/page.tsx:182](../src/app/leagues/%5Bid%5D/waivers/page.tsx#L182) (`rosteredCoupleIds`), [waivers-panel.tsx:201](../src/components/waivers-panel.tsx#L201-L220).
+- **Where:** [waivers/page.tsx:205](../../src/app/leagues/%5Bid%5D/waivers/page.tsx#L205); also [waivers/page.tsx:120](../../src/app/leagues/%5Bid%5D/waivers/page.tsx#L119-L123) (claims read), [waivers/page.tsx:182](../../src/app/leagues/%5Bid%5D/waivers/page.tsx#L182) (`rosteredCoupleIds`), [waivers-panel.tsx:201](../../src/components/waivers-panel.tsx#L201-L220).
 - **What's wrong:**
   - The page reads every `waiver_claims` row in the league (RLS lets any member read them) and passes them unfiltered to `WaiversPanel`, which renders "{manager} → {couple} (slot N)" plus a status.
   - Each claim carries `week_number`, but nothing compares it with the viewer's cutoff. The same page does clamp the viewer's own open slots through `partitionRecastSlots`.
@@ -317,22 +317,22 @@ Severity:
   - A Spoiler-Free viewer who is a week behind sees "Bob → X (slot 2)". They know Bob's roster from the Dance Cards, so they learn who went home before watching.
   - CLAUDE.md requires Recast copy to go through the spoiler-safe helpers.
 - **Fix:**
-  - Filter claims to `week_number <=` the viewer's cutoff week, with a count-only "N recasts after your last watched week" line if needed. `week_number` is the latest fully completed week when the claim was submitted, i.e. the elimination week or later ([schema.sql:3245](../supabase/schema.sql#L3245-L3258)), so this is the right gate.
+  - Filter claims to `week_number <=` the viewer's cutoff week, with a count-only "N recasts after your last watched week" line if needed. `week_number` is the latest fully completed week when the claim was submitted, i.e. the elimination week or later ([schema.sql:3245](../../supabase/schema.sql#L3245-L3258)), so this is the right gate.
   - Keep a pending claim visible to its own claimant. They can only submit once their own cutoff reveals the open slot.
   - Compute Available Couples from the roster slots as of the cutoff week (`slotActiveInWeek`). This leak is secondary.
 - **Evidence:**
-  - Read all of `waivers/page.tsx` and `waivers-panel.tsx`; read [schema.sql:421](../supabase/schema.sql#L421-L432) (`waiver_claims.week_number`), [:3127](../supabase/schema.sql#L3127-L3130) (member SELECT policy) and `submit_waiver_claim` at L3186-3268.
+  - Read all of `waivers/page.tsx` and `waivers-panel.tsx`; read [schema.sql:421](../../supabase/schema.sql#L421-L432) (`waiver_claims.week_number`), [:3127](../../supabase/schema.sql#L3127-L3130) (member SELECT policy) and `submit_waiver_claim` at L3186-3268.
   - Read-only query: all 5 live leagues have `waiver_mode='locked'`, with 0 `waiver_claims` and 0 `source='waiver'` slots. There is no exposure today; it goes live as soon as a commissioner turns Recast on.
   - **1/1 upheld.** The verifier inferred, without tracing inside `resolveSpoilerCutoff`, that viewers with Spoiler-Free off already see everything, so they gain nothing new.
 
 **FE-12 · `usePersistedState` carries the old key's value to a new key, so an East dismiss can suppress the West live-scores prompt** — Low
-- **Where:** [use-persisted-state.ts:20](../src/lib/use-persisted-state.ts#L20); also [live-scores-prompt.tsx:176](../src/components/live-scores-prompt.tsx#L176-L179), [curtain-call-league-list.tsx:54](../src/components/curtain-call-league-list.tsx#L54), [dance-card-league-list.tsx:32](../src/components/dance-card-league-list.tsx#L32).
+- **Where:** [use-persisted-state.ts:20](../../src/lib/use-persisted-state.ts#L20); also [live-scores-prompt.tsx:176](../../src/components/live-scores-prompt.tsx#L176-L179), [curtain-call-league-list.tsx:54](../../src/components/curtain-call-league-list.tsx#L54), [dance-card-league-list.tsx:32](../../src/components/dance-card-league-list.tsx#L32).
 - **What's wrong:** when `key` changes while the component stays mounted:
   1. The read effect finds nothing stored under the new key and leaves the old value in state.
   2. `hydrated` is already true, so the write effect in the same commit saves the old value under the new key.
   
   `LiveScoresPrompt`'s key includes the coast. If the prompt goes from East to West without unmounting, the East dismissal is copied to the West key. That happens when:
-  - the tab was hidden through the ET-to-PT gap, because `RevealAutoRefresh` skips hidden tabs ([reveal-auto-refresh.tsx:30](../src/components/reveal-auto-refresh.tsx#L30));
+  - the tab was hidden through the ET-to-PT gap, because `RevealAutoRefresh` skips hidden tabs ([reveal-auto-refresh.tsx:30](../../src/components/reveal-auto-refresh.tsx#L30));
   - or on any night where the East end touches 8pm PT (a `duration_minutes` of 180 or more).
   
   League at a Glance's expanded state for Curtain Call and Dance Card (keys include `weekId`) carries over the same way, and persists into each newly paged week.
@@ -347,7 +347,7 @@ Severity:
   - **1/1 upheld.**
 
 **FE-13 · Removing a custom moment just after adding it silently fails, and the moment is still published** — Low
-- **Where:** [results-form.tsx:695](../src/components/results-form.tsx#L695); also [results-form.tsx:703](../src/components/results-form.tsx#L703-L706), [results-draft.ts:255](../src/lib/results-draft.ts#L255).
+- **Where:** [results-form.tsx:695](../../src/components/results-form.tsx#L695); also [results-form.tsx:703](../../src/components/results-form.tsx#L703-L706), [results-draft.ts:255](../../src/lib/results-draft.ts#L255).
 - **What's wrong:**
   - `handleAddCustomMoment` appends a local row with id `local-${Date.now()}`.
   - Adding a moment doesn't touch `draft_episode_overrides.updated_at`, so the rehydrate effect doesn't run, and the real uuid never replaces the local id. (Its deps are the episode id, `published_at`, `updatedAt`, `hasDraft` and the released count.)
@@ -356,24 +356,24 @@ Severity:
   - Same root cause: `loadDraftForEpisode` returns an empty draft when there's no `draft_episode_overrides` row. A moment added before any draft save therefore disappears after a reload, but `commit_episode_publication` still publishes it.
 - **Why it matters:** an admin who adds a moment by mistake and removes it sees it vanish, but it stays in `draft_episode_custom_moments`. `commit_episode_publication` then installs it into the live `episode_custom_moments`. It reappears the next time the episode is selected.
 - **Fix:** have the add action return the inserted row's id (`.select('id').single()`) and swap it in. On remove, check the result and restore the row if it failed.
-- **Evidence:** a PGlite script ran `delete … where id = 'local-1760000000000'` on a uuid primary key and got error 22P02 "invalid input syntax for type uuid"; the row count stayed 1. Read `results-draft.ts:239-261` and [actions.ts:90](../src/app/admin/results/actions.ts#L90-L110). **1/1 upheld.** The verifier added the same-session limit and the related reload quirk.
+- **Evidence:** a PGlite script ran `delete … where id = 'local-1760000000000'` on a uuid primary key and got error 22P02 "invalid input syntax for type uuid"; the row count stayed 1. Read `results-draft.ts:239-261` and [actions.ts:90](../../src/app/admin/results/actions.ts#L90-L110). **1/1 upheld.** The verifier added the same-session limit and the related reload quirk.
 
 **FE-14 · Score History lines are cached for the life of the page, so they go stale during the 20s live refreshes or after un-marking watched** — Low
-- **Where:** [standings-leaderboard.tsx:39](../src/components/standings-leaderboard.tsx#L39).
+- **Where:** [standings-leaderboard.tsx:39](../../src/components/standings-leaderboard.tsx#L39).
 - **What's wrong:**
   - `toggle()` fetches `getScoreHistory` once per manager and never fetches again once lines exist, even after the row is closed and reopened.
   - `RevealAutoRefresh` and the Mark Watched or un-mark refreshes update `row.totalPoints` and the totals bar from new server props, but the line feed keeps its first fetch.
-  - The cached lines include the revealing week and released draft dances ([score-history-data.ts:53](../src/lib/score-history-data.ts#L53-L73), L124-128), so they really do change during the 20s refreshes.
-  - Neither refresh path remounts `StandingsLeaderboard`: both are `router.refresh` or `revalidatePath` ([reveal-auto-refresh.tsx:31](../src/components/reveal-auto-refresh.tsx#L31), [watched-through-setting.tsx:32](../src/components/watched-through-setting.tsx#L32), `this-week/actions.ts`).
+  - The cached lines include the revealing week and released draft dances ([score-history-data.ts:53](../../src/lib/score-history-data.ts#L53-L73), L124-128), so they really do change during the 20s refreshes.
+  - Neither refresh path remounts `StandingsLeaderboard`: both are `router.refresh` or `revalidatePath` ([reveal-auto-refresh.tsx:31](../../src/components/reveal-auto-refresh.tsx#L31), [watched-through-setting.tsx:32](../../src/components/watched-through-setting.tsx#L32), `this-week/actions.ts`).
   - A failed fetch isn't cached, only a successful one.
 - **Why it matters:**
   - On a live night, the totals bar and Season Total move while the lines and running totals stay on the old snapshot, so they disagree.
   - If a viewer moves "I last watched" back, an already-loaded history keeps listing the hidden weeks' lines, elimination-pick outcomes included. Those are only lines the viewer has already seen, which keeps this Low.
 - **Fix:** key the cache to something that changes with the server data. For example, pass a data version from the page (the latest scored week, or the revealing state) and clear the cached results when it changes. Or refetch on every open.
-- **Evidence:** read `standings-leaderboard.tsx:29-41` and [score-history-panel.tsx:35](../src/components/score-history-panel.tsx#L35-L52). The Standings page mounts `RevealAutoRefresh` through `LeaguePageShell` (`league-page-shell.tsx:50`). **1/1 upheld.**
+- **Evidence:** read `standings-leaderboard.tsx:29-41` and [score-history-panel.tsx:35](../../src/components/score-history-panel.tsx#L35-L52). The Standings page mounts `RevealAutoRefresh` through `LeaguePageShell` (`league-page-shell.tsx:50`). **1/1 upheld.**
 
 **FE-15 · The Spoiler-Free switch in the Stay Updated sheet keeps its mount-time value after the setting changes in Settings** — Low
-- **Where:** [live-scores-prompt.tsx:51](../src/components/live-scores-prompt.tsx#L51); also [live-scores-prompt.tsx:193](../src/components/live-scores-prompt.tsx#L193-L202) (`LiveScoresPill`), [spoiler-free-strip.tsx:151](../src/components/spoiler-free-strip.tsx#L151) and [:244](../src/components/spoiler-free-strip.tsx#L244).
+- **Where:** [live-scores-prompt.tsx:51](../../src/components/live-scores-prompt.tsx#L51); also [live-scores-prompt.tsx:193](../../src/components/live-scores-prompt.tsx#L193-L202) (`LiveScoresPill`), [spoiler-free-strip.tsx:151](../../src/components/spoiler-free-strip.tsx#L151) and [:244](../../src/components/spoiler-free-strip.tsx#L244).
 - **What's wrong:**
   - `LiveScoresSheet` does `useState(spoilerFreeMode)` and never re-syncs it.
   - When the sheet is reached through `LiveScoresPill`, from the posting `MarkWatchedStrip` or the `DraftGapStrip`, the sheet stays mounted after Spoiler-Free is changed in the Settings sheet.
@@ -383,7 +383,7 @@ Severity:
 - **Evidence:** read `live-scores-prompt.tsx:51-78` and 193-202, and `spoiler-free-strip.tsx`. The toggle action calls `revalidatePath('/', 'layout')` and `router.refresh`, so props update but this state doesn't. **1/1 upheld, narrowed.** The original finding also blamed `SpoilerModeToggle` in the Settings sheet. The verifier dropped that half: Base UI's `Dialog.Portal` unmounts when the sheet closes, so the toggle remounts from the fresh prop.
 
 **FE-16 · Undo Last Pick can drop two picks locally if the realtime DELETE arrives before the action returns (unreproduced race)** — Low
-- **Where:** [draft-room.tsx:520](../src/components/draft-room.tsx#L520); also [draft-room.tsx:206](../src/components/draft-room.tsx#L199-L211).
+- **Where:** [draft-room.tsx:520](../../src/components/draft-room.tsx#L520); also [draft-room.tsx:206](../../src/components/draft-room.tsx#L199-L211).
 - **What's wrong:**
   - On success, `handleUndoLastPick` does `setPicks(prev => prev.slice(0, -1))`.
   - The realtime DELETE handler also removes the deleted pick, by id.
@@ -395,7 +395,7 @@ Severity:
 - **Evidence:** read `draft-room.tsx:199-211` and 513-523. The race wasn't reproduced. **1/1 upheld.**
 
 **FE-17 · Remaining hydration-unsafe renders: the clock and `Math.random` in the first render, and absolute dates in the server's time zone** — Low
-- **Where:** [draft-room.tsx:304](../src/components/draft-room.tsx#L304); also [draft-status-card.tsx:37](../src/components/draft-status-card.tsx#L37), [draft-room.tsx:360](../src/components/draft-room.tsx#L355-L363), [schedule-manager.tsx:476](../src/components/schedule-manager.tsx#L476), [account-data-form.tsx:121](../src/components/account-data-form.tsx#L121).
+- **Where:** [draft-room.tsx:304](../../src/components/draft-room.tsx#L304); also [draft-status-card.tsx:37](../../src/components/draft-status-card.tsx#L37), [draft-room.tsx:360](../../src/components/draft-room.tsx#L355-L363), [schedule-manager.tsx:476](../../src/components/schedule-manager.tsx#L476), [account-data-form.tsx:121](../../src/components/account-data-form.tsx#L121).
 - **What's wrong:** the first render (SSR and hydration) computes:
   - **The draft countdown:** `useState(() => Date.now())` in the draft room and the Picks draft card feeds the `${secondsRemaining}s` text (rendered at `draft-room.tsx:772` and `draft-status-card.tsx:106`). It only mismatches while `draft_status` is `in_progress` with a turn start set. With no turn start, the limit is shown, which is deterministic.
   - **The lobby order:** the draft room's `useState` initializer calls `shuffle()` (`Math.random`) when no draft order is saved. The commissioner's lobby order (a not-started, non-custom draft, rendered at L592) then differs between server and client. The mount effect at L381-388 saves the client's order, so the saved and displayed orders agree and nothing is lost.
@@ -412,14 +412,14 @@ Severity:
 - **Evidence:** a grep sweep of all 62 client files for `Date.now`, `new Date`, `toLocale*` and `Math.random`, then a check of which of them run in the initial server render. `all-results-view.tsx:322` and `results-form.tsx:1060` were excluded because they render only after expanding a row or a client-side selection. **1/1 upheld.** The verifier added the preconditions above.
 
 **FE-18 · Grand Finale reorder arrows are announced as "Move [object Object] up" (extends ux-audit N3, which is marked fixed)** — Low
-- **Where:** [grand-finale-box.tsx:405](../src/components/grand-finale-box.tsx#L405); also [grand-finale-box.tsx:414](../src/components/grand-finale-box.tsx#L414).
-- **What's wrong:** ``aria-label={`Move ${nameFor(coupleId)} up`}`` puts `nameFor`'s return value into a template string. That value is a React element (`coupleNameNode`, [couple-name.tsx:14](../src/components/couple-name.tsx#L14-L16)), not a string.
+- **Where:** [grand-finale-box.tsx:405](../../src/components/grand-finale-box.tsx#L405); also [grand-finale-box.tsx:414](../../src/components/grand-finale-box.tsx#L414).
+- **What's wrong:** ``aria-label={`Move ${nameFor(coupleId)} up`}`` puts `nameFor`'s return value into a template string. That value is a React element (`coupleNameNode`, [couple-name.tsx:14](../../src/components/couple-name.tsx#L14-L16)), not a string.
 - **Why it matters:** screen readers hear "Move [object Object] up/down" on the core bracket-reorder task. ux-audit N3 is marked fixed, but this part doesn't work.
 - **Fix:** build the label from strings, e.g. a `nameTextFor(id)` helper that returns `${celebrity} & ${pro}` from the same `coupleDisplayNames[id] ?? { celebrity_name, pro_name }` fallback that `nameFor` uses.
 - **Evidence:** read `grand-finale-box.tsx:106-111`, 405 and 414. The draft-order arrows (`draft-room.tsx:605`) use a string and are fine. **1/1 upheld.**
 
 **FE-19 · The league switcher prefetches on every Picks or Standings mount, but CLAUDE.md and a code comment say it loads when opened** — Low
-- **Where:** [league-switcher.tsx:51](../src/components/league-switcher.tsx#L51); also [switcher/actions.ts:10](../src/app/leagues/%5Bid%5D/switcher/actions.ts#L10-L11), [league-header.tsx:82](../src/components/league-header.tsx#L82-L102).
+- **Where:** [league-switcher.tsx:51](../../src/components/league-switcher.tsx#L51); also [switcher/actions.ts:10](../../src/app/leagues/%5Bid%5D/switcher/actions.ts#L10-L11), [league-header.tsx:82](../../src/components/league-header.tsx#L82-L102).
 - **What's wrong:**
   - The mount effect calls `getSwitcherSummaries` for multi-league viewers, which runs `loadHomeLeagueData` for every other league. It runs again on every sheet open (L57).
   - The remount happens on Picks and Standings navigation, and also when `LeagueHeader` switches between its draft, spoiler and plain chrome branches.
@@ -430,17 +430,17 @@ Severity:
 - **Evidence:** read `league-switcher.tsx:30-59` and `switcher/actions.ts:32-52`. **1/1 upheld, reframed.** The verifier found the prefetch is intentional and that the load claim is unmeasured, so the main fix is now the docs sync.
 
 **FE-20 · The draft room refetches on every `league_members` delete in any league** — Low
-- **Where:** [draft-room.tsx:256](../src/components/draft-room.tsx#L249-L260).
+- **Where:** [draft-room.tsx:256](../../src/components/draft-room.tsx#L249-L260).
 - **What's wrong:** the DELETE subscription on `league_members` has no filter, because realtime can't filter DELETE events. Every member removal anywhere in the app makes every open draft room run `refreshDraftState` (three queries in parallel).
 - **Why it matters:** this is needless load during drafts. It scales with open draft rooms times leaves and removals across the whole app, and a cascading league delete sends one event per member.
 - **Fix:**
-  - Filtering on `payload.old.user_id` won't work. `league_members` has a single-column primary key (`id`, [schema.sql:131](../supabase/schema.sql#L131)), and with RLS on, a realtime DELETE payload carries only primary-key columns, even with replica identity full.
+  - Filtering on `payload.old.user_id` won't work. `league_members` has a single-column primary key (`id`, [schema.sql:131](../../supabase/schema.sql#L131)), and with RLS on, a realtime DELETE payload carries only primary-key columns, even with replica identity full.
   - Instead, add `id` to the `league_members` select in `refreshDraftState` (L154; it isn't selected today), keep it in members state, and ignore any DELETE whose `payload.old.id` isn't a local member id.
   - Alternatively, debounce the refetch, which also collapses the burst from a cascading delete.
 - **Evidence:** read `draft-room.tsx:249-260`. **1/1 upheld, fix corrected** by the verifier.
 
 **FE-21 · Dead manager-scores branch in `WeeklyResultsView`** — Low
-- **Where:** [weekly-results-view.tsx:226](../src/components/weekly-results-view.tsx#L226-L250); also [this-week/page.tsx:307](../src/app/this-week/page.tsx#L307).
+- **Where:** [weekly-results-view.tsx:226](../../src/components/weekly-results-view.tsx#L226-L250); also [this-week/page.tsx:307](../../src/app/this-week/page.tsx#L307).
 - **What's wrong:**
   - The only caller never passes `nameByManager`, `scoresByEpisode` or `currentUserId`, so the "Points by Team" section is unreachable.
   - Its `isYou` check (L234) compares raw ids, which would mislabel a co-manager if the section were revived. Nothing renders it today, so there is no live co-manager bug.
@@ -455,10 +455,10 @@ Severity:
 - **Evidence:** a grep finds no `managerScores`, `nameByManager` or `currentUserId` passed from `src/app/this-week/page.tsx`, and no other caller. **1/1 upheld.** The verifier corrected the start line from 225 to 226 and listed the full cleanup.
 
 **FE-22 · Native (iOS) Google sign-in: a hydration mismatch on the login pages, the invite `next` is dropped, and failures are silent** — Low
-- **Where:** [google-sign-in-button.tsx:31](../src/components/google-sign-in-button.tsx#L31); also [google-sign-in-button.tsx:15](../src/components/google-sign-in-button.tsx#L15), [:20](../src/components/google-sign-in-button.tsx#L20), [native-auth-listener.tsx:37](../src/components/native-auth-listener.tsx#L37), [join/[code]/page.tsx:80](../src/app/join/%5Bcode%5D/page.tsx#L80), [join/co-manager/[code]/page.tsx:67](../src/app/join/co-manager/%5Bcode%5D/page.tsx#L67).
+- **Where:** [google-sign-in-button.tsx:31](../../src/components/google-sign-in-button.tsx#L31); also [google-sign-in-button.tsx:15](../../src/components/google-sign-in-button.tsx#L15), [:20](../../src/components/google-sign-in-button.tsx#L20), [native-auth-listener.tsx:37](../../src/components/native-auth-listener.tsx#L37), [join/[code]/page.tsx:80](../../src/app/join/%5Bcode%5D/page.tsx#L80), [join/co-manager/[code]/page.tsx:67](../../src/app/join/co-manager/%5Bcode%5D/page.tsx#L67).
 - **What's wrong:**
   - `GoogleSignInButton` branches on `Capacitor.isNativePlatform()` during render. `capacitor.config.ts` loads the deployed Vercel URL (`server.url`), so the page is server-rendered with the web branch (a `<form action={signInWithGoogle}>`). The WKWebView then hydrates it with the native branch (a bare `<Button onClick>`), and the element trees differ.
-  - The native branch ignores the `next` prop. `redirectTo` is the fixed `NATIVE_AUTH_CALLBACK_URL`, and `NativeAuthListener` always lands on `getDefaultLandingPath()` (`/`). The web flow does carry `next` ([auth/actions.ts:52](../src/app/auth/actions.ts#L52-L72)).
+  - The native branch ignores the `next` prop. `redirectTo` is the fixed `NATIVE_AUTH_CALLBACK_URL`, and `NativeAuthListener` always lands on `getDefaultLandingPath()` (`/`). The web flow does carry `next` ([auth/actions.ts:52](../../src/app/auth/actions.ts#L52-L72)).
   - `if (error || !data.url) return;` gives no feedback and no pending state.
 - **Why it matters:**
   - The mismatch recovers: React client-renders and the native button then works. So it is a console error and a re-render, not a broken page.
@@ -472,7 +472,7 @@ Severity:
 - **Evidence:** read `google-sign-in-button.tsx`, `native-auth-listener.tsx`, `capacitor.config.ts`, `src/lib/native-auth.ts` and `default-landing.ts` in full, plus `login/page.tsx:13-21` and `join/[code]/page.tsx` L15 and L80 (both pass `next`). No device run. **1/1 upheld, rated down from Medium to Low** after the verifier narrowed the impact as above and added the co-manager invite page.
 
 **FE-23 · Read actions fired on mount (switcher summaries, spoiler progress) sit in Next's single action queue ahead of the viewer's first Save (extends FE-19)** — Low
-- **Where:** [use-spoiler-progress.ts:16](../src/lib/use-spoiler-progress.ts#L15-L17); also [account-settings-sheet.tsx:65](../src/components/account-settings-sheet.tsx#L65), [league-switcher.tsx:51](../src/components/league-switcher.tsx#L51), [league-header.tsx:90](../src/components/league-header.tsx#L90), and `node_modules/next/dist/client/components/app-router-instance.js:122`.
+- **Where:** [use-spoiler-progress.ts:16](../../src/lib/use-spoiler-progress.ts#L15-L17); also [account-settings-sheet.tsx:65](../../src/components/account-settings-sheet.tsx#L65), [league-switcher.tsx:51](../../src/components/league-switcher.tsx#L51), [league-header.tsx:90](../../src/components/league-header.tsx#L90), and `node_modules/next/dist/client/components/app-router-instance.js:122`.
 - **What's wrong:**
   - Next 15.5's router runs server actions and refreshes one at a time. `app-router-instance.js` L122-155 queues any non-navigation action behind the pending one, and only navigations jump the queue. Each action holds the queue for its whole fetch round trip (`server-action-reducer.js` L154).
   - Every TopBar mount for a Spoiler-Free viewer fires `getSpoilerProgress`, through `useSpoilerProgress` in `AccountSettingsSheet`.
@@ -486,7 +486,7 @@ Severity:
 - **Evidence:** read `app-router-instance.js` L40-160 in the installed next@15.5.27 (`runAction`/`dispatchAction` queueing; only `ACTION_NAVIGATE` and `ACTION_RESTORE` bypass it), plus `use-spoiler-progress.ts`, `account-settings-sheet.tsx:48-70`, `league-switcher.tsx:30-55` and `league-header.tsx:84-100`. The delay wasn't timed. **1/1 upheld.**
 
 **FE-24 · The Grand Finale windowed list centers on the next-elimination row only when it mounts** — Low
-- **Where:** [grand-finale-order-list.tsx:254](../src/components/grand-finale-order-list.tsx#L249-L254); also [grand-finale-box.tsx:207](../src/components/grand-finale-box.tsx#L207), [grand-finale-league-list.tsx:68](../src/components/grand-finale-league-list.tsx#L68).
+- **Where:** [grand-finale-order-list.tsx:254](../../src/components/grand-finale-order-list.tsx#L249-L254); also [grand-finale-box.tsx:207](../../src/components/grand-finale-box.tsx#L207), [grand-finale-league-list.tsx:68](../../src/components/grand-finale-league-list.tsx#L68).
 - **What's wrong:**
   - The effect that scrolls the short window (`max-h-40` / `max-h-52`) to `[data-next-elim]` depends only on `[windowed]`.
   - The windowed list only appears in locked views: the collapsed locked summary in `GrandFinaleBox`, and the post-lock League at a Glance list. The order is fixed in both.
@@ -497,7 +497,7 @@ Severity:
 - **Evidence:** read `grand-finale-order-list.tsx:210-297`. **1/1 upheld.** The verifier corrected the trigger: the original "the order changes in the preview" can't happen, because the pre-lock "Order So Far" preview isn't windowed.
 
 **FE-25 · Custom draft order rows use position-based keys on a reorderable list, and their arrows don't name the manager** — Low
-- **Where:** [custom-draft-order-card.tsx:56](../src/components/custom-draft-order-card.tsx#L56); also [custom-draft-order-card.tsx:68](../src/components/custom-draft-order-card.tsx#L68) and [:79](../src/components/custom-draft-order-card.tsx#L79) (aria-labels).
+- **Where:** [custom-draft-order-card.tsx:56](../../src/components/custom-draft-order-card.tsx#L56); also [custom-draft-order-card.tsx:68](../../src/components/custom-draft-order-card.tsx#L68) and [:79](../../src/components/custom-draft-order-card.tsx#L79) (aria-labels).
 - **What's wrong:**
   - Rows are keyed `${roundIndex}-${indexInRound}`, although ↑/↓ reorders managers within a round. `draft-room.tsx:594` keys its order by `userId`.
   - The arrows' aria-labels are just "Move up/down in round N", with no manager name. `draft-room.tsx:605` and 614 include it.
@@ -508,11 +508,11 @@ Severity:
   - Use `key={`${roundIndex}-${userId}`}`.
   - The stable key alone isn't enough for ↓. React moves the focused node with `insertBefore`, and most browsers blur a moved node, so focus drops to `body`. Refocus the moved manager's button after `onChange`.
   - Put the manager's name in both aria-labels.
-  - Edge case: the RPCs only check per-manager totals, not that each round is a permutation ([schema.sql:1755](../supabase/schema.sql#L1755-L1790), [draft.ts:159](../src/lib/draft.ts#L159-L174)). A sequence written straight through the RPC with a manager twice in one round would give duplicate keys. Only a commissioner could do that, and the only effect is React's duplicate-key warning.
+  - Edge case: the RPCs only check per-manager totals, not that each round is a permutation ([schema.sql:1755](../../supabase/schema.sql#L1755-L1790), [draft.ts:159](../../src/lib/draft.ts#L159-L174)). A sequence written straight through the RPC with a manager twice in one round would give duplicate keys. Only a commissioner could do that, and the only effect is React's duplicate-key warning.
 - **Evidence:** read all of `custom-draft-order-card.tsx` (L47-91). **1/1 upheld.** The verifier corrected the focus behavior (it drops to `body` on ↓; it doesn't bounce between two managers) and added the aria-label gap.
 
 **FE-26 · `/settings/account` server-renders a locale-formatted date (overlaps FE-17)** — Low
-- **Where:** [account-data-form.tsx:121](../src/components/account-data-form.tsx#L121); also [settings/account/page.tsx:40](../src/app/settings/account/page.tsx#L40).
+- **Where:** [account-data-form.tsx:121](../../src/components/account-data-form.tsx#L121); also [settings/account/page.tsx:40](../../src/app/settings/account/page.tsx#L40).
 - **What's wrong:**
   - `DangerZone` renders `new Date(deletionRequestedAt).toLocaleDateString()` during render.
   - On the `/settings/account` fallback page, `AccountDataForm` is server-rendered, unlike in the Settings sheet's dialog, which mounts on open. So the server's locale and time zone produce the first text.
@@ -531,18 +531,18 @@ This finding touches a settled decision. It is for Kylie to decide; nothing shou
 
 **FE-27 · The Couples Leaderboard takes the owner from the newest roster slot, so it reveals a recast made in a week the viewer hasn't watched (latent)** — Low
 - **Settled decision:** Couples Leaderboard, "Owner is the couple's current (else last) holder".
-- **Where:** [couples-leaderboard.ts:108](../src/lib/couples-leaderboard.ts#L108); also [couples-leaderboard.ts:55](../src/lib/couples-leaderboard.ts#L47-L56), [standings/page.tsx:199](../src/app/leagues/%5Bid%5D/standings/page.tsx#L199), [league-page-data.ts:248](../src/lib/league-page-data.ts#L248) (`leagueSlotPeriods`, not clamped).
+- **Where:** [couples-leaderboard.ts:108](../../src/lib/couples-leaderboard.ts#L108); also [couples-leaderboard.ts:55](../../src/lib/couples-leaderboard.ts#L47-L56), [standings/page.tsx:199](../../src/app/leagues/%5Bid%5D/standings/page.tsx#L199), [league-page-data.ts:248](../../src/lib/league-page-data.ts#L248) (`leagueSlotPeriods`, not clamped).
 - **What's wrong:**
   - `buildCouplesLeaderboard` picks the holder from every `roster_slot` period, preferring `endWeek` null, and reports it as `ownerId`.
   - The Standings page passes the slot periods unclamped, while weeks and couples are spoiler-clamped.
-  - A recast slot starts the week after the claim (`finalize_waiver_claim`, [schema.sql:3155](../supabase/schema.sql#L3155-L3156)). So a couple recast after a behind viewer's cutoff shows its new owner instead of "Undrafted".
+  - A recast slot starts the week after the claim (`finalize_waiver_claim`, [schema.sql:3155](../../supabase/schema.sql#L3155-L3156)). So a couple recast after a behind viewer's cutoff shows its new owner instead of "Undrafted".
   - Its judges points also drop to 0, because weeks before `slot.startWeek` are skipped (L71-75).
 - **Why it matters:** a Spoiler-Free viewer who is behind sees a couple that was "Undrafted" now owned by Bob, with 0 points. That shows Bob filled a slot, so one of his couples went out in a week the viewer hasn't watched. It is latent today: no live league uses Recast.
 - **Fix, if wanted:** clamp at the call site (`standings/page.tsx:199`), or inside `buildCouplesLeaderboard` while keeping it pure:
   - drop slots whose `startWeek` is after the viewer's cutoff week;
   - treat an `endWeek` at or after the cutoff as still open.
   
-  The cutoff week is the latest week in `visibleDanceWeeks`, including an opted-in revealing or draft week. The Picks League at a Glance list already clamps this way ([picks/page.tsx:409](../src/app/leagues/%5Bid%5D/picks/page.tsx#L409-L411), `slotActiveInWeek`). The settled rule would then read "current holder as of the viewer's cutoff".
+  The cutoff week is the latest week in `visibleDanceWeeks`, including an opted-in revealing or draft week. The Picks League at a Glance list already clamps this way ([picks/page.tsx:409](../../src/app/leagues/%5Bid%5D/picks/page.tsx#L409-L411), `slotActiveInWeek`). The settled rule would then read "current holder as of the viewer's cutoff".
 - **Evidence:** read `couples-leaderboard.ts:30-115` and `standings/page.tsx:165-212`. The read-only query from FE-11 found 0 recasts live. **1/1 upheld.** The verifier confirmed the settled-decision label.
 
 ---
@@ -593,7 +593,7 @@ This finding touches a settled decision. It is for Kylie to decide; nothing shou
 
 ## Dropped in verification
 
-- **Recast process, approve and reject don't revalidate the league layout**, [waivers/actions.ts:30](../src/app/leagues/%5Bid%5D/waivers/actions.ts#L30) (also L41, L52). The citation is accurate, but the stale Picks or Standings it predicts doesn't happen:
+- **Recast process, approve and reject don't revalidate the league layout**, [waivers/actions.ts:30](../../src/app/leagues/%5Bid%5D/waivers/actions.ts#L30) (also L41, L52). The citation is accurate, but the stale Picks or Standings it predicts doesn't happen:
   - Once a server action revalidates any path, Next 15.5.27 builds a fresh client cache and wipes the prefetch cache, whichever path was passed.
   - The pages are dynamic, with no `unstable_cache` or `"use cache"`, so nothing is cached on the server.
   - The only callers are on the `/waivers` page these actions do revalidate.

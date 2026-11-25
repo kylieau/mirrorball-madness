@@ -581,8 +581,8 @@ breaker. Everything it found is fixed except:
 ## Audit remediation — 2026-10-20
 
 The owner approved the recommended fixes after `682afc7`. Local implementation
-and evidence: `docs/audit-remediation.md`. Release prerequisites and remaining
-manual checks: `docs/audit-release-runbook.md`. This replaces the previous
+and evidence: `docs/audits/audit-remediation.md`. Release prerequisites and remaining
+manual checks: `docs/audits/audit-release-runbook.md`. This replaces the previous
 wait-for-selection list; it does not mean every audit finding was implemented.
 
 Still outstanding:
@@ -614,7 +614,7 @@ Still outstanding:
   - Before E08's curtain, get the two open Grand Finale late entries (Jonathan Au,
     #supportSWEKylie, 80%; arielle, Carrie Ann's Biggest Fans, 100%) submitted or
     closed. The air-to-publish pause refuses their submits until E08 publishes.
-  - Observe E08's publish, live reveal and undo (checklist: `docs/audit-release-runbook.md`
+  - Observe E08's publish, live reveal and undo (checklist: `docs/audits/audit-release-runbook.md`
     → First live night after the release); also redo the missed E07
     re-check of Home/Results/Picks/Standings/switcher with a released draft and a
     live-revealed couple.
@@ -633,7 +633,7 @@ Still outstanding:
 
 ## UX audit follow-ups — 2026-10-18
 
-Full findings and fix status: `docs/ux-audit.md` (Status section at the top). Shipped and deployed through `d4f20d0`.
+Full findings and fix status: `docs/audits/ux-audit.md` (Status section at the top). Shipped and deployed through `d4f20d0`.
 
 **Still open:**
 - **Email recovery/ownership (A1):** confirmation-aware signup, token-hash recovery,
